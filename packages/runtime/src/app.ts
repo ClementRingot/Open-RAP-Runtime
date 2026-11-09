@@ -3,6 +3,7 @@
 import Fastify, { type FastifyInstance, type FastifyReply, type FastifyRequest, type FastifyServerOptions } from "fastify";
 import type { Model } from "@rap-transpiler/model";
 import { AuthenticationError, Authenticator, type AuthOptions } from "./auth/auth.js";
+import { OidcSessions } from "./auth/session.js";
 import type { User } from "./auth/user.js";
 import type { Database } from "./db/database.js";
 import { CsrfTokens } from "./odata/csrf.js";
@@ -75,6 +76,8 @@ export async function createApp(options: AppOptions): Promise<FastifyInstance> {
   handler.setServicePath(servicePath);
   const authenticator = new Authenticator(options.auth ?? { mode: "none" });
   const csrf = new CsrfTokens(options.csrfSecret);
+  const auth = options.auth;
+  const sessions = auth?.mode === "oidc" && auth.session !== undefined ? new OidcSessions(authenticator, { ...auth, session: auth.session }) : undefined;
 
   // bodies are read as text: the OData layer parses JSON (decimals as strings) and multipart
   app.removeAllContentTypeParsers();
@@ -83,11 +86,18 @@ export async function createApp(options: AppOptions): Promise<FastifyInstance> {
   app.decorateRequest("user", undefined);
 
   app.addHook("onRequest", async (request, reply) => {
+    if (sessions !== undefined && (request.url === "/" || request.url.startsWith("/ui")) && request.headers.authorization === undefined) {
+      // the UI needs a session: log in first
+      if (sessions.user(request) === undefined) {
+        return reply.redirect(sessions.loginUrl(request.url === "/" ? "/ui/index.html" : request.url));
+      }
+      return;
+    }
     if (!request.url.startsWith(servicePath.replace(/\/$/, ""))) {
       return;
     }
     try {
-      const user = request.user ?? (await authenticator.fromAuthorization(request.headers.authorization));
+      const user = request.user ?? (request.headers.authorization === undefined ? sessions?.user(request) : undefined) ?? (await authenticator.fromAuthorization(request.headers.authorization));
       if (user === undefined) {
         throw new AuthenticationError("authentication required");
       }
@@ -117,9 +127,9 @@ export async function createApp(options: AppOptions): Promise<FastifyInstance> {
     const ieee754 = isIeee754(headers);
     const extra: Record<string, string> = {};
     if ((headers["x-csrf-token"] ?? "").toLowerCase() === "fetch") {
-      extra["X-CSRF-Token"] = csrf.token(user);
+      extra["X-CSRF-Token"] = csrf.token(user, user.session);
     }
-    if (csrf.required(user, request.method) && !csrf.valid(user, headers["x-csrf-token"])) {
+    if (csrf.required(user, request.method) && !csrf.valid(user, headers["x-csrf-token"], user.session)) {
       const failure = errorResponse(new ODataError(403, "CSRF_TOKEN_REQUIRED", "CSRF token validation failed", undefined, [], { "X-CSRF-Token": "Required" }), ieee754);
       return send(reply, failure);
     }
@@ -137,6 +147,7 @@ export async function createApp(options: AppOptions): Promise<FastifyInstance> {
   app.route({ method: ["GET", "HEAD", "POST", "PATCH", "PUT", "DELETE"], url: `${root}/*`, handler: serve });
 
   app.get("/health", async () => ({ status: "ok" }));
+  sessions?.register(app);
 
   if (options.ui !== undefined) {
     await registerUi(app, options.ui);

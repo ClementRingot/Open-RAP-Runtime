@@ -26,15 +26,22 @@ export interface OidcAuthOptions {
   requiredRole?: string;
   /** Key set, for tests or a fixed configuration (default: from the discovery document). */
   jwks?: JWTVerifyGetKey;
-  /** Browser sessions (milestone J6). */
+  /**
+   * Where the discovery document is fetched, when it differs from the issuer (an internal URL of
+   * the provider, the tokens naming its public URL).
+   */
+  discoveryUrl?: string;
+  /** Browser sessions: authorization code flow with PKCE (auth/session.ts). */
   session?: {
     clientId: string;
     clientSecret?: string;
     /** Public URL of the application, for the redirect URI. */
     baseUrl: string;
-    /** Secret of the session cookie (32 bytes or more). */
+    /** Secret of the session cookie (32 characters or more). */
     secret: string;
     scopes?: string;
+    /** Lifetime of a session in seconds (default 8 hours). */
+    maxAge?: number;
   };
 }
 
@@ -60,7 +67,8 @@ export class Authenticator {
 
   private async keySet(options: OidcAuthOptions): Promise<JWTVerifyGetKey> {
     if (this.jwks === undefined) {
-      const discovery = await fetch(new URL(".well-known/openid-configuration", options.issuer.endsWith("/") ? options.issuer : `${options.issuer}/`));
+      const base = options.discoveryUrl ?? options.issuer;
+      const discovery = await fetch(base.includes(".well-known") ? base : new URL(".well-known/openid-configuration", base.endsWith("/") ? base : `${base}/`));
       if (!discovery.ok) {
         throw new AuthenticationError(`OIDC discovery failed (${discovery.status})`, 503);
       }

@@ -9,6 +9,8 @@ export interface User {
   email?: string;
   roles: string[];
   authenticatedBy: "development" | "bearer" | "session";
+  /** Browser sessions: the session identifier (the CSRF token is bound to it). */
+  session?: string;
 }
 
 export function abapUserName(id: string): string {

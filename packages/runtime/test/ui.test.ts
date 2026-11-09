@@ -15,6 +15,7 @@ interface Locator {
   press(key: string): Promise<void>;
   count(): Promise<number>;
   first(): Locator;
+  last(): Locator;
   waitFor(options?: { state?: string; timeout?: number }): Promise<void>;
   textContent(): Promise<string | null>;
   isEnabled(): Promise<boolean>;
