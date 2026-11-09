@@ -10,6 +10,9 @@ import { errorResponse, isIeee754, ODataHandler, type HandlerContext, type OData
 import { ReadEngine } from "./odata/read.js";
 import { ServiceRuntime } from "./odata/service.js";
 import { ODataError } from "./odata/errors.js";
+import { RapWriteHandler } from "./odata/write.js";
+import type { RapRuntime } from "./rap/runtime.js";
+import type { Kysely } from "kysely";
 
 export interface AppOptions {
   model: Model;
@@ -20,8 +23,10 @@ export interface AppOptions {
   /** Secret of the CSRF tokens (default: random per process). */
   csrfSecret?: string;
   logger?: FastifyServerOptions["logger"];
-  /** Factory of the write handler (managed RAP runtime), given the service and the reads. */
+  /** Factory of the write handler, given the service and the reads (default: the managed RAP runtime of `rap`). */
   writes?: (service: ServiceRuntime, read: ReadEngine, db: Database) => WriteHandler;
+  /** The managed RAP runtime (transpiled behavior pools): writes, actions and feature control. */
+  rap?: RapRuntime;
   /** Extra plugins (UI, login routes), registered after the service. */
   extend?: (app: FastifyInstance, services: AppServices) => Promise<void> | void;
 }
@@ -61,7 +66,7 @@ export async function createApp(options: AppOptions): Promise<FastifyInstance> {
   const app = Fastify({ logger: options.logger ?? false, bodyLimit: 20 * 1024 * 1024, return503OnClosing: true });
   const service = new ServiceRuntime(options.model);
   const read = new ReadEngine(service, () => options.db);
-  const writes = options.writes?.(service, read, options.db);
+  const writes = options.writes?.(service, read, options.db) ?? (options.rap === undefined ? undefined : new RapWriteHandler(service, read, options.db as unknown as Kysely<unknown>, options.rap));
   const handler = new ODataHandler(service, read, options.metadata, writes);
   const servicePath = options.model.service.path;
   handler.setServicePath(servicePath);

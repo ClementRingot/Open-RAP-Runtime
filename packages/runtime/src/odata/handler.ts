@@ -27,6 +27,8 @@ export interface ODataResponse {
   status: number;
   headers: Record<string, string>;
   body?: string;
+  /** Requests of a change set: the response is rendered once the change set is saved. */
+  deferred?: () => Promise<ODataResponse>;
 }
 
 export interface HandlerContext {
@@ -48,8 +50,13 @@ export interface Target {
 export interface WriteHandler {
   /** Handles POST, PATCH, PUT, DELETE and operation calls. */
   handle(request: ODataRequest, target: Target, ctx: HandlerContext): Promise<ODataResponse>;
-  /** Runs the requests of a change set in one LUW: all succeed or all fail. */
-  changeset(run: (ctx: HandlerContext) => Promise<BatchResponsePart[]>, ctx: HandlerContext): Promise<BatchResponsePart[] | ODataResponse>;
+  /**
+   * Runs the requests of a change set in one LUW: all succeed or all fail. `run` throws a
+   * ChangesetFailure when a request fails; the responses it returns may be deferred.
+   */
+  changeset(run: (ctx: HandlerContext) => Promise<Array<{ response: ODataResponse; contentId?: string }>>, ctx: HandlerContext): Promise<BatchResponsePart[] | ODataResponse>;
+  /** Service root, for the Location headers. */
+  setServicePath?(path: string): void;
   /** Instance feature control and other computed values for rows about to be returned. */
   enrich?(info: TypeInfo, rows: Array<Record<string, unknown>>, options: QueryOptions, ctx: HandlerContext): Promise<void>;
 }
@@ -285,6 +292,7 @@ export class ODataHandler {
 
   public setServicePath(path: string): void {
     this.servicePath = path;
+    this.writes?.setServicePath?.(path);
   }
 
   private async batch(request: ODataRequest, ctx: HandlerContext): Promise<ODataResponse> {
@@ -308,14 +316,17 @@ export class ODataHandler {
         continue;
       }
       const result = await this.writes.changeset(async (changesetCtx) => {
-        const parts: BatchResponsePart[] = [];
+        const parts: Array<{ response: ODataResponse; contentId?: string }> = [];
         for (const r of item.requests) {
           const part = this.toRequest(r, this.servicePath);
+          if (part.method === "GET") {
+            throw new ChangesetFailure(errorResponse(badRequest("A change set cannot contain GET requests"), ctx.ieee754));
+          }
           const response = await this.handle(part, { ...changesetCtx, ieee754: isIeee754(part.headers) });
           if (response.status >= 400) {
             throw new ChangesetFailure(response);
           }
-          parts.push(toPart(response, r.contentId));
+          parts.push(r.contentId === undefined ? { response } : { response, contentId: r.contentId });
         }
         return parts;
       }, ctx);
@@ -337,7 +348,7 @@ export class ChangesetFailure extends Error {
   }
 }
 
-function toPart(response: ODataResponse, contentId: string | undefined): BatchResponsePart {
+export function toPart(response: ODataResponse, contentId: string | undefined): BatchResponsePart {
   const part: BatchResponsePart = { status: response.status, headers: response.headers };
   if (response.body !== undefined) {
     part.body = response.body;

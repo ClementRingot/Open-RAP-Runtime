@@ -8,6 +8,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { createApp, type AppOptions } from "../src/app.js";
 import { createDatabase, PGLITE_PARSERS, type Database } from "../src/db/database.js";
+import { RapRuntime } from "../src/rap/runtime.js";
 
 export const FIXTURE_DIR = fileURLToPath(new URL("../../../fixtures/travel", import.meta.url));
 
@@ -86,6 +87,29 @@ export async function fixtureApp(options: Partial<AppOptions> = {}, seed = true)
   }
   const db = createDatabase(new PGliteDialect({ pglite }));
   const app = await createApp({ model, metadata, db, ...options });
+  await app.ready();
+  return {
+    app,
+    db,
+    pglite,
+    model,
+    close: async () => {
+      await app.close();
+      await db.destroy();
+    },
+  };
+}
+
+/** The fixture application with the managed RAP runtime (writes, actions, feature control). */
+export async function writableApp(): Promise<TestApp> {
+  const { model, metadata, schema, abapDir } = await generatedFixture();
+  const pglite = await PGlite.create({ parsers: PGLITE_PARSERS });
+  await pglite.exec("SET TIME ZONE 'UTC'");
+  await pglite.exec(schema);
+  await pglite.exec(SEED);
+  const db = createDatabase(new PGliteDialect({ pglite }));
+  const rap = await RapRuntime.load(model, abapDir);
+  const app = await createApp({ model, metadata, db, rap });
   await app.ready();
   return {
     app,
