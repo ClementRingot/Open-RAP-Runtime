@@ -302,8 +302,18 @@ export function attachHandlers(behavior: BehaviorModel, registry: abaplint.Regis
     }
     for (const handler of handlers) {
       if (handler.what.kind === "precheck" && (same(handler.what.alias, entity.alias) || same(handler.what.alias, entity.entity))) {
-        entity.precheckHandlers[handler.what.operation.toLowerCase()] = handler.ref;
-        handler.used = true;
+        // the BDEF must declare the precheck of the operation, else the handler is not called
+        const [operation = "", detail = ""] = handler.what.operation.toLowerCase().split(":");
+        const declared =
+          operation === "action"
+            ? entity.actions.some((a) => same(a.name, detail) && a.precheck)
+            : operation === "create" && detail !== ""
+              ? entity.associations.some((a) => same(a.name, detail) && a.createPrecheck)
+              : entity.operations.some((o) => o.kind === operation && o.precheck);
+        if (declared) {
+          entity.precheckHandlers[handler.what.operation.toLowerCase()] = handler.ref;
+          handler.used = true;
+        }
       }
     }
   }

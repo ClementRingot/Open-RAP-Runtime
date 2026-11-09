@@ -596,8 +596,9 @@ export class RapWriteHandler implements WriteHandler {
     const returnType = operation.returnType as NonNullable<ODataOperation["returnType"]>;
     if (returnType.entityType) {
       const targetSet = resultEntity === "$self" ? set : this.setOf(resultEntity);
+      // instance actions: the key of the result row; static actions and other entities: the result itself
       const entities = results
-        .map((r) => (resultEntity === "$self" ? r.key : (r.value === undefined ? undefined : r.value)))
+        .map((r) => (resultEntity === "$self" && r.key !== undefined ? r.key : r.value))
         .filter((k): k is Row => k !== undefined)
         .map((k) => ({ set: targetSet, key: this.projectedKey(targetSet, k) }));
       if (!returnType.collection) {

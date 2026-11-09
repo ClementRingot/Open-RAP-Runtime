@@ -78,6 +78,18 @@ export async function generatedVariant(changes: Record<string, string | ((conten
   }
 }
 
+/** Replaces each `from` by its `to`, and fails when a `from` is not in the content. */
+export function edit(content: string, replacements: Array<[string, string]>): string {
+  let result = content;
+  for (const [from, to] of replacements) {
+    if (!result.includes(from)) {
+      throw new Error(`edit: text not found: ${from.slice(0, 80)}`);
+    }
+    result = result.replace(from, to);
+  }
+  return result;
+}
+
 export const SERVICE = "/sap/opu/odata4/sap/zrt_ui_travel_o4/srvd/sap/zrt_ui_travel/0001/";
 
 export const T1 = "3f2504e0-4f89-11d3-9a0c-0305e82c3301";

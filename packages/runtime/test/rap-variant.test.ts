@@ -5,7 +5,7 @@
  */
 
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { generatedVariant, SERVICE, T2, writableApp, type TestApp } from "./helpers.js";
+import { edit, generatedVariant, SERVICE, T2, writableApp, type TestApp } from "./helpers.js";
 
 const ABP = "zbp_rt_r_travel.clas.locals_imp.abap";
 
@@ -78,7 +78,7 @@ beforeAll(async () => {
           "   </T100>\n  </asx:values>",
           "    <T100>\n     <SPRSL>E</SPRSL>\n     <ARBGB>ZRT_TRAVEL</ARBGB>\n     <MSGNR>003</MSGNR>\n     <TEXT>Agency &amp;1 is unknown</TEXT>\n    </T100>\n   </T100>\n  </asx:values>",
         ),
-      "zrt_r_travel.bdef.asbdef": (c) => c.replace("  validation validateDates on save { create; field BeginDate, EndDate; }", "  validation validateDates on save { create; field BeginDate, EndDate; }\n  validation validateAgency on save { create; field AgencyID; }"),
+      "zrt_r_travel.bdef.asbdef": (c) => edit(c, [["  validation validateDates on save { create; field BeginDate, EndDate; }", "  validation validateDates on save { create; field BeginDate, EndDate; }\n  validation validateAgency on save { create; field AgencyID; }"]]),
       [ABP]: (c) =>
         c
           .replace(
