@@ -7,6 +7,7 @@ import type { Diagnostics } from "./diagnostics.js";
 import { generateAbap } from "./gen/abap/generate.js";
 import { generateCsdl } from "./gen/csdl.js";
 import { generateSql } from "./gen/sql.js";
+import { generateUi } from "./gen/ui/index.js";
 import type { Project } from "./input/project.js";
 import { buildModel, type BuildOptions } from "./ir/builder.js";
 
@@ -43,6 +44,7 @@ export async function generateApplication(project: Project, options: GenerateOpt
     { path: "odata/metadata.xml", content: generateCsdl(model) },
     ...abap.modules.map((m) => ({ path: `abap/${m.path}`, content: m.content })),
     ...abap.sources.map((s) => ({ path: `abap/src/${s.fileName}`, content: s.content })),
+    ...generateUi(model).map((f) => ({ path: `ui/${f.path}`, content: f.content })),
   ];
   return { diagnostics, model, files };
 }

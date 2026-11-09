@@ -26,13 +26,22 @@ export function compiledFixture(): { model: Model; metadata: string; schema: str
   return compiled;
 }
 
-let generated: Promise<{ model: Model; metadata: string; schema: string; abapDir: string }> | undefined;
+export interface GeneratedFixture {
+  model: Model;
+  metadata: string;
+  schema: string;
+  abapDir: string;
+  /** The generated application folder. */
+  dir: string;
+}
+
+let generated: Promise<GeneratedFixture> | undefined;
 
 /**
  * The fixture built by `rapt build` (ABAP transpiled), written under test/.generated so that the
  * generated modules resolve @abaplint/runtime from this package.
  */
-export function generatedFixture(): Promise<{ model: Model; metadata: string; schema: string; abapDir: string }> {
+export function generatedFixture(): Promise<GeneratedFixture> {
   generated ??= (async () => {
     const result = await generateApplication(loadProject(FIXTURE_DIR));
     if (result.model === undefined || result.diagnostics.hasErrors()) {
@@ -43,7 +52,7 @@ export function generatedFixture(): Promise<{ model: Model; metadata: string; sc
     mkdirSync(out, { recursive: true });
     writeFiles(out, result.files);
     const file = (name: string): string => result.files.find((f) => f.path === name)?.content ?? "";
-    return { model: result.model, metadata: file("odata/metadata.xml"), schema: file("db/schema.sql"), abapDir: path.join(out, "abap") };
+    return { model: result.model, metadata: file("odata/metadata.xml"), schema: file("db/schema.sql"), abapDir: path.join(out, "abap"), dir: out };
   })();
   return generated;
 }
@@ -52,7 +61,7 @@ export function generatedFixture(): Promise<{ model: Model; metadata: string; sc
  * A variant of the fixture (files of src/ replaced or added, or changed by a function), built and
  * written like generatedFixture. One per test file: the ABAP runtime of a worker is global.
  */
-export async function generatedVariant(changes: Record<string, string | ((content: string) => string)>): Promise<{ model: Model; metadata: string; schema: string; abapDir: string }> {
+export async function generatedVariant(changes: Record<string, string | ((content: string) => string)>): Promise<GeneratedFixture> {
   const dir = mkdtempSync(path.join(tmpdir(), "rapt-variant-"));
   try {
     mkdirSync(path.join(dir, "src"));
@@ -72,7 +81,7 @@ export async function generatedVariant(changes: Record<string, string | ((conten
     mkdirSync(out, { recursive: true });
     writeFiles(out, result.files);
     const file = (name: string): string => result.files.find((f) => f.path === name)?.content ?? "";
-    return { model: result.model, metadata: file("odata/metadata.xml"), schema: file("db/schema.sql"), abapDir: path.join(out, "abap") };
+    return { model: result.model, metadata: file("odata/metadata.xml"), schema: file("db/schema.sql"), abapDir: path.join(out, "abap"), dir: out };
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }
@@ -144,7 +153,7 @@ export async function fixtureApp(options: Partial<AppOptions> = {}, seed = true)
 }
 
 /** The fixture application with the managed RAP runtime (writes, actions, feature control). */
-export async function writableApp(fixture?: Promise<{ model: Model; metadata: string; schema: string; abapDir: string }>): Promise<TestApp> {
+export async function writableApp(fixture?: Promise<GeneratedFixture>, options: Partial<AppOptions> = {}): Promise<TestApp> {
   const { model, metadata, schema, abapDir } = await (fixture ?? generatedFixture());
   const pglite = await PGlite.create({ parsers: PGLITE_PARSERS });
   await pglite.exec("SET TIME ZONE 'UTC'");
@@ -152,7 +161,7 @@ export async function writableApp(fixture?: Promise<{ model: Model; metadata: st
   await pglite.exec(SEED);
   const db = createDatabase(new PGliteDialect({ pglite }));
   const rap = await RapRuntime.load(model, abapDir);
-  const app = await createApp({ model, metadata, db, rap });
+  const app = await createApp({ model, metadata, db, rap, ...options });
   await app.ready();
   return {
     app,

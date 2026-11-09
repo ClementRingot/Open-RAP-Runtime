@@ -10,3 +10,4 @@ export { COMPILER_VERSION } from "./version.js";
 export { generateApplication, writeFiles, type GeneratedFile } from "./build.js";
 export { generateCsdl } from "./gen/csdl.js";
 export { generateSql, quoteIdentifier, sqlType } from "./gen/sql.js";
+export { generateUi, buildUiLayout, type UiLayout } from "./gen/ui/index.js";

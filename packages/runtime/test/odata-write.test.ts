@@ -154,6 +154,12 @@ describe("OData writes on the managed runtime", () => {
     expect(copies.body["@odata.count"]).toBe(2);
   });
 
+  it("selects members of the feature control the way the ODataModel V4 does", async () => {
+    const row = await get(`Travel(${T1})?$select=TravelUUID,__OperationControl/acceptTravel`);
+    expect(row.status).toBe(200);
+    expect(row.body).toMatchObject({ __OperationControl: { acceptTravel: true } });
+  });
+
   it("returns the instance feature control with the rows read", async () => {
     const list = await get(`Travel?$select=TravelUUID,OverallStatus,__OperationControl&$orderby=TravelID`);
     expect(list.body["value"]).toEqual([

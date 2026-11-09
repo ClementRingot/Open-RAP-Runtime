@@ -12,6 +12,7 @@ import { ServiceRuntime } from "./odata/service.js";
 import { ODataError } from "./odata/errors.js";
 import { RapWriteHandler } from "./odata/write.js";
 import type { RapRuntime } from "./rap/runtime.js";
+import { registerUi, type UiOptions } from "./ui/plugin.js";
 import type { Kysely } from "kysely";
 
 export interface AppOptions {
@@ -27,6 +28,8 @@ export interface AppOptions {
   writes?: (service: ServiceRuntime, read: ReadEngine, db: Database) => WriteHandler;
   /** The managed RAP runtime (transpiled behavior pools): writes, actions and feature control. */
   rap?: RapRuntime;
+  /** The generated UI (`ui/` folder) and the OpenUI5 resources. */
+  ui?: UiOptions;
   /** Extra plugins (UI, login routes), registered after the service. */
   extend?: (app: FastifyInstance, services: AppServices) => Promise<void> | void;
 }
@@ -134,6 +137,10 @@ export async function createApp(options: AppOptions): Promise<FastifyInstance> {
   app.route({ method: ["GET", "HEAD", "POST", "PATCH", "PUT", "DELETE"], url: `${root}/*`, handler: serve });
 
   app.get("/health", async () => ({ status: "ok" }));
+
+  if (options.ui !== undefined) {
+    await registerUi(app, options.ui);
+  }
 
   await options.extend?.(app, { service, handler, authenticator, csrf });
   return app;

@@ -32,7 +32,15 @@
   },
   "devDependencies": {
     "@electric-sql/pglite": "0.5.16",
+    "@openui5/sap.f": "1.136.22",
+    "@openui5/sap.m": "1.136.22",
+    "@openui5/sap.ui.core": "1.136.22",
+    "@openui5/sap.ui.layout": "1.136.22",
+    "@openui5/sap.ui.unified": "1.136.22",
+    "@openui5/sap.uxap": "1.136.22",
+    "@openui5/themelib_sap_horizon": "1.136.22",
     "@rap-transpiler/compiler": "workspace:*",
-    "@types/pg": "^8.23.1"
+    "@types/pg": "^8.23.1",
+    "less-openui5": "0.12.0"
   }
 }

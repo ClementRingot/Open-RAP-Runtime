@@ -274,14 +274,14 @@ export class ReadEngine {
       selected = [];
       for (const path of options.select) {
         const name = path[0] as string;
+        if (name.startsWith("__")) {
+          continue; // instance feature control (also its members: __OperationControl/accept), computed by the RAP runtime
+        }
         if (path.length > 1 || name.includes(".")) {
           if (name.includes(".")) {
             continue; // operations in $select (advertised actions) carry no data
           }
           throw notImplemented(`$select of the path ${path.join("/")}`);
-        }
-        if (name.startsWith("__")) {
-          continue; // instance feature control, computed by the RAP runtime
         }
         if (!info.properties.has(name)) {
           if (info.navigations.has(name)) {
