@@ -34,6 +34,7 @@ Aucune dépendance externe à ce stade. Les dépendances du runtime (Fastify, Ky
 | `typescript` | 7.0.2 | Apache-2.0 | Compilation et typecheck |
 | `vitest` | 5.1.0 | MIT | Tests (imposé par le cahier des charges) |
 | `@types/node` | 22.20.5 | MIT | Types Node.js |
+| `@electric-sql/pglite` | 0.5.16 | Apache-2.0 | PostgreSQL en processus (WASM) pour les tests (D18) |
 
 Dépendances transitives de développement : MIT pour la plupart, plus `picocolors` (ISC),
 `source-map-js` (BSD-3-Clause), `detect-libc` et `expect-type` (Apache-2.0).

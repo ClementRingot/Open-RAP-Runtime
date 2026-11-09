@@ -3,3 +3,4 @@ export * from "./annotations.js";
 export * from "./lookup.js";
 export * from "./model.js";
 export * from "./naming.js";
+export * from "./odata.js";

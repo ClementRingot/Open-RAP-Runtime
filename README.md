@@ -16,7 +16,7 @@ OpenUI5 de type List Report / Object Page, sans système SAP.
 | Jalon | Contenu | État |
 |---|---|---|
 | J1 | Parser BDEF (Chevrotain), parser SRVD, adaptateur CDS (abaplint), IR, `rapt check`, `rapt ir` | fait |
-| J2 | Générateurs SQL (PostgreSQL) et `$metadata` (CSDL) | à faire |
+| J2 | Générateurs SQL (PostgreSQL) et `$metadata` (CSDL), `rapt build` | fait |
 | J3 | Runtime OData V4 en lecture | à faire |
 | J4 | Écriture, runtime RAP managed, EML, behavior pool transpilé | à faire |
 | J5 | UI OpenUI5 générée | à faire |
@@ -32,6 +32,7 @@ pnpm build
 pnpm test
 node packages/compiler/dist/cli.js check fixtures/travel     # diagnostics
 node packages/compiler/dist/cli.js ir fixtures/travel        # représentation intermédiaire (JSON)
+node packages/compiler/dist/cli.js build fixtures/travel --out out/travel   # application générée
 ```
 
 Le dossier source est un export abapGit (`.abapgit.xml` et `src/`) ; la fixture de référence est

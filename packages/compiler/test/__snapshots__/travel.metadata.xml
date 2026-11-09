@@ -1,0 +1,508 @@
+<?xml version="1.0" encoding="utf-8"?>
+<edmx:Edmx Version="4.0" xmlns:edmx="http://docs.oasis-open.org/odata/ns/edmx">
+  <edmx:Reference Uri="https://oasis-tcs.github.io/odata-vocabularies/vocabularies/Org.OData.Core.V1.xml">
+    <edmx:Include Namespace="Org.OData.Core.V1" Alias="Core"/>
+  </edmx:Reference>
+  <edmx:Reference Uri="https://oasis-tcs.github.io/odata-vocabularies/vocabularies/Org.OData.Capabilities.V1.xml">
+    <edmx:Include Namespace="Org.OData.Capabilities.V1" Alias="Capabilities"/>
+  </edmx:Reference>
+  <edmx:Reference Uri="https://oasis-tcs.github.io/odata-vocabularies/vocabularies/Org.OData.Measures.V1.xml">
+    <edmx:Include Namespace="Org.OData.Measures.V1" Alias="Measures"/>
+  </edmx:Reference>
+  <edmx:Reference Uri="https://sap.github.io/odata-vocabularies/vocabularies/Common.xml">
+    <edmx:Include Namespace="com.sap.vocabularies.Common.v1" Alias="Common"/>
+  </edmx:Reference>
+  <edmx:Reference Uri="https://sap.github.io/odata-vocabularies/vocabularies/UI.xml">
+    <edmx:Include Namespace="com.sap.vocabularies.UI.v1" Alias="UI"/>
+  </edmx:Reference>
+  <edmx:DataServices>
+    <Schema Namespace="com.sap.gateway.srvd.zrt_ui_travel.v0001" Alias="SAP__self" xmlns="http://docs.oasis-open.org/odata/ns/edm">
+      <EntityType Name="TravelType">
+        <Key>
+          <PropertyRef Name="TravelUUID"/>
+        </Key>
+        <Property Name="TravelUUID" Type="Edm.Guid" Nullable="false"/>
+        <Property Name="TravelID" Type="Edm.String" MaxLength="8" Nullable="false"/>
+        <Property Name="AgencyID" Type="Edm.String" MaxLength="6" Nullable="false"/>
+        <Property Name="CustomerID" Type="Edm.String" MaxLength="6" Nullable="false"/>
+        <Property Name="BeginDate" Type="Edm.Date"/>
+        <Property Name="EndDate" Type="Edm.Date"/>
+        <Property Name="BookingFee" Type="Edm.Decimal" Precision="16" Scale="2" Nullable="false"/>
+        <Property Name="TotalPrice" Type="Edm.Decimal" Precision="16" Scale="2" Nullable="false"/>
+        <Property Name="CurrencyCode" Type="Edm.String" MaxLength="5" Nullable="false"/>
+        <Property Name="Description" Type="Edm.String" MaxLength="256" Nullable="false"/>
+        <Property Name="OverallStatus" Type="Edm.String" MaxLength="1" Nullable="false"/>
+        <Property Name="CreatedBy" Type="Edm.String" MaxLength="12" Nullable="false"/>
+        <Property Name="CreatedAt" Type="Edm.DateTimeOffset" Precision="7"/>
+        <Property Name="LastChangedBy" Type="Edm.String" MaxLength="12" Nullable="false"/>
+        <Property Name="LastChangedAt" Type="Edm.DateTimeOffset" Precision="7"/>
+        <Property Name="LocalLastChangedAt" Type="Edm.DateTimeOffset" Precision="7"/>
+        <Property Name="__OperationControl" Type="SAP__self.TravelOperationControl"/>
+        <NavigationProperty Name="_Booking" Type="Collection(SAP__self.BookingType)" Partner="_Travel"/>
+      </EntityType>
+      <EntityType Name="BookingType">
+        <Key>
+          <PropertyRef Name="BookingUUID"/>
+        </Key>
+        <Property Name="BookingUUID" Type="Edm.Guid" Nullable="false"/>
+        <Property Name="TravelUUID" Type="Edm.Guid"/>
+        <Property Name="BookingID" Type="Edm.String" MaxLength="4" Nullable="false"/>
+        <Property Name="BookingDate" Type="Edm.Date"/>
+        <Property Name="CarrierID" Type="Edm.String" MaxLength="3" Nullable="false"/>
+        <Property Name="ConnectionID" Type="Edm.String" MaxLength="4" Nullable="false"/>
+        <Property Name="FlightDate" Type="Edm.Date"/>
+        <Property Name="FlightPrice" Type="Edm.Decimal" Precision="16" Scale="2" Nullable="false"/>
+        <Property Name="CurrencyCode" Type="Edm.String" MaxLength="5" Nullable="false"/>
+        <Property Name="BookingStatus" Type="Edm.String" MaxLength="1" Nullable="false"/>
+        <Property Name="LocalLastChangedAt" Type="Edm.DateTimeOffset" Precision="7"/>
+        <NavigationProperty Name="_Travel" Type="SAP__self.TravelType" Nullable="false" Partner="_Booking">
+          <ReferentialConstraint Property="TravelUUID" ReferencedProperty="TravelUUID"/>
+        </NavigationProperty>
+      </EntityType>
+      <ComplexType Name="TravelOperationControl">
+        <Property Name="acceptTravel" Type="Edm.Boolean" Nullable="false"/>
+      </ComplexType>
+      <Action Name="acceptTravel" IsBound="true" EntitySetPath="_it">
+        <Parameter Name="_it" Type="SAP__self.TravelType" Nullable="false"/>
+        <ReturnType Type="SAP__self.TravelType" Nullable="false"/>
+      </Action>
+      <EntityContainer Name="Container">
+        <EntitySet Name="Travel" EntityType="SAP__self.TravelType">
+          <NavigationPropertyBinding Path="_Booking" Target="Booking"/>
+        </EntitySet>
+        <EntitySet Name="Booking" EntityType="SAP__self.BookingType">
+          <NavigationPropertyBinding Path="_Travel" Target="Travel"/>
+        </EntitySet>
+      </EntityContainer>
+      <Annotations Target="SAP__self.TravelType/TravelUUID">
+        <Annotation Term="Common.Label" String="Travel UUID"/>
+        <Annotation Term="Core.Computed"/>
+        <Annotation Term="UI.Hidden"/>
+      </Annotations>
+      <Annotations Target="SAP__self.TravelType/TravelID">
+        <Annotation Term="Common.Label" String="Travel ID"/>
+        <Annotation Term="Common.FieldControl" EnumMember="Common.FieldControlType/Mandatory"/>
+        <Annotation Term="Common.IsDigitSequence"/>
+      </Annotations>
+      <Annotations Target="SAP__self.TravelType/AgencyID">
+        <Annotation Term="Common.Label" String="Agency ID"/>
+        <Annotation Term="Common.FieldControl" EnumMember="Common.FieldControlType/Mandatory"/>
+        <Annotation Term="Common.IsDigitSequence"/>
+      </Annotations>
+      <Annotations Target="SAP__self.TravelType/CustomerID">
+        <Annotation Term="Common.Label" String="Customer ID"/>
+        <Annotation Term="Common.FieldControl" EnumMember="Common.FieldControlType/Mandatory"/>
+        <Annotation Term="Common.IsDigitSequence"/>
+      </Annotations>
+      <Annotations Target="SAP__self.TravelType/BeginDate">
+        <Annotation Term="Common.Label" String="Begin Date"/>
+        <Annotation Term="Common.FieldControl" EnumMember="Common.FieldControlType/Mandatory"/>
+      </Annotations>
+      <Annotations Target="SAP__self.TravelType/EndDate">
+        <Annotation Term="Common.Label" String="End Date"/>
+        <Annotation Term="Common.FieldControl" EnumMember="Common.FieldControlType/Mandatory"/>
+      </Annotations>
+      <Annotations Target="SAP__self.TravelType/BookingFee">
+        <Annotation Term="Common.Label" String="Booking Fee"/>
+        <Annotation Term="Measures.ISOCurrency" Path="CurrencyCode"/>
+      </Annotations>
+      <Annotations Target="SAP__self.TravelType/TotalPrice">
+        <Annotation Term="Common.Label" String="Total Price"/>
+        <Annotation Term="Core.Computed"/>
+        <Annotation Term="Measures.ISOCurrency" Path="CurrencyCode"/>
+      </Annotations>
+      <Annotations Target="SAP__self.TravelType/CurrencyCode">
+        <Annotation Term="Common.Label" String="Currency"/>
+        <Annotation Term="Common.FieldControl" EnumMember="Common.FieldControlType/Mandatory"/>
+        <Annotation Term="Common.IsCurrency"/>
+      </Annotations>
+      <Annotations Target="SAP__self.TravelType/Description">
+        <Annotation Term="Common.Label" String="Description"/>
+      </Annotations>
+      <Annotations Target="SAP__self.TravelType/OverallStatus">
+        <Annotation Term="Common.Label" String="Status"/>
+        <Annotation Term="Core.Computed"/>
+      </Annotations>
+      <Annotations Target="SAP__self.TravelType/CreatedBy">
+        <Annotation Term="Common.Label" String="Created By"/>
+        <Annotation Term="Core.Computed"/>
+      </Annotations>
+      <Annotations Target="SAP__self.TravelType/CreatedAt">
+        <Annotation Term="Common.Label" String="Created At"/>
+        <Annotation Term="Core.Computed"/>
+      </Annotations>
+      <Annotations Target="SAP__self.TravelType/LastChangedBy">
+        <Annotation Term="Common.Label" String="Changed By"/>
+        <Annotation Term="Core.Computed"/>
+      </Annotations>
+      <Annotations Target="SAP__self.TravelType/LastChangedAt">
+        <Annotation Term="Common.Label" String="Changed At"/>
+        <Annotation Term="Core.Computed"/>
+      </Annotations>
+      <Annotations Target="SAP__self.TravelType/LocalLastChangedAt">
+        <Annotation Term="Core.Computed"/>
+        <Annotation Term="UI.Hidden"/>
+      </Annotations>
+      <Annotations Target="SAP__self.TravelType">
+        <Annotation Term="UI.HeaderInfo">
+          <Record Type="UI.HeaderInfoType">
+            <PropertyValue Property="TypeName" String="Travel"/>
+            <PropertyValue Property="TypeNamePlural" String="Travels"/>
+            <PropertyValue Property="Title">
+              <Record Type="UI.DataField">
+                <PropertyValue Property="Value" Path="TravelID"/>
+              </Record>
+            </PropertyValue>
+            <PropertyValue Property="Description">
+              <Record Type="UI.DataField">
+                <PropertyValue Property="Value" Path="Description"/>
+              </Record>
+            </PropertyValue>
+          </Record>
+        </Annotation>
+        <Annotation Term="UI.LineItem">
+          <Collection>
+            <Record Type="UI.DataField">
+              <PropertyValue Property="Value" Path="TravelID"/>
+              <Annotation Term="UI.Importance" EnumMember="UI.ImportanceType/High"/>
+            </Record>
+            <Record Type="UI.DataField">
+              <PropertyValue Property="Value" Path="AgencyID"/>
+              <Annotation Term="UI.Importance" EnumMember="UI.ImportanceType/High"/>
+            </Record>
+            <Record Type="UI.DataField">
+              <PropertyValue Property="Value" Path="CustomerID"/>
+              <Annotation Term="UI.Importance" EnumMember="UI.ImportanceType/Medium"/>
+            </Record>
+            <Record Type="UI.DataField">
+              <PropertyValue Property="Value" Path="BeginDate"/>
+              <Annotation Term="UI.Importance" EnumMember="UI.ImportanceType/Medium"/>
+            </Record>
+            <Record Type="UI.DataField">
+              <PropertyValue Property="Value" Path="EndDate"/>
+              <Annotation Term="UI.Importance" EnumMember="UI.ImportanceType/Medium"/>
+            </Record>
+            <Record Type="UI.DataField">
+              <PropertyValue Property="Value" Path="TotalPrice"/>
+              <Annotation Term="UI.Importance" EnumMember="UI.ImportanceType/Medium"/>
+            </Record>
+            <Record Type="UI.DataField">
+              <PropertyValue Property="Value" Path="OverallStatus"/>
+              <Annotation Term="UI.Importance" EnumMember="UI.ImportanceType/High"/>
+            </Record>
+            <Record Type="UI.DataFieldForAction">
+              <PropertyValue Property="Action" String="com.sap.gateway.srvd.zrt_ui_travel.v0001.acceptTravel"/>
+              <PropertyValue Property="Label" String="Accept Travel"/>
+            </Record>
+          </Collection>
+        </Annotation>
+        <Annotation Term="UI.Identification">
+          <Collection>
+            <Record Type="UI.DataField">
+              <PropertyValue Property="Value" Path="TravelID"/>
+            </Record>
+            <Record Type="UI.DataField">
+              <PropertyValue Property="Value" Path="AgencyID"/>
+            </Record>
+            <Record Type="UI.DataField">
+              <PropertyValue Property="Value" Path="CustomerID"/>
+            </Record>
+            <Record Type="UI.DataField">
+              <PropertyValue Property="Value" Path="Description"/>
+            </Record>
+            <Record Type="UI.DataField">
+              <PropertyValue Property="Value" Path="OverallStatus"/>
+            </Record>
+            <Record Type="UI.DataFieldForAction">
+              <PropertyValue Property="Action" String="com.sap.gateway.srvd.zrt_ui_travel.v0001.acceptTravel"/>
+              <PropertyValue Property="Label" String="Accept Travel"/>
+            </Record>
+          </Collection>
+        </Annotation>
+        <Annotation Term="UI.SelectionFields">
+          <Collection>
+            <PropertyPath>TravelID</PropertyPath>
+            <PropertyPath>AgencyID</PropertyPath>
+            <PropertyPath>CustomerID</PropertyPath>
+            <PropertyPath>OverallStatus</PropertyPath>
+          </Collection>
+        </Annotation>
+        <Annotation Term="UI.FieldGroup" Qualifier="Dates">
+          <Record Type="UI.FieldGroupType">
+            <PropertyValue Property="Data">
+              <Collection>
+                <Record Type="UI.DataField">
+                  <PropertyValue Property="Value" Path="BeginDate"/>
+                </Record>
+                <Record Type="UI.DataField">
+                  <PropertyValue Property="Value" Path="EndDate"/>
+                </Record>
+              </Collection>
+            </PropertyValue>
+          </Record>
+        </Annotation>
+        <Annotation Term="UI.FieldGroup" Qualifier="Prices">
+          <Record Type="UI.FieldGroupType">
+            <PropertyValue Property="Data">
+              <Collection>
+                <Record Type="UI.DataField">
+                  <PropertyValue Property="Value" Path="BookingFee"/>
+                </Record>
+                <Record Type="UI.DataField">
+                  <PropertyValue Property="Value" Path="TotalPrice"/>
+                </Record>
+                <Record Type="UI.DataField">
+                  <PropertyValue Property="Value" Path="CurrencyCode"/>
+                </Record>
+              </Collection>
+            </PropertyValue>
+          </Record>
+        </Annotation>
+        <Annotation Term="UI.Facets">
+          <Collection>
+            <Record Type="UI.ReferenceFacet">
+              <PropertyValue Property="ID" String="Travel"/>
+              <PropertyValue Property="Label" String="Travel"/>
+              <PropertyValue Property="Target" AnnotationPath="@UI.Identification"/>
+            </Record>
+            <Record Type="UI.ReferenceFacet">
+              <PropertyValue Property="ID" String="Dates"/>
+              <PropertyValue Property="Label" String="Dates"/>
+              <PropertyValue Property="Target" AnnotationPath="@UI.FieldGroup#Dates"/>
+            </Record>
+            <Record Type="UI.ReferenceFacet">
+              <PropertyValue Property="ID" String="Prices"/>
+              <PropertyValue Property="Label" String="Prices"/>
+              <PropertyValue Property="Target" AnnotationPath="@UI.FieldGroup#Prices"/>
+            </Record>
+            <Record Type="UI.ReferenceFacet">
+              <PropertyValue Property="ID" String="Booking"/>
+              <PropertyValue Property="Label" String="Bookings"/>
+              <PropertyValue Property="Target" AnnotationPath="_Booking/@UI.LineItem"/>
+            </Record>
+          </Collection>
+        </Annotation>
+        <Annotation Term="UI.PresentationVariant">
+          <Record Type="UI.PresentationVariantType">
+            <PropertyValue Property="SortOrder">
+              <Collection>
+                <Record Type="Common.SortOrderType">
+                  <PropertyValue Property="Property" PropertyPath="TravelID"/>
+                  <PropertyValue Property="Descending" Bool="true"/>
+                </Record>
+              </Collection>
+            </PropertyValue>
+            <PropertyValue Property="Visualizations">
+              <Collection>
+                <AnnotationPath>@UI.LineItem</AnnotationPath>
+              </Collection>
+            </PropertyValue>
+          </Record>
+        </Annotation>
+        <Annotation Term="Common.Label" String="Travel"/>
+      </Annotations>
+      <Annotations Target="SAP__self.Container/Travel">
+        <Annotation Term="Capabilities.InsertRestrictions">
+          <Record Type="Capabilities.InsertRestrictionsType">
+            <PropertyValue Property="Insertable" Bool="true"/>
+          </Record>
+        </Annotation>
+        <Annotation Term="Capabilities.UpdateRestrictions">
+          <Record Type="Capabilities.UpdateRestrictionsType">
+            <PropertyValue Property="Updatable" Bool="true"/>
+          </Record>
+        </Annotation>
+        <Annotation Term="Capabilities.DeleteRestrictions">
+          <Record Type="Capabilities.DeleteRestrictionsType">
+            <PropertyValue Property="Deletable" Bool="true"/>
+          </Record>
+        </Annotation>
+        <Annotation Term="Capabilities.SearchRestrictions">
+          <Record Type="Capabilities.SearchRestrictionsType">
+            <PropertyValue Property="Searchable" Bool="true"/>
+          </Record>
+        </Annotation>
+        <Annotation Term="Capabilities.NavigationRestrictions">
+          <Record Type="Capabilities.NavigationRestrictionsType">
+            <PropertyValue Property="RestrictedProperties">
+              <Collection>
+                <Record Type="Capabilities.NavigationPropertyRestriction">
+                  <PropertyValue Property="NavigationProperty" NavigationPropertyPath="_Booking"/>
+                  <PropertyValue Property="InsertRestrictions">
+                    <Record Type="Capabilities.InsertRestrictionsType">
+                      <PropertyValue Property="Insertable" Bool="true"/>
+                    </Record>
+                  </PropertyValue>
+                </Record>
+              </Collection>
+            </PropertyValue>
+          </Record>
+        </Annotation>
+        <Annotation Term="Core.OptimisticConcurrency">
+          <Collection>
+            <PropertyPath>LocalLastChangedAt</PropertyPath>
+          </Collection>
+        </Annotation>
+      </Annotations>
+      <Annotations Target="SAP__self.BookingType/BookingUUID">
+        <Annotation Term="Common.Label" String="Booking UUID"/>
+        <Annotation Term="Core.Computed"/>
+        <Annotation Term="UI.Hidden"/>
+      </Annotations>
+      <Annotations Target="SAP__self.BookingType/TravelUUID">
+        <Annotation Term="Common.Label" String="Travel UUID"/>
+        <Annotation Term="Core.Computed"/>
+        <Annotation Term="UI.Hidden"/>
+      </Annotations>
+      <Annotations Target="SAP__self.BookingType/BookingID">
+        <Annotation Term="Common.Label" String="Booking ID"/>
+        <Annotation Term="Common.FieldControl" EnumMember="Common.FieldControlType/Mandatory"/>
+        <Annotation Term="Common.IsDigitSequence"/>
+      </Annotations>
+      <Annotations Target="SAP__self.BookingType/BookingDate">
+        <Annotation Term="Common.Label" String="Booking Date"/>
+      </Annotations>
+      <Annotations Target="SAP__self.BookingType/CarrierID">
+        <Annotation Term="Common.Label" String="Airline"/>
+        <Annotation Term="Common.FieldControl" EnumMember="Common.FieldControlType/Mandatory"/>
+      </Annotations>
+      <Annotations Target="SAP__self.BookingType/ConnectionID">
+        <Annotation Term="Common.Label" String="Flight Number"/>
+        <Annotation Term="Common.FieldControl" EnumMember="Common.FieldControlType/Mandatory"/>
+        <Annotation Term="Common.IsDigitSequence"/>
+      </Annotations>
+      <Annotations Target="SAP__self.BookingType/FlightDate">
+        <Annotation Term="Common.Label" String="Flight Date"/>
+        <Annotation Term="Common.FieldControl" EnumMember="Common.FieldControlType/Mandatory"/>
+      </Annotations>
+      <Annotations Target="SAP__self.BookingType/FlightPrice">
+        <Annotation Term="Common.Label" String="Flight Price"/>
+        <Annotation Term="Measures.ISOCurrency" Path="CurrencyCode"/>
+      </Annotations>
+      <Annotations Target="SAP__self.BookingType/CurrencyCode">
+        <Annotation Term="Common.Label" String="Currency"/>
+        <Annotation Term="Common.IsCurrency"/>
+      </Annotations>
+      <Annotations Target="SAP__self.BookingType/BookingStatus">
+        <Annotation Term="Common.Label" String="Booking Status"/>
+      </Annotations>
+      <Annotations Target="SAP__self.BookingType/LocalLastChangedAt">
+        <Annotation Term="Core.Computed"/>
+        <Annotation Term="UI.Hidden"/>
+      </Annotations>
+      <Annotations Target="SAP__self.BookingType">
+        <Annotation Term="UI.HeaderInfo">
+          <Record Type="UI.HeaderInfoType">
+            <PropertyValue Property="TypeName" String="Booking"/>
+            <PropertyValue Property="TypeNamePlural" String="Bookings"/>
+            <PropertyValue Property="Title">
+              <Record Type="UI.DataField">
+                <PropertyValue Property="Value" Path="BookingID"/>
+              </Record>
+            </PropertyValue>
+          </Record>
+        </Annotation>
+        <Annotation Term="UI.LineItem">
+          <Collection>
+            <Record Type="UI.DataField">
+              <PropertyValue Property="Value" Path="BookingID"/>
+              <Annotation Term="UI.Importance" EnumMember="UI.ImportanceType/High"/>
+            </Record>
+            <Record Type="UI.DataField">
+              <PropertyValue Property="Value" Path="BookingDate"/>
+              <Annotation Term="UI.Importance" EnumMember="UI.ImportanceType/Medium"/>
+            </Record>
+            <Record Type="UI.DataField">
+              <PropertyValue Property="Value" Path="CarrierID"/>
+              <Annotation Term="UI.Importance" EnumMember="UI.ImportanceType/High"/>
+            </Record>
+            <Record Type="UI.DataField">
+              <PropertyValue Property="Value" Path="ConnectionID"/>
+              <Annotation Term="UI.Importance" EnumMember="UI.ImportanceType/High"/>
+            </Record>
+            <Record Type="UI.DataField">
+              <PropertyValue Property="Value" Path="FlightDate"/>
+              <Annotation Term="UI.Importance" EnumMember="UI.ImportanceType/High"/>
+            </Record>
+            <Record Type="UI.DataField">
+              <PropertyValue Property="Value" Path="FlightPrice"/>
+              <Annotation Term="UI.Importance" EnumMember="UI.ImportanceType/Medium"/>
+            </Record>
+            <Record Type="UI.DataField">
+              <PropertyValue Property="Value" Path="BookingStatus"/>
+              <Annotation Term="UI.Importance" EnumMember="UI.ImportanceType/Low"/>
+            </Record>
+          </Collection>
+        </Annotation>
+        <Annotation Term="UI.Identification">
+          <Collection>
+            <Record Type="UI.DataField">
+              <PropertyValue Property="Value" Path="BookingID"/>
+            </Record>
+            <Record Type="UI.DataField">
+              <PropertyValue Property="Value" Path="BookingDate"/>
+            </Record>
+            <Record Type="UI.DataField">
+              <PropertyValue Property="Value" Path="CarrierID"/>
+            </Record>
+            <Record Type="UI.DataField">
+              <PropertyValue Property="Value" Path="ConnectionID"/>
+            </Record>
+            <Record Type="UI.DataField">
+              <PropertyValue Property="Value" Path="FlightDate"/>
+            </Record>
+            <Record Type="UI.DataField">
+              <PropertyValue Property="Value" Path="FlightPrice"/>
+            </Record>
+            <Record Type="UI.DataField">
+              <PropertyValue Property="Value" Path="CurrencyCode"/>
+            </Record>
+            <Record Type="UI.DataField">
+              <PropertyValue Property="Value" Path="BookingStatus"/>
+            </Record>
+          </Collection>
+        </Annotation>
+        <Annotation Term="UI.Facets">
+          <Collection>
+            <Record Type="UI.ReferenceFacet">
+              <PropertyValue Property="ID" String="Booking"/>
+              <PropertyValue Property="Label" String="Booking"/>
+              <PropertyValue Property="Target" AnnotationPath="@UI.Identification"/>
+            </Record>
+          </Collection>
+        </Annotation>
+        <Annotation Term="Common.Label" String="Booking"/>
+      </Annotations>
+      <Annotations Target="SAP__self.Container/Booking">
+        <Annotation Term="Capabilities.InsertRestrictions">
+          <Record Type="Capabilities.InsertRestrictionsType">
+            <PropertyValue Property="Insertable" Bool="false"/>
+          </Record>
+        </Annotation>
+        <Annotation Term="Capabilities.UpdateRestrictions">
+          <Record Type="Capabilities.UpdateRestrictionsType">
+            <PropertyValue Property="Updatable" Bool="true"/>
+          </Record>
+        </Annotation>
+        <Annotation Term="Capabilities.DeleteRestrictions">
+          <Record Type="Capabilities.DeleteRestrictionsType">
+            <PropertyValue Property="Deletable" Bool="true"/>
+          </Record>
+        </Annotation>
+        <Annotation Term="Capabilities.SearchRestrictions">
+          <Record Type="Capabilities.SearchRestrictionsType">
+            <PropertyValue Property="Searchable" Bool="false"/>
+          </Record>
+        </Annotation>
+        <Annotation Term="Core.OptimisticConcurrency">
+          <Collection>
+            <PropertyPath>LocalLastChangedAt</PropertyPath>
+          </Collection>
+        </Annotation>
+      </Annotations>
+      <Annotations Target="SAP__self.acceptTravel(SAP__self.TravelType)">
+        <Annotation Term="Core.OperationAvailable" Path="_it/__OperationControl/acceptTravel"/>
+      </Annotations>
+    </Schema>
+  </edmx:DataServices>
+</edmx:Edmx>

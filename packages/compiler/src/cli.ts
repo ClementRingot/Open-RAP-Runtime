@@ -2,6 +2,8 @@
 /** rapt: command line of the RAP → Node.js compiler. */
 
 import { writeFileSync } from "node:fs";
+import path from "node:path";
+import { generateApplication, writeFiles } from "./build.js";
 import { parseArgs } from "node:util";
 import { formatDiagnostic, type Diagnostics } from "./diagnostics.js";
 import { loadProject } from "./input/project.js";
@@ -13,12 +15,13 @@ const USAGE = `rapt ${COMPILER_VERSION}: compiles RAP sources (abapGit format) i
 Usage:
   rapt check <src> [--service <SRVD>]           report the diagnostics of the sources
   rapt ir    <src> [--service <SRVD>] [--out f] print (or write) the intermediate representation
+  rapt build <src> --out <dir> [--service <SRVD>] generate the application into <dir>
 
 Options:
   --service <name>   service definition to build (required when the sources have several)
   --binding <name>   service binding name (default: the SRVB of the service, else <SRVD>_O4)
   --path <path>      service root path (default: /sap/opu/odata4/sap/<binding>/srvd/sap/<srvd>/0001/)
-  --out <file>       output file (rapt ir)
+  --out <path>       output file (rapt ir) or folder (rapt build)
   --warnings-as-errors
   -h, --help
 `;
@@ -68,6 +71,22 @@ export function main(argv: string[]): number {
   if (typeof parsed.values["path"] === "string") options.path = parsed.values["path"];
 
   const project = loadProject(source);
+  if (command === "build") {
+    const out = parsed.values["out"];
+    if (typeof out !== "string") {
+      process.stderr.write(`rapt build needs --out <dir>\n\n${USAGE}`);
+      return 2;
+    }
+    const result = generateApplication(project, options);
+    report(result.diagnostics);
+    const buildFailed = result.files.length === 0 || (parsed.values["warnings-as-errors"] === true && result.diagnostics.items.some((d) => d.severity === "warning"));
+    if (buildFailed) {
+      return 1;
+    }
+    writeFiles(out, result.files);
+    process.stdout.write(`${result.files.length} files written to ${path.resolve(out)}\n`);
+    return 0;
+  }
   const { model, diagnostics } = buildModel(project, options);
   const failed = diagnostics.hasErrors() || (parsed.values["warnings-as-errors"] === true && diagnostics.items.some((d) => d.severity === "warning"));
 

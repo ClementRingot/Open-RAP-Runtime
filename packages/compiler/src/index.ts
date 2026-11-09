@@ -7,3 +7,6 @@ export { buildModel, type BuildOptions, type BuildResult } from "./ir/builder.js
 export { classifyMethodDefinition } from "./ir/handlers.js";
 export { parseSrvd } from "./srvd/parser.js";
 export { COMPILER_VERSION } from "./version.js";
+export { generateApplication, writeFiles, type GeneratedFile } from "./build.js";
+export { generateCsdl } from "./gen/csdl.js";
+export { generateSql, quoteIdentifier, sqlType } from "./gen/sql.js";
