@@ -15,7 +15,7 @@ export function abaplintRegistry(project: Project): abaplint.Registry {
     JSON.stringify({
       global: { files: "/**/*.*" },
       syntax: { version: abaplint.Version.Cloud, errorNamespace: "^(Z|Y|LCL_|LHC_|LSC_|TY_|LIF_)" },
-      rules: { parser_error: true, syntax_check: true },
+      rules: { parser_error: true },
     }),
   );
   const registry = new abaplint.Registry(config);
@@ -28,12 +28,19 @@ export function abaplintRegistry(project: Project): abaplint.Registry {
   return registry;
 }
 
-/** ABAP syntax errors of the behavior pools, on the lines of the original sources. */
+const EML_START = /^\s*(?:(?:READ|MODIFY)\s+ENTIT|(?:COMMIT|ROLLBACK)\s+ENTITIES\b)/i;
+
+/**
+ * Parser errors of the behavior pools, on the lines of the original sources. The complete check
+ * (types included) runs on the rewritten sources, where the derived types are known
+ * (gen/abap/generate.ts). EML statements are parsed by the rewrite pass: abaplint does not know
+ * every form of them.
+ */
 export function syntaxCheck(project: Project, registry: abaplint.Registry, classes: string[], diagnostics: Diagnostics): void {
   const wanted = new Set(classes.map((c) => c.toUpperCase()));
   for (const issue of registry.findIssues()) {
     const key = issue.getKey();
-    if (key !== "parser_error" && key !== "syntax_check") {
+    if (key !== "parser_error") {
       continue;
     }
     const fileName = issue.getFilename();
@@ -42,6 +49,12 @@ export function syntaxCheck(project: Project, registry: abaplint.Registry, class
       continue;
     }
     if (file.type !== "CLAS" && file.type !== "INTF") {
+      continue;
+    }
+    const lines = file.content.split("\n");
+    const start = issue.getStart();
+    const rest = [(lines[start.getRow() - 1] ?? "").slice(start.getCol() - 1), ...lines.slice(start.getRow(), start.getRow() + 2)].join("\n");
+    if (EML_START.test(rest)) {
       continue;
     }
     diagnostics.error("ABP004", `ABAP ${key === "parser_error" ? "syntax" : "check"} error: ${issue.getMessage()}`, {

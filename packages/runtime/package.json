@@ -22,6 +22,7 @@
     "build": "tsc -p tsconfig.build.json"
   },
   "dependencies": {
+    "@abaplint/runtime": "2.14.24",
     "@rap-transpiler/model": "workspace:*",
     "chevrotain": "13.2.0",
     "fastify": "5.12.8",
@@ -31,7 +32,7 @@
   },
   "devDependencies": {
     "@electric-sql/pglite": "0.5.16",
-    "@types/pg": "^8.23.1",
-    "@rap-transpiler/compiler": "workspace:*"
+    "@rap-transpiler/compiler": "workspace:*",
+    "@types/pg": "^8.23.1"
   }
 }

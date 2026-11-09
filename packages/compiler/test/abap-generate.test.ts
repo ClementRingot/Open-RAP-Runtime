@@ -1,31 +1,151 @@
-import { mkdirSync, writeFileSync } from "node:fs";
-import path from "node:path";
+import * as abaplint from "@abaplint/core";
 import { describe, expect, it } from "vitest";
-import { Diagnostics, formatDiagnostic } from "../src/diagnostics.js";
+import { Diagnostics, type Diagnostic } from "../src/diagnostics.js";
+import { parseEml } from "../src/gen/abap/eml.js";
 import { abapSources, generateAbap } from "../src/gen/abap/generate.js";
+import { toks } from "../src/gen/abap/tokens.js";
 import { loadProject } from "../src/input/project.js";
 import { buildModel } from "../src/ir/builder.js";
-import { FIXTURE_DIR } from "./helpers.js";
+import { FIXTURE_DIR, fixtureVariant, readFixture } from "./helpers.js";
+
+const ABP = "zbp_rt_r_travel.clas.locals_imp.abap";
+const I = "zrap_dt_zrt_r_travel";
+
+function generate(changes: Parameters<typeof fixtureVariant>[0] = {}): Promise<{ diagnostics: Diagnostic[]; output: Awaited<ReturnType<typeof generateAbap>>; rewritten: string }> {
+  const variant = Object.keys(changes).length === 0 ? undefined : fixtureVariant(changes);
+  const project = loadProject(variant?.dir ?? FIXTURE_DIR);
+  try {
+    const { model, diagnostics } = buildModel(project);
+    if (model === undefined) {
+      throw new Error("no model");
+    }
+    const rewritten = abapSources(project, model, new Diagnostics()).find((s) => s.fileName === ABP)?.content ?? "";
+    return generateAbap(project, model, diagnostics).then((output) => ({ diagnostics: diagnostics.items, output, rewritten }));
+  } finally {
+    variant?.cleanup();
+  }
+}
+
+/** The tokens of one ABAP statement, without its final period. */
+function statementTokens(statement: string): ReturnType<typeof toks> {
+  const source = `CLASS lcl DEFINITION. PUBLIC SECTION. METHODS m. ENDCLASS.\nCLASS lcl IMPLEMENTATION.\n  METHOD m.\n    ${statement}\n  ENDMETHOD.\nENDCLASS.`;
+  const registry = new abaplint.Registry().addFile(new abaplint.MemoryFile("zrapt_probe.prog.abap", source));
+  registry.parse();
+  const file = (registry.getFirstObject() as abaplint.ABAPObject).getABAPFiles()[0] as abaplint.ABAPFile;
+  const found = file.getStatements().find((s) => s.getStart().getRow() === 4);
+  return toks(found?.getTokens() ?? []).slice(0, -1);
+}
+
+describe("EML parser", () => {
+  it("reads the long form with several entities, operations and responses", () => {
+    const eml = parseEml(
+      statementTokens(
+        "READ ENTITIES OF zrt_r_travel IN LOCAL MODE ENTITY Travel ALL FIELDS WITH CORRESPONDING #( keys ) RESULT DATA(travels) BY \\_Booking FIELDS ( BookingID ) WITH VALUE #( ( %tky = x ) ) RESULT DATA(bookings) LINK DATA(links) ENTITY Booking FROM lt_keys RESULT lt_result FAILED DATA(failed_read) REPORTED reported.",
+      ),
+    );
+    expect(eml.kind).toBe("read");
+    if (eml.kind !== "read") return;
+    expect(eml.mode).toBe("local");
+    expect(eml.bdef?.str).toBe("zrt_r_travel");
+    expect(eml.groups.map((g) => [g.entity.str, g.operations.map((o) => o.kind)])).toEqual([
+      ["Travel", ["read", "readBy"]],
+      ["Booking", ["read"]],
+    ]);
+    expect(eml.failed?.tokens.map((t) => t.str).join("")).toBe("DATA(failed_read)");
+    expect(eml.reported?.tokens.map((t) => t.str)).toEqual(["reported"]);
+  });
+
+  it("reads forms abaplint does not parse", () => {
+    const eml = parseEml(statementTokens("MODIFY ENTITIES OF zrt_r_travel ENTITY Travel CREATE AUTO FILL CID SET FIELDS WITH VALUE #( ( TravelID = '1' ) ) CREATE BY \\_Booking SET FIELDS WITH lt_bookings MAPPED DATA(m)."));
+    expect(eml.kind).toBe("modify");
+    if (eml.kind !== "modify") return;
+    expect(eml.groups[0]?.operations).toMatchObject([
+      { kind: "create", autoFillCid: true, fields: { kind: "set" } },
+      { kind: "createBy", autoFillCid: false, fields: { kind: "set" } },
+    ]);
+    expect(eml.mapped).toBeDefined();
+  });
+
+  it("reads the short forms, COMMIT and ROLLBACK", () => {
+    const short = parseEml(statementTokens("MODIFY ENTITY IN LOCAL MODE zrt_r_travel UPDATE FIELDS ( Description ) WITH lt_update FAILED DATA(f)."));
+    expect(short).toMatchObject({ kind: "modify", mode: "local", groups: [{ operations: [{ kind: "update", fields: { kind: "list" } }] }] });
+    expect(parseEml(statementTokens("COMMIT ENTITIES RESPONSE OF zrt_r_travel FAILED DATA(cf) REPORTED DATA(cr)."))).toMatchObject({ kind: "commit", simulation: false, responses: [{ bdef: { str: "zrt_r_travel" } }] });
+    expect(parseEml(statementTokens("ROLLBACK ENTITIES."))).toEqual({ kind: "rollback" });
+  });
+
+  it("keeps a component that looks like a keyword inside an operand", () => {
+    const eml = parseEml(statementTokens("READ ENTITIES OF zrt_r_travel ENTITY Travel FROM ls_data-result RESULT DATA(r)."));
+    if (eml.kind !== "read") throw new Error("read expected");
+    const operation = eml.groups[0]?.operations[0];
+    expect(operation?.kind === "read" ? operation.source.tokens.map((t) => t.str).join("") : "").toBe("ls_data-result");
+  });
+
+  it("rejects the dynamic form", () => {
+    expect(() => parseEml(statementTokens("MODIFY ENTITIES OPERATIONS lt_operations FAILED DATA(f)."))).toThrow(/OPERATIONS/);
+  });
+});
 
 describe("ABAP generation of the fixture", () => {
-  it("rewrites and transpiles the behavior pool", async () => {
-    const project = loadProject(FIXTURE_DIR);
-    const { model, diagnostics } = buildModel(project);
-    expect(model).toBeDefined();
-    const d = new Diagnostics();
-    const out = await generateAbap(project, model!, d);
-    const dump = process.env["RAPT_DUMP"];
-    if (dump !== undefined) {
-      for (const s of out?.sources ?? abapSources(project, model!, new Diagnostics())) {
-        mkdirSync(path.join(dump, "src"), { recursive: true });
-        writeFileSync(path.join(dump, "src", s.fileName), s.content);
-      }
-      for (const m of out?.modules ?? []) {
-        mkdirSync(path.dirname(path.join(dump, "js", m.path)), { recursive: true });
-        writeFileSync(path.join(dump, "js", m.path), m.content);
-      }
-    }
-    expect(d.items.map(formatDiagnostic)).toEqual([]);
-    expect(diagnostics.errors()).toEqual([]);
-  }, 60000);
+  it("rewrites, checks and transpiles the behavior pool", async () => {
+    const { diagnostics, output } = await generate();
+    expect(diagnostics.filter((d) => d.severity === "error")).toEqual([]);
+    expect(output?.entry).toBe("init.mjs");
+    const paths = output?.modules.map((m) => m.path) ?? [];
+    expect(paths).toEqual(expect.arrayContaining(["init.mjs", "zbp_rt_r_travel.clas.mjs", "zbp_rt_r_travel.clas.locals.mjs", `${I}.intf.mjs`, "zrap_eml.clas.mjs"]));
+    const locals = output?.modules.find((m) => m.path === "zbp_rt_r_travel.clas.locals.mjs")?.content ?? "";
+    expect(locals).toContain("abap.Classes['ZRAP_EML'].read_by_association(");
+    expect(locals).toContain('abap.Classes[\'CLAS-ZBP_RT_R_TRAVEL-LHC_TRAVEL\']');
+  });
+
+  it("keeps the line numbers of the original sources", async () => {
+    const { rewritten } = await generate();
+    expect(rewritten.split("\n").length).toBe(readFixture(ABP).split("\n").length);
+  });
+
+  it("types the handler definitions with the derived types", async () => {
+    const { rewritten } = await generate();
+    expect(rewritten).toContain(`METHODS validateDates IMPORTING keys TYPE ${I}=>tt_e1_keys CHANGING failed TYPE ${I}=>ts_failed_late reported TYPE ${I}=>ts_reported_late`);
+    expect(rewritten).toContain(`METHODS acceptTravel IMPORTING keys TYPE ${I}=>tt_e1_a1_imp CHANGING result TYPE ${I}=>tt_e1_a1_res mapped TYPE ${I}=>ts_mapped_early`);
+    expect(rewritten).toContain(`METHODS get_global_authorizations IMPORTING requested_authorizations TYPE ${I}=>ts_e1_gauth_req CHANGING result TYPE ${I}=>ts_e1_gauth_res`);
+    expect(rewritten).toContain(`METHODS calculateTotalPrice IMPORTING keys TYPE ${I}=>tt_e2_keys`);
+  });
+
+  it("lowers EML to the kernel, with explicit types and hoisted declarations", async () => {
+    const { rewritten } = await generate();
+    expect(rewritten).toContain(
+      `DATA bookings TYPE ${I}=>tt_e1_b1_rres. zrap_eml=>begin( bdef = \`ZRT_R_TRAVEL\` local = abap_true ). zrap_eml=>read_by_association( EXPORTING bdef = \`ZRT_R_TRAVEL\` entity = \`ZRT_R_TRAVEL\` association = \`_BOOKING\` fields = \`TRAVELUUID FLIGHTPRICE CURRENCYCODE\` keys = CORRESPONDING ${I}=>tt_e1_b1_rimp( travels ) CHANGING result = bookings ). zrap_eml=>end( ).`,
+    );
+    expect(rewritten).toContain(`zrap_eml=>execute( bdef = \`ZRT_R_TRAVEL\` entity = \`ZRT_R_TRAVEL\` action = \`RECALCTOTALPRICE\` rows = CORRESPONDING ${I}=>tt_e1_a2_imp( keys ) ).`);
+    expect(rewritten).toContain("zrap_eml=>end( CHANGING failed = failed ).");
+  });
+
+  it("accepts EML forms abaplint does not parse", async () => {
+    const { diagnostics } = await generate({
+      [ABP]: (c) =>
+        c.replace(
+          "    READ ENTITIES OF zrt_r_travel IN LOCAL MODE\n      ENTITY Travel\n        ALL FIELDS WITH CORRESPONDING #( keys )\n      RESULT DATA(travels).",
+          "    MODIFY ENTITIES OF zrt_r_travel IN LOCAL MODE\n      ENTITY Travel\n        CREATE BY \\_Booking AUTO FILL CID SET FIELDS WITH VALUE #( FOR k IN keys ( %tky = k-%tky %target = VALUE #( ( BookingID = '0001' ) ) ) )\n      MAPPED DATA(created).\n    READ ENTITIES OF zrt_r_travel IN LOCAL MODE\n      ENTITY Travel\n        ALL FIELDS WITH CORRESPONDING #( keys )\n      RESULT DATA(travels).",
+        ),
+    });
+    expect(diagnostics.filter((d) => d.severity === "error")).toEqual([]);
+  });
+
+  it("reports unknown EML names on the original position", async () => {
+    const { diagnostics } = await generate({ [ABP]: (c) => c.replace("FIELDS ( BeginDate EndDate )", "FIELDS ( BeginDate EndDat )") });
+    expect(diagnostics).toContainEqual(expect.objectContaining({ code: "ABP006", message: "Travel has no field EndDat", file: `src/${ABP}`, line: 136 }));
+  });
+
+  it("reports typing errors of the rewritten code on the original line", async () => {
+    const { diagnostics } = await generate({ [ABP]: (c) => c.replace("%element-EndDate = if_abap_behv=>mk-on ) TO reported-travel.\n      ENDIF.", "%element-EndDat = if_abap_behv=>mk-on ) TO reported-travel.\n      ENDIF.") });
+    const error = diagnostics.find((d) => d.code === "ABP004");
+    expect(error).toMatchObject({ file: `src/${ABP}` });
+    expect(readFixture(ABP).split("\n")[(error?.line ?? 0) - 1]).toContain("%element-EndDate");
+  });
+
+  it("reports EML on a projection and unsupported statements", async () => {
+    const projection = await generate({ [ABP]: (c) => c.replace("MODIFY ENTITIES OF zrt_r_travel IN LOCAL MODE\n      ENTITY Travel\n        EXECUTE reCalcTotalPrice\n        FROM CORRESPONDING #( keys ).", "MODIFY ENTITIES OF zrt_c_travel\n      ENTITY Travel\n        EXECUTE acceptTravel\n        FROM CORRESPONDING #( keys ).") });
+    expect(projection.diagnostics).toContainEqual(expect.objectContaining({ code: "ABP007", message: expect.stringContaining("projection ZRT_C_TRAVEL") }));
+    const permissions = await generate({ [ABP]: (c) => c.replace("    DELETE travels WHERE OverallStatus IS NOT INITIAL.", "    GET PERMISSIONS ONLY GLOBAL AUTHORIZATION ENTITY zrt_r_travel REQUEST VALUE #( %update = if_abap_behv=>mk-on ) RESULT DATA(p).\n    DELETE travels WHERE OverallStatus IS NOT INITIAL.") });
+    expect(permissions.diagnostics).toContainEqual(expect.objectContaining({ code: "ABP007", message: "GET PERMISSIONS is not supported" }));
+  });
 });

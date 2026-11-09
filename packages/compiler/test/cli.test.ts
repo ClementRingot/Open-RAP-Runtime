@@ -22,26 +22,26 @@ describe("rapt CLI", () => {
   });
   afterEach(() => vi.restoreAllMocks());
 
-  it("check: succeeds on the fixture", () => {
-    expect(main(["check", FIXTURE_DIR])).toBe(0);
+  it("check: succeeds on the fixture", async () => {
+    expect(await main(["check", FIXTURE_DIR])).toBe(0);
     expect(out.join("")).toContain("0 error(s), 0 warning(s), 0 info");
   });
 
-  it("check: fails with positioned errors", () => {
+  it("check: fails with positioned errors", async () => {
     const variant = fixtureVariant({ "zrt_r_travel.bdef.asbdef": (c) => c.replace("lock master", "lock mastr") });
     try {
-      expect(main(["check", variant.dir])).toBe(1);
+      expect(await main(["check", variant.dir])).toBe(1);
       expect(err.join("")).toMatch(/^src\/zrt_r_travel\.bdef\.asbdef:\d+:\d+: error BDEF/m);
     } finally {
       variant.cleanup();
     }
   });
 
-  it("ir: writes the model", () => {
+  it("ir: writes the model", async () => {
     const dir = mkdtempSync(path.join(tmpdir(), "rapt-cli-"));
     try {
       const file = path.join(dir, "model.json");
-      expect(main(["ir", FIXTURE_DIR, "--out", file])).toBe(0);
+      expect(await main(["ir", FIXTURE_DIR, "--out", file])).toBe(0);
       const model = JSON.parse(readFileSync(file, "utf8")) as { service: { name: string } };
       expect(model.service.name).toBe("ZRT_UI_TRAVEL");
     } finally {
@@ -49,10 +49,10 @@ describe("rapt CLI", () => {
     }
   });
 
-  it("prints the usage", () => {
-    expect(main(["--help"])).toBe(0);
+  it("prints the usage", async () => {
+    expect(await main(["--help"])).toBe(0);
     expect(out.join("")).toContain("Usage:");
-    expect(main([])).toBe(2);
-    expect(main(["frobnicate", FIXTURE_DIR])).toBe(2);
+    expect(await main([])).toBe(2);
+    expect(await main(["frobnicate", FIXTURE_DIR])).toBe(2);
   });
 });

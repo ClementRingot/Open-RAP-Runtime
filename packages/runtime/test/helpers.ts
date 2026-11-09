@@ -1,8 +1,10 @@
 import { PGlite } from "@electric-sql/pglite";
-import { buildModel, generateCsdl, generateSql, loadProject } from "@rap-transpiler/compiler";
+import { buildModel, generateApplication, generateCsdl, generateSql, loadProject, writeFiles } from "@rap-transpiler/compiler";
 import type { Model } from "@rap-transpiler/model";
 import type { FastifyInstance } from "fastify";
 import { PGliteDialect } from "kysely";
+import { mkdirSync, rmSync } from "node:fs";
+import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { createApp, type AppOptions } from "../src/app.js";
 import { createDatabase, PGLITE_PARSERS, type Database } from "../src/db/database.js";
@@ -20,6 +22,28 @@ export function compiledFixture(): { model: Model; metadata: string; schema: str
     compiled = { model, metadata: generateCsdl(model), schema: generateSql(model).schema };
   }
   return compiled;
+}
+
+let generated: Promise<{ model: Model; metadata: string; schema: string; abapDir: string }> | undefined;
+
+/**
+ * The fixture built by `rapt build` (ABAP transpiled), written under test/.generated so that the
+ * generated modules resolve @abaplint/runtime from this package.
+ */
+export function generatedFixture(): Promise<{ model: Model; metadata: string; schema: string; abapDir: string }> {
+  generated ??= (async () => {
+    const result = await generateApplication(loadProject(FIXTURE_DIR));
+    if (result.model === undefined || result.diagnostics.hasErrors()) {
+      throw new Error(`fixture does not build: ${JSON.stringify(result.diagnostics.items)}`);
+    }
+    const out = fileURLToPath(new URL(`./.generated/travel-${process.pid}-${Math.random().toString(36).slice(2, 8)}`, import.meta.url));
+    rmSync(out, { recursive: true, force: true });
+    mkdirSync(out, { recursive: true });
+    writeFiles(out, result.files);
+    const file = (name: string): string => result.files.find((f) => f.path === name)?.content ?? "";
+    return { model: result.model, metadata: file("odata/metadata.xml"), schema: file("db/schema.sql"), abapDir: path.join(out, "abap") };
+  })();
+  return generated;
 }
 
 export const SERVICE = "/sap/opu/odata4/sap/zrt_ui_travel_o4/srvd/sap/zrt_ui_travel/0001/";

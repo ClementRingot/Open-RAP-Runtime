@@ -37,7 +37,7 @@ function report(diagnostics: Diagnostics): void {
   }
 }
 
-export function main(argv: string[]): number {
+export async function main(argv: string[]): Promise<number> {
   let parsed: ReturnType<typeof parseArgs<{ options: Record<string, { type: "string" | "boolean"; short?: string }>; allowPositionals: true }>>;
   try {
     parsed = parseArgs({
@@ -77,7 +77,7 @@ export function main(argv: string[]): number {
       process.stderr.write(`rapt build needs --out <dir>\n\n${USAGE}`);
       return 2;
     }
-    const result = generateApplication(project, options);
+    const result = await generateApplication(project, options);
     report(result.diagnostics);
     const buildFailed = result.files.length === 0 || (parsed.values["warnings-as-errors"] === true && result.diagnostics.items.some((d) => d.severity === "warning"));
     if (buildFailed) {
@@ -87,7 +87,8 @@ export function main(argv: string[]): number {
     process.stdout.write(`${result.files.length} files written to ${path.resolve(out)}\n`);
     return 0;
   }
-  const { model, diagnostics } = buildModel(project, options);
+  // check: the whole generation (ABAP rewrite, check and transpilation), without writing
+  const { model, diagnostics } = command === "check" ? await generateApplication(project, options) : buildModel(project, options);
   const failed = diagnostics.hasErrors() || (parsed.values["warnings-as-errors"] === true && diagnostics.items.some((d) => d.severity === "warning"));
 
   switch (command) {
@@ -121,5 +122,5 @@ export function main(argv: string[]): number {
 
 const invokedDirectly = process.argv[1] !== undefined && import.meta.url === new URL(`file://${process.argv[1]}`).href;
 if (invokedDirectly || process.argv[1]?.endsWith("/rapt")) {
-  process.exitCode = main(process.argv.slice(2));
+  process.exitCode = await main(process.argv.slice(2));
 }

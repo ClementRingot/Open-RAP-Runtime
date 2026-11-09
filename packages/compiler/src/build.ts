@@ -4,6 +4,7 @@ import { mkdirSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import type { Model } from "@rap-transpiler/model";
 import type { Diagnostics } from "./diagnostics.js";
+import { generateAbap } from "./gen/abap/generate.js";
 import { generateCsdl } from "./gen/csdl.js";
 import { generateSql } from "./gen/sql.js";
 import type { Project } from "./input/project.js";
@@ -21,16 +22,27 @@ export interface BuildApplicationResult {
   files: GeneratedFile[];
 }
 
+export interface GenerateOptions extends BuildOptions {
+  /** Run the transpiler (default true); `rapt check` can skip writing but still transpiles. */
+  transpile?: boolean;
+}
+
 /** Generates the files of the application in memory. */
-export function generateApplication(project: Project, options: BuildOptions = {}): BuildApplicationResult {
+export async function generateApplication(project: Project, options: GenerateOptions = {}): Promise<BuildApplicationResult> {
   const { model, diagnostics } = buildModel(project, options);
   if (model === undefined || diagnostics.hasErrors()) {
     return model === undefined ? { diagnostics, files: [] } : { diagnostics, model, files: [] };
+  }
+  const abap = await generateAbap(project, model, diagnostics, options.transpile === false ? { transpile: false } : {});
+  if (abap === undefined || diagnostics.hasErrors()) {
+    return { diagnostics, model, files: [] };
   }
   const files: GeneratedFile[] = [
     { path: "model/model.json", content: `${JSON.stringify(model, null, 2)}\n` },
     { path: "db/schema.sql", content: generateSql(model).schema },
     { path: "odata/metadata.xml", content: generateCsdl(model) },
+    ...abap.modules.map((m) => ({ path: `abap/${m.path}`, content: m.content })),
+    ...abap.sources.map((s) => ({ path: `abap/src/${s.fileName}`, content: s.content })),
   ];
   return { diagnostics, model, files };
 }

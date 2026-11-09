@@ -43,6 +43,9 @@ importers:
 
   packages/runtime:
     dependencies:
+      '@abaplint/runtime':
+        specifier: 2.14.24
+        version: 2.14.24
       '@rap-transpiler/model':
         specifier: workspace:*
         version: link:../model
@@ -77,6 +80,9 @@ packages:
   '@abaplint/core@2.120.98':
     resolution: {integrity: sha512-rHaWJu1VF+oKHTEzXFrULUHBzB8JgfrG8xLzKZn4H2hi1Gp/fG9y1zr2W/JpLH6nu0UZWrEfx7HiTap6zYMYsw==}
     engines: {node: '>=22.0.0'}
+
+  '@abaplint/runtime@2.14.24':
+    resolution: {integrity: sha512-loGZvMnfxgU2swqeT/s+c3p5sGFHCy3SZdpXmT5zbvfs29rt3fB6/BHfPeqWnL9Y067R/RCRCDBRoOJf0NwL+w==}
 
   '@abaplint/transpiler@2.14.24':
     resolution: {integrity: sha512-6bxOL1eFg2JfgipgqdMmi1gOAHs9zzpHCtTC1p4FCU9xK8jWse5wijFMhL957GZZjOEN0UC924HdqYIhPWlVgA==}
@@ -746,6 +752,15 @@ packages:
   strnum@2.5.1:
     resolution: {integrity: sha512-UM4nTLWzQiDBseVxUGxN0wJzIk0UU89Qi7pKXz9qISo+lhviJikTuikBsK/oFRlpvYHvSdz0TVoLyQ+sEpYwxA==}
 
+  temporal-polyfill@1.0.8:
+    resolution: {integrity: sha512-RCCGa0GddT099XG49ijdD0tDf86L8vfuZun1+JyJiO4Y2NP9PACQsG0OnvNPXwVLisdvhr/zqL2nhKQmXXx08A==}
+
+  temporal-spec@1.0.1:
+    resolution: {integrity: sha512-wxVoanmDeavXie1vu2JaQ3WIc3JZnWAOYFBsJyATaVsXsycKYUflGsyBmrRSnoCpZJpwPyr38VpgSUlQ8CbFxg==}
+
+  temporal-utils@1.0.4:
+    resolution: {integrity: sha512-4mAcgbWlaxe+gn23gk8g0iHxCVGVOhKzSCfF5HM3lfvH8BdT+/pBmH/R/E4CrIse+koUgs8ThkPzCLnui6Fi8w==}
+
   thread-stream@4.2.1:
     resolution: {integrity: sha512-Stg6edJXC/6/xqGwSXwFokrUhChJ18amEjpKH89WrQQ0oVFDF+pUUcTpiwWhFUrE89Vf16FBOlwhaw+lescxMQ==}
     engines: {node: '>=20'}
@@ -881,6 +896,10 @@ snapshots:
       fast-xml-parser: 5.12.0
       json5: 2.2.3
       vscode-languageserver-types: 3.18.5
+
+  '@abaplint/runtime@2.14.24':
+    dependencies:
+      temporal-polyfill: 1.0.8
 
   '@abaplint/transpiler@2.14.24':
     dependencies:
@@ -1420,6 +1439,15 @@ snapshots:
   strnum@2.5.1:
     dependencies:
       anynum: 1.0.1
+
+  temporal-polyfill@1.0.8:
+    dependencies:
+      temporal-spec: 1.0.1
+      temporal-utils: 1.0.4
+
+  temporal-spec@1.0.1: {}
+
+  temporal-utils@1.0.4: {}
 
   thread-stream@4.2.1:
     dependencies:
