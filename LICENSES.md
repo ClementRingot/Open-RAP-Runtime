@@ -22,10 +22,23 @@ Dépendances transitives (production) : `@chevrotain/*` (Apache-2.0), `source-ma
 `json5`, `vscode-languageserver-types`, `fast-xml-builder`, `strnum`, `anynum`,
 `@nodable/entities`, `is-unsafe`, `path-expression-matcher`, `xml-naming` (MIT).
 
-### `@rap-transpiler/model`, `@rap-transpiler/runtime`
+### `@rap-transpiler/model`
 
-Aucune dépendance externe à ce stade. Les dépendances du runtime (Fastify, Kysely, pg,
-`@abaplint/runtime`, jose, openid-client…) seront ajoutées et consignées aux jalons J3 à J6.
+Aucune dépendance externe.
+
+### `@rap-transpiler/runtime`
+
+| Paquet | Version | Licence | Usage | Vérifié le |
+|---|---|---|---|---|
+| `fastify` | 5.12.8 | MIT | Serveur HTTP | 2026-11-09 |
+| `kysely` | 0.29.8 | MIT | Construction de requêtes SQL paramétrées ; dialecte PGlite intégré | 2026-11-09 |
+| `pg` | 8.23.1 | MIT | Pilote PostgreSQL | 2026-11-09 |
+| `chevrotain` | 13.2.0 | Apache-2.0 | Grammaire des URL OData (`$filter`, `$orderby`, `$select`, `$expand`) | 2026-11-09 |
+| `jose` | 6.2.16 | MIT | Vérification des JWT et JWKS (OIDC) | 2026-11-09 |
+
+Dépendances transitives (production) : MIT pour la plupart (`avvio`, `find-my-way`,
+`fast-json-stringify`, `pino`, `ajv`…), plus `fast-uri`, `light-my-request`,
+`secure-json-parse` (BSD-3-Clause) et `fastq`, `pg-int8`, `semver`, `split2` (ISC).
 
 ## Outillage de développement (non distribué)
 
@@ -35,6 +48,7 @@ Aucune dépendance externe à ce stade. Les dépendances du runtime (Fastify, Ky
 | `vitest` | 5.1.0 | MIT | Tests (imposé par le cahier des charges) |
 | `@types/node` | 22.20.5 | MIT | Types Node.js |
 | `@electric-sql/pglite` | 0.5.16 | Apache-2.0 | PostgreSQL en processus (WASM) pour les tests (D18) |
+| `@types/pg` | 8.x | MIT | Types de `pg` |
 
 Dépendances transitives de développement : MIT pour la plupart, plus `picocolors` (ISC),
 `source-map-js` (BSD-3-Clause), `detect-libc` et `expect-type` (Apache-2.0).

@@ -12,7 +12,9 @@
       "default": "./dist/index.js"
     }
   },
-  "files": ["dist"],
+  "files": [
+    "dist"
+  ],
   "engines": {
     "node": ">=22"
   },
@@ -20,6 +22,16 @@
     "build": "tsc -p tsconfig.build.json"
   },
   "dependencies": {
-    "@rap-transpiler/model": "workspace:*"
+    "@rap-transpiler/model": "workspace:*",
+    "chevrotain": "13.2.0",
+    "fastify": "5.12.8",
+    "jose": "6.2.16",
+    "kysely": "0.29.8",
+    "pg": "8.23.1"
+  },
+  "devDependencies": {
+    "@electric-sql/pglite": "0.5.16",
+    "@types/pg": "^8.23.1",
+    "@rap-transpiler/compiler": "workspace:*"
   }
 }

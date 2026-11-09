@@ -1,0 +1,135 @@
+/** The Fastify application of a generated service. */
+
+import Fastify, { type FastifyInstance, type FastifyReply, type FastifyRequest, type FastifyServerOptions } from "fastify";
+import type { Model } from "@rap-transpiler/model";
+import { AuthenticationError, Authenticator, type AuthOptions } from "./auth/auth.js";
+import type { User } from "./auth/user.js";
+import type { Database } from "./db/database.js";
+import { CsrfTokens } from "./odata/csrf.js";
+import { errorResponse, isIeee754, ODataHandler, type HandlerContext, type ODataRequest, type ODataResponse, type WriteHandler } from "./odata/handler.js";
+import { ReadEngine } from "./odata/read.js";
+import { ServiceRuntime } from "./odata/service.js";
+import { ODataError } from "./odata/errors.js";
+
+export interface AppOptions {
+  model: Model;
+  /** The generated $metadata document. */
+  metadata: string;
+  db: Database;
+  auth?: AuthOptions;
+  /** Secret of the CSRF tokens (default: random per process). */
+  csrfSecret?: string;
+  logger?: FastifyServerOptions["logger"];
+  /** Factory of the write handler (managed RAP runtime), given the service and the reads. */
+  writes?: (service: ServiceRuntime, read: ReadEngine, db: Database) => WriteHandler;
+  /** Extra plugins (UI, login routes), registered after the service. */
+  extend?: (app: FastifyInstance, services: AppServices) => Promise<void> | void;
+}
+
+export interface AppServices {
+  service: ServiceRuntime;
+  handler: ODataHandler;
+  authenticator: Authenticator;
+  csrf: CsrfTokens;
+}
+
+declare module "fastify" {
+  interface FastifyRequest {
+    user?: User;
+  }
+}
+
+/** Fastify keeps headers lower case; multi-valued ones are joined. */
+function headersOf(request: FastifyRequest): Record<string, string | undefined> {
+  const headers: Record<string, string | undefined> = {};
+  for (const [name, value] of Object.entries(request.headers)) {
+    headers[name.toLowerCase()] = Array.isArray(value) ? value.join(", ") : value;
+  }
+  return headers;
+}
+
+function send(reply: FastifyReply, response: ODataResponse): FastifyReply {
+  reply.status(response.status);
+  for (const [name, value] of Object.entries(response.headers)) {
+    reply.header(name, value);
+  }
+  // a Buffer keeps the Content-Type as written (Fastify rewrites JSON media types of strings)
+  return reply.send(Buffer.from(response.body ?? "", "utf8"));
+}
+
+export async function createApp(options: AppOptions): Promise<FastifyInstance> {
+  const app = Fastify({ logger: options.logger ?? false, bodyLimit: 20 * 1024 * 1024, return503OnClosing: true });
+  const service = new ServiceRuntime(options.model);
+  const read = new ReadEngine(service, () => options.db);
+  const writes = options.writes?.(service, read, options.db);
+  const handler = new ODataHandler(service, read, options.metadata, writes);
+  const servicePath = options.model.service.path;
+  handler.setServicePath(servicePath);
+  const authenticator = new Authenticator(options.auth ?? { mode: "none" });
+  const csrf = new CsrfTokens(options.csrfSecret);
+
+  // bodies are read as text: the OData layer parses JSON (decimals as strings) and multipart
+  app.removeAllContentTypeParsers();
+  app.addContentTypeParser("*", { parseAs: "string" }, (_request, body, done) => done(null, body));
+
+  app.decorateRequest("user", undefined);
+
+  app.addHook("onRequest", async (request, reply) => {
+    if (!request.url.startsWith(servicePath.replace(/\/$/, ""))) {
+      return;
+    }
+    try {
+      const user = request.user ?? (await authenticator.fromAuthorization(request.headers.authorization));
+      if (user === undefined) {
+        throw new AuthenticationError("authentication required");
+      }
+      request.user = user;
+    } catch (error) {
+      const status = error instanceof AuthenticationError ? error.status : 401;
+      const odata = new ODataError(status, status === 403 ? "FORBIDDEN" : "UNAUTHORIZED", (error as Error).message, undefined, [], status === 401 ? { "WWW-Authenticate": 'Bearer realm="rap-transpiler"' } : {});
+      await send(reply, errorResponse(odata, false));
+    }
+  });
+
+  const serve = async (request: FastifyRequest, reply: FastifyReply): Promise<FastifyReply> => {
+    const user = request.user as User;
+    const headers = headersOf(request);
+    const url = request.url;
+    const relative = url.startsWith(servicePath) ? url.slice(servicePath.length) : url === servicePath.replace(/\/$/, "") ? "" : url.slice(servicePath.length - 1);
+    const question = relative.indexOf("?");
+    const odataRequest: ODataRequest = {
+      method: request.method,
+      path: question < 0 ? relative : relative.slice(0, question),
+      query: question < 0 ? "" : relative.slice(question + 1),
+      headers,
+    };
+    if (typeof request.body === "string") {
+      odataRequest.body = request.body;
+    }
+    const ieee754 = isIeee754(headers);
+    const extra: Record<string, string> = {};
+    if ((headers["x-csrf-token"] ?? "").toLowerCase() === "fetch") {
+      extra["X-CSRF-Token"] = csrf.token(user);
+    }
+    if (csrf.required(user, request.method) && !csrf.valid(user, headers["x-csrf-token"])) {
+      const failure = errorResponse(new ODataError(403, "CSRF_TOKEN_REQUIRED", "CSRF token validation failed", undefined, [], { "X-CSRF-Token": "Required" }), ieee754);
+      return send(reply, failure);
+    }
+    const ctx: HandlerContext = { user, ieee754, language: (headers["accept-language"] ?? "en").split(",")[0]?.trim() ?? "en" };
+    if (request.method === "HEAD") {
+      return send(reply, { status: 200, headers: { "OData-Version": "4.0", ...extra } });
+    }
+    const response = await handler.handle(odataRequest, ctx);
+    response.headers = { ...response.headers, ...extra };
+    return send(reply, response);
+  };
+
+  const root = servicePath.replace(/\/$/, "");
+  app.route({ method: ["GET", "HEAD", "POST", "PATCH", "PUT", "DELETE"], url: root, handler: serve });
+  app.route({ method: ["GET", "HEAD", "POST", "PATCH", "PUT", "DELETE"], url: `${root}/*`, handler: serve });
+
+  app.get("/health", async () => ({ status: "ok" }));
+
+  await options.extend?.(app, { service, handler, authenticator, csrf });
+  return app;
+}

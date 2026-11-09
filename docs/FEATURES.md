@@ -115,9 +115,33 @@ comportement de l'application générée.
 |---|---|---|
 | `define root view entity`, `define view entity`, `as projection on`, `provider contract` | ✅ | |
 | `composition`, `association to parent`, `redirected to` | ✅ | |
-| Associations vers des entités sans BO (entity sets en lecture seule) | ⏳ J3 | |
+| Associations vers des entités sans BO (entity sets en lecture seule) | ✅ | Entités exposées sans comportement : lecture seule. |
 | Métadonnées d'extension (DDLX) et fusion des annotations | ✅ | |
 | Entités abstraites (paramètres d'action) | ⏳ J4 | |
 | Expressions CDS (CASE, CAST, calculs, littéraux) | ❌ | Prévu après le MVP. |
 | Contrôle d'accès DCL | ❌ | `@AccessControl.authorizationCheck` est ignoré. |
 | Side effects (`side effects { … }`) | ⏳ J4 | Générés en `Common.SideEffects`. |
+
+## Service OData V4
+
+| Fonctionnalité | Statut | Note |
+|---|---|---|
+| Document de service, `$metadata` (CSDL avec annotations) | ✅ | |
+| GET collection, GET entité (clé courte et nommée) | ✅ | |
+| Navigation `Entité(…)/_Assoc`, clé sur la navigation, `/$count` | ✅ | |
+| `$filter` : eq, ne, gt, ge, lt, le, and, or, not, in, parenthèses, `null` | ✅ | Requêtes SQL paramétrées. |
+| `$filter` : contains, startswith, endswith, tolower, toupper, trim, length, indexof, substring, concat, year…second, now | ✅ | `%` et `_` sont des caractères littéraux. |
+| `$filter` sur une navigation vers un (`_Travel/Status`) | ✅ | Sous-requête scalaire. |
+| `$filter` avec `any`/`all` sur une collection | ❌ | Réponse 501. |
+| `$orderby`, `$top`, `$skip`, `$count` | ✅ | Les clés complètent le tri : pagination stable. |
+| `$select` | ✅ | Clés et ETag toujours lus. |
+| `$expand` un niveau, avec `$select`, `$orderby`, `$filter`, `$top`, `$skip`, `$count` imbriqués | ✅ | `$top`/`$skip` par parent (`row_number()`). `$expand` imbriqué : 501. |
+| `$search` simple | ✅ | ILIKE sur les champs `@Search.defaultSearchElement`, chaque terme requis. |
+| `IEEE754Compatible=true` (Decimal et Int64 en chaînes) | ✅ | Nombres JSON exacts sinon. |
+| ETag (`@odata.etag`, en-tête `ETag`) | ✅ | `If-Match` : J4. |
+| `$batch` multipart (lectures) | ✅ | Change sets : J4. |
+| Jeton CSRF (`X-CSRF-Token: Fetch`) | ✅ | Exigé pour les sessions par cookie (J6). |
+| Erreurs au format OData V4 (`@Common.numericSeverity`) | ✅ | |
+| Paramètres `sap-*` | ✅ | Ignorés. |
+| Authentification : mode dev, Bearer JWT (OIDC, JWKS) | ✅ | Sessions navigateur : J6. |
+| `$apply`, JSON batch, `$value`, propriétés seules | ❌ | Hors MVP. |

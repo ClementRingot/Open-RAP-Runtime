@@ -37,3 +37,10 @@ Versions de référence : `@abaplint/core` 2.120.98, `@abaplint/transpiler` 2.14
 |---|---|
 | Colonne mandant (`CLNT`) | Retirée : applications mono-tenant (D9) |
 | Septième décimale des `TIMESTAMPL` | Perdue : `timestamptz(6)` (D8) |
+
+## OData
+
+| Écart | Statut |
+|---|---|
+| Comparaisons `lt`/`le` sur une date initiale : en ABAP `00000000` est inférieure à toute date ; ici la valeur initiale est `NULL` et n'est retenue par aucune comparaison (sémantique OData de `null`). | Assumé |
+| `$filter` avec `any`/`all`, `$expand` imbriqué, `$apply`, JSON batch, `$value` | Réponse 501 ou 400 |

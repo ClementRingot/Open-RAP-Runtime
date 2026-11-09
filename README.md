@@ -17,7 +17,7 @@ OpenUI5 de type List Report / Object Page, sans système SAP.
 |---|---|---|
 | J1 | Parser BDEF (Chevrotain), parser SRVD, adaptateur CDS (abaplint), IR, `rapt check`, `rapt ir` | fait |
 | J2 | Générateurs SQL (PostgreSQL) et `$metadata` (CSDL), `rapt build` | fait |
-| J3 | Runtime OData V4 en lecture | à faire |
+| J3 | Runtime OData V4 en lecture (Fastify, `$batch`, CSRF, OIDC Bearer) | fait |
 | J4 | Écriture, runtime RAP managed, EML, behavior pool transpilé | à faire |
 | J5 | UI OpenUI5 générée | à faire |
 | J6 | Docker, OIDC, tests de bout en bout | à faire |
