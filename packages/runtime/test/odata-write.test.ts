@@ -128,6 +128,32 @@ describe("OData writes on the managed runtime", () => {
     expect(again.body).toMatchObject({ error: { message: `The action acceptTravel is not possible for Travel(${T1})` } });
   });
 
+  it("returns the success messages of an action in sap-messages (T100 text)", async () => {
+    const response = await send("POST", `Travel(${T3})/${NS}.acceptTravel`, {}, { "if-match": "*" });
+    expect(response.status).toBe(200);
+    expect(JSON.parse(String(response.headers["sap-messages"]))).toEqual([{ code: "ZRT_TRAVEL/002", message: "Travel 00000003 accepted", numericSeverity: 1, transition: true }]);
+  });
+
+  it("calls an action with a parameter of an abstract entity", async () => {
+    const response = await send("POST", `Travel(${T1})/${NS}.deductDiscount`, { DiscountPercent: 10 }, { "if-match": "*" });
+    expect(response.status).toBe(200);
+    // 20.00 - 10 %; the determination recalculates the total: 18.00 + 1500.50
+    expect(response.body).toMatchObject({ TravelUUID: T1, BookingFee: "18.00", TotalPrice: "1518.50" });
+    const refused = await send("POST", `Travel(${T1})/${NS}.deductDiscount`, { DiscountPercent: 0 }, { "if-match": "*" });
+    expect(refused.status).toBe(400);
+    expect(refused.body).toMatchObject({ error: { code: "ZRT_TRAVEL/001", message: "The discount must be between 1 and 100 %, not 0 %" } });
+    expect((await send("POST", `Travel(${T1})/${NS}.deductDiscount`, { Discount: 1 }, { "if-match": "*" })).status).toBe(400);
+  });
+
+  it("calls a factory action: the new instance is the result", async () => {
+    const response = await send("POST", `Travel(${T2})/${NS}.copyTravel`, {}, { "if-match": "*" });
+    expect(response.status).toBe(200);
+    expect(response.body).toMatchObject({ TravelID: "00000002", Description: "Copy of Business trip to Berlin", OverallStatus: "O", TotalPrice: "10.00" });
+    expect(response.body["TravelUUID"]).not.toBe(T2);
+    const copies = await get("Travel?$filter=TravelID eq '00000002'&$count=true");
+    expect(copies.body["@odata.count"]).toBe(2);
+  });
+
   it("returns the instance feature control with the rows read", async () => {
     const list = await get(`Travel?$select=TravelUUID,OverallStatus,__OperationControl&$orderby=TravelID`);
     expect(list.body["value"]).toEqual([

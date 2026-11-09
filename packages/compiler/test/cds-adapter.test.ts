@@ -79,8 +79,17 @@ describe("CDS adapter over abaplint", () => {
     const status = extension.elements.find((e) => e.name === "OverallStatus");
     expect(status?.annotations).toEqual({
       ui: {
-        lineitem: [{ position: 70, importance: "#HIGH" }, { type: "#FOR_ACTION", dataaction: "acceptTravel", label: "Accept Travel" }],
-        identification: [{ position: 50 }, { type: "#FOR_ACTION", dataaction: "acceptTravel", label: "Accept Travel" }],
+        lineitem: [
+          { position: 70, importance: "#HIGH" },
+          { type: "#FOR_ACTION", dataaction: "acceptTravel", label: "Accept Travel" },
+          { type: "#FOR_ACTION", dataaction: "copyTravel", label: "Copy Travel" },
+        ],
+        identification: [
+          { position: 50 },
+          { type: "#FOR_ACTION", dataaction: "acceptTravel", label: "Accept Travel" },
+          { type: "#FOR_ACTION", dataaction: "deductDiscount", label: "Deduct Discount" },
+          { type: "#FOR_ACTION", dataaction: "copyTravel", label: "Copy Travel" },
+        ],
         selectionfield: [{ position: 40 }],
       },
     });

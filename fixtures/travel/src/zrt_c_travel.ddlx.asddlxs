@@ -52,9 +52,12 @@ annotate entity ZRT_C_Travel with
   Description;
 
   @UI: { lineItem:       [ { position: 70, importance: #HIGH },
-                           { type: #FOR_ACTION, dataAction: 'acceptTravel', label: 'Accept Travel' } ],
+                           { type: #FOR_ACTION, dataAction: 'acceptTravel', label: 'Accept Travel' },
+                           { type: #FOR_ACTION, dataAction: 'copyTravel', label: 'Copy Travel' } ],
          identification: [ { position: 50 },
-                           { type: #FOR_ACTION, dataAction: 'acceptTravel', label: 'Accept Travel' } ],
+                           { type: #FOR_ACTION, dataAction: 'acceptTravel', label: 'Accept Travel' },
+                           { type: #FOR_ACTION, dataAction: 'deductDiscount', label: 'Deduct Discount' },
+                           { type: #FOR_ACTION, dataAction: 'copyTravel', label: 'Copy Travel' } ],
          selectionField: [ { position: 40 } ] }
   OverallStatus;
 

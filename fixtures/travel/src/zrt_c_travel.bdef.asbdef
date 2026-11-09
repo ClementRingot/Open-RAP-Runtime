@@ -9,6 +9,8 @@ use etag
   use delete;
 
   use action acceptTravel;
+  use action deductDiscount;
+  use action copyTravel;
 
   use association _Booking { create; }
 }

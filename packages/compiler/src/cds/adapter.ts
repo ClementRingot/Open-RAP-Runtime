@@ -121,6 +121,20 @@ class AdapterContext {
     const topTokens = tree.getChildren().filter(isToken).map((t) => tokenText(t).toUpperCase());
     const names = tree.findDirectExpressions(E.CDSName);
     const nameNode = names[0];
+    // the annotations of the entity are those before its body: in abstract and custom entities, the
+    // annotations of the elements are direct children of the definition too
+    const header: abaplint.Nodes.ExpressionNode[] = [];
+    for (const child of tree.getChildren()) {
+      if (isToken(child)) {
+        if (tokenText(child) === "{") {
+          break;
+        }
+        continue;
+      }
+      if (child.get() instanceof E.CDSAnnotation) {
+        header.push(child);
+      }
+    }
     const entity: CdsEntityAst = {
       kind,
       statement: statement.constructor.name,
@@ -128,7 +142,7 @@ class AdapterContext {
       root: topTokens.includes("ROOT"),
       hasJoin: false,
       hasWhere: false,
-      annotations: this.annotations(tree.findDirectExpressions(E.CDSAnnotation)),
+      annotations: this.annotations(header),
       elements: [],
       associations: [],
       loc: this.loc(nameNode ?? tree),

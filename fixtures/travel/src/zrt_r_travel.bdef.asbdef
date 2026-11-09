@@ -17,6 +17,8 @@ etag master LocalLastChangedAt
   field ( mandatory ) TravelID, AgencyID, CustomerID, BeginDate, EndDate, CurrencyCode;
 
   action ( features : instance ) acceptTravel result [1] $self;
+  action deductDiscount parameter ZRT_A_Discount result [1] $self;
+  factory action copyTravel [1];
   internal action reCalcTotalPrice;
 
   determination setStatusOpen on modify { create; }

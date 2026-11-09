@@ -76,6 +76,8 @@ describe("IR of the Travel fixture", () => {
     });
     expect(travel?.actions.map((a) => [a.name, a.handler?.method, a.handler?.params.result])).toEqual([
       ["acceptTravel", "accepttravel", "result"],
+      ["deductDiscount", "deductdiscount", "result"],
+      ["copyTravel", "copytravel", undefined],
       ["reCalcTotalPrice", "recalctotalprice", undefined],
     ]);
     expect(travel?.globalAuthorizationHandler?.params).toMatchObject({ requested: "requested_authorizations", result: "result" });

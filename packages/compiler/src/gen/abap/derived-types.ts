@@ -46,9 +46,9 @@ export function abapTypeText(t: AbapType): string {
     case "utclong":
       return "utclong";
     case "int1":
-      return "int1";
     case "int2":
-      return "int2";
+      // ABAP has no built-in names for them (the DDIC types are INT1 and INT2): i holds their values
+      return "i";
     case "int4":
       return "i";
     case "int8":

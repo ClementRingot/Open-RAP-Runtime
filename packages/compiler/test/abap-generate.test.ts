@@ -115,7 +115,7 @@ describe("ABAP generation of the fixture", () => {
     expect(rewritten).toContain(
       `DATA bookings TYPE ${I}=>tt_e1_b1_rres. zrap_eml=>begin( bdef = \`ZRT_R_TRAVEL\` local = abap_true ). zrap_eml=>read_by_association( EXPORTING bdef = \`ZRT_R_TRAVEL\` entity = \`ZRT_R_TRAVEL\` association = \`_BOOKING\` fields = \`TRAVELUUID FLIGHTPRICE CURRENCYCODE\` keys = CORRESPONDING ${I}=>tt_e1_b1_rimp( travels ) CHANGING result = bookings ). zrap_eml=>end( ).`,
     );
-    expect(rewritten).toContain(`zrap_eml=>execute( bdef = \`ZRT_R_TRAVEL\` entity = \`ZRT_R_TRAVEL\` action = \`RECALCTOTALPRICE\` rows = CORRESPONDING ${I}=>tt_e1_a2_imp( keys ) ).`);
+    expect(rewritten).toContain(`zrap_eml=>execute( bdef = \`ZRT_R_TRAVEL\` entity = \`ZRT_R_TRAVEL\` action = \`RECALCTOTALPRICE\` rows = CORRESPONDING ${I}=>tt_e1_a4_imp( keys ) ).`);
     expect(rewritten).toContain("zrap_eml=>end( CHANGING failed = failed ).");
   });
 
@@ -132,7 +132,8 @@ describe("ABAP generation of the fixture", () => {
 
   it("reports unknown EML names on the original position", async () => {
     const { diagnostics } = await generate({ [ABP]: (c) => c.replace("FIELDS ( BeginDate EndDate )", "FIELDS ( BeginDate EndDat )") });
-    expect(diagnostics).toContainEqual(expect.objectContaining({ code: "ABP006", message: "Travel has no field EndDat", file: `src/${ABP}`, line: 136 }));
+    const line = readFixture(ABP).split("\n").findIndex((l) => l.includes("FIELDS ( BeginDate EndDate )")) + 1;
+    expect(diagnostics).toContainEqual(expect.objectContaining({ code: "ABP006", message: "Travel has no field EndDat", file: `src/${ABP}`, line }));
   });
 
   it("reports typing errors of the rewritten code on the original line", async () => {

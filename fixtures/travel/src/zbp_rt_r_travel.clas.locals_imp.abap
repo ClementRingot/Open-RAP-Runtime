@@ -15,6 +15,12 @@ CLASS lhc_travel DEFINITION INHERITING FROM cl_abap_behavior_handler.
     METHODS acceptTravel FOR MODIFY
       IMPORTING keys FOR ACTION Travel~acceptTravel RESULT result.
 
+    METHODS deductDiscount FOR MODIFY
+      IMPORTING keys FOR ACTION Travel~deductDiscount RESULT result.
+
+    METHODS copyTravel FOR MODIFY
+      IMPORTING keys FOR ACTION Travel~copyTravel.
+
     METHODS reCalcTotalPrice FOR MODIFY
       IMPORTING keys FOR ACTION Travel~reCalcTotalPrice.
 
@@ -43,6 +49,12 @@ CLASS lhc_travel IMPLEMENTATION.
     ENDIF.
     IF requested_authorizations-%action-acceptTravel = if_abap_behv=>mk-on.
       result-%action-acceptTravel = if_abap_behv=>auth-allowed.
+    ENDIF.
+    IF requested_authorizations-%action-deductDiscount = if_abap_behv=>mk-on.
+      result-%action-deductDiscount = if_abap_behv=>auth-allowed.
+    ENDIF.
+    IF requested_authorizations-%action-copyTravel = if_abap_behv=>mk-on.
+      result-%action-copyTravel = if_abap_behv=>auth-allowed.
     ENDIF.
   ENDMETHOD.
 
@@ -77,6 +89,88 @@ CLASS lhc_travel IMPLEMENTATION.
     result = VALUE #( FOR travel IN travels
                       ( %tky   = travel-%tky
                         %param = travel ) ).
+
+    reported-travel = VALUE #( FOR travel IN travels
+                               ( %tky = travel-%tky
+                                 %msg = new_message( id       = 'ZRT_TRAVEL'
+                                                     number   = '002'
+                                                     severity = if_abap_behv_message=>severity-success
+                                                     v1       = travel-TravelID ) ) ).
+  ENDMETHOD.
+
+  METHOD deductDiscount.
+    " Reduces the booking fee by the percentage given as parameter.
+    DATA travels_for_update TYPE TABLE FOR UPDATE zrt_r_travel\\Travel.
+
+    READ ENTITIES OF zrt_r_travel IN LOCAL MODE
+      ENTITY Travel
+        FIELDS ( BookingFee ) WITH CORRESPONDING #( keys )
+      RESULT DATA(travels).
+
+    LOOP AT keys INTO DATA(key).
+      IF key-%param-DiscountPercent < 1 OR key-%param-DiscountPercent > 100.
+        APPEND VALUE #( %tky = key-%tky ) TO failed-travel.
+        APPEND VALUE #( %tky = key-%tky
+                        %msg = new_message( id       = 'ZRT_TRAVEL'
+                                            number   = '001'
+                                            severity = if_abap_behv_message=>severity-error
+                                            v1       = key-%param-DiscountPercent ) ) TO reported-travel.
+        CONTINUE.
+      ENDIF.
+      READ TABLE travels INTO DATA(travel) WITH KEY TravelUUID = key-TravelUUID.
+      IF sy-subrc = 0.
+        APPEND VALUE #( %tky       = travel-%tky
+                        BookingFee = travel-BookingFee * ( 100 - key-%param-DiscountPercent ) / 100 ) TO travels_for_update.
+      ENDIF.
+    ENDLOOP.
+
+    MODIFY ENTITIES OF zrt_r_travel IN LOCAL MODE
+      ENTITY Travel
+        UPDATE FIELDS ( BookingFee )
+        WITH travels_for_update.
+
+    READ ENTITIES OF zrt_r_travel IN LOCAL MODE
+      ENTITY Travel
+        ALL FIELDS WITH CORRESPONDING #( travels_for_update )
+      RESULT DATA(updated).
+
+    result = VALUE #( FOR u IN updated
+                      ( %tky   = u-%tky
+                        %param = u ) ).
+  ENDMETHOD.
+
+  METHOD copyTravel.
+    " The copy is a new open travel with the same data and without bookings.
+    DATA copies TYPE TABLE FOR CREATE zrt_r_travel\\Travel.
+
+    READ ENTITIES OF zrt_r_travel IN LOCAL MODE
+      ENTITY Travel
+        ALL FIELDS WITH CORRESPONDING #( keys )
+      RESULT DATA(travels).
+
+    LOOP AT keys INTO DATA(key).
+      READ TABLE travels INTO DATA(travel) WITH KEY TravelUUID = key-TravelUUID.
+      IF sy-subrc <> 0.
+        CONTINUE.
+      ENDIF.
+      APPEND VALUE #( %cid         = key-%cid
+                      TravelID     = travel-TravelID
+                      AgencyID     = travel-AgencyID
+                      CustomerID   = travel-CustomerID
+                      BeginDate    = travel-BeginDate
+                      EndDate      = travel-EndDate
+                      BookingFee   = travel-BookingFee
+                      CurrencyCode = travel-CurrencyCode
+                      Description  = |Copy of { travel-Description }| ) TO copies.
+    ENDLOOP.
+
+    MODIFY ENTITIES OF zrt_r_travel IN LOCAL MODE
+      ENTITY Travel
+        CREATE FIELDS ( TravelID AgencyID CustomerID BeginDate EndDate BookingFee CurrencyCode Description )
+        WITH copies
+      MAPPED DATA(created).
+
+    mapped-travel = created-travel.
   ENDMETHOD.
 
   METHOD reCalcTotalPrice.

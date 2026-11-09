@@ -36,13 +36,15 @@ describe("BDEF parser: fixture", () => {
       [["readonly"], 7],
       [["mandatory"], 6],
     ]);
-    const [accept, recalc] = items(travel, "action");
+    const [accept, discount, copy, recalc] = items(travel, "action");
     expect(accept).toMatchObject({
       name: { text: "acceptTravel" },
       internal: false,
       options: [{ name: "features", value: "instance" }],
       result: { selective: false, cardinality: { min: 1, max: 1 }, entity: { text: "$self" }, entityKeyword: false },
     });
+    expect(discount).toMatchObject({ name: { text: "deductDiscount" }, parameter: { text: "ZRT_A_Discount" }, result: { entity: { text: "$self" } } });
+    expect(copy).toMatchObject({ name: { text: "copyTravel" }, factory: true, factoryCardinality: { min: 1, max: 1 } });
     expect(recalc).toMatchObject({ name: { text: "reCalcTotalPrice" }, internal: true });
     expect(recalc?.result).toBeUndefined();
     expect(items(travel, "determination").map((d) => [d.name.text, d.on, d.triggers.create, d.triggers.fields.map((f) => f.text)])).toEqual([

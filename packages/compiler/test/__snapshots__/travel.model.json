@@ -372,6 +372,41 @@
   ],
   "entities": [
     {
+      "name": "ZRT_A_Discount",
+      "kind": "abstract",
+      "root": false,
+      "fields": [
+        {
+          "name": "DiscountPercent",
+          "type": {
+            "kind": "int1"
+          },
+          "key": false,
+          "annotations": {
+            "endusertext": {
+              "label": "Discount (%)"
+            }
+          },
+          "src": {
+            "file": "src/zrt_a_discount.ddls.asddls",
+            "line": 5,
+            "column": 3
+          }
+        }
+      ],
+      "associations": [],
+      "annotations": {
+        "endusertext": {
+          "label": "Discount on the booking fee"
+        }
+      },
+      "src": {
+        "file": "src/zrt_a_discount.ddls.asddls",
+        "line": 2,
+        "column": 24
+      }
+    },
+    {
       "name": "ZRT_C_Booking",
       "kind": "projection",
       "root": false,
@@ -1162,6 +1197,11 @@
                   "type": "#FOR_ACTION",
                   "dataaction": "acceptTravel",
                   "label": "Accept Travel"
+                },
+                {
+                  "type": "#FOR_ACTION",
+                  "dataaction": "copyTravel",
+                  "label": "Copy Travel"
                 }
               ],
               "identification": [
@@ -1172,6 +1212,16 @@
                   "type": "#FOR_ACTION",
                   "dataaction": "acceptTravel",
                   "label": "Accept Travel"
+                },
+                {
+                  "type": "#FOR_ACTION",
+                  "dataaction": "deductDiscount",
+                  "label": "Deduct Discount"
+                },
+                {
+                  "type": "#FOR_ACTION",
+                  "dataaction": "copyTravel",
+                  "label": "Copy Travel"
                 }
               ],
               "selectionfield": [
@@ -2114,6 +2164,34 @@
                 "line": 11,
                 "column": 3
               }
+            },
+            {
+              "name": "deductDiscount",
+              "kind": "action",
+              "static": false,
+              "factory": false,
+              "internal": false,
+              "precheck": false,
+              "use": true,
+              "src": {
+                "file": "src/zrt_c_travel.bdef.asbdef",
+                "line": 12,
+                "column": 3
+              }
+            },
+            {
+              "name": "copyTravel",
+              "kind": "action",
+              "static": false,
+              "factory": false,
+              "internal": false,
+              "precheck": false,
+              "use": true,
+              "src": {
+                "file": "src/zrt_c_travel.bdef.asbdef",
+                "line": 13,
+                "column": 3
+              }
             }
           ],
           "sideEffects": [],
@@ -2163,7 +2241,7 @@
           "precheckHandlers": {},
           "src": {
             "file": "src/zrt_c_travel.bdef.asbdef",
-            "line": 16,
+            "line": 18,
             "column": 1
           }
         }
@@ -2269,7 +2347,7 @@
               },
               "src": {
                 "file": "src/zrt_r_travel.bdef.asbdef",
-                "line": 22,
+                "line": 24,
                 "column": 3
               },
               "handler": {
@@ -2298,7 +2376,7 @@
               },
               "src": {
                 "file": "src/zrt_r_travel.bdef.asbdef",
-                "line": 23,
+                "line": 25,
                 "column": 3
               },
               "handler": {
@@ -2327,7 +2405,7 @@
               },
               "src": {
                 "file": "src/zrt_r_travel.bdef.asbdef",
-                "line": 25,
+                "line": 27,
                 "column": 3
               },
               "handler": {
@@ -2378,6 +2456,68 @@
               }
             },
             {
+              "name": "deductDiscount",
+              "kind": "action",
+              "static": false,
+              "factory": false,
+              "internal": false,
+              "precheck": false,
+              "src": {
+                "file": "src/zrt_r_travel.bdef.asbdef",
+                "line": 20,
+                "column": 3
+              },
+              "parameter": "ZRT_A_Discount",
+              "result": {
+                "cardinality": {
+                  "min": 1,
+                  "max": 1
+                },
+                "entity": "$self",
+                "selective": false
+              },
+              "handler": {
+                "classKey": "CLAS-ZBP_RT_R_TRAVEL-LHC_TRAVEL",
+                "className": "LHC_TRAVEL",
+                "method": "deductdiscount",
+                "params": {
+                  "failed": "failed",
+                  "reported": "reported",
+                  "keys": "keys",
+                  "result": "result",
+                  "mapped": "mapped"
+                }
+              }
+            },
+            {
+              "name": "copyTravel",
+              "kind": "action",
+              "static": false,
+              "factory": true,
+              "internal": false,
+              "precheck": false,
+              "src": {
+                "file": "src/zrt_r_travel.bdef.asbdef",
+                "line": 21,
+                "column": 3
+              },
+              "factoryCardinality": {
+                "min": 1,
+                "max": 1
+              },
+              "handler": {
+                "classKey": "CLAS-ZBP_RT_R_TRAVEL-LHC_TRAVEL",
+                "className": "LHC_TRAVEL",
+                "method": "copytravel",
+                "params": {
+                  "failed": "failed",
+                  "reported": "reported",
+                  "keys": "keys",
+                  "mapped": "mapped"
+                }
+              }
+            },
+            {
               "name": "reCalcTotalPrice",
               "kind": "action",
               "static": false,
@@ -2386,7 +2526,7 @@
               "precheck": false,
               "src": {
                 "file": "src/zrt_r_travel.bdef.asbdef",
-                "line": 20,
+                "line": 22,
                 "column": 3
               },
               "handler": {
@@ -2535,7 +2675,7 @@
               },
               "src": {
                 "file": "src/zrt_r_travel.bdef.asbdef",
-                "line": 62,
+                "line": 64,
                 "column": 3
               },
               "handler": {
@@ -2557,7 +2697,7 @@
           "precheckHandlers": {},
           "src": {
             "file": "src/zrt_r_travel.bdef.asbdef",
-            "line": 48,
+            "line": 50,
             "column": 1
           },
           "persistentTable": "zrt_booking",
@@ -2601,5 +2741,10 @@
       "strict": 2
     }
   ],
-  "messageClasses": {}
+  "messageClasses": {
+    "ZRT_TRAVEL": {
+      "001": "The discount must be between 1 and 100 %, not &1 %",
+      "002": "Travel &1 accepted"
+    }
+  }
 }

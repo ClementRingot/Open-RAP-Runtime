@@ -66,6 +66,15 @@
         <Parameter Name="_it" Type="SAP__self.TravelType" Nullable="false"/>
         <ReturnType Type="SAP__self.TravelType" Nullable="false"/>
       </Action>
+      <Action Name="deductDiscount" IsBound="true" EntitySetPath="_it">
+        <Parameter Name="_it" Type="SAP__self.TravelType" Nullable="false"/>
+        <Parameter Name="DiscountPercent" Type="Edm.Byte" Nullable="false"/>
+        <ReturnType Type="SAP__self.TravelType" Nullable="false"/>
+      </Action>
+      <Action Name="copyTravel" IsBound="true" EntitySetPath="_it">
+        <Parameter Name="_it" Type="SAP__self.TravelType" Nullable="false"/>
+        <ReturnType Type="SAP__self.TravelType" Nullable="false"/>
+      </Action>
       <EntityContainer Name="Container">
         <EntitySet Name="Travel" EntityType="SAP__self.TravelType">
           <NavigationPropertyBinding Path="_Booking" Target="Booking"/>
@@ -194,6 +203,10 @@
               <PropertyValue Property="Action" String="com.sap.gateway.srvd.zrt_ui_travel.v0001.acceptTravel"/>
               <PropertyValue Property="Label" String="Accept Travel"/>
             </Record>
+            <Record Type="UI.DataFieldForAction">
+              <PropertyValue Property="Action" String="com.sap.gateway.srvd.zrt_ui_travel.v0001.copyTravel"/>
+              <PropertyValue Property="Label" String="Copy Travel"/>
+            </Record>
           </Collection>
         </Annotation>
         <Annotation Term="UI.Identification">
@@ -216,6 +229,14 @@
             <Record Type="UI.DataFieldForAction">
               <PropertyValue Property="Action" String="com.sap.gateway.srvd.zrt_ui_travel.v0001.acceptTravel"/>
               <PropertyValue Property="Label" String="Accept Travel"/>
+            </Record>
+            <Record Type="UI.DataFieldForAction">
+              <PropertyValue Property="Action" String="com.sap.gateway.srvd.zrt_ui_travel.v0001.deductDiscount"/>
+              <PropertyValue Property="Label" String="Deduct Discount"/>
+            </Record>
+            <Record Type="UI.DataFieldForAction">
+              <PropertyValue Property="Action" String="com.sap.gateway.srvd.zrt_ui_travel.v0001.copyTravel"/>
+              <PropertyValue Property="Label" String="Copy Travel"/>
             </Record>
           </Collection>
         </Annotation>
@@ -502,6 +523,9 @@
       </Annotations>
       <Annotations Target="SAP__self.acceptTravel(SAP__self.TravelType)">
         <Annotation Term="Core.OperationAvailable" Path="_it/__OperationControl/acceptTravel"/>
+      </Annotations>
+      <Annotations Target="SAP__self.deductDiscount(SAP__self.TravelType)/DiscountPercent">
+        <Annotation Term="Common.Label" String="Discount (%)"/>
       </Annotations>
     </Schema>
   </edmx:DataServices>
