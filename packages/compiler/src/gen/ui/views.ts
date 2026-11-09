@@ -195,7 +195,7 @@ function childTable(section: Extract<UiSection, { kind: "table" }>): string {
               <items>
                 <ColumnListItem type="{= \${ui>/editMode} ? 'Inactive' : 'Navigation' }" press=".onChildPress">
                   <cells>
-                    ${table.columns.map((c) => `<VBox>${displayOrInput(c, undefined)}</VBox>`).join("\n                    ")}
+                    ${table.columns.map((c) => `<VBox${c.kind === "amount" || c.kind === "decimal" || c.kind === "integer" ? ' alignItems="End"' : ""}>${displayOrInput(c, undefined)}</VBox>`).join("\n                    ")}
                   </cells>
                 </ColumnListItem>
               </items>

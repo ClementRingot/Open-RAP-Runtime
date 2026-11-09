@@ -158,3 +158,21 @@ n'utilise pas.
 | Paramètres `sap-*` | ✅ | Ignorés. |
 | Authentification : mode dev, Bearer JWT (OIDC, JWKS) | ✅ | Sessions navigateur : J6. |
 | `$apply`, JSON batch, `$value`, propriétés seules | ❌ | Hors MVP. |
+
+## UI générée (OpenUI5)
+
+| Fonctionnalité | Statut | Note |
+|---|---|---|
+| List Report : colonnes (`UI.lineItem`), tri (`UI.presentationVariant`), pagination continue | ✅ | `sap.f.DynamicPage`, `sap.m.Table`. |
+| Champs de filtre (`UI.selectionField`), recherche (`@Search.searchable`) | ✅ | Texte : `contains` insensible à la casse ; dates et nombres : égalité. |
+| Création non-draft depuis la List Report | ✅ | Object Page en mode création, `POST` à l'enregistrement. |
+| Suppression, actions de la table (`#FOR_ACTION` dans `UI.lineItem`) | ✅ | Sur la ligne sélectionnée. |
+| Object Page : en-tête (`UI.headerInfo`), sections (`UI.facet` : identification, groupes de champs, tables) | ✅ | `sap.uxap.ObjectPageLayout`. |
+| Édition et sauvegarde (PATCH dans un change set, `If-Match`) | ✅ | Annulation par `resetChanges`. |
+| Tables des compositions, création et suppression d'enfants en mode édition | 🟡 | Affichage et navigation testés ; création et suppression d'enfants non couvertes par un test navigateur. |
+| Actions d'en-tête (`UI.identification`), paramètres (dialogue), actions factory | 🟡 | Action sans paramètre testée dans le navigateur ; paramètres et factory testés en OData. |
+| Feature control : actions (`__OperationControl`), Edit/Delete (`__EntityControl`), champs (`__FieldControl`) | 🟡 | Actions testées dans le navigateur. |
+| Champs en lecture seule, obligatoires, modifiables à la création seulement | ✅ | Depuis les caractéristiques de champ de la BDEF. |
+| Messages (erreurs, succès) | ✅ | `MessageBox`, `MessageToast`, `MessagePopover`. |
+| Aide à la saisie (value help), variantes, personnalisation de table | ❌ | Prévu après le MVP. |
+

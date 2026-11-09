@@ -98,6 +98,13 @@ et la conséquence. Les numéros D1 à D13 correspondent aux points 1 à 13 du �
 - **Décision** : contrôles `sap.m`, `sap.f`, `sap.uxap`, `sap.ui.layout`, thème `sap_horizon`,
   ODataModel V4 avec `autoExpandSelect`. `sap.ui.mdc` est une évolution possible.
 - **Pourquoi** : bibliothèques Apache-2.0 ; le ODataModel V4 est celui de Fiori Elements V4.
+- **Réalisation (J5)** : `rapt build` écrit `ui/` : une vue XML de List Report par entity set
+  racine et une vue d'Object Page par entity set, générées depuis les annotations `@UI` (même
+  dérivation que le CSDL), et des contrôleurs génériques pilotés par `ui/model/layout.json`
+  (filtres, recherche, création non-draft, édition et sauvegarde par `submitBatch`, suppression,
+  actions avec dialogue de paramètres, actions factory, tables de compositions éditables,
+  messages). Le feature control passe par `__OperationControl`, `__EntityControl` et
+  `__FieldControl`, que l'ODataModel sélectionne lui-même.
 
 ## D11 — Exécution ABP sérialisée, réentrante dans un même LUW
 
@@ -248,4 +255,16 @@ et la conséquence. Les numéros D1 à D13 correspondent aux points 1 à 13 du �
   modèle de persistance d'un BO managed passe par l'EML. Une erreur à la génération vaut mieux
   qu'une erreur à l'exécution. L'accès SQL en lecture (contrôle d'existence d'une agence, par
   exemple) est une évolution possible (KNOWN_GAPS.md).
+
+## D27 — Ressources OpenUI5 servies depuis les paquets npm
+
+- **Décision** : le runtime sert `/resources/` à partir des paquets npm d'OpenUI5 (`@openui5/*`
+  1.136, Apache-2.0) : les sources des bibliothèques telles quelles, et les thèmes compilés à la
+  première demande avec `less-openui5` (Apache-2.0), puis gardés en mémoire. `/ui/` sert
+  l'application générée.
+- **Pourquoi** : le CDN d'OpenUI5 n'est pas toujours joignable (il ne l'est pas depuis
+  l'environnement de développement de ce projet) et une application autonome ne doit pas en
+  dépendre ; npm suffit, sans outillage UI5 au démarrage. Le premier chargement demande environ
+  400 modules : un bundle construit par l'outillage UI5 (`ui5 build`) est prévu pour l'image
+  Docker (J6).
 

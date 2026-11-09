@@ -48,6 +48,19 @@ Le socle ABAP « clean-room » généré dans chaque application (`if_abap_behv`
 partir des signatures publiques documentées par SAP ; aucun code SAP n'est copié. Il est sous la
 licence MIT du dépôt.
 
+### Interface générée (OpenUI5)
+
+Dépendances des applications générées (J6) ; devDependencies de `@rap-transpiler/runtime` pour
+ses tests.
+
+| Paquet | Version | Licence | Usage | Vérifié le |
+|---|---|---|---|---|
+| `@openui5/sap.ui.core`, `sap.m`, `sap.f`, `sap.uxap`, `sap.ui.layout`, `sap.ui.unified` | 1.136.22 | Apache-2.0 | Bibliothèques OpenUI5 de l'UI | 2026-11-09 |
+| `@openui5/themelib_sap_horizon` | 1.136.22 | Apache-2.0 | Thème SAP Horizon | 2026-11-09 |
+| `less-openui5` | 0.12.0 | Apache-2.0 | Compilation des thèmes à la première demande (D27) | 2026-11-09 |
+
+Dépendances transitives : `@adobe/css-tools` et `mime` (MIT).
+
 ## Outillage de développement (non distribué)
 
 | Paquet | Version | Licence | Usage |
@@ -57,6 +70,7 @@ licence MIT du dépôt.
 | `@types/node` | 22.20.5 | MIT | Types Node.js |
 | `@electric-sql/pglite` | 0.5.16 | Apache-2.0 | PostgreSQL en processus (WASM) pour les tests (D18) |
 | `@types/pg` | 8.x | MIT | Types de `pg` |
+| `playwright` | 1.63 | Apache-2.0 | Tests de l'UI dans Chromium (pré-installé dans l'environnement de développement ; ajouté en J6 pour la CI) |
 
 Dépendances transitives de développement : MIT pour la plupart, plus `picocolors` (ISC),
 `source-map-js` (BSD-3-Clause), `detect-libc` et `expect-type` (Apache-2.0).

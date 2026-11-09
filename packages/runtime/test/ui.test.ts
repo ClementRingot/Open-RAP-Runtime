@@ -26,6 +26,7 @@ interface Page {
   waitForFunction(fn: string, arg?: unknown, options?: { timeout?: number }): Promise<unknown>;
   on(event: string, listener: (value: unknown) => void): void;
   screenshot(options: { path: string; fullPage?: boolean }): Promise<unknown>;
+  waitForTimeout(ms: number): Promise<void>;
 }
 interface Browser {
   newPage(options?: { viewport?: { width: number; height: number } }): Promise<Page>;
@@ -114,7 +115,24 @@ describe.skipIf(browserType === undefined)("generated UI (OpenUI5)", () => {
     await page.locator(id("TravelObject", "save")).click();
     await page.getByText("Changes saved").first().waitFor({ timeout: 30_000 });
     expect((await odata(`Travel(${T3})`))["Description"]).toBe("Ski holidays in the Alps");
-    if (SHOTS !== undefined) await page.screenshot({ path: path.join(SHOTS, "object-page.png"), fullPage: true });
+    if (SHOTS !== undefined) {
+      await page.waitForTimeout(1000);
+      await page.screenshot({ path: path.join(SHOTS, "object-page.png") });
+    }
+  }, 120_000);
+
+  it("shows the compositions of the object in a table and opens their Object Page", async () => {
+    const page = await open();
+    await page.locator(ROWS).last().click();
+    await page.getByText("Paris and Rome").first().waitFor({ timeout: 30_000 });
+    await page.waitForFunction(`document.querySelectorAll('${id("TravelObject", "table_Booking")} tr.sapMLIB').length === 3`, undefined, { timeout: 30_000 });
+    if (SHOTS !== undefined) {
+      await page.waitForTimeout(1000); // the page transition of sap.m.App
+      await page.screenshot({ path: path.join(SHOTS, "object-page-bookings.png") });
+    }
+    await page.locator(`${id("TravelObject", "table_Booking")} tr.sapMLIB`).first().click();
+    await page.locator(id("BookingObject", "edit")).waitFor({ timeout: 30_000 });
+    await page.waitForFunction(`(document.querySelector('${id("BookingObject", "text_field_Booking_FlightPrice")}') || {}).textContent?.includes("750.25")`, undefined, { timeout: 30_000 });
   }, 120_000);
 
   it("runs an action and disables it by instance feature control", async () => {

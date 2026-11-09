@@ -19,7 +19,7 @@ OpenUI5 de type List Report / Object Page, sans système SAP.
 | J2 | Générateurs SQL (PostgreSQL) et `$metadata` (CSDL), `rapt build` | fait |
 | J3 | Runtime OData V4 en lecture (Fastify, `$batch`, CSRF, OIDC Bearer) | fait |
 | J4 | Écriture, runtime RAP managed, EML, behavior pool transpilé | fait |
-| J5 | UI OpenUI5 générée | à faire |
+| J5 | UI OpenUI5 générée (List Report, Object Page) | fait |
 | J6 | Docker, OIDC, tests de bout en bout | à faire |
 
 ## Démarrage
@@ -47,6 +47,7 @@ db/schema.sql        tables et vues PostgreSQL
 odata/metadata.xml   $metadata (CSDL avec annotations UI)
 abap/*.mjs           behavior pool transpilé (abap/init.mjs charge l'ensemble)
 abap/src/            ABAP donné au transpiler : sources réécrites, types dérivés, socle clean-room
+ui/                  UI OpenUI5 : List Report et Object Pages générées depuis les annotations @UI
 ```
 
 Le behavior pool est réécrit avant transpilation : types dérivés de la BDEF, signatures des
