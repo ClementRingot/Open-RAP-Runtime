@@ -6,14 +6,18 @@ Ce tableau est mis à jour à chaque jalon.
 Légende : ✅ pris en charge et testé · 🟡 partiel (voir la note) · ⏳ prévu (jalon indiqué) ·
 ❌ hors périmètre (raison indiquée).
 
+Depuis J1, toutes les constructions de ces tableaux sont analysées et représentées dans l'IR,
+avec un diagnostic positionné pour celles qui sont hors périmètre ; le statut indique le
+comportement de l'application générée.
+
 ## BDEF : en-tête et entités
 
 | Fonctionnalité | Statut | Note |
 |---|---|---|
-| `managed implementation in class … unique` | ⏳ J1 | |
-| `strict`, `strict ( 2 )` | ⏳ J1 | Accepté ; les règles strictes sont celles de SAP, l'outil ne les revérifie pas toutes. |
-| `define root behavior for` / entité enfant, `alias` | ⏳ J1 | |
-| `persistent table` | ⏳ J1 | |
+| `managed implementation in class … unique` | ✅ | |
+| `strict`, `strict ( 2 )` | ✅ | Accepté ; les règles strictes sont celles de SAP, l'outil ne les revérifie pas toutes. |
+| `define root behavior for` / entité enfant, `alias` | ✅ | |
+| `persistent table` | ✅ | |
 | `lock master`, `lock dependent by` | ⏳ J4 | `SELECT … FOR UPDATE NOWAIT` sur la racine. |
 | `etag master`, `etag dependent by` | ⏳ J4 | |
 | `authorization master ( global )`, `( instance )`, `( global, instance )` | ⏳ J4 | Handlers appelés pour les requêtes OData (pas en local mode). |
@@ -100,19 +104,19 @@ Légende : ✅ pris en charge et testé · 🟡 partiel (voir la note) · ⏳ pr
 
 | Fonctionnalité | Statut | Note |
 |---|---|---|
-| BDEF `projection` : `use create/update/delete/action/association` | ⏳ J1 | |
+| BDEF `projection` : `use create/update/delete/action/association` | ✅ | |
 | `use etag` | ⏳ J4 | |
-| Éléments renommés ou omis dans la projection | ⏳ J1 | |
+| Éléments renommés ou omis dans la projection | ✅ | |
 | `augment`, precheck et actions propres à la projection | ❌ | Prévu après le MVP. |
 
 ## CDS et service
 
 | Fonctionnalité | Statut | Note |
 |---|---|---|
-| `define root view entity`, `define view entity`, `as projection on`, `provider contract` | ⏳ J1 | |
-| `composition`, `association to parent`, `redirected to` | ⏳ J1 | |
+| `define root view entity`, `define view entity`, `as projection on`, `provider contract` | ✅ | |
+| `composition`, `association to parent`, `redirected to` | ✅ | |
 | Associations vers des entités sans BO (entity sets en lecture seule) | ⏳ J3 | |
-| Métadonnées d'extension (DDLX) et fusion des annotations | ⏳ J1 | |
+| Métadonnées d'extension (DDLX) et fusion des annotations | ✅ | |
 | Entités abstraites (paramètres d'action) | ⏳ J4 | |
 | Expressions CDS (CASE, CAST, calculs, littéraux) | ❌ | Prévu après le MVP. |
 | Contrôle d'accès DCL | ❌ | `@AccessControl.authorizationCheck` est ignoré. |

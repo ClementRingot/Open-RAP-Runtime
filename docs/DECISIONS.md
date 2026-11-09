@@ -100,11 +100,15 @@ et la conséquence. Les numéros D1 à D13 correspondent aux points 1 à 13 du �
 - **Décision** : paquets `@rap-transpiler/model`, `@rap-transpiler/compiler`,
   `@rap-transpiler/runtime` ; CLI `rapt` ; licence MIT pour ce dépôt.
 
-## D13 — Corpus de test SAP-samples
+## D13 — Corpus de test des parsers
 
-- **Décision** : un petit extrait de sources BDEF et CDS des dépôts SAP-samples (Apache-2.0),
-  utilisé en lecture seule pour tester la robustesse des parsers, avec attribution dans
-  LICENSES.md.
+- **Décision initiale** : un extrait de sources BDEF et CDS des dépôts SAP-samples (Apache-2.0).
+- **Ajustement (J1)** : les dépôts SAP-samples ont été réorganisés et leurs chemins ne sont plus
+  trouvables par la recherche de code. Le corpus est donc écrit pour le projet
+  (`packages/compiler/test/bdef-parser.test.ts`) : noms à namespace, options d'opérations,
+  actions statiques, factory et internes, fonctions, side effects, mappings `control`, et les
+  constructions hors périmètre (draft, late numbering, événements…). Les mêmes sources sont
+  comparées au parser BDEF d'abaplint (D1). Un extrait SAP-samples pourra s'ajouter plus tard.
 
 ## D14 — Périmètre fonctionnel : un BO RAP managed non-draft complet
 

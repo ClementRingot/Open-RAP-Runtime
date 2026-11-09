@@ -1,0 +1,49 @@
+@Metadata.layer: #CORE
+@UI.headerInfo: {
+  typeName: 'Booking',
+  typeNamePlural: 'Bookings',
+  title: { type: #STANDARD, value: 'BookingID' }
+}
+annotate entity ZRT_C_Booking with
+{
+  @UI.facet: [ { id: 'Booking', purpose: #STANDARD, type: #IDENTIFICATION_REFERENCE, label: 'Booking', position: 10 } ]
+  @UI.hidden: true
+  BookingUUID;
+
+  @UI.hidden: true
+  TravelUUID;
+
+  @UI: { lineItem:       [ { position: 10, importance: #HIGH } ],
+         identification: [ { position: 10 } ] }
+  BookingID;
+
+  @UI: { lineItem:       [ { position: 20, importance: #MEDIUM } ],
+         identification: [ { position: 20 } ] }
+  BookingDate;
+
+  @UI: { lineItem:       [ { position: 30, importance: #HIGH } ],
+         identification: [ { position: 30 } ] }
+  CarrierID;
+
+  @UI: { lineItem:       [ { position: 40, importance: #HIGH } ],
+         identification: [ { position: 40 } ] }
+  ConnectionID;
+
+  @UI: { lineItem:       [ { position: 50, importance: #HIGH } ],
+         identification: [ { position: 50 } ] }
+  FlightDate;
+
+  @UI: { lineItem:       [ { position: 60, importance: #MEDIUM } ],
+         identification: [ { position: 60 } ] }
+  FlightPrice;
+
+  @UI.identification: [ { position: 70 } ]
+  CurrencyCode;
+
+  @UI: { lineItem:       [ { position: 70, importance: #LOW } ],
+         identification: [ { position: 80 } ] }
+  BookingStatus;
+
+  @UI.hidden: true
+  LocalLastChangedAt;
+}

@@ -1,0 +1,63 @@
+@Metadata.layer: #CORE
+@UI.headerInfo: {
+  typeName: 'Travel',
+  typeNamePlural: 'Travels',
+  title: { type: #STANDARD, value: 'TravelID' },
+  description: { type: #STANDARD, value: 'Description' }
+}
+@UI.presentationVariant: [ { sortOrder: [ { by: 'TravelID', direction: #DESC } ] } ]
+annotate entity ZRT_C_Travel with
+{
+  @UI.facet: [ { id: 'Travel', purpose: #STANDARD, type: #IDENTIFICATION_REFERENCE, label: 'Travel', position: 10 },
+               { id: 'Dates', purpose: #STANDARD, type: #FIELDGROUP_REFERENCE, targetQualifier: 'Dates', label: 'Dates', position: 20 },
+               { id: 'Prices', purpose: #STANDARD, type: #FIELDGROUP_REFERENCE, targetQualifier: 'Prices', label: 'Prices', position: 30 },
+               { id: 'Booking', purpose: #STANDARD, type: #LINEITEM_REFERENCE, label: 'Bookings', position: 40, targetElement: '_Booking' } ]
+  @UI.hidden: true
+  TravelUUID;
+
+  @UI: { lineItem:       [ { position: 10, importance: #HIGH } ],
+         identification: [ { position: 10 } ],
+         selectionField: [ { position: 10 } ] }
+  TravelID;
+
+  @UI: { lineItem:       [ { position: 20, importance: #HIGH } ],
+         identification: [ { position: 20 } ],
+         selectionField: [ { position: 20 } ] }
+  AgencyID;
+
+  @UI: { lineItem:       [ { position: 30, importance: #MEDIUM } ],
+         identification: [ { position: 30 } ],
+         selectionField: [ { position: 30 } ] }
+  CustomerID;
+
+  @UI: { lineItem:   [ { position: 40, importance: #MEDIUM } ],
+         fieldGroup: [ { qualifier: 'Dates', position: 10 } ] }
+  BeginDate;
+
+  @UI: { lineItem:   [ { position: 50, importance: #MEDIUM } ],
+         fieldGroup: [ { qualifier: 'Dates', position: 20 } ] }
+  EndDate;
+
+  @UI.fieldGroup: [ { qualifier: 'Prices', position: 10 } ]
+  BookingFee;
+
+  @UI: { lineItem:   [ { position: 60, importance: #MEDIUM } ],
+         fieldGroup: [ { qualifier: 'Prices', position: 20 } ] }
+  TotalPrice;
+
+  @UI.fieldGroup: [ { qualifier: 'Prices', position: 30 } ]
+  CurrencyCode;
+
+  @UI.identification: [ { position: 40 } ]
+  Description;
+
+  @UI: { lineItem:       [ { position: 70, importance: #HIGH },
+                           { type: #FOR_ACTION, dataAction: 'acceptTravel', label: 'Accept Travel' } ],
+         identification: [ { position: 50 },
+                           { type: #FOR_ACTION, dataAction: 'acceptTravel', label: 'Accept Travel' } ],
+         selectionField: [ { position: 40 } ] }
+  OverallStatus;
+
+  @UI.hidden: true
+  LocalLastChangedAt;
+}

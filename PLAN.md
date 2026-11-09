@@ -600,98 +600,25 @@ précision des horodatages ; mandant ignoré ; exécution ABP sérialisée.
 
 ## 10. Fixture Travel / Booking
 
-Format abapGit (`fixtures/travel/.abapgit.xml` et `fixtures/travel/src/`). Objets prévus :
+La fixture est livrée dans [fixtures/travel](fixtures/travel) (format abapGit) ; sa description
+détaillée est dans [fixtures/travel/README.md](fixtures/travel/README.md). Les objets portent le
+préfixe `ZRT_` pour éviter les collisions avec les objets des tutoriels RAP si on l'importe sur
+un vrai système.
 
 | Objet | Type | Rôle |
 |---|---|---|
-| `ZTRAVEL` | TABL | Table persistante des voyages |
-| `ZBOOKING` | TABL | Table persistante des réservations |
-| `ZR_TRAVEL` | DDLS, root view entity | Couche R, `composition [0..*] of ZR_Booking` |
-| `ZR_BOOKING` | DDLS, view entity | Enfant, `association to parent ZR_Travel` |
-| `ZC_TRAVEL`, `ZC_BOOKING` | DDLS, projections | `provider contract transactional_query`, `redirected to` |
-| `ZC_TRAVEL`, `ZC_BOOKING` | DDLX | Annotations UI (lineItem, selectionField, headerInfo, facet, identification, fieldGroup) |
-| `ZR_TRAVEL` | BDEF managed, strict(2) | Comportement |
-| `ZC_TRAVEL` | BDEF projection | `use …` |
-| `ZBP_R_TRAVEL` | CLAS, behavior pool | Validation, détermination, action |
-| `ZUI_TRAVEL` | SRVD | `expose ZC_Travel as Travel; expose ZC_Booking as Booking;` |
-| `ZUI_TRAVEL_O4` | SRVB (optionnel) | Binding OData V4 UI |
+| `ZRT_TRAVEL`, `ZRT_BOOKING` | TABL | Tables persistantes |
+| `ZRT_R_TRAVEL` | DDLS | Root view entity, `composition [0..*] of ZRT_R_Booking` |
+| `ZRT_R_BOOKING` | DDLS | View entity enfant, `association to parent` |
+| `ZRT_C_TRAVEL`, `ZRT_C_BOOKING` | DDLS, DDLX | Projections et annotations UI |
+| `ZRT_R_TRAVEL`, `ZRT_C_TRAVEL` | BDEF | Comportement managed strict(2) et projection |
+| `ZBP_RT_R_TRAVEL` | CLAS | Behavior pool |
+| `ZRT_UI_TRAVEL`, `ZRT_UI_TRAVEL_O4` | SRVD, SRVB | Service et binding OData V4 |
 
-Champs :
-
-- **Travel** : `TravelUUID` (clé, `SYSUUID_X16`, numérotation managed), `TravelID` (NUMC 8,
-  saisi), `AgencyID` (NUMC 6), `Description` (CHAR 256), `BeginDate` et `EndDate` (DATS),
-  `TotalPrice` (CURR 16,2) avec `CurrencyCode` (CUKY), `OverallStatus` (CHAR 1, en lecture
-  seule), champs d'administration (`CreatedBy`, `CreatedAt`, `LastChangedBy`, `LastChangedAt`,
-  `LocalLastChangedAt`, ce dernier en etag master).
-- **Booking** : `BookingUUID` (clé, managed), `TravelUUID` (parent, lecture seule), `BookingID`
-  (NUMC 4), `CarrierID` (CHAR 3), `ConnectionID` (NUMC 4), `FlightDate` (DATS), `FlightPrice`
-  (CURR) avec `CurrencyCode`, `LocalLastChangedAt` (etag master).
-
-Esquisse du BDEF de base (la version définitive sera livrée au J1) :
-
-```
-managed implementation in class zbp_r_travel unique;
-strict ( 2 );
-
-define behavior for ZR_Travel alias Travel
-persistent table ztravel
-lock master
-authorization master ( global )      // décision 7 : accepté mais ignoré par l'outil
-etag master LocalLastChangedAt
-{
-  create;
-  update;
-  delete;
-  association _Booking { create; }
-
-  field ( numbering : managed, readonly ) TravelUUID;
-  field ( readonly ) OverallStatus, CreatedBy, CreatedAt, LastChangedBy, LastChangedAt, LocalLastChangedAt;
-  field ( mandatory ) TravelID, AgencyID, BeginDate, EndDate;
-
-  determination setStatusOpen on modify { create; }
-  validation validateDates on save { create; field BeginDate, EndDate; }
-  action acceptTravel result [1] $self;
-
-  mapping for ztravel corresponding
-  {
-    TravelUUID = travel_uuid;
-    TravelID   = travel_id;
-    // … un couple par champ
-  }
-}
-
-define behavior for ZR_Booking alias Booking
-persistent table zbooking
-lock dependent by _Travel
-authorization dependent by _Travel
-etag master LocalLastChangedAt
-{
-  update;
-  delete;
-  association _Travel;
-
-  field ( numbering : managed, readonly ) BookingUUID;
-  field ( readonly ) TravelUUID, LocalLastChangedAt;
-  field ( mandatory ) BookingID, FlightDate;
-
-  mapping for zbooking corresponding { /* … */ }
-}
-```
-
-BDEF de projection : `use create; use update; use delete; use action acceptTravel;
-use association _Booking { create; }` pour Travel ; `use update; use delete;
-use association _Travel;` pour Booking ; `use etag` sur les deux.
-
-Behavior pool (ABAP pur, EML uniquement, aucun appel système) :
-
-- **`setStatusOpen`** (détermination on modify, à la création) : `READ ENTITIES … IN LOCAL MODE`
-  puis `MODIFY … UPDATE FIELDS ( OverallStatus )` à `'O'` si le statut est initial.
-- **`validateDates`** (validation on save) : dates renseignées et `EndDate >= BeginDate` ; sinon
-  `failed` et `reported` avec `new_message_with_text` et `%element-EndDate`.
-- **`acceptTravel`** (action) : passe `OverallStatus` à `'A'`, relit l'instance et remplit
-  `result-%param`.
-- **`get_global_authorizations`** : tout autorisé. Présent pour que la fixture s'active telle
-  quelle sur un vrai système ; jamais appelé par l'outil.
+Par rapport à l'esquisse initiale, la fixture couvre davantage de fonctionnalités non-draft
+(décision D14) : autorisation globale, feature control d'instance sur l'action `acceptTravel`,
+action interne `reCalcTotalPrice` appelée par deux déterminations `calculateTotalPrice`
+(sur Travel et sur Booking), avec une lecture `READ … BY \_Booking` et `READ … BY \_Travel`.
 
 ---
 
@@ -730,7 +657,7 @@ Formes envoyées par le ODataModel V4 d'UI5 et par une List Report / Object Page
 V4. Chemins relatifs à la racine du service, sauf la première ligne.
 
 ```
-HEAD /sap/opu/odata4/sap/zui_travel_o4/srvd/sap/zui_travel/0001/       X-CSRF-Token: Fetch
+HEAD /sap/opu/odata4/sap/zrt_ui_travel_o4/srvd/sap/zrt_ui_travel/0001/       X-CSRF-Token: Fetch
 GET  $metadata                                                         Accept: application/xml
 POST $batch                         Content-Type: multipart/mixed;boundary=batch_id-1731160000000-12
 
@@ -763,5 +690,5 @@ Accept-Language:fr
 | 13 | Création avec enfants (changeset) | `POST Travel`, corps `{"TravelID":"00000042", …, "_Booking":[{…}]}` |
 | 14 | Création d'un enfant (changeset) | `POST Travel(…)/_Booking` |
 | 15 | Suppression (changeset) | `DELETE Booking(…)`, `If-Match: W/"…"` |
-| 16 | Action | `POST Travel(…)/com.sap.gateway.srvd.zui_travel.v0001.acceptTravel`, `If-Match`, corps `{}`, éventuellement suivi de `?$select=…` |
+| 16 | Action | `POST Travel(…)/com.sap.gateway.srvd.zrt_ui_travel.v0001.acceptTravel`, `If-Match`, corps `{}`, éventuellement suivi de `?$select=…` |
 | 17 | Cas d'erreur | ETag périmé → 412 ; `If-Match` absent → 428 ; propriété inconnue dans `$select` → 400 ; validation en échec → 400 avec `details[].target` ; clé inexistante → 404 |

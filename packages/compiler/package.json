@@ -1,0 +1,32 @@
+{
+  "name": "@rap-transpiler/compiler",
+  "version": "0.1.0",
+  "description": "Compiles SAP RAP sources (abapGit format) into a standalone Node.js OData V4 application.",
+  "type": "module",
+  "license": "MIT",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "bin": {
+    "rapt": "./dist/cli.js"
+  },
+  "files": ["dist", "framework"],
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json"
+  },
+  "dependencies": {
+    "@abaplint/core": "2.120.98",
+    "@abaplint/transpiler": "2.14.24",
+    "@rap-transpiler/model": "workspace:*",
+    "chevrotain": "13.2.0",
+    "fast-xml-parser": "5.12.0"
+  }
+}

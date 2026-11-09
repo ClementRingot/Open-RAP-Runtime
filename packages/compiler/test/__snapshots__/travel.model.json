@@ -1,0 +1,2605 @@
+{
+  "formatVersion": 1,
+  "generator": {
+    "name": "rap-transpiler",
+    "version": "0.1.0"
+  },
+  "service": {
+    "name": "ZRT_UI_TRAVEL",
+    "binding": "ZRT_UI_TRAVEL_O4",
+    "version": "0001",
+    "namespace": "com.sap.gateway.srvd.zrt_ui_travel.v0001",
+    "path": "/sap/opu/odata4/sap/zrt_ui_travel_o4/srvd/sap/zrt_ui_travel/0001/",
+    "entitySets": [
+      {
+        "name": "Travel",
+        "entity": "ZRT_C_Travel"
+      },
+      {
+        "name": "Booking",
+        "entity": "ZRT_C_Booking"
+      }
+    ],
+    "annotations": {
+      "endusertext": {
+        "label": "Travel service"
+      }
+    }
+  },
+  "tables": [
+    {
+      "name": "zrt_booking",
+      "columns": [
+        {
+          "name": "client",
+          "type": {
+            "kind": "clnt",
+            "length": 3,
+            "dataElement": "MANDT"
+          },
+          "key": true,
+          "notNull": true,
+          "client": true
+        },
+        {
+          "name": "booking_uuid",
+          "type": {
+            "kind": "raw",
+            "length": 16,
+            "dataElement": "SYSUUID_X16"
+          },
+          "key": true,
+          "notNull": true,
+          "client": false
+        },
+        {
+          "name": "parent_uuid",
+          "type": {
+            "kind": "raw",
+            "length": 16,
+            "dataElement": "SYSUUID_X16"
+          },
+          "key": false,
+          "notNull": false,
+          "client": false
+        },
+        {
+          "name": "booking_id",
+          "type": {
+            "kind": "numc",
+            "length": 4
+          },
+          "key": false,
+          "notNull": false,
+          "client": false
+        },
+        {
+          "name": "booking_date",
+          "type": {
+            "kind": "dats",
+            "length": 8
+          },
+          "key": false,
+          "notNull": false,
+          "client": false
+        },
+        {
+          "name": "carrier_id",
+          "type": {
+            "kind": "char",
+            "length": 3
+          },
+          "key": false,
+          "notNull": false,
+          "client": false
+        },
+        {
+          "name": "connection_id",
+          "type": {
+            "kind": "numc",
+            "length": 4
+          },
+          "key": false,
+          "notNull": false,
+          "client": false
+        },
+        {
+          "name": "flight_date",
+          "type": {
+            "kind": "dats",
+            "length": 8
+          },
+          "key": false,
+          "notNull": false,
+          "client": false
+        },
+        {
+          "name": "flight_price",
+          "type": {
+            "kind": "curr",
+            "length": 16,
+            "decimals": 2
+          },
+          "key": false,
+          "notNull": false,
+          "client": false,
+          "reference": {
+            "table": "zrt_booking",
+            "field": "currency_code"
+          }
+        },
+        {
+          "name": "currency_code",
+          "type": {
+            "kind": "cuky",
+            "length": 5
+          },
+          "key": false,
+          "notNull": false,
+          "client": false
+        },
+        {
+          "name": "booking_status",
+          "type": {
+            "kind": "char",
+            "length": 1
+          },
+          "key": false,
+          "notNull": false,
+          "client": false
+        },
+        {
+          "name": "local_last_changed_at",
+          "type": {
+            "kind": "timestampl",
+            "length": 21,
+            "decimals": 7,
+            "dataElement": "ABP_LOCINST_LASTCHANGE_TSTMPL"
+          },
+          "key": false,
+          "notNull": false,
+          "client": false
+        }
+      ],
+      "src": {
+        "file": "src/zrt_booking.tabl.xml",
+        "line": 1,
+        "column": 1
+      },
+      "description": "Booking (rap-transpiler reference BO)"
+    },
+    {
+      "name": "zrt_travel",
+      "columns": [
+        {
+          "name": "client",
+          "type": {
+            "kind": "clnt",
+            "length": 3,
+            "dataElement": "MANDT"
+          },
+          "key": true,
+          "notNull": true,
+          "client": true
+        },
+        {
+          "name": "travel_uuid",
+          "type": {
+            "kind": "raw",
+            "length": 16,
+            "dataElement": "SYSUUID_X16"
+          },
+          "key": true,
+          "notNull": true,
+          "client": false
+        },
+        {
+          "name": "travel_id",
+          "type": {
+            "kind": "numc",
+            "length": 8
+          },
+          "key": false,
+          "notNull": false,
+          "client": false
+        },
+        {
+          "name": "agency_id",
+          "type": {
+            "kind": "numc",
+            "length": 6
+          },
+          "key": false,
+          "notNull": false,
+          "client": false
+        },
+        {
+          "name": "customer_id",
+          "type": {
+            "kind": "numc",
+            "length": 6
+          },
+          "key": false,
+          "notNull": false,
+          "client": false
+        },
+        {
+          "name": "begin_date",
+          "type": {
+            "kind": "dats",
+            "length": 8
+          },
+          "key": false,
+          "notNull": false,
+          "client": false
+        },
+        {
+          "name": "end_date",
+          "type": {
+            "kind": "dats",
+            "length": 8
+          },
+          "key": false,
+          "notNull": false,
+          "client": false
+        },
+        {
+          "name": "booking_fee",
+          "type": {
+            "kind": "curr",
+            "length": 16,
+            "decimals": 2
+          },
+          "key": false,
+          "notNull": false,
+          "client": false,
+          "reference": {
+            "table": "zrt_travel",
+            "field": "currency_code"
+          }
+        },
+        {
+          "name": "total_price",
+          "type": {
+            "kind": "curr",
+            "length": 16,
+            "decimals": 2
+          },
+          "key": false,
+          "notNull": false,
+          "client": false,
+          "reference": {
+            "table": "zrt_travel",
+            "field": "currency_code"
+          }
+        },
+        {
+          "name": "currency_code",
+          "type": {
+            "kind": "cuky",
+            "length": 5
+          },
+          "key": false,
+          "notNull": false,
+          "client": false
+        },
+        {
+          "name": "description",
+          "type": {
+            "kind": "char",
+            "length": 256
+          },
+          "key": false,
+          "notNull": false,
+          "client": false
+        },
+        {
+          "name": "overall_status",
+          "type": {
+            "kind": "char",
+            "length": 1
+          },
+          "key": false,
+          "notNull": false,
+          "client": false
+        },
+        {
+          "name": "created_by",
+          "type": {
+            "kind": "char",
+            "length": 12,
+            "dataElement": "ABP_CREATION_USER"
+          },
+          "key": false,
+          "notNull": false,
+          "client": false
+        },
+        {
+          "name": "created_at",
+          "type": {
+            "kind": "timestampl",
+            "length": 21,
+            "decimals": 7,
+            "dataElement": "ABP_CREATION_TSTMPL"
+          },
+          "key": false,
+          "notNull": false,
+          "client": false
+        },
+        {
+          "name": "last_changed_by",
+          "type": {
+            "kind": "char",
+            "length": 12,
+            "dataElement": "ABP_LASTCHANGE_USER"
+          },
+          "key": false,
+          "notNull": false,
+          "client": false
+        },
+        {
+          "name": "last_changed_at",
+          "type": {
+            "kind": "timestampl",
+            "length": 21,
+            "decimals": 7,
+            "dataElement": "ABP_LASTCHANGE_TSTMPL"
+          },
+          "key": false,
+          "notNull": false,
+          "client": false
+        },
+        {
+          "name": "local_last_changed_at",
+          "type": {
+            "kind": "timestampl",
+            "length": 21,
+            "decimals": 7,
+            "dataElement": "ABP_LOCINST_LASTCHANGE_TSTMPL"
+          },
+          "key": false,
+          "notNull": false,
+          "client": false
+        }
+      ],
+      "src": {
+        "file": "src/zrt_travel.tabl.xml",
+        "line": 1,
+        "column": 1
+      },
+      "description": "Travel (rap-transpiler reference BO)"
+    }
+  ],
+  "entities": [
+    {
+      "name": "ZRT_C_Booking",
+      "kind": "projection",
+      "root": false,
+      "source": "ZRT_R_Booking",
+      "sqlView": "zrt_c_booking",
+      "fields": [
+        {
+          "name": "BookingUUID",
+          "type": {
+            "kind": "raw",
+            "length": 16,
+            "dataElement": "SYSUUID_X16"
+          },
+          "key": true,
+          "annotations": {
+            "endusertext": {
+              "label": "Booking UUID"
+            },
+            "ui": {
+              "facet": [
+                {
+                  "id": "Booking",
+                  "purpose": "#STANDARD",
+                  "type": "#IDENTIFICATION_REFERENCE",
+                  "label": "Booking",
+                  "position": 10
+                }
+              ],
+              "hidden": true
+            }
+          },
+          "src": {
+            "file": "src/zrt_c_booking.ddls.asddls",
+            "line": 7,
+            "column": 7
+          },
+          "baseField": "BookingUUID"
+        },
+        {
+          "name": "TravelUUID",
+          "type": {
+            "kind": "raw",
+            "length": 16,
+            "dataElement": "SYSUUID_X16"
+          },
+          "key": false,
+          "annotations": {
+            "endusertext": {
+              "label": "Travel UUID"
+            },
+            "ui": {
+              "hidden": true
+            }
+          },
+          "src": {
+            "file": "src/zrt_c_booking.ddls.asddls",
+            "line": 8,
+            "column": 7
+          },
+          "baseField": "TravelUUID"
+        },
+        {
+          "name": "BookingID",
+          "type": {
+            "kind": "numc",
+            "length": 4
+          },
+          "key": false,
+          "annotations": {
+            "endusertext": {
+              "label": "Booking ID"
+            },
+            "ui": {
+              "lineitem": [
+                {
+                  "position": 10,
+                  "importance": "#HIGH"
+                }
+              ],
+              "identification": [
+                {
+                  "position": 10
+                }
+              ]
+            }
+          },
+          "src": {
+            "file": "src/zrt_c_booking.ddls.asddls",
+            "line": 9,
+            "column": 7
+          },
+          "baseField": "BookingID"
+        },
+        {
+          "name": "BookingDate",
+          "type": {
+            "kind": "dats",
+            "length": 8
+          },
+          "key": false,
+          "annotations": {
+            "endusertext": {
+              "label": "Booking Date"
+            },
+            "ui": {
+              "lineitem": [
+                {
+                  "position": 20,
+                  "importance": "#MEDIUM"
+                }
+              ],
+              "identification": [
+                {
+                  "position": 20
+                }
+              ]
+            }
+          },
+          "src": {
+            "file": "src/zrt_c_booking.ddls.asddls",
+            "line": 10,
+            "column": 7
+          },
+          "baseField": "BookingDate"
+        },
+        {
+          "name": "CarrierID",
+          "type": {
+            "kind": "char",
+            "length": 3
+          },
+          "key": false,
+          "annotations": {
+            "endusertext": {
+              "label": "Airline"
+            },
+            "ui": {
+              "lineitem": [
+                {
+                  "position": 30,
+                  "importance": "#HIGH"
+                }
+              ],
+              "identification": [
+                {
+                  "position": 30
+                }
+              ]
+            }
+          },
+          "src": {
+            "file": "src/zrt_c_booking.ddls.asddls",
+            "line": 11,
+            "column": 7
+          },
+          "baseField": "CarrierID"
+        },
+        {
+          "name": "ConnectionID",
+          "type": {
+            "kind": "numc",
+            "length": 4
+          },
+          "key": false,
+          "annotations": {
+            "endusertext": {
+              "label": "Flight Number"
+            },
+            "ui": {
+              "lineitem": [
+                {
+                  "position": 40,
+                  "importance": "#HIGH"
+                }
+              ],
+              "identification": [
+                {
+                  "position": 40
+                }
+              ]
+            }
+          },
+          "src": {
+            "file": "src/zrt_c_booking.ddls.asddls",
+            "line": 12,
+            "column": 7
+          },
+          "baseField": "ConnectionID"
+        },
+        {
+          "name": "FlightDate",
+          "type": {
+            "kind": "dats",
+            "length": 8
+          },
+          "key": false,
+          "annotations": {
+            "endusertext": {
+              "label": "Flight Date"
+            },
+            "ui": {
+              "lineitem": [
+                {
+                  "position": 50,
+                  "importance": "#HIGH"
+                }
+              ],
+              "identification": [
+                {
+                  "position": 50
+                }
+              ]
+            }
+          },
+          "src": {
+            "file": "src/zrt_c_booking.ddls.asddls",
+            "line": 13,
+            "column": 7
+          },
+          "baseField": "FlightDate"
+        },
+        {
+          "name": "FlightPrice",
+          "type": {
+            "kind": "curr",
+            "length": 16,
+            "decimals": 2
+          },
+          "key": false,
+          "annotations": {
+            "endusertext": {
+              "label": "Flight Price"
+            },
+            "semantics": {
+              "amount": {
+                "currencycode": "CurrencyCode"
+              }
+            },
+            "ui": {
+              "lineitem": [
+                {
+                  "position": 60,
+                  "importance": "#MEDIUM"
+                }
+              ],
+              "identification": [
+                {
+                  "position": 60
+                }
+              ]
+            }
+          },
+          "src": {
+            "file": "src/zrt_c_booking.ddls.asddls",
+            "line": 14,
+            "column": 7
+          },
+          "currencyCode": "CurrencyCode",
+          "baseField": "FlightPrice"
+        },
+        {
+          "name": "CurrencyCode",
+          "type": {
+            "kind": "cuky",
+            "length": 5
+          },
+          "key": false,
+          "annotations": {
+            "endusertext": {
+              "label": "Currency"
+            },
+            "ui": {
+              "identification": [
+                {
+                  "position": 70
+                }
+              ]
+            }
+          },
+          "src": {
+            "file": "src/zrt_c_booking.ddls.asddls",
+            "line": 15,
+            "column": 7
+          },
+          "baseField": "CurrencyCode"
+        },
+        {
+          "name": "BookingStatus",
+          "type": {
+            "kind": "char",
+            "length": 1
+          },
+          "key": false,
+          "annotations": {
+            "endusertext": {
+              "label": "Booking Status"
+            },
+            "ui": {
+              "lineitem": [
+                {
+                  "position": 70,
+                  "importance": "#LOW"
+                }
+              ],
+              "identification": [
+                {
+                  "position": 80
+                }
+              ]
+            }
+          },
+          "src": {
+            "file": "src/zrt_c_booking.ddls.asddls",
+            "line": 16,
+            "column": 7
+          },
+          "baseField": "BookingStatus"
+        },
+        {
+          "name": "LocalLastChangedAt",
+          "type": {
+            "kind": "timestampl",
+            "length": 21,
+            "decimals": 7,
+            "dataElement": "ABP_LOCINST_LASTCHANGE_TSTMPL"
+          },
+          "key": false,
+          "annotations": {
+            "semantics": {
+              "systemdatetime": {
+                "localinstancelastchangedat": true
+              }
+            },
+            "ui": {
+              "hidden": true
+            }
+          },
+          "src": {
+            "file": "src/zrt_c_booking.ddls.asddls",
+            "line": 17,
+            "column": 7
+          },
+          "semantics": "localInstanceLastChangedAt",
+          "baseField": "LocalLastChangedAt"
+        }
+      ],
+      "associations": [
+        {
+          "name": "_Travel",
+          "target": "ZRT_C_Travel",
+          "kind": "toParent",
+          "cardinality": {
+            "min": 1,
+            "max": 1
+          },
+          "on": [
+            {
+              "source": "TravelUUID",
+              "target": "TravelUUID"
+            }
+          ],
+          "baseAssociation": "_Travel",
+          "src": {
+            "file": "src/zrt_c_booking.ddls.asddls",
+            "line": 19,
+            "column": 7
+          }
+        }
+      ],
+      "annotations": {
+        "accesscontrol": {
+          "authorizationcheck": "#NOT_REQUIRED"
+        },
+        "endusertext": {
+          "label": "Booking"
+        },
+        "metadata": {
+          "allowextensions": true
+        },
+        "ui": {
+          "headerinfo": {
+            "typename": "Booking",
+            "typenameplural": "Bookings",
+            "title": {
+              "type": "#STANDARD",
+              "value": "BookingID"
+            }
+          }
+        }
+      },
+      "src": {
+        "file": "src/zrt_c_booking.ddls.asddls",
+        "line": 4,
+        "column": 20
+      }
+    },
+    {
+      "name": "ZRT_C_Travel",
+      "kind": "projection",
+      "root": true,
+      "source": "ZRT_R_Travel",
+      "sqlView": "zrt_c_travel",
+      "fields": [
+        {
+          "name": "TravelUUID",
+          "type": {
+            "kind": "raw",
+            "length": 16,
+            "dataElement": "SYSUUID_X16"
+          },
+          "key": true,
+          "annotations": {
+            "endusertext": {
+              "label": "Travel UUID"
+            },
+            "ui": {
+              "facet": [
+                {
+                  "id": "Travel",
+                  "purpose": "#STANDARD",
+                  "type": "#IDENTIFICATION_REFERENCE",
+                  "label": "Travel",
+                  "position": 10
+                },
+                {
+                  "id": "Dates",
+                  "purpose": "#STANDARD",
+                  "type": "#FIELDGROUP_REFERENCE",
+                  "targetqualifier": "Dates",
+                  "label": "Dates",
+                  "position": 20
+                },
+                {
+                  "id": "Prices",
+                  "purpose": "#STANDARD",
+                  "type": "#FIELDGROUP_REFERENCE",
+                  "targetqualifier": "Prices",
+                  "label": "Prices",
+                  "position": 30
+                },
+                {
+                  "id": "Booking",
+                  "purpose": "#STANDARD",
+                  "type": "#LINEITEM_REFERENCE",
+                  "label": "Bookings",
+                  "position": 40,
+                  "targetelement": "_Booking"
+                }
+              ],
+              "hidden": true
+            }
+          },
+          "src": {
+            "file": "src/zrt_c_travel.ddls.asddls",
+            "line": 9,
+            "column": 7
+          },
+          "baseField": "TravelUUID"
+        },
+        {
+          "name": "TravelID",
+          "type": {
+            "kind": "numc",
+            "length": 8
+          },
+          "key": false,
+          "annotations": {
+            "endusertext": {
+              "label": "Travel ID"
+            },
+            "search": {
+              "defaultsearchelement": true
+            },
+            "ui": {
+              "lineitem": [
+                {
+                  "position": 10,
+                  "importance": "#HIGH"
+                }
+              ],
+              "identification": [
+                {
+                  "position": 10
+                }
+              ],
+              "selectionfield": [
+                {
+                  "position": 10
+                }
+              ]
+            }
+          },
+          "src": {
+            "file": "src/zrt_c_travel.ddls.asddls",
+            "line": 11,
+            "column": 7
+          },
+          "baseField": "TravelID"
+        },
+        {
+          "name": "AgencyID",
+          "type": {
+            "kind": "numc",
+            "length": 6
+          },
+          "key": false,
+          "annotations": {
+            "endusertext": {
+              "label": "Agency ID"
+            },
+            "ui": {
+              "lineitem": [
+                {
+                  "position": 20,
+                  "importance": "#HIGH"
+                }
+              ],
+              "identification": [
+                {
+                  "position": 20
+                }
+              ],
+              "selectionfield": [
+                {
+                  "position": 20
+                }
+              ]
+            }
+          },
+          "src": {
+            "file": "src/zrt_c_travel.ddls.asddls",
+            "line": 12,
+            "column": 7
+          },
+          "baseField": "AgencyID"
+        },
+        {
+          "name": "CustomerID",
+          "type": {
+            "kind": "numc",
+            "length": 6
+          },
+          "key": false,
+          "annotations": {
+            "endusertext": {
+              "label": "Customer ID"
+            },
+            "ui": {
+              "lineitem": [
+                {
+                  "position": 30,
+                  "importance": "#MEDIUM"
+                }
+              ],
+              "identification": [
+                {
+                  "position": 30
+                }
+              ],
+              "selectionfield": [
+                {
+                  "position": 30
+                }
+              ]
+            }
+          },
+          "src": {
+            "file": "src/zrt_c_travel.ddls.asddls",
+            "line": 13,
+            "column": 7
+          },
+          "baseField": "CustomerID"
+        },
+        {
+          "name": "BeginDate",
+          "type": {
+            "kind": "dats",
+            "length": 8
+          },
+          "key": false,
+          "annotations": {
+            "endusertext": {
+              "label": "Begin Date"
+            },
+            "ui": {
+              "lineitem": [
+                {
+                  "position": 40,
+                  "importance": "#MEDIUM"
+                }
+              ],
+              "fieldgroup": [
+                {
+                  "qualifier": "Dates",
+                  "position": 10
+                }
+              ]
+            }
+          },
+          "src": {
+            "file": "src/zrt_c_travel.ddls.asddls",
+            "line": 14,
+            "column": 7
+          },
+          "baseField": "BeginDate"
+        },
+        {
+          "name": "EndDate",
+          "type": {
+            "kind": "dats",
+            "length": 8
+          },
+          "key": false,
+          "annotations": {
+            "endusertext": {
+              "label": "End Date"
+            },
+            "ui": {
+              "lineitem": [
+                {
+                  "position": 50,
+                  "importance": "#MEDIUM"
+                }
+              ],
+              "fieldgroup": [
+                {
+                  "qualifier": "Dates",
+                  "position": 20
+                }
+              ]
+            }
+          },
+          "src": {
+            "file": "src/zrt_c_travel.ddls.asddls",
+            "line": 15,
+            "column": 7
+          },
+          "baseField": "EndDate"
+        },
+        {
+          "name": "BookingFee",
+          "type": {
+            "kind": "curr",
+            "length": 16,
+            "decimals": 2
+          },
+          "key": false,
+          "annotations": {
+            "endusertext": {
+              "label": "Booking Fee"
+            },
+            "semantics": {
+              "amount": {
+                "currencycode": "CurrencyCode"
+              }
+            },
+            "ui": {
+              "fieldgroup": [
+                {
+                  "qualifier": "Prices",
+                  "position": 10
+                }
+              ]
+            }
+          },
+          "src": {
+            "file": "src/zrt_c_travel.ddls.asddls",
+            "line": 16,
+            "column": 7
+          },
+          "currencyCode": "CurrencyCode",
+          "baseField": "BookingFee"
+        },
+        {
+          "name": "TotalPrice",
+          "type": {
+            "kind": "curr",
+            "length": 16,
+            "decimals": 2
+          },
+          "key": false,
+          "annotations": {
+            "endusertext": {
+              "label": "Total Price"
+            },
+            "semantics": {
+              "amount": {
+                "currencycode": "CurrencyCode"
+              }
+            },
+            "ui": {
+              "lineitem": [
+                {
+                  "position": 60,
+                  "importance": "#MEDIUM"
+                }
+              ],
+              "fieldgroup": [
+                {
+                  "qualifier": "Prices",
+                  "position": 20
+                }
+              ]
+            }
+          },
+          "src": {
+            "file": "src/zrt_c_travel.ddls.asddls",
+            "line": 17,
+            "column": 7
+          },
+          "currencyCode": "CurrencyCode",
+          "baseField": "TotalPrice"
+        },
+        {
+          "name": "CurrencyCode",
+          "type": {
+            "kind": "cuky",
+            "length": 5
+          },
+          "key": false,
+          "annotations": {
+            "endusertext": {
+              "label": "Currency"
+            },
+            "ui": {
+              "fieldgroup": [
+                {
+                  "qualifier": "Prices",
+                  "position": 30
+                }
+              ]
+            }
+          },
+          "src": {
+            "file": "src/zrt_c_travel.ddls.asddls",
+            "line": 18,
+            "column": 7
+          },
+          "baseField": "CurrencyCode"
+        },
+        {
+          "name": "Description",
+          "type": {
+            "kind": "char",
+            "length": 256
+          },
+          "key": false,
+          "annotations": {
+            "endusertext": {
+              "label": "Description"
+            },
+            "search": {
+              "defaultsearchelement": true
+            },
+            "ui": {
+              "identification": [
+                {
+                  "position": 40
+                }
+              ]
+            }
+          },
+          "src": {
+            "file": "src/zrt_c_travel.ddls.asddls",
+            "line": 20,
+            "column": 7
+          },
+          "baseField": "Description"
+        },
+        {
+          "name": "OverallStatus",
+          "type": {
+            "kind": "char",
+            "length": 1
+          },
+          "key": false,
+          "annotations": {
+            "endusertext": {
+              "label": "Status"
+            },
+            "ui": {
+              "lineitem": [
+                {
+                  "position": 70,
+                  "importance": "#HIGH"
+                },
+                {
+                  "type": "#FOR_ACTION",
+                  "dataaction": "acceptTravel",
+                  "label": "Accept Travel"
+                }
+              ],
+              "identification": [
+                {
+                  "position": 50
+                },
+                {
+                  "type": "#FOR_ACTION",
+                  "dataaction": "acceptTravel",
+                  "label": "Accept Travel"
+                }
+              ],
+              "selectionfield": [
+                {
+                  "position": 40
+                }
+              ]
+            }
+          },
+          "src": {
+            "file": "src/zrt_c_travel.ddls.asddls",
+            "line": 21,
+            "column": 7
+          },
+          "baseField": "OverallStatus"
+        },
+        {
+          "name": "CreatedBy",
+          "type": {
+            "kind": "char",
+            "length": 12,
+            "dataElement": "ABP_CREATION_USER"
+          },
+          "key": false,
+          "annotations": {
+            "endusertext": {
+              "label": "Created By"
+            },
+            "semantics": {
+              "user": {
+                "createdby": true
+              }
+            }
+          },
+          "src": {
+            "file": "src/zrt_c_travel.ddls.asddls",
+            "line": 22,
+            "column": 7
+          },
+          "semantics": "createdBy",
+          "baseField": "CreatedBy"
+        },
+        {
+          "name": "CreatedAt",
+          "type": {
+            "kind": "timestampl",
+            "length": 21,
+            "decimals": 7,
+            "dataElement": "ABP_CREATION_TSTMPL"
+          },
+          "key": false,
+          "annotations": {
+            "endusertext": {
+              "label": "Created At"
+            },
+            "semantics": {
+              "systemdatetime": {
+                "createdat": true
+              }
+            }
+          },
+          "src": {
+            "file": "src/zrt_c_travel.ddls.asddls",
+            "line": 23,
+            "column": 7
+          },
+          "semantics": "createdAt",
+          "baseField": "CreatedAt"
+        },
+        {
+          "name": "LastChangedBy",
+          "type": {
+            "kind": "char",
+            "length": 12,
+            "dataElement": "ABP_LASTCHANGE_USER"
+          },
+          "key": false,
+          "annotations": {
+            "endusertext": {
+              "label": "Changed By"
+            },
+            "semantics": {
+              "user": {
+                "lastchangedby": true
+              }
+            }
+          },
+          "src": {
+            "file": "src/zrt_c_travel.ddls.asddls",
+            "line": 24,
+            "column": 7
+          },
+          "semantics": "lastChangedBy",
+          "baseField": "LastChangedBy"
+        },
+        {
+          "name": "LastChangedAt",
+          "type": {
+            "kind": "timestampl",
+            "length": 21,
+            "decimals": 7,
+            "dataElement": "ABP_LASTCHANGE_TSTMPL"
+          },
+          "key": false,
+          "annotations": {
+            "endusertext": {
+              "label": "Changed At"
+            },
+            "semantics": {
+              "systemdatetime": {
+                "lastchangedat": true
+              }
+            }
+          },
+          "src": {
+            "file": "src/zrt_c_travel.ddls.asddls",
+            "line": 25,
+            "column": 7
+          },
+          "semantics": "lastChangedAt",
+          "baseField": "LastChangedAt"
+        },
+        {
+          "name": "LocalLastChangedAt",
+          "type": {
+            "kind": "timestampl",
+            "length": 21,
+            "decimals": 7,
+            "dataElement": "ABP_LOCINST_LASTCHANGE_TSTMPL"
+          },
+          "key": false,
+          "annotations": {
+            "semantics": {
+              "systemdatetime": {
+                "localinstancelastchangedat": true
+              }
+            },
+            "ui": {
+              "hidden": true
+            }
+          },
+          "src": {
+            "file": "src/zrt_c_travel.ddls.asddls",
+            "line": 26,
+            "column": 7
+          },
+          "semantics": "localInstanceLastChangedAt",
+          "baseField": "LocalLastChangedAt"
+        }
+      ],
+      "associations": [
+        {
+          "name": "_Booking",
+          "target": "ZRT_C_Booking",
+          "kind": "composition",
+          "cardinality": {
+            "min": 0,
+            "max": "*"
+          },
+          "on": [
+            {
+              "source": "TravelUUID",
+              "target": "TravelUUID"
+            }
+          ],
+          "baseAssociation": "_Booking",
+          "src": {
+            "file": "src/zrt_c_travel.ddls.asddls",
+            "line": 28,
+            "column": 7
+          }
+        }
+      ],
+      "annotations": {
+        "accesscontrol": {
+          "authorizationcheck": "#NOT_REQUIRED"
+        },
+        "endusertext": {
+          "label": "Travel"
+        },
+        "metadata": {
+          "allowextensions": true
+        },
+        "search": {
+          "searchable": true
+        },
+        "ui": {
+          "headerinfo": {
+            "typename": "Travel",
+            "typenameplural": "Travels",
+            "title": {
+              "type": "#STANDARD",
+              "value": "TravelID"
+            },
+            "description": {
+              "type": "#STANDARD",
+              "value": "Description"
+            }
+          },
+          "presentationvariant": [
+            {
+              "sortorder": [
+                {
+                  "by": "TravelID",
+                  "direction": "#DESC"
+                }
+              ]
+            }
+          ]
+        }
+      },
+      "src": {
+        "file": "src/zrt_c_travel.ddls.asddls",
+        "line": 5,
+        "column": 25
+      },
+      "providerContract": "transactional_query"
+    },
+    {
+      "name": "ZRT_R_Booking",
+      "kind": "view",
+      "root": false,
+      "source": "zrt_booking",
+      "sqlView": "zrt_r_booking",
+      "fields": [
+        {
+          "name": "BookingUUID",
+          "type": {
+            "kind": "raw",
+            "length": 16,
+            "dataElement": "SYSUUID_X16"
+          },
+          "key": true,
+          "annotations": {
+            "endusertext": {
+              "label": "Booking UUID"
+            }
+          },
+          "src": {
+            "file": "src/zrt_r_booking.ddls.asddls",
+            "line": 8,
+            "column": 7
+          },
+          "column": "booking_uuid"
+        },
+        {
+          "name": "TravelUUID",
+          "type": {
+            "kind": "raw",
+            "length": 16,
+            "dataElement": "SYSUUID_X16"
+          },
+          "key": false,
+          "annotations": {
+            "endusertext": {
+              "label": "Travel UUID"
+            }
+          },
+          "src": {
+            "file": "src/zrt_r_booking.ddls.asddls",
+            "line": 10,
+            "column": 7
+          },
+          "column": "parent_uuid"
+        },
+        {
+          "name": "BookingID",
+          "type": {
+            "kind": "numc",
+            "length": 4
+          },
+          "key": false,
+          "annotations": {
+            "endusertext": {
+              "label": "Booking ID"
+            }
+          },
+          "src": {
+            "file": "src/zrt_r_booking.ddls.asddls",
+            "line": 12,
+            "column": 7
+          },
+          "column": "booking_id"
+        },
+        {
+          "name": "BookingDate",
+          "type": {
+            "kind": "dats",
+            "length": 8
+          },
+          "key": false,
+          "annotations": {
+            "endusertext": {
+              "label": "Booking Date"
+            }
+          },
+          "src": {
+            "file": "src/zrt_r_booking.ddls.asddls",
+            "line": 14,
+            "column": 7
+          },
+          "column": "booking_date"
+        },
+        {
+          "name": "CarrierID",
+          "type": {
+            "kind": "char",
+            "length": 3
+          },
+          "key": false,
+          "annotations": {
+            "endusertext": {
+              "label": "Airline"
+            }
+          },
+          "src": {
+            "file": "src/zrt_r_booking.ddls.asddls",
+            "line": 16,
+            "column": 7
+          },
+          "column": "carrier_id"
+        },
+        {
+          "name": "ConnectionID",
+          "type": {
+            "kind": "numc",
+            "length": 4
+          },
+          "key": false,
+          "annotations": {
+            "endusertext": {
+              "label": "Flight Number"
+            }
+          },
+          "src": {
+            "file": "src/zrt_r_booking.ddls.asddls",
+            "line": 18,
+            "column": 7
+          },
+          "column": "connection_id"
+        },
+        {
+          "name": "FlightDate",
+          "type": {
+            "kind": "dats",
+            "length": 8
+          },
+          "key": false,
+          "annotations": {
+            "endusertext": {
+              "label": "Flight Date"
+            }
+          },
+          "src": {
+            "file": "src/zrt_r_booking.ddls.asddls",
+            "line": 20,
+            "column": 7
+          },
+          "column": "flight_date"
+        },
+        {
+          "name": "FlightPrice",
+          "type": {
+            "kind": "curr",
+            "length": 16,
+            "decimals": 2
+          },
+          "key": false,
+          "annotations": {
+            "endusertext": {
+              "label": "Flight Price"
+            },
+            "semantics": {
+              "amount": {
+                "currencycode": "CurrencyCode"
+              }
+            }
+          },
+          "src": {
+            "file": "src/zrt_r_booking.ddls.asddls",
+            "line": 23,
+            "column": 7
+          },
+          "currencyCode": "CurrencyCode",
+          "column": "flight_price"
+        },
+        {
+          "name": "CurrencyCode",
+          "type": {
+            "kind": "cuky",
+            "length": 5
+          },
+          "key": false,
+          "annotations": {
+            "endusertext": {
+              "label": "Currency"
+            }
+          },
+          "src": {
+            "file": "src/zrt_r_booking.ddls.asddls",
+            "line": 25,
+            "column": 7
+          },
+          "column": "currency_code"
+        },
+        {
+          "name": "BookingStatus",
+          "type": {
+            "kind": "char",
+            "length": 1
+          },
+          "key": false,
+          "annotations": {
+            "endusertext": {
+              "label": "Booking Status"
+            }
+          },
+          "src": {
+            "file": "src/zrt_r_booking.ddls.asddls",
+            "line": 27,
+            "column": 7
+          },
+          "column": "booking_status"
+        },
+        {
+          "name": "LocalLastChangedAt",
+          "type": {
+            "kind": "timestampl",
+            "length": 21,
+            "decimals": 7,
+            "dataElement": "ABP_LOCINST_LASTCHANGE_TSTMPL"
+          },
+          "key": false,
+          "annotations": {
+            "semantics": {
+              "systemdatetime": {
+                "localinstancelastchangedat": true
+              }
+            }
+          },
+          "src": {
+            "file": "src/zrt_r_booking.ddls.asddls",
+            "line": 29,
+            "column": 7
+          },
+          "semantics": "localInstanceLastChangedAt",
+          "column": "local_last_changed_at"
+        }
+      ],
+      "associations": [
+        {
+          "name": "_Travel",
+          "target": "ZRT_R_Travel",
+          "kind": "toParent",
+          "cardinality": {
+            "min": 1,
+            "max": 1
+          },
+          "on": [
+            {
+              "source": "TravelUUID",
+              "target": "TravelUUID"
+            }
+          ],
+          "src": {
+            "file": "src/zrt_r_booking.ddls.asddls",
+            "line": 5,
+            "column": 3
+          }
+        }
+      ],
+      "annotations": {
+        "accesscontrol": {
+          "authorizationcheck": "#NOT_REQUIRED"
+        },
+        "endusertext": {
+          "label": "Booking"
+        }
+      },
+      "src": {
+        "file": "src/zrt_r_booking.ddls.asddls",
+        "line": 3,
+        "column": 20
+      }
+    },
+    {
+      "name": "ZRT_R_Travel",
+      "kind": "view",
+      "root": true,
+      "source": "zrt_travel",
+      "sqlView": "zrt_r_travel",
+      "fields": [
+        {
+          "name": "TravelUUID",
+          "type": {
+            "kind": "raw",
+            "length": 16,
+            "dataElement": "SYSUUID_X16"
+          },
+          "key": true,
+          "annotations": {
+            "endusertext": {
+              "label": "Travel UUID"
+            }
+          },
+          "src": {
+            "file": "src/zrt_r_travel.ddls.asddls",
+            "line": 8,
+            "column": 7
+          },
+          "column": "travel_uuid"
+        },
+        {
+          "name": "TravelID",
+          "type": {
+            "kind": "numc",
+            "length": 8
+          },
+          "key": false,
+          "annotations": {
+            "endusertext": {
+              "label": "Travel ID"
+            }
+          },
+          "src": {
+            "file": "src/zrt_r_travel.ddls.asddls",
+            "line": 10,
+            "column": 7
+          },
+          "column": "travel_id"
+        },
+        {
+          "name": "AgencyID",
+          "type": {
+            "kind": "numc",
+            "length": 6
+          },
+          "key": false,
+          "annotations": {
+            "endusertext": {
+              "label": "Agency ID"
+            }
+          },
+          "src": {
+            "file": "src/zrt_r_travel.ddls.asddls",
+            "line": 12,
+            "column": 7
+          },
+          "column": "agency_id"
+        },
+        {
+          "name": "CustomerID",
+          "type": {
+            "kind": "numc",
+            "length": 6
+          },
+          "key": false,
+          "annotations": {
+            "endusertext": {
+              "label": "Customer ID"
+            }
+          },
+          "src": {
+            "file": "src/zrt_r_travel.ddls.asddls",
+            "line": 14,
+            "column": 7
+          },
+          "column": "customer_id"
+        },
+        {
+          "name": "BeginDate",
+          "type": {
+            "kind": "dats",
+            "length": 8
+          },
+          "key": false,
+          "annotations": {
+            "endusertext": {
+              "label": "Begin Date"
+            }
+          },
+          "src": {
+            "file": "src/zrt_r_travel.ddls.asddls",
+            "line": 16,
+            "column": 7
+          },
+          "column": "begin_date"
+        },
+        {
+          "name": "EndDate",
+          "type": {
+            "kind": "dats",
+            "length": 8
+          },
+          "key": false,
+          "annotations": {
+            "endusertext": {
+              "label": "End Date"
+            }
+          },
+          "src": {
+            "file": "src/zrt_r_travel.ddls.asddls",
+            "line": 18,
+            "column": 7
+          },
+          "column": "end_date"
+        },
+        {
+          "name": "BookingFee",
+          "type": {
+            "kind": "curr",
+            "length": 16,
+            "decimals": 2
+          },
+          "key": false,
+          "annotations": {
+            "endusertext": {
+              "label": "Booking Fee"
+            },
+            "semantics": {
+              "amount": {
+                "currencycode": "CurrencyCode"
+              }
+            }
+          },
+          "src": {
+            "file": "src/zrt_r_travel.ddls.asddls",
+            "line": 21,
+            "column": 7
+          },
+          "currencyCode": "CurrencyCode",
+          "column": "booking_fee"
+        },
+        {
+          "name": "TotalPrice",
+          "type": {
+            "kind": "curr",
+            "length": 16,
+            "decimals": 2
+          },
+          "key": false,
+          "annotations": {
+            "endusertext": {
+              "label": "Total Price"
+            },
+            "semantics": {
+              "amount": {
+                "currencycode": "CurrencyCode"
+              }
+            }
+          },
+          "src": {
+            "file": "src/zrt_r_travel.ddls.asddls",
+            "line": 24,
+            "column": 7
+          },
+          "currencyCode": "CurrencyCode",
+          "column": "total_price"
+        },
+        {
+          "name": "CurrencyCode",
+          "type": {
+            "kind": "cuky",
+            "length": 5
+          },
+          "key": false,
+          "annotations": {
+            "endusertext": {
+              "label": "Currency"
+            }
+          },
+          "src": {
+            "file": "src/zrt_r_travel.ddls.asddls",
+            "line": 26,
+            "column": 7
+          },
+          "column": "currency_code"
+        },
+        {
+          "name": "Description",
+          "type": {
+            "kind": "char",
+            "length": 256
+          },
+          "key": false,
+          "annotations": {
+            "endusertext": {
+              "label": "Description"
+            }
+          },
+          "src": {
+            "file": "src/zrt_r_travel.ddls.asddls",
+            "line": 28,
+            "column": 7
+          },
+          "column": "description"
+        },
+        {
+          "name": "OverallStatus",
+          "type": {
+            "kind": "char",
+            "length": 1
+          },
+          "key": false,
+          "annotations": {
+            "endusertext": {
+              "label": "Status"
+            }
+          },
+          "src": {
+            "file": "src/zrt_r_travel.ddls.asddls",
+            "line": 30,
+            "column": 7
+          },
+          "column": "overall_status"
+        },
+        {
+          "name": "CreatedBy",
+          "type": {
+            "kind": "char",
+            "length": 12,
+            "dataElement": "ABP_CREATION_USER"
+          },
+          "key": false,
+          "annotations": {
+            "endusertext": {
+              "label": "Created By"
+            },
+            "semantics": {
+              "user": {
+                "createdby": true
+              }
+            }
+          },
+          "src": {
+            "file": "src/zrt_r_travel.ddls.asddls",
+            "line": 33,
+            "column": 7
+          },
+          "semantics": "createdBy",
+          "column": "created_by"
+        },
+        {
+          "name": "CreatedAt",
+          "type": {
+            "kind": "timestampl",
+            "length": 21,
+            "decimals": 7,
+            "dataElement": "ABP_CREATION_TSTMPL"
+          },
+          "key": false,
+          "annotations": {
+            "endusertext": {
+              "label": "Created At"
+            },
+            "semantics": {
+              "systemdatetime": {
+                "createdat": true
+              }
+            }
+          },
+          "src": {
+            "file": "src/zrt_r_travel.ddls.asddls",
+            "line": 36,
+            "column": 7
+          },
+          "semantics": "createdAt",
+          "column": "created_at"
+        },
+        {
+          "name": "LastChangedBy",
+          "type": {
+            "kind": "char",
+            "length": 12,
+            "dataElement": "ABP_LASTCHANGE_USER"
+          },
+          "key": false,
+          "annotations": {
+            "endusertext": {
+              "label": "Changed By"
+            },
+            "semantics": {
+              "user": {
+                "lastchangedby": true
+              }
+            }
+          },
+          "src": {
+            "file": "src/zrt_r_travel.ddls.asddls",
+            "line": 39,
+            "column": 7
+          },
+          "semantics": "lastChangedBy",
+          "column": "last_changed_by"
+        },
+        {
+          "name": "LastChangedAt",
+          "type": {
+            "kind": "timestampl",
+            "length": 21,
+            "decimals": 7,
+            "dataElement": "ABP_LASTCHANGE_TSTMPL"
+          },
+          "key": false,
+          "annotations": {
+            "endusertext": {
+              "label": "Changed At"
+            },
+            "semantics": {
+              "systemdatetime": {
+                "lastchangedat": true
+              }
+            }
+          },
+          "src": {
+            "file": "src/zrt_r_travel.ddls.asddls",
+            "line": 42,
+            "column": 7
+          },
+          "semantics": "lastChangedAt",
+          "column": "last_changed_at"
+        },
+        {
+          "name": "LocalLastChangedAt",
+          "type": {
+            "kind": "timestampl",
+            "length": 21,
+            "decimals": 7,
+            "dataElement": "ABP_LOCINST_LASTCHANGE_TSTMPL"
+          },
+          "key": false,
+          "annotations": {
+            "semantics": {
+              "systemdatetime": {
+                "localinstancelastchangedat": true
+              }
+            }
+          },
+          "src": {
+            "file": "src/zrt_r_travel.ddls.asddls",
+            "line": 44,
+            "column": 7
+          },
+          "semantics": "localInstanceLastChangedAt",
+          "column": "local_last_changed_at"
+        }
+      ],
+      "associations": [
+        {
+          "name": "_Booking",
+          "target": "ZRT_R_Booking",
+          "kind": "composition",
+          "cardinality": {
+            "min": 0,
+            "max": "*"
+          },
+          "on": [
+            {
+              "source": "TravelUUID",
+              "target": "TravelUUID"
+            }
+          ],
+          "src": {
+            "file": "src/zrt_r_travel.ddls.asddls",
+            "line": 5,
+            "column": 3
+          }
+        }
+      ],
+      "annotations": {
+        "accesscontrol": {
+          "authorizationcheck": "#NOT_REQUIRED"
+        },
+        "endusertext": {
+          "label": "Travel"
+        }
+      },
+      "src": {
+        "file": "src/zrt_r_travel.ddls.asddls",
+        "line": 3,
+        "column": 25
+      }
+    }
+  ],
+  "behaviors": [
+    {
+      "name": "ZRT_C_TRAVEL",
+      "implementationType": "projection",
+      "privilegedMode": false,
+      "entities": [
+        {
+          "entity": "ZRT_C_Travel",
+          "alias": "Travel",
+          "root": true,
+          "earlyNumbering": false,
+          "operations": [
+            {
+              "kind": "create",
+              "internal": false,
+              "precheck": false,
+              "use": true
+            },
+            {
+              "kind": "update",
+              "internal": false,
+              "precheck": false,
+              "use": true
+            },
+            {
+              "kind": "delete",
+              "internal": false,
+              "precheck": false,
+              "use": true
+            }
+          ],
+          "associations": [
+            {
+              "name": "_Booking",
+              "create": true,
+              "createInternal": false,
+              "createPrecheck": false,
+              "internal": false,
+              "use": true
+            }
+          ],
+          "fieldCharacteristics": {},
+          "determinations": [],
+          "validations": [],
+          "actions": [
+            {
+              "name": "acceptTravel",
+              "kind": "action",
+              "static": false,
+              "factory": false,
+              "internal": false,
+              "precheck": false,
+              "use": true,
+              "src": {
+                "file": "src/zrt_c_travel.bdef.asbdef",
+                "line": 11,
+                "column": 3
+              }
+            }
+          ],
+          "sideEffects": [],
+          "useEtag": true,
+          "precheckHandlers": {},
+          "src": {
+            "file": "src/zrt_c_travel.bdef.asbdef",
+            "line": 4,
+            "column": 1
+          }
+        },
+        {
+          "entity": "ZRT_C_Booking",
+          "alias": "Booking",
+          "root": false,
+          "earlyNumbering": false,
+          "operations": [
+            {
+              "kind": "update",
+              "internal": false,
+              "precheck": false,
+              "use": true
+            },
+            {
+              "kind": "delete",
+              "internal": false,
+              "precheck": false,
+              "use": true
+            }
+          ],
+          "associations": [
+            {
+              "name": "_Travel",
+              "create": false,
+              "createInternal": false,
+              "createPrecheck": false,
+              "internal": false,
+              "use": true
+            }
+          ],
+          "fieldCharacteristics": {},
+          "determinations": [],
+          "validations": [],
+          "actions": [],
+          "sideEffects": [],
+          "useEtag": true,
+          "precheckHandlers": {},
+          "src": {
+            "file": "src/zrt_c_travel.bdef.asbdef",
+            "line": 16,
+            "column": 1
+          }
+        }
+      ],
+      "src": {
+        "file": "src/zrt_c_travel.bdef.asbdef",
+        "line": 1,
+        "column": 1
+      },
+      "strict": 2
+    },
+    {
+      "name": "ZRT_R_TRAVEL",
+      "implementationType": "managed",
+      "privilegedMode": false,
+      "entities": [
+        {
+          "entity": "ZRT_R_Travel",
+          "alias": "Travel",
+          "root": true,
+          "earlyNumbering": false,
+          "operations": [
+            {
+              "kind": "create",
+              "internal": false,
+              "precheck": false
+            },
+            {
+              "kind": "update",
+              "internal": false,
+              "precheck": false
+            },
+            {
+              "kind": "delete",
+              "internal": false,
+              "precheck": false
+            }
+          ],
+          "associations": [
+            {
+              "name": "_Booking",
+              "create": true,
+              "createInternal": false,
+              "createPrecheck": false,
+              "internal": false
+            }
+          ],
+          "fieldCharacteristics": {
+            "TravelUUID": [
+              "numberingManaged",
+              "readonly"
+            ],
+            "OverallStatus": [
+              "readonly"
+            ],
+            "TotalPrice": [
+              "readonly"
+            ],
+            "CreatedBy": [
+              "readonly"
+            ],
+            "CreatedAt": [
+              "readonly"
+            ],
+            "LastChangedBy": [
+              "readonly"
+            ],
+            "LastChangedAt": [
+              "readonly"
+            ],
+            "LocalLastChangedAt": [
+              "readonly"
+            ],
+            "TravelID": [
+              "mandatory"
+            ],
+            "AgencyID": [
+              "mandatory"
+            ],
+            "CustomerID": [
+              "mandatory"
+            ],
+            "BeginDate": [
+              "mandatory"
+            ],
+            "EndDate": [
+              "mandatory"
+            ],
+            "CurrencyCode": [
+              "mandatory"
+            ]
+          },
+          "determinations": [
+            {
+              "name": "setStatusOpen",
+              "on": "modify",
+              "internal": false,
+              "triggers": {
+                "create": true,
+                "update": false,
+                "delete": false,
+                "fields": []
+              },
+              "src": {
+                "file": "src/zrt_r_travel.bdef.asbdef",
+                "line": 22,
+                "column": 3
+              },
+              "handler": {
+                "classKey": "CLAS-ZBP_RT_R_TRAVEL-LHC_TRAVEL",
+                "className": "LHC_TRAVEL",
+                "method": "setstatusopen",
+                "params": {
+                  "failed": "failed",
+                  "reported": "reported",
+                  "keys": "keys"
+                }
+              }
+            },
+            {
+              "name": "calculateTotalPrice",
+              "on": "modify",
+              "internal": false,
+              "triggers": {
+                "create": true,
+                "update": false,
+                "delete": false,
+                "fields": [
+                  "BookingFee",
+                  "CurrencyCode"
+                ]
+              },
+              "src": {
+                "file": "src/zrt_r_travel.bdef.asbdef",
+                "line": 23,
+                "column": 3
+              },
+              "handler": {
+                "classKey": "CLAS-ZBP_RT_R_TRAVEL-LHC_TRAVEL",
+                "className": "LHC_TRAVEL",
+                "method": "calculatetotalprice",
+                "params": {
+                  "failed": "failed",
+                  "reported": "reported",
+                  "keys": "keys"
+                }
+              }
+            }
+          ],
+          "validations": [
+            {
+              "name": "validateDates",
+              "triggers": {
+                "create": true,
+                "update": false,
+                "delete": false,
+                "fields": [
+                  "BeginDate",
+                  "EndDate"
+                ]
+              },
+              "src": {
+                "file": "src/zrt_r_travel.bdef.asbdef",
+                "line": 25,
+                "column": 3
+              },
+              "handler": {
+                "classKey": "CLAS-ZBP_RT_R_TRAVEL-LHC_TRAVEL",
+                "className": "LHC_TRAVEL",
+                "method": "validatedates",
+                "params": {
+                  "failed": "failed",
+                  "reported": "reported",
+                  "keys": "keys"
+                }
+              }
+            }
+          ],
+          "actions": [
+            {
+              "name": "acceptTravel",
+              "kind": "action",
+              "static": false,
+              "factory": false,
+              "internal": false,
+              "precheck": false,
+              "src": {
+                "file": "src/zrt_r_travel.bdef.asbdef",
+                "line": 19,
+                "column": 3
+              },
+              "features": "instance",
+              "result": {
+                "cardinality": {
+                  "min": 1,
+                  "max": 1
+                },
+                "entity": "$self",
+                "selective": false
+              },
+              "handler": {
+                "classKey": "CLAS-ZBP_RT_R_TRAVEL-LHC_TRAVEL",
+                "className": "LHC_TRAVEL",
+                "method": "accepttravel",
+                "params": {
+                  "failed": "failed",
+                  "reported": "reported",
+                  "keys": "keys",
+                  "result": "result",
+                  "mapped": "mapped"
+                }
+              }
+            },
+            {
+              "name": "reCalcTotalPrice",
+              "kind": "action",
+              "static": false,
+              "factory": false,
+              "internal": true,
+              "precheck": false,
+              "src": {
+                "file": "src/zrt_r_travel.bdef.asbdef",
+                "line": 20,
+                "column": 3
+              },
+              "handler": {
+                "classKey": "CLAS-ZBP_RT_R_TRAVEL-LHC_TRAVEL",
+                "className": "LHC_TRAVEL",
+                "method": "recalctotalprice",
+                "params": {
+                  "failed": "failed",
+                  "reported": "reported",
+                  "keys": "keys",
+                  "mapped": "mapped"
+                }
+              }
+            }
+          ],
+          "sideEffects": [],
+          "useEtag": false,
+          "precheckHandlers": {},
+          "src": {
+            "file": "src/zrt_r_travel.bdef.asbdef",
+            "line": 4,
+            "column": 1
+          },
+          "persistentTable": "zrt_travel",
+          "lock": {
+            "kind": "master"
+          },
+          "authorization": {
+            "kind": "master",
+            "global": true,
+            "instance": false
+          },
+          "etag": {
+            "kind": "master",
+            "field": "LocalLastChangedAt"
+          },
+          "mapping": {
+            "table": "zrt_travel",
+            "corresponding": true,
+            "fields": {
+              "TravelUUID": "travel_uuid",
+              "TravelID": "travel_id",
+              "AgencyID": "agency_id",
+              "CustomerID": "customer_id",
+              "BeginDate": "begin_date",
+              "EndDate": "end_date",
+              "BookingFee": "booking_fee",
+              "TotalPrice": "total_price",
+              "CurrencyCode": "currency_code",
+              "Description": "description",
+              "OverallStatus": "overall_status",
+              "CreatedBy": "created_by",
+              "CreatedAt": "created_at",
+              "LastChangedBy": "last_changed_by",
+              "LastChangedAt": "last_changed_at",
+              "LocalLastChangedAt": "local_last_changed_at"
+            }
+          },
+          "instanceFeaturesHandler": {
+            "classKey": "CLAS-ZBP_RT_R_TRAVEL-LHC_TRAVEL",
+            "className": "LHC_TRAVEL",
+            "method": "get_instance_features",
+            "params": {
+              "failed": "failed",
+              "reported": "reported",
+              "keys": "keys",
+              "requested": "requested_features",
+              "result": "result"
+            }
+          },
+          "globalAuthorizationHandler": {
+            "classKey": "CLAS-ZBP_RT_R_TRAVEL-LHC_TRAVEL",
+            "className": "LHC_TRAVEL",
+            "method": "get_global_authorizations",
+            "params": {
+              "failed": "failed",
+              "reported": "reported",
+              "requested": "requested_authorizations",
+              "result": "result"
+            }
+          }
+        },
+        {
+          "entity": "ZRT_R_Booking",
+          "alias": "Booking",
+          "root": false,
+          "earlyNumbering": false,
+          "operations": [
+            {
+              "kind": "update",
+              "internal": false,
+              "precheck": false
+            },
+            {
+              "kind": "delete",
+              "internal": false,
+              "precheck": false
+            }
+          ],
+          "associations": [
+            {
+              "name": "_Travel",
+              "create": false,
+              "createInternal": false,
+              "createPrecheck": false,
+              "internal": false
+            }
+          ],
+          "fieldCharacteristics": {
+            "BookingUUID": [
+              "numberingManaged",
+              "readonly"
+            ],
+            "TravelUUID": [
+              "readonly"
+            ],
+            "LocalLastChangedAt": [
+              "readonly"
+            ],
+            "BookingID": [
+              "mandatory"
+            ],
+            "CarrierID": [
+              "mandatory"
+            ],
+            "ConnectionID": [
+              "mandatory"
+            ],
+            "FlightDate": [
+              "mandatory"
+            ]
+          },
+          "determinations": [
+            {
+              "name": "calculateTotalPrice",
+              "on": "modify",
+              "internal": false,
+              "triggers": {
+                "create": true,
+                "update": false,
+                "delete": false,
+                "fields": [
+                  "FlightPrice",
+                  "CurrencyCode"
+                ]
+              },
+              "src": {
+                "file": "src/zrt_r_travel.bdef.asbdef",
+                "line": 62,
+                "column": 3
+              },
+              "handler": {
+                "classKey": "CLAS-ZBP_RT_R_TRAVEL-LHC_BOOKING",
+                "className": "LHC_BOOKING",
+                "method": "calculatetotalprice",
+                "params": {
+                  "failed": "failed",
+                  "reported": "reported",
+                  "keys": "keys"
+                }
+              }
+            }
+          ],
+          "validations": [],
+          "actions": [],
+          "sideEffects": [],
+          "useEtag": false,
+          "precheckHandlers": {},
+          "src": {
+            "file": "src/zrt_r_travel.bdef.asbdef",
+            "line": 48,
+            "column": 1
+          },
+          "persistentTable": "zrt_booking",
+          "lock": {
+            "kind": "dependent",
+            "by": "_Travel"
+          },
+          "authorization": {
+            "kind": "dependent",
+            "by": "_Travel"
+          },
+          "etag": {
+            "kind": "master",
+            "field": "LocalLastChangedAt"
+          },
+          "mapping": {
+            "table": "zrt_booking",
+            "corresponding": true,
+            "fields": {
+              "BookingUUID": "booking_uuid",
+              "TravelUUID": "parent_uuid",
+              "BookingID": "booking_id",
+              "BookingDate": "booking_date",
+              "CarrierID": "carrier_id",
+              "ConnectionID": "connection_id",
+              "FlightDate": "flight_date",
+              "FlightPrice": "flight_price",
+              "CurrencyCode": "currency_code",
+              "BookingStatus": "booking_status",
+              "LocalLastChangedAt": "local_last_changed_at"
+            }
+          }
+        }
+      ],
+      "src": {
+        "file": "src/zrt_r_travel.bdef.asbdef",
+        "line": 1,
+        "column": 1
+      },
+      "implementationClass": "ZBP_RT_R_TRAVEL",
+      "strict": 2
+    }
+  ],
+  "messageClasses": {}
+}
