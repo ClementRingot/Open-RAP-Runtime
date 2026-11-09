@@ -1,8 +1,11 @@
 # Compilateur RAP → application Node.js autonome — Plan
 
-> **Statut : proposition à valider.** Aucun code du projet n'est écrit.
+> **Statut : validé le 2026-11-09, en cours de réalisation.** Les décisions prises sont au §11
+> et détaillées dans [docs/DECISIONS.md](docs/DECISIONS.md). Le périmètre a été élargi à toutes
+> les fonctionnalités d'un BO RAP managed non-draft (décision D14) ; la couverture est suivie
+> dans [docs/FEATURES.md](docs/FEATURES.md).
 > Les constats du §2 viennent de vérifications faites le 2026-11-09 sur les versions publiées
-> des bibliothèques, dans un bac à sable hors dépôt. Rien d'autre que ce fichier n'est commité.
+> des bibliothèques, dans un bac à sable hors dépôt.
 
 ## Sommaire
 
@@ -16,7 +19,7 @@
 8. [Jalons](#8-jalons)
 9. [Risques](#9-risques)
 10. [Fixture Travel / Booking](#10-fixture-travel--booking)
-11. [Décisions à valider](#11-décisions-à-valider)
+11. [Décisions prises](#11-décisions-prises)
 12. [Annexe A — requêtes de la suite de conformité](#annexe-a--requêtes-de-la-suite-de-conformité)
 
 ---
@@ -40,7 +43,7 @@
   consiste à implémenter ce contrat en TypeScript, au-dessus du buffer transactionnel.
 - Aucune dépendance SAP : ni `@sap/cds`, ni SAPUI5, ni `sap.fe`. Toutes les licences sont MIT,
   Apache-2.0, BSD ou PostgreSQL (§4).
-- **13 décisions à valider au §11**, chacune avec ma recommandation.
+- Les 13 décisions du §11 sont prises (détail et raisons dans docs/DECISIONS.md).
 
 ---
 
@@ -692,40 +695,32 @@ Behavior pool (ABAP pur, EML uniquement, aucun appel système) :
 
 ---
 
-## 11. Décisions à valider
+## 11. Décisions prises
 
-Répondez par exemple « OK sauf 5 et 8 ». Ma recommandation est indiquée pour chaque point.
+Le porteur du projet a délégué les choix techniques, avec une exigence : toutes les
+fonctionnalités d'un BO RAP non-draft doivent être respectées. Les recommandations ont toutes
+été retenues, avec trois ajustements dus à cette exigence. Le détail est dans
+[docs/DECISIONS.md](docs/DECISIONS.md).
 
-1. **Grammaire BDEF avec Chevrotain**, comme demandé, avec le parser BDEF d'abaplint comme
-   oracle de test. *Recommandation : oui.*
-2. **ABP : types dérivés générés + réécriture source à source** (PoC validé, sans fork ni patch
-   des paquets abaplint). Alternative : contribuer d'abord les types dérivés à abaplint, plus
-   propre à terme mais sur un calendrier qui ne dépend pas de nous. *Recommandation : réécriture
-   maintenant ; contribution upstream plus tard, avec votre accord, puisque c'est public.*
-3. **Fastify** plutôt qu'Express. *Recommandation : Fastify.*
-4. **Lectures OData via des vues SQL générées** depuis les CDS (couche R, puis C).
-   *Recommandation : oui.*
-5. **Ajouts au périmètre OData** du §6.6 : navigation, ge/le/not/startswith/endswith, `/$count`,
-   `$search` simple, CSRF, IEEE754Compatible, deep insert sur 1 niveau, `sap-messages`. Sans eux,
-   une List Report / Object Page V4 ne fonctionne pas entièrement. *Recommandation : oui.*
-6. **Chemin du service calqué sur RAP** (`/sap/opu/odata4/sap/<binding>/srvd/sap/<srvd>/0001/`),
-   configurable. *Recommandation : oui, par défaut.*
-7. **Fixture activable sur un vrai système.** À ma connaissance, strict(2) impose une définition
-   d'autorisation. La fixture déclarerait `authorization master ( global )` avec un handler
-   « tout autorisé » ; l'outil l'accepte, ne l'exécute pas et émet un avertissement.
-   *Recommandation : oui ; vous pourrez valider la fixture dans ADT.*
-8. **Horodatages en `timestamptz` (microsecondes)** plutôt qu'en `numeric(21,7)`, fidèle à ABAP
-   mais moins naturel en SQL. *Recommandation : timestamptz.*
-9. **Mandant** : colonne `CLIENT`/`MANDT` retirée, application mono-tenant.
-   *Recommandation : oui.*
-10. **UI** : OpenUI5 1.136 LTS, contrôles `sap.m`, `sap.f`, `sap.uxap` ; `sap.ui.mdc` plus tard.
-    *Recommandation : oui.*
-11. **Exécution ABP sérialisée** dans un processus, à cause de l'état global du runtime ABAP.
-    *Recommandation : oui pour le MVP.*
-12. **Nommage et licence** : paquets `@rap-transpiler/model`, `@rap-transpiler/compiler`,
-    `@rap-transpiler/runtime` ; CLI `rapt` ; licence MIT pour ce dépôt. *À confirmer.*
-13. **Corpus de test** : sources BDEF/CDS des exemples SAP-samples (Apache-2.0), en lecture
-    seule, avec attribution dans LICENSES.md. *Recommandation : oui.*
+| # | Décision | Ajustement |
+|---|---|---|
+| 1 | Grammaire BDEF Chevrotain, parser abaplint comme oracle (D1) | |
+| 2 | Types dérivés générés + réécriture de l'ABP (D2) | La passe abaisse aussi `READ … BY \_assoc`, `LINK` et `CREATE BY \_assoc`, que le transpiler ne traite pas : ce sont des fonctionnalités courantes d'un BO non-draft. |
+| 3 | Fastify (D3) | |
+| 4 | Lectures via des vues SQL générées (D4) | |
+| 5 | Ajouts au périmètre OData (D5) | |
+| 6 | Chemin du service calqué sur RAP, configurable (D6) | |
+| 7 | Fixture activable sur un vrai système (D7) | L'autorisation globale de la fixture est réellement exécutée, plus seulement acceptée. |
+| 8 | Horodatages en `timestamptz(6)` (D8) | |
+| 9 | Mandant retiré (D9) | |
+| 10 | OpenUI5 1.136 LTS, `sap.m`, `sap.f`, `sap.uxap` (D10) | |
+| 11 | Exécution ABP sérialisée (D11) | Le verrou est réentrant pour le LUW qui le détient. |
+| 12 | `@rap-transpiler/*`, CLI `rapt`, licence MIT (D12) | |
+| 13 | Extrait du corpus SAP-samples pour tester les parsers (D13) | |
+
+Décisions complémentaires (D14 à D21) : périmètre non-draft complet, runtime piloté par l'IR,
+représentation canonique des valeurs, chaîne d'outils, PGlite pour les tests, DDIC « ombre »
+pour le transpiler, sémantique de `mandatory`, déclenchement des déterminations.
 
 ---
 
