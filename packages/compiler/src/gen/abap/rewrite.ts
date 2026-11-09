@@ -412,6 +412,9 @@ export function rewriteAbapFile(file: abaplint.ABAPFile, context: RewriteContext
   return edits.size === 0 ? file.getRaw() : edits.apply();
 }
 
+/** abaplint statements of ABAP SQL. */
+const SQL_STATEMENTS = new Set(["Select", "SelectLoop", "InsertDatabase", "UpdateDatabase", "ModifyDatabase", "DeleteDatabase", "OpenCursor", "FetchNextCursor", "CloseCursor", "WithLoop", "With"]);
+
 function rewriteStatement(kind: string, tokens: Tok[], edits: SourceEdits, context: RewriteContext): void {
   const last = tokens[tokens.length - 1] as Tok;
   if (isEmlStatement(tokens)) {
@@ -421,6 +424,9 @@ function rewriteStatement(kind: string, tokens: Tok[], edits: SourceEdits, conte
     const statement = parseEml(tokens.slice(0, -1));
     edits.replace(tokens[0] as Tok, last, emlCode(statement, context));
     return;
+  }
+  if (SQL_STATEMENTS.has(kind)) {
+    throw new RewriteError("ABP007", "ABAP SQL is not supported in a behavior pool: the generated application gives the ABAP code no database access (read the business object with EML)", tokens[0]);
   }
   const head = `${tokens[0]?.upper ?? ""} ${tokens[1]?.upper ?? ""}`;
   if (head === "GET PERMISSIONS" || head === "SET LOCKS" || (head === "RAISE ENTITY" && tokens[2]?.upper === "EVENT")) {

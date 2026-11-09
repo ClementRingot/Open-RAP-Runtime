@@ -16,22 +16,30 @@ et la conséquence. Les numéros D1 à D13 correspondent aux points 1 à 13 du �
 
 ## D2 — ABP : types dérivés générés et réécriture source à source
 
-- **Décision** : le compilateur génère, pour chaque BDEF, une interface ABAP contenant les types
-  dérivés RAP (`%tky`, `%control`, tables `FOR …`, réponses `FAILED/REPORTED/MAPPED`), puis
-  réécrit l'ABP avant de le donner au transpiler :
-  signatures des handlers, références `TYPE TABLE FOR …`, `#` des opérandes EML, `DATA(…)`
-  inline des réponses EML.
-  Les formes EML que le transpiler n'abaisse pas (`READ … BY \_assoc`, `LINK`,
-  `CREATE BY \_assoc`) sont abaissées par cette même passe vers notre kernel.
+- **Décision** : le compilateur génère, pour chaque BDEF managed, une interface ABAP
+  (`ZRAP_DT_<BDEF>`) contenant les types dérivés RAP (`%tky`, `%control`, tables `FOR …`,
+  réponses `FAILED/REPORTED/MAPPED`, demandes et résultats d'autorisation et de feature control),
+  puis réécrit le behavior pool avant de le donner au transpiler :
+  signatures des handlers, références `TYPE TABLE|STRUCTURE|RESPONSE FOR …`, suppression de
+  `FOR BEHAVIOR OF`, et **toutes** les instructions EML (`READ`, `MODIFY`, `COMMIT`, `ROLLBACK
+  ENTITIES`, formes longues et courtes) abaissées en appels de la classe noyau `ZRAP_EML`
+  (`begin`, opérations, `end`). Les `#` des opérandes deviennent le type dérivé attendu ; les
+  déclarations en ligne (`RESULT DATA(x)`) sont remontées en `DATA x TYPE …`.
+- **Ajustement (J4)** : l'EML est analysé par un parser à base de jetons propre au projet
+  (`gen/abap/eml.ts`), et non plus laissé à l'abaissement du transpiler : abaplint ne reconnaît
+  pas toutes les formes (`CREATE AUTO FILL CID SET FIELDS WITH` est une instruction inconnue pour
+  lui), et l'abaissement du transpiler perdait `IN LOCAL MODE`, `BY \_assoc`, `LINK` et
+  `CREATE BY`. Le contrôle ABAP complet (types compris) s'exécute sur les sources réécrites, avec
+  la configuration du transpiler ; chaque remplacement garde le nombre de lignes du texte
+  remplacé, de sorte que les erreurs (ABP004) pointent sur la ligne d'origine.
 - **Pourquoi** : abaplint type ces constructions en `void` et le transpiler refuse alors l'ABP.
-  Le PoC (PLAN.md, V10) prouve que l'approche fonctionne avec les paquets publiés. Les lectures
-  et créations par association sont indispensables à un BO non-draft réel (calcul d'un total
-  depuis les enfants, par exemple).
+  Le PoC (PLAN.md, V10) a prouvé l'approche avec les paquets publiés ; J4 l'a généralisée.
 - **Conséquence** : on ne patche ni ne monkeypatche jamais le transpiler ou le runtime ; on leur
-  donne de l'ABAP standard. Toute construction que la passe ne sait pas traiter produit un
-  diagnostic et une entrée dans KNOWN_GAPS.md. Une contribution upstream (types dérivés dans
-  abaplint, abaissement des formes `BY`) reste souhaitable, mais elle est publique : elle ne sera
-  proposée qu'avec l'accord du porteur du projet.
+  donne de l'ABAP standard. Les méthodes de `ZRAP_EML`, classe « clean-room » du projet, sont
+  remplacées à l'exécution par le noyau JavaScript (`runtime/src/rap/kernel.ts`). Toute
+  construction que la passe ne sait pas traiter produit un diagnostic (ABP005 à ABP007) et une
+  entrée dans KNOWN_GAPS.md. Une contribution upstream (types dérivés dans abaplint) reste
+  souhaitable ; elle est publique et ne sera proposée qu'avec l'accord du porteur du projet.
 
 ## D3 — Fastify plutôt qu'Express
 
@@ -73,9 +81,12 @@ et la conséquence. Les numéros D1 à D13 correspondent aux points 1 à 13 du �
 - **Décision** : `TIMESTAMPL`/`UTCLONG` → `timestamptz(6)`, `TIMESTAMP` → `timestamptz(0)`.
 - **Pourquoi** : type naturel en SQL et pour les filtres OData. Les horodatages générés par le
   runtime sont à la microseconde, ce qui garde les ETag stables.
-- **Conséquence** : la septième décimale ABAP est perdue (KNOWN_GAPS.md). Dans l'ABP, le runtime
-  abaplint représente les `DEC` par un nombre JavaScript : un `TIMESTAMPL` y perd ses dernières
-  décimales. Les ETag ne passent donc jamais par l'ABP.
+- **Conséquence** : la septième décimale ABAP est perdue (KNOWN_GAPS.md).
+- **Ajustement (J4)** : `@abaplint/runtime` 2.14.24 stocke les nombres packed sous forme exacte
+  (entier `BigInt` mis à l'échelle). Les conversions entre le buffer et l'ABAP passent par du
+  texte (`toFixed`) : un `TIMESTAMPL` arrive intact dans l'ABP et en revient intact. Seules les
+  opérations arithmétiques du runtime sur des packed passent par des nombres JavaScript
+  (KNOWN_GAPS.md). Les ETag sont des valeurs canoniques du buffer, jamais recalculées par l'ABP.
 
 ## D9 — Mandant retiré
 
@@ -94,6 +105,10 @@ et la conséquence. Les numéros D1 à D13 correspondent aux points 1 à 13 du �
   qui le détient (une détermination qui exécute une action interne ne se bloque pas elle-même).
 - **Pourquoi** : le runtime abaplint a un état global (`sy-*`, attributs statiques).
 - **Conséquence** : montée en charge par processus ou conteneurs.
+- **Réalisation (J4)** : `RapRuntime.transaction` enchaîne les LUW sur une promesse (un LUW à la
+  fois par processus) ; le LUW courant est porté par `AsyncLocalStorage`, ce qui rend réentrants
+  les appels EML des handlers. Entre processus, les verrous sont des verrous de ligne PostgreSQL
+  (`SELECT … FOR UPDATE NOWAIT` sur l'instance du `lock master`, cause `locked` si refusé).
 
 ## D12 — Nommage et licence
 
@@ -152,10 +167,14 @@ et la conséquence. Les numéros D1 à D13 correspondent aux points 1 à 13 du �
 
 ## D19 — DDIC « ombre » pour le transpiler
 
-- **Décision** : le registre passé au transpiler reçoit des tables aux types prédéfinis et des
-  vues CDS sans associations, générées depuis l'IR.
+- **Décision** : le registre passé au transpiler reçoit les tables du modèle avec des types
+  prédéfinis (DATATYPE, LENG, DECIMALS), les éléments de données du catalogue standard et du
+  projet ; pas de vues CDS.
 - **Pourquoi** : la couche SQL du transpiler échoue sur les associations et ne connaît pas les
-  éléments de données SAP standard ; notre SQL vient de l'IR.
+  éléments de données SAP standard ; les types de l'ABP viennent de l'interface dérivée (D2) ;
+  notre SQL vient de l'IR.
+- **Conséquence** : un type `TYPE zr_travel` (vue CDS) n'est pas disponible dans l'ABP
+  (KNOWN_GAPS.md) ; les types dérivés et les tables le sont.
 
 ## D20 — `field ( mandatory )` sans contrôle à l'exécution
 
@@ -171,3 +190,62 @@ et la conséquence. Les numéros D1 à D13 correspondent aux points 1 à 13 du �
   par ses propres modifications ; la boucle est bornée (erreur au-delà de 20 tours).
   Les validations et les déterminations on save s'exécutent dans la séquence de sauvegarde, sur
   les changements cumulés du LUW.
+
+## D22 — Causes d'échec RAP et statuts HTTP
+
+- **Décision** : la première entrée de `failed` donne le statut de l'erreur OData :
+  `unspecific` 400, `unauthorized` 403, `not_found` 404, `locked` et `conflict` 409, `readonly`
+  400, `disabled` 409, `dependency` 424 ; un `If-Match` absent sur PATCH, PUT et DELETE d'une
+  entité à ETag donne 428, un ETag périmé 412. Le message principal est le premier message
+  d'erreur de `reported` ; les autres messages vont dans `details`. Sans message, un texte
+  générique décrit la cause (« Travel(…) is locked by another user »).
+- **Pourquoi** : SAP ne publie pas de table de correspondance ; ces statuts sont ceux du
+  protocole HTTP pour chaque cause, et Fiori elements affiche le message quel que soit le statut.
+
+## D23 — Un LUW par requête ou par change set ; réponses rendues après le commit
+
+- **Décision** : une requête de modification (ou un change set de `$batch`) est un LUW : les
+  opérations, les déterminations on modify à la fin de chaque requête (D21), puis la séquence de
+  sauvegarde, dans une transaction PostgreSQL. Les réponses (entité créée, résultat d'action…)
+  sont lues après le commit dans les vues de projection ; dans un change set, elles sont
+  différées jusqu'à la fin du change set. Un échec annule tout le change set, qui reçoit une seule
+  réponse d'erreur.
+- **Pourquoi** : la réponse montre l'état sauvegardé (déterminations, champs d'administration,
+  ETag), comme RAP, et les lectures n'ont jamais à voir le buffer non sauvegardé. Les navigations
+  d'une écriture (`$1/_Booking`, `Travel(…)/_Booking(…)`) sont résolues dans le LUW, qui voit les
+  instances créées plus tôt dans le change set.
+
+## D24 — Socle ABAP « clean-room » étendu
+
+- **Décision** : en plus de `if_abap_behv`, `cl_abap_behavior_handler` et `cl_abap_context_info`,
+  le compilateur fournit `if_message`, `if_t100_message`, `if_t100_dyn_msg`,
+  `if_abap_behv_message`, `cx_root` (et `cx_static_check`, `cx_dynamic_check`, `cx_no_check`,
+  les classes des erreurs d'exécution), `cl_system_uuid`, la structure `scx_t100key` et les
+  éléments de données standard du catalogue DDIC. Le texte d'une exception est son message T100,
+  ses attributs résolus par nom (méthode native `ZRAP_EML=>exception_text`).
+- **Pourquoi** : les behavior pools réels utilisent des classes d'exception de messages (motif
+  `/DMO/CM_FLIGHT_MESSAGES`), `cl_system_uuid` et ces types. Le transpiler fait de toute classe
+  nommée `CX_ROOT` une sous-classe d'`Error` JavaScript : il suffit de la fournir.
+- **Conséquence** : ces objets sont écrits à partir des signatures publiques de SAP (LICENSES.md) ;
+  un objet du projet de même nom a priorité.
+
+## D25 — Contrôles de l'interface OData des écritures
+
+- **Décision** : les propriétés `readonly`, de numérotation managed et les champs
+  d'administration envoyés par un client OData sont ignorés (comme `Core.Computed` le prévoit) ;
+  une propriété inconnue donne 400. Les opérations non exposées (`use create` absent, opération
+  `internal`) donnent 405. Les clés d'une entité ne changent pas par PATCH (400).
+  Le feature control d'instance (`__EntityControl`, `__OperationControl`, `__FieldControl`) n'est
+  calculé que si la requête sélectionne ces propriétés (ou n'a pas de `$select`).
+- **Pourquoi** : c'est le comportement attendu par l'ODataModel V4 de Fiori elements ; le calcul
+  du feature control appelle l'ABP et ne doit pas pénaliser les lectures qui ne l'utilisent pas.
+
+## D26 — ABAP SQL hors du périmètre de l'ABP
+
+- **Décision** : une instruction ABAP SQL (`SELECT`, `INSERT`, `UPDATE`, `MODIFY`, `DELETE` sur une
+  table) dans un behavior pool est une erreur de compilation (ABP007).
+- **Pourquoi** : le runtime abaplint n'a pas de connexion à la base de l'application, et le
+  modèle de persistance d'un BO managed passe par l'EML. Une erreur à la génération vaut mieux
+  qu'une erreur à l'exécution. L'accès SQL en lecture (contrôle d'existence d'une agence, par
+  exemple) est une évolution possible (KNOWN_GAPS.md).
+

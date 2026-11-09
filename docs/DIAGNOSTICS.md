@@ -62,5 +62,9 @@ Le code de retour est 1 dès qu'il y a une erreur (ou un avertissement avec
 | BDEF026 | erreur | Projection BDEF sur autre chose qu'une projection d'un BO managed |
 | ABP001 | erreur | Behavior pool introuvable |
 | ABP002 | erreur | Méthode de handler manquante |
-| ABP003 | avertissement | Méthode de handler sans élément BDEF correspondant |
-| ABP004 | erreur | Erreur de syntaxe ABAP (abaplint) |
+| ABP003 | avertissement | Méthode de handler sans élément BDEF correspondant (dont un precheck non déclaré) : elle n'est pas appelée |
+| ABP004 | erreur | Erreur ABAP (abaplint) : syntaxe des sources d'origine, contrôle complet des sources réécrites, à la ligne d'origine |
+| ABP005 | erreur | Instruction EML mal formée ou forme non prise en charge (`OPERATIONS`, `RELATING TO`…) |
+| ABP006 | erreur | Nom inconnu dans l'EML ou un type dérivé : BDEF, entité, champ, association, action |
+| ABP007 | erreur | Construction non prise en charge : ABAP SQL, EML sur une projection, `GET PERMISSIONS`, type dérivé ou handler hors périmètre |
+| ABP008 | erreur | Erreur interne (ABAP généré) ou erreur du transpiler |

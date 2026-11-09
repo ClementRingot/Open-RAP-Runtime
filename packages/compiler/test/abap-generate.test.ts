@@ -148,5 +148,7 @@ describe("ABAP generation of the fixture", () => {
     expect(projection.diagnostics).toContainEqual(expect.objectContaining({ code: "ABP007", message: expect.stringContaining("projection ZRT_C_TRAVEL") }));
     const permissions = await generate({ [ABP]: (c) => c.replace("    DELETE travels WHERE OverallStatus IS NOT INITIAL.", "    GET PERMISSIONS ONLY GLOBAL AUTHORIZATION ENTITY zrt_r_travel REQUEST VALUE #( %update = if_abap_behv=>mk-on ) RESULT DATA(p).\n    DELETE travels WHERE OverallStatus IS NOT INITIAL.") });
     expect(permissions.diagnostics).toContainEqual(expect.objectContaining({ code: "ABP007", message: "GET PERMISSIONS is not supported" }));
+    const select = await generate({ [ABP]: (c) => c.replace("    DELETE travels WHERE OverallStatus IS NOT INITIAL.", "    SELECT SINGLE travel_id FROM zrt_travel INTO @DATA(first_id).\n    DELETE travels WHERE OverallStatus IS NOT INITIAL.") });
+    expect(select.diagnostics).toContainEqual(expect.objectContaining({ code: "ABP007", message: expect.stringContaining("ABAP SQL is not supported") }));
   });
 });

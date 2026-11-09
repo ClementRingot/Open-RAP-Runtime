@@ -18,7 +18,7 @@ OpenUI5 de type List Report / Object Page, sans système SAP.
 | J1 | Parser BDEF (Chevrotain), parser SRVD, adaptateur CDS (abaplint), IR, `rapt check`, `rapt ir` | fait |
 | J2 | Générateurs SQL (PostgreSQL) et `$metadata` (CSDL), `rapt build` | fait |
 | J3 | Runtime OData V4 en lecture (Fastify, `$batch`, CSRF, OIDC Bearer) | fait |
-| J4 | Écriture, runtime RAP managed, EML, behavior pool transpilé | à faire |
+| J4 | Écriture, runtime RAP managed, EML, behavior pool transpilé | fait |
 | J5 | UI OpenUI5 générée | à faire |
 | J6 | Docker, OIDC, tests de bout en bout | à faire |
 
@@ -38,6 +38,20 @@ node packages/compiler/dist/cli.js build fixtures/travel --out out/travel   # ap
 Le dossier source est un export abapGit (`.abapgit.xml` et `src/`) ; la fixture de référence est
 [fixtures/travel](fixtures/travel). Les codes de diagnostic sont décrits dans
 [docs/DIAGNOSTICS.md](docs/DIAGNOSTICS.md).
+
+## Application générée (`rapt build`)
+
+```
+model/model.json     IR lue par le runtime
+db/schema.sql        tables et vues PostgreSQL
+odata/metadata.xml   $metadata (CSDL avec annotations UI)
+abap/*.mjs           behavior pool transpilé (abap/init.mjs charge l'ensemble)
+abap/src/            ABAP donné au transpiler : sources réécrites, types dérivés, socle clean-room
+```
+
+Le behavior pool est réécrit avant transpilation : types dérivés de la BDEF, signatures des
+handlers, EML abaissé vers la classe noyau `ZRAP_EML` (décision D2). Les diagnostics ABAP
+(ABP004 à ABP008) pointent sur les lignes des sources d'origine.
 
 ## Organisation
 
