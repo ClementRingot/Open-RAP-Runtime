@@ -3,7 +3,8 @@ import { buildModel, generateApplication, generateCsdl, generateSql, loadProject
 import type { Model } from "@rap-transpiler/model";
 import type { FastifyInstance } from "fastify";
 import { PGliteDialect } from "kysely";
-import { mkdirSync, rmSync } from "node:fs";
+import { copyFileSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { createApp, type AppOptions } from "../src/app.js";
@@ -45,6 +46,36 @@ export function generatedFixture(): Promise<{ model: Model; metadata: string; sc
     return { model: result.model, metadata: file("odata/metadata.xml"), schema: file("db/schema.sql"), abapDir: path.join(out, "abap") };
   })();
   return generated;
+}
+
+/**
+ * A variant of the fixture (files of src/ replaced or added, or changed by a function), built and
+ * written like generatedFixture. One per test file: the ABAP runtime of a worker is global.
+ */
+export async function generatedVariant(changes: Record<string, string | ((content: string) => string)>): Promise<{ model: Model; metadata: string; schema: string; abapDir: string }> {
+  const dir = mkdtempSync(path.join(tmpdir(), "rapt-variant-"));
+  try {
+    mkdirSync(path.join(dir, "src"));
+    copyFileSync(path.join(FIXTURE_DIR, ".abapgit.xml"), path.join(dir, ".abapgit.xml"));
+    for (const file of readdirSync(path.join(FIXTURE_DIR, "src"))) {
+      copyFileSync(path.join(FIXTURE_DIR, "src", file), path.join(dir, "src", file));
+    }
+    for (const [file, change] of Object.entries(changes)) {
+      const target = path.join(dir, "src", file);
+      writeFileSync(target, typeof change === "function" ? change(readFileSync(target, "utf8")) : change);
+    }
+    const result = await generateApplication(loadProject(dir));
+    if (result.model === undefined || result.diagnostics.hasErrors()) {
+      throw new Error(`variant does not build: ${JSON.stringify(result.diagnostics.errors())}`);
+    }
+    const out = fileURLToPath(new URL(`./.generated/variant-${process.pid}-${Math.random().toString(36).slice(2, 8)}`, import.meta.url));
+    mkdirSync(out, { recursive: true });
+    writeFiles(out, result.files);
+    const file = (name: string): string => result.files.find((f) => f.path === name)?.content ?? "";
+    return { model: result.model, metadata: file("odata/metadata.xml"), schema: file("db/schema.sql"), abapDir: path.join(out, "abap") };
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
 }
 
 export const SERVICE = "/sap/opu/odata4/sap/zrt_ui_travel_o4/srvd/sap/zrt_ui_travel/0001/";
@@ -101,8 +132,8 @@ export async function fixtureApp(options: Partial<AppOptions> = {}, seed = true)
 }
 
 /** The fixture application with the managed RAP runtime (writes, actions, feature control). */
-export async function writableApp(): Promise<TestApp> {
-  const { model, metadata, schema, abapDir } = await generatedFixture();
+export async function writableApp(fixture?: Promise<{ model: Model; metadata: string; schema: string; abapDir: string }>): Promise<TestApp> {
+  const { model, metadata, schema, abapDir } = await (fixture ?? generatedFixture());
   const pglite = await PGlite.create({ parsers: PGLITE_PARSERS });
   await pglite.exec("SET TIME ZONE 'UTC'");
   await pglite.exec(schema);

@@ -93,6 +93,11 @@ const CATALOG: Record<string, Omit<AbapType, "dataElement">> = {
   "/DMO/SUPPL_PRICE": t("curr", 16, 2),
 };
 
+/** All the data elements of the catalog. */
+export function catalogDataElements(): Array<[string, AbapType]> {
+  return Object.entries(CATALOG).map(([name, type]) => [name, { ...type, dataElement: name }]);
+}
+
 export function catalogDataElement(name: string): AbapType | undefined {
   const upper = name.toUpperCase();
   const entry = CATALOG[upper];

@@ -50,7 +50,41 @@ const IF_ABAP_BEHV = `INTERFACE if_abap_behv PUBLIC.
 ENDINTERFACE.
 `;
 
+const IF_MESSAGE = `INTERFACE if_message PUBLIC.
+  METHODS get_text RETURNING VALUE(result) TYPE string.
+  METHODS get_longtext
+    IMPORTING preserve_newlines TYPE abap_bool OPTIONAL
+    RETURNING VALUE(result)     TYPE string.
+ENDINTERFACE.
+`;
+
+const IF_T100_MESSAGE = `INTERFACE if_t100_message PUBLIC.
+  INTERFACES if_message.
+  DATA t100key TYPE scx_t100key.
+  CONSTANTS:
+    BEGIN OF default_textid,
+      msgid TYPE symsgid VALUE 'SY',
+      msgno TYPE symsgno VALUE '530',
+      attr1 TYPE scx_attrname VALUE '',
+      attr2 TYPE scx_attrname VALUE '',
+      attr3 TYPE scx_attrname VALUE '',
+      attr4 TYPE scx_attrname VALUE '',
+    END OF default_textid.
+ENDINTERFACE.
+`;
+
+const IF_T100_DYN_MSG = `INTERFACE if_t100_dyn_msg PUBLIC.
+  INTERFACES if_t100_message.
+  DATA msgty TYPE symsgty.
+  DATA msgv1 TYPE symsgv.
+  DATA msgv2 TYPE symsgv.
+  DATA msgv3 TYPE symsgv.
+  DATA msgv4 TYPE symsgv.
+ENDINTERFACE.
+`;
+
 const IF_ABAP_BEHV_MESSAGE = `INTERFACE if_abap_behv_message PUBLIC.
+  INTERFACES if_t100_dyn_msg.
   TYPES t_severity TYPE c LENGTH 1.
   CONSTANTS:
     BEGIN OF severity,
@@ -61,9 +95,91 @@ const IF_ABAP_BEHV_MESSAGE = `INTERFACE if_abap_behv_message PUBLIC.
       none        TYPE t_severity VALUE ' ',
     END OF severity.
   DATA m_severity TYPE t_severity.
-  METHODS get_text RETURNING VALUE(result) TYPE string.
-  METHODS get_longtext RETURNING VALUE(result) TYPE string.
 ENDINTERFACE.
+`;
+
+/** Root of the exception classes; the transpiler makes a class named CX_ROOT extend Error. */
+const CX_ROOT = `CLASS cx_root DEFINITION PUBLIC ABSTRACT CREATE PUBLIC.
+  PUBLIC SECTION.
+    INTERFACES if_message.
+    ALIASES get_text FOR if_message~get_text.
+    ALIASES get_longtext FOR if_message~get_longtext.
+    DATA textid TYPE sotr_conc READ-ONLY.
+    DATA previous TYPE REF TO cx_root READ-ONLY.
+    DATA is_resumable TYPE abap_bool READ-ONLY.
+    METHODS constructor
+      IMPORTING textid   LIKE textid OPTIONAL
+                previous LIKE previous OPTIONAL.
+ENDCLASS.
+
+CLASS cx_root IMPLEMENTATION.
+  METHOD constructor.
+    me->textid = textid.
+    me->previous = previous.
+  ENDMETHOD.
+
+  METHOD if_message~get_text.
+    result = zrap_eml=>exception_text( me ).
+  ENDMETHOD.
+
+  METHOD if_message~get_longtext.
+    result = if_message~get_text( ).
+  ENDMETHOD.
+ENDCLASS.
+`;
+
+const exceptionClass = (name: string, superclass: string, abstract = false): string => `CLASS ${name} DEFINITION PUBLIC${abstract ? " ABSTRACT" : ""} INHERITING FROM ${superclass} CREATE PUBLIC.
+ENDCLASS.
+
+CLASS ${name} IMPLEMENTATION.
+ENDCLASS.
+`;
+
+/** Exception classes of the ABAP runtime errors the transpiled code raises, and their parents. */
+const EXCEPTIONS: Array<[string, string, boolean]> = [
+  ["cx_static_check", "cx_root", true],
+  ["cx_dynamic_check", "cx_root", true],
+  ["cx_no_check", "cx_root", true],
+  ["cx_sy_arithmetic_error", "cx_dynamic_check", false],
+  ["cx_sy_zerodivide", "cx_sy_arithmetic_error", false],
+  ["cx_sy_arithmetic_overflow", "cx_sy_arithmetic_error", false],
+  ["cx_sy_conversion_error", "cx_dynamic_check", false],
+  ["cx_sy_conversion_no_number", "cx_sy_conversion_error", false],
+  ["cx_sy_conversion_overflow", "cx_sy_conversion_error", false],
+  ["cx_sy_itab_line_not_found", "cx_dynamic_check", false],
+  ["cx_sy_move_cast_error", "cx_dynamic_check", false],
+  ["cx_sy_ref_is_initial", "cx_dynamic_check", false],
+  ["cx_sy_range_out_of_bounds", "cx_dynamic_check", false],
+  ["cx_uuid_error", "cx_static_check", false],
+];
+
+const CL_SYSTEM_UUID = `CLASS cl_system_uuid DEFINITION PUBLIC FINAL CREATE PRIVATE.
+  PUBLIC SECTION.
+    CLASS-METHODS create_uuid_x16_static RETURNING VALUE(uuid) TYPE sysuuid_x16 RAISING cx_uuid_error.
+    CLASS-METHODS create_uuid_c32_static RETURNING VALUE(uuid) TYPE sysuuid_c32 RAISING cx_uuid_error.
+    CLASS-METHODS create_uuid_c36_static RETURNING VALUE(uuid) TYPE sysuuid_c36 RAISING cx_uuid_error.
+ENDCLASS.
+
+CLASS cl_system_uuid IMPLEMENTATION.
+  METHOD create_uuid_x16_static.
+    uuid = zrap_eml=>uuid( ).
+  ENDMETHOD.
+
+  METHOD create_uuid_c32_static.
+    DATA raw TYPE sysuuid_x16.
+    raw = zrap_eml=>uuid( ).
+    uuid = raw.
+  ENDMETHOD.
+
+  METHOD create_uuid_c36_static.
+    DATA raw TYPE sysuuid_x16.
+    DATA hex TYPE c LENGTH 32.
+    raw = zrap_eml=>uuid( ).
+    hex = raw.
+    uuid = |{ hex(8) }-{ hex+8(4) }-{ hex+12(4) }-{ hex+16(4) }-{ hex+20(12) }|.
+    TRANSLATE uuid TO LOWER CASE.
+  ENDMETHOD.
+ENDCLASS.
 `;
 
 const ZRAP_CL_MESSAGE = `CLASS zrap_cl_message DEFINITION PUBLIC CREATE PUBLIC.
@@ -97,9 +213,16 @@ CLASS zrap_cl_message IMPLEMENTATION.
     me->msgv2 = msgv2.
     me->msgv3 = msgv3.
     me->msgv4 = msgv4.
+    if_t100_message~t100key-msgid = msgid.
+    if_t100_message~t100key-msgno = msgno.
+    if_t100_dyn_msg~msgty = severity.
+    if_t100_dyn_msg~msgv1 = msgv1.
+    if_t100_dyn_msg~msgv2 = msgv2.
+    if_t100_dyn_msg~msgv3 = msgv3.
+    if_t100_dyn_msg~msgv4 = msgv4.
   ENDMETHOD.
 
-  METHOD if_abap_behv_message~get_text.
+  METHOD if_message~get_text.
     IF text IS NOT INITIAL OR msgid IS INITIAL.
       result = text.
       RETURN.
@@ -107,8 +230,8 @@ CLASS zrap_cl_message IMPLEMENTATION.
     result = zrap_eml=>message_text( id = msgid number = msgno v1 = msgv1 v2 = msgv2 v3 = msgv3 v4 = msgv4 ).
   ENDMETHOD.
 
-  METHOD if_abap_behv_message~get_longtext.
-    result = if_abap_behv_message~get_text( ).
+  METHOD if_message~get_longtext.
+    result = if_message~get_text( ).
   ENDMETHOD.
 ENDCLASS.
 `;
@@ -258,6 +381,12 @@ const ZRAP_EML = `CLASS zrap_eml DEFINITION PUBLIC ABSTRACT FINAL.
                 v3          TYPE string OPTIONAL
                 v4          TYPE string OPTIONAL
       RETURNING VALUE(text) TYPE string.
+    "! Text of an exception object: its T100 message (if_t100_message), attributes resolved.
+    CLASS-METHODS exception_text
+      IMPORTING exception   TYPE REF TO object
+      RETURNING VALUE(text) TYPE string.
+    CLASS-METHODS uuid
+      RETURNING VALUE(uuid) TYPE sysuuid_x16.
 ENDCLASS.
 
 CLASS zrap_eml IMPLEMENTATION.
@@ -294,12 +423,24 @@ CLASS zrap_eml IMPLEMENTATION.
   METHOD message_text.
     text = |{ id } { number }|.
   ENDMETHOD.
+
+  METHOD exception_text.
+  ENDMETHOD.
+
+  METHOD uuid.
+  ENDMETHOD.
 ENDCLASS.
 `;
 
 export const FRAMEWORK_SOURCES: FrameworkSource[] = [
   { fileName: "if_abap_behv.intf.abap", source: IF_ABAP_BEHV },
+  { fileName: "if_message.intf.abap", source: IF_MESSAGE },
+  { fileName: "if_t100_message.intf.abap", source: IF_T100_MESSAGE },
+  { fileName: "if_t100_dyn_msg.intf.abap", source: IF_T100_DYN_MSG },
   { fileName: "if_abap_behv_message.intf.abap", source: IF_ABAP_BEHV_MESSAGE },
+  { fileName: "cx_root.clas.abap", source: CX_ROOT },
+  ...EXCEPTIONS.map(([name, superclass, abstract]) => ({ fileName: `${name}.clas.abap`, source: exceptionClass(name, superclass, abstract) })),
+  { fileName: "cl_system_uuid.clas.abap", source: CL_SYSTEM_UUID },
   { fileName: "zrap_cl_message.clas.abap", source: ZRAP_CL_MESSAGE },
   { fileName: "cl_abap_behavior_handler.clas.abap", source: CL_ABAP_BEHAVIOR_HANDLER },
   { fileName: "cl_abap_context_info.clas.abap", source: CL_ABAP_CONTEXT_INFO },

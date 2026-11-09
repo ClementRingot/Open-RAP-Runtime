@@ -283,10 +283,10 @@ export class AbapBridge {
       }
     }
     const message: Message = { severity, text };
-    const msgid = abapString(object.msgid);
-    if (msgid !== "") {
-      message.msgid = msgid;
-      message.msgno = abapString(object.msgno);
+    const key = this.t100Key(object);
+    if (key !== undefined) {
+      message.msgid = key.msgid;
+      message.msgno = key.msgno;
     }
     return message;
   }
@@ -396,5 +396,34 @@ export class AbapBridge {
 
   public t100(id: string, number: string, vars: string[]): string {
     return formatT100(this.texts, id, number, vars);
+  }
+
+  /** The T100 message key of a message object (`if_t100_message~t100key`), if it has one. */
+  public t100Key(object: AbapData): { msgid: string; msgno: string; attributes: string[] } | undefined {
+    const key = object?.["if_t100_message$t100key"];
+    if (key === undefined) {
+      return undefined;
+    }
+    const msgid = abapString(component(key, "msgid"));
+    if (msgid === "") {
+      return undefined;
+    }
+    return { msgid, msgno: abapString(component(key, "msgno")), attributes: [1, 2, 3, 4].map((n) => abapString(component(key, `attr${n}`))) };
+  }
+
+  /** Text of an exception: its T100 message with the attributes named by attr1…attr4. */
+  public exceptionText(object: AbapData): string {
+    const key = this.t100Key(object);
+    if (key === undefined) {
+      return "An exception was raised";
+    }
+    const vars = key.attributes.map((name) => {
+      if (name === "") {
+        return "";
+      }
+      const attribute = object[name.toLowerCase().replace(/~/g, "$")];
+      return attribute === undefined ? name : abapString(attribute);
+    });
+    return this.t100(key.msgid, key.msgno, vars);
   }
 }

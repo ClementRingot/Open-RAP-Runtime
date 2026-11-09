@@ -269,4 +269,12 @@ export function installKernel(runtime: RapRuntime): void {
     const vars = ["v1", "v2", "v3", "v4"].map((v) => abapString(input?.[v]));
     return new abap.types.String().set(bridge.t100(abapString(input?.["id"]), abapString(input?.["number"]), vars));
   };
+
+  // the T100 text of an exception object (if_t100_message), its attributes resolved by name
+  kernel.exception_text = async (input: Input): Promise<AbapData> => {
+    const object = input?.["exception"]?.get?.();
+    return new abap.types.String().set(object === undefined ? "" : bridge.exceptionText(object));
+  };
+
+  kernel.uuid = async (): Promise<AbapData> => new abap.types.Hex({ length: 16 }).set(randomUUID().replace(/-/g, "").toUpperCase());
 }

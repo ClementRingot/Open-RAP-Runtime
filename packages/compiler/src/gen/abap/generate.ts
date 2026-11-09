@@ -15,7 +15,7 @@ import { abaplintRegistry } from "../../ir/handlers.js";
 import { generateDerivedTypes } from "./derived-types.js";
 import { FRAMEWORK_SOURCES } from "./framework.js";
 import { BdefCatalog, poolBdefOf, rewriteAbapFile } from "./rewrite.js";
-import { shadowTable } from "./shadow.js";
+import { frameworkDictionary, shadowTable } from "./shadow.js";
 
 export interface AbapSource {
   fileName: string;
@@ -91,6 +91,13 @@ export function abapSources(project: Project, model: Model, diagnostics: Diagnos
     const shadow = shadowTable(table);
     sources.push({ fileName: shadow.fileName, content: shadow.content });
   }
+  const projectObjects = new Set(project.files.map((f) => `${f.type}:${f.name}`));
+  for (const table of model.tables) {
+    projectObjects.add(`TABL:${table.name.toUpperCase()}`);
+  }
+  for (const file of frameworkDictionary(projectObjects)) {
+    sources.push({ fileName: file.fileName, content: file.content });
+  }
   for (const file of project.files.filter((f) => DDIC_TYPES.has(f.type) && f.extension === "xml")) {
     sources.push({ fileName: file.fileName, content: file.content, original: file.path });
   }
@@ -145,6 +152,15 @@ export function checkAbap(sources: AbapSource[], diagnostics: Diagnostics): abap
   return registry;
 }
 
+/** Namespaced objects (/DMO/…) give module names with `#`, imported as `%23`: plain names are safer. */
+function safeModulePath(file: string): string {
+  return file.replace(/#/g, "_");
+}
+
+function safeImports(code: string): string {
+  return code.replace(/(["'])(\.\/[^"'\n]*%23[^"'\n]*)\1/g, (_m, quote: string, specifier: string) => `${quote}${specifier.replace(/%23/g, "_")}${quote}`);
+}
+
 /** Rewrite, check and transpile. Returns undefined when there are errors (in `diagnostics`). */
 export async function generateAbap(project: Project, model: Model, diagnostics: Diagnostics, options: { transpile?: boolean } = {}): Promise<AbapOutput | undefined> {
   const sources = abapSources(project, model, diagnostics);
@@ -164,8 +180,8 @@ export async function generateAbap(project: Project, model: Model, diagnostics: 
   }
   try {
     const output = await new Transpiler({ unknownTypes: UnknownTypesEnum.compileError, ignoreSourceMap: true, addCommonJS: true }).run(registry);
-    const modules = output.objects.map((o) => ({ path: o.filename, content: o.chunk.getCode() }));
-    modules.push({ path: "init.mjs", content: output.initializationScript });
+    const modules = output.objects.map((o) => ({ path: safeModulePath(o.filename), content: safeImports(o.chunk.getCode()) }));
+    modules.push({ path: "init.mjs", content: safeImports(output.initializationScript) });
     return { sources, modules, entry: "init.mjs" };
   } catch (error) {
     diagnostics.error("ABP008", `transpiler: ${(error as Error).message}`);
