@@ -56,7 +56,7 @@ Connexion OIDC (Keycloak fourni dans le profil `oidc` de docker-compose, utilisa
 Le behavior pool peut appeler des API distantes avec le client HTTP d'ABAP Cloud et le client
 proxy OData d'un service consumption model (SCM, SCM2) ; chaque destination se configure par
 variables d'environnement (`DESTINATION_<NOM>_URL`, `_USER`, `_PASSWORD`, `_TOKEN`, `_HEADERS`),
-listées dans le `.env.example` généré ([D31](docs/DECISIONS.md)).
+listées dans le `.env.example` généré ([guide](docs/API_DISTANTES.md), [D31](docs/DECISIONS.md)).
 
 ## Application générée (`rapt build`)
 

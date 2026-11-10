@@ -9,8 +9,9 @@ Légende : ✅ pris en charge et testé · 🟡 partiel ou non couvert par un te
 Depuis J1, toutes les constructions de ces tableaux sont analysées et représentées dans l'IR,
 avec un diagnostic positionné pour celles qui sont hors périmètre ; le statut indique le
 comportement de l'application générée. Les tests de J4 portent sur la fixture Travel/Booking et
-sur deux variantes (`packages/runtime/test/rap-variant*.test.ts`) qui ajoutent ce que la fixture
-n'utilise pas.
+sur ses variantes (`packages/runtime/test/variants.ts`, tests `rap-variant*.test.ts`) qui
+ajoutent ce que la fixture n'utilise pas : numérotation, feature control global, saver
+(additional, unmanaged), ABAP SQL, ETag dépendant, API distantes.
 
 ## BDEF : en-tête et entités
 
