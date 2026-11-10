@@ -3,7 +3,7 @@
 
 import { writeFileSync } from "node:fs";
 import path from "node:path";
-import { generateApplication, writeFiles } from "./build.js";
+import { generateApplication, writeFiles, type GenerateOptions } from "./build.js";
 import { parseArgs } from "node:util";
 import { formatDiagnostic, type Diagnostics } from "./diagnostics.js";
 import { loadProject } from "./input/project.js";
@@ -21,6 +21,7 @@ Options:
   --service <name>   service definition to build (required when the sources have several)
   --binding <name>   service binding name (default: the SRVB of the service, else <SRVD>_O4)
   --path <path>      service root path (default: /sap/opu/odata4/sap/<binding>/srvd/sap/<srvd>/0001/)
+  --runtime <dir>    @rap-transpiler/runtime package to embed in the application (default: next to rapt)
   --out <path>       output file (rapt ir) or folder (rapt build)
   --warnings-as-errors
   -h, --help
@@ -48,6 +49,7 @@ export async function main(argv: string[]): Promise<number> {
         binding: { type: "string" },
         path: { type: "string" },
         out: { type: "string" },
+        runtime: { type: "string" },
         "warnings-as-errors": { type: "boolean" },
         help: { type: "boolean", short: "h" },
       },
@@ -65,10 +67,11 @@ export async function main(argv: string[]): Promise<number> {
     process.stderr.write(`missing <src>\n\n${USAGE}`);
     return 2;
   }
-  const options: BuildOptions = {};
+  const options: GenerateOptions = {};
   if (typeof parsed.values["service"] === "string") options.service = parsed.values["service"];
   if (typeof parsed.values["binding"] === "string") options.binding = parsed.values["binding"];
   if (typeof parsed.values["path"] === "string") options.path = parsed.values["path"];
+  if (typeof parsed.values["runtime"] === "string") options.runtimeDir = parsed.values["runtime"];
 
   const project = loadProject(source);
   if (command === "build") {
@@ -88,7 +91,7 @@ export async function main(argv: string[]): Promise<number> {
     return 0;
   }
   // check: the whole generation (ABAP rewrite, check and transpilation), without writing
-  const { model, diagnostics } = command === "check" ? await generateApplication(project, options) : buildModel(project, options);
+  const { model, diagnostics } = command === "check" ? await generateApplication(project, { ...options, scaffold: false }) : buildModel(project, options);
   const failed = diagnostics.hasErrors() || (parsed.values["warnings-as-errors"] === true && diagnostics.items.some((d) => d.severity === "warning"));
 
   switch (command) {

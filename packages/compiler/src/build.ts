@@ -5,6 +5,7 @@ import path from "node:path";
 import type { Model } from "@rap-transpiler/model";
 import type { Diagnostics } from "./diagnostics.js";
 import { generateAbap } from "./gen/abap/generate.js";
+import { generateScaffold } from "./gen/app/index.js";
 import { generateCsdl } from "./gen/csdl.js";
 import { generateSql } from "./gen/sql.js";
 import { generateUi } from "./gen/ui/index.js";
@@ -26,6 +27,10 @@ export interface BuildApplicationResult {
 export interface GenerateOptions extends BuildOptions {
   /** Run the transpiler (default true); `rapt check` can skip writing but still transpiles. */
   transpile?: boolean;
+  /** Write package.json, server.mjs, Docker files and the embedded runtime (default true). */
+  scaffold?: boolean;
+  /** Folder of the @rap-transpiler/runtime package to embed (default: next to the compiler). */
+  runtimeDir?: string;
 }
 
 /** Generates the files of the application in memory. */
@@ -46,6 +51,12 @@ export async function generateApplication(project: Project, options: GenerateOpt
     ...abap.sources.map((s) => ({ path: `abap/src/${s.fileName}`, content: s.content })),
     ...generateUi(model).map((f) => ({ path: `ui/${f.path}`, content: f.content })),
   ];
+  if (options.scaffold !== false) {
+    files.push(...generateScaffold(model, diagnostics, options.runtimeDir === undefined ? {} : { runtimeDir: options.runtimeDir }));
+    if (diagnostics.hasErrors()) {
+      return { diagnostics, model, files: [] };
+    }
+  }
   return { diagnostics, model, files };
 }
 

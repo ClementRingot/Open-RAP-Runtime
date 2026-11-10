@@ -43,7 +43,7 @@ let generated: Promise<GeneratedFixture> | undefined;
  */
 export function generatedFixture(): Promise<GeneratedFixture> {
   generated ??= (async () => {
-    const result = await generateApplication(loadProject(FIXTURE_DIR));
+    const result = await generateApplication(loadProject(FIXTURE_DIR), { scaffold: false });
     if (result.model === undefined || result.diagnostics.hasErrors()) {
       throw new Error(`fixture does not build: ${JSON.stringify(result.diagnostics.items)}`);
     }
@@ -73,7 +73,7 @@ export async function generatedVariant(changes: Record<string, string | ((conten
       const target = path.join(dir, "src", file);
       writeFileSync(target, typeof change === "function" ? change(readFileSync(target, "utf8")) : change);
     }
-    const result = await generateApplication(loadProject(dir));
+    const result = await generateApplication(loadProject(dir), { scaffold: false });
     if (result.model === undefined || result.diagnostics.hasErrors()) {
       throw new Error(`variant does not build: ${JSON.stringify(result.diagnostics.errors())}`);
     }

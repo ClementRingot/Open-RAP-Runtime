@@ -91,7 +91,9 @@ export class Ui5Resources {
     const source = `${folder}/library.source.less`;
     let build = this.themes.get(source);
     if (build === undefined) {
-      const builder = (this.builder ??= new (this.require("less-openui5") as { Builder: new () => LessBuilder }).Builder());
+      // (a variable rather than `new (x as T).Builder()`: TypeScript 7.0 drops those parentheses)
+      const less = this.require("less-openui5") as { Builder: new () => LessBuilder };
+      const builder = (this.builder ??= new less.Builder());
       build = (async () => {
         // the library name gives its private parameters (_sap_m_…) and the inline parameters
         const library = folder.slice(0, folder.indexOf("/themes/")).replace(/\//g, ".");

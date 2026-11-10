@@ -13,3 +13,6 @@ export { ReadEngine } from "./odata/read.js";
 export { ServiceRuntime } from "./odata/service.js";
 export { parseExpand, parseFilter, parseOrderby, parseSelect } from "./odata/uri/parser.js";
 export * from "./values.js";
+export { start, type RunningServer, type StartOptions } from "./server.js";
+export { RapRuntime } from "./rap/runtime.js";
+export { OidcSessions } from "./auth/session.js";
