@@ -60,3 +60,13 @@ Versions de référence : `@abaplint/core` 2.120.98, `@abaplint/transpiler` 2.14
 | `$filter` avec `any`/`all`, `$expand` imbriqué, `$apply`, JSON batch, `$value` | Réponse 501 ou 400 |
 | `If-Match` sur une entité `etag dependent by` | Non contrôlé : seule l'entité `etag master` expose son ETag. |
 | Feature control global (`features : global`) dans les lectures | Calculé avec le feature control d'instance, sans cache entre requêtes. |
+
+## Application générée
+
+| Écart | Statut |
+|---|---|
+| Premier chargement de l'UI : environ 400 modules OpenUI5 servis un par un (pas de bundle `ui5 build`) | Assumé (D27) ; mise en cache HTTP d'une heure. |
+| Sessions : ni rafraîchissement de jeton, ni révocation avant l'expiration du cookie (8 h) | Assumé (D28). |
+| Verrous entre plusieurs instances de l'application | Verrous de ligne PostgreSQL (`NOWAIT`) ; pas de test de conflit automatisé. |
+| TypeScript 7.0.2 compile `new (x as T).Y()` sans parenthèses | Forme évitée dans le code (D29). |
+

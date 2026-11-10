@@ -150,6 +150,11 @@ et la conséquence. Les numéros D1 à D13 correspondent aux points 1 à 13 du �
   qui lit `model.json`. Seuls le SQL, le CSDL, le JavaScript de l'ABP, l'UI et le packaging sont
   générés. Le runtime est embarqué sous forme de tarball dans `vendor/`.
 - **Pourquoi** : un seul runtime testé pour tous les BO ; une sortie autonome sans registre privé.
+- **Ajustement (J6)** : plutôt qu'un tarball, `vendor/` contient les paquets `runtime` et `model`
+  compilés (`dist/` et un `package.json` de production) ; leur version porte une empreinte de
+  leur contenu, pour que `npm install` les mette à jour après un nouveau `rapt build`. Le
+  `.npmrc` (`install-links=true`) les installe comme des paquets ordinaires. `server.mjs` appelle
+  `start()` du runtime, configuré par variables d'environnement (`.env.example`).
 
 ## D16 — Représentation canonique des valeurs
 
@@ -267,4 +272,33 @@ et la conséquence. Les numéros D1 à D13 correspondent aux points 1 à 13 du �
   dépendre ; npm suffit, sans outillage UI5 au démarrage. Le premier chargement demande environ
   400 modules : un bundle construit par l'outillage UI5 (`ui5 build`) est prévu pour l'image
   Docker (J6).
+
+## D28 — Sessions OIDC sans dépendance supplémentaire
+
+- **Décision** : le flux « authorization code » avec PKCE est écrit avec `jose` (déjà utilisé
+  pour les jetons porteurs) : état de connexion et session dans des cookies signés (HMAC-SHA256,
+  HttpOnly, SameSite=Lax), sans stockage côté serveur ; jeton CSRF lié à la session ; découverte
+  possible sur une URL interne (`OIDC_DISCOVERY_URL`) distincte de l'émetteur public. Les tests
+  utilisent un fournisseur OIDC écrit pour eux (découverte, autorisation, jeton, JWKS).
+- **Ajustement du PLAN.md** : `openid-client`, `@fastify/secure-session` et `oauth2-mock-server`
+  ne sont pas ajoutés. `openid-client` exige que l'émetteur soit l'URL de découverte, ce qui ne
+  convient pas à Keycloak dans docker-compose (le navigateur voit `localhost:8180`, le conteneur
+  de l'application `keycloak:8080`).
+- **Conséquence** : la session dure 8 heures (`maxAge`) ; il n'y a ni rafraîchissement de jeton,
+  ni révocation côté serveur avant expiration (KNOWN_GAPS.md).
+
+## D29 — Test de bout en bout et CI
+
+- **Décision** : le test e2e (`packages/runtime/test/e2e.test.ts`) part de la CLI compilée :
+  `rapt build` de la fixture, `npm install` de l'application générée, `node server.mjs` sur un
+  vrai PostgreSQL (celui de `RAPT_E2E_DATABASE_URL`, sinon un serveur démarré pour le test, sinon
+  PGlite), puis le service OData et l'UI dans Chromium. La CI fournit un service PostgreSQL 16 et
+  Chromium. Un second job construit l'image et démarre le `docker-compose.yml` généré
+  (`--wait`, contrôles HTTP du service et de l'UI). Vérifié aussi dans l'environnement de
+  développement : image construite, PostgreSQL et application démarrés par compose, création,
+  création par association, action et UI servies par le conteneur.
+- **Pourquoi** : c'est l'artefact livré qui est testé, pas les sources du runtime.
+- **Note** : TypeScript 7.0.2 compile `new (x as T).Builder()` sans les parenthèses ; seul le
+  JavaScript compilé (dist) le montre, Vitest compilant les sources autrement. Le test e2e, qui
+  exécute le dist, l'a révélé ; le code évite cette forme.
 

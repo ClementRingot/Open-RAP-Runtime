@@ -85,3 +85,6 @@ copyleft limité aux fichiers de la bibliothèque elle-même, sans effet sur not
 | Élément | Licence | Usage |
 |---|---|---|
 | PostgreSQL 16 | PostgreSQL License | Base de données des applications générées (à partir de J2) |
+| Image `node:22-alpine` | Node.js : MIT ; Alpine : paquets libres | Base de l'image Docker de l'application générée |
+| Image `postgres:16-alpine` | PostgreSQL License | Base de données du docker-compose généré |
+| Image `quay.io/keycloak/keycloak:26.0` | Apache-2.0 | Fournisseur OIDC du profil `oidc` du docker-compose (non embarqué dans l'image de l'application) |

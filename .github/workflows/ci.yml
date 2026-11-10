@@ -40,3 +40,33 @@ jobs:
       - run: pnpm test
       - name: Check the reference fixture
         run: node packages/compiler/dist/cli.js check fixtures/travel --warnings-as-errors
+
+  docker:
+    # the generated application as delivered: image, docker compose, OData service
+    needs: test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm build
+      - run: node packages/compiler/dist/cli.js build fixtures/travel --out out/travel
+      - name: docker compose up
+        working-directory: out/travel
+        run: docker compose up -d --build --wait --wait-timeout 180
+      - name: Service checks
+        run: |
+          S=http://localhost:8080/sap/opu/odata4/sap/zrt_ui_travel_o4/srvd/sap/zrt_ui_travel/0001
+          curl -fsS http://localhost:8080/health
+          curl -fsS -X POST "$S/Travel" -H "content-type: application/json" \
+            -d '{"TravelID":"00000001","AgencyID":"070001","CustomerID":"000001","BeginDate":"2027-05-01","EndDate":"2027-05-08","BookingFee":"40.00","CurrencyCode":"EUR"}'
+          curl -fsS "$S/Travel?\$count=true" | grep -q '"@odata.count":1'
+          curl -fsS -o /dev/null http://localhost:8080/ui/index.html
+      - name: docker compose down
+        if: always()
+        working-directory: out/travel
+        run: docker compose down -v

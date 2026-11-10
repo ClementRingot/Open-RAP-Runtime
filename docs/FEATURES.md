@@ -176,3 +176,17 @@ n'utilise pas.
 | Messages (erreurs, succès) | ✅ | `MessageBox`, `MessageToast`, `MessagePopover`. |
 | Aide à la saisie (value help), variantes, personnalisation de table | ❌ | Prévu après le MVP. |
 
+## Application générée et exploitation
+
+| Fonctionnalité | Statut | Note |
+|---|---|---|
+| `package.json`, `server.mjs`, runtime embarqué (`vendor/`), `npm install` | ✅ | Test e2e. |
+| Configuration par variables d'environnement (`.env.example`) | ✅ | |
+| PostgreSQL (`DATABASE_URL`), schéma appliqué au démarrage | ✅ | Test e2e sur PostgreSQL 16. |
+| PGlite embarqué (`PGLITE_DIR`) pour le développement | 🟡 | Repli du test e2e quand aucun PostgreSQL n'est disponible. |
+| Dockerfile multi-étapes, `docker-compose.yml` (app + PostgreSQL) | ✅ | Image construite et `docker compose up` vérifié (service OData, actions, UI) ; job CI `docker`. |
+| Profil Keycloak (realm importé : client `rapt-app`, utilisateur `alice`) | 🟡 | Non exécuté contre un vrai Keycloak ; le flux est testé avec un fournisseur simulé. |
+| OIDC : jetons porteurs (JWKS), sessions navigateur (code + PKCE), CSRF, déconnexion | ✅ | |
+| Rôle obligatoire (`OIDC_REQUIRED_ROLE`) | ✅ | Rôles Keycloak (`realm_access.roles`) ou revendication configurable. |
+| Bundle UI5 optimisé (`ui5 build`) | ❌ | Ressources servies depuis les sources npm (D27). |
+

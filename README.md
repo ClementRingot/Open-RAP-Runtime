@@ -20,7 +20,7 @@ OpenUI5 de type List Report / Object Page, sans système SAP.
 | J3 | Runtime OData V4 en lecture (Fastify, `$batch`, CSRF, OIDC Bearer) | fait |
 | J4 | Écriture, runtime RAP managed, EML, behavior pool transpilé | fait |
 | J5 | UI OpenUI5 générée (List Report, Object Page) | fait |
-| J6 | Docker, OIDC, tests de bout en bout | à faire |
+| J6 | Application packagée (npm, Docker, docker-compose), sessions OIDC, test de bout en bout | fait |
 
 ## Démarrage
 
@@ -39,6 +39,20 @@ Le dossier source est un export abapGit (`.abapgit.xml` et `src/`) ; la fixture 
 [fixtures/travel](fixtures/travel). Les codes de diagnostic sont décrits dans
 [docs/DIAGNOSTICS.md](docs/DIAGNOSTICS.md).
 
+## Lancer l'application générée
+
+```sh
+node packages/compiler/dist/cli.js build fixtures/travel --out out/travel
+cd out/travel
+docker compose up --build                 # http://localhost:8080/ (sans connexion)
+# ou, avec Node.js 22 et un PostgreSQL :
+npm install && DATABASE_URL=postgres://user:password@localhost:5432/app npm start
+```
+
+Connexion OIDC (Keycloak fourni dans le profil `oidc` de docker-compose, utilisateur `alice`) :
+`AUTH_MODE=oidc docker compose --profile oidc up --build`. Les variables sont décrites dans le
+`README.md` et le `.env.example` de l'application générée.
+
 ## Application générée (`rapt build`)
 
 ```
@@ -48,6 +62,9 @@ odata/metadata.xml   $metadata (CSDL avec annotations UI)
 abap/*.mjs           behavior pool transpilé (abap/init.mjs charge l'ensemble)
 abap/src/            ABAP donné au transpiler : sources réécrites, types dérivés, socle clean-room
 ui/                  UI OpenUI5 : List Report et Object Pages générées depuis les annotations @UI
+package.json         dépendances ; vendor/ embarque le runtime et le modèle (aucun registre privé)
+server.mjs           démarrage (variables d'environnement : .env.example)
+Dockerfile, docker-compose.yml, keycloak/   image, PostgreSQL, Keycloak (profil oidc)
 ```
 
 Le behavior pool est réécrit avant transpilation : types dérivés de la BDEF, signatures des
