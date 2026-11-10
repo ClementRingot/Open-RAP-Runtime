@@ -1,0 +1,56 @@
+{
+  "roles": {
+    "travel_manager": {
+      "description": "Manages the travels of every agency",
+      "authorizations": [
+        {
+          "object": "ZAO_TRAVL",
+          "fields": {
+            "ACTVT": [
+              "01",
+              "02",
+              "03",
+              "06"
+            ],
+            "ZAGENCY": [
+              "*"
+            ]
+          }
+        }
+      ]
+    },
+    "travel_agent": {
+      "description": "Changes the travels of their agency (claim agency of the token)",
+      "authorizations": [
+        {
+          "object": "ZAO_TRAVL",
+          "fields": {
+            "ACTVT": [
+              "02",
+              "03"
+            ],
+            "ZAGENCY": [
+              "{claim:agency}"
+            ]
+          }
+        }
+      ]
+    },
+    "travel_viewer": {
+      "description": "Displays the travels of the agencies 07…",
+      "authorizations": [
+        {
+          "object": "ZAO_TRAVL",
+          "fields": {
+            "ACTVT": [
+              "03"
+            ],
+            "ZAGENCY": [
+              "07*"
+            ]
+          }
+        }
+      ]
+    }
+  }
+}

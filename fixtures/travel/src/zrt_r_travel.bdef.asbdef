@@ -4,7 +4,7 @@ strict ( 2 );
 define behavior for ZRT_R_Travel alias Travel
 persistent table zrt_travel
 lock master
-authorization master ( global )
+authorization master ( global, instance )
 etag master LocalLastChangedAt
 {
   create;

@@ -71,4 +71,10 @@ Le code de retour est 1 dès qu'il y a une erreur (ou un avertissement avec
 | ABP007 | erreur | Construction non prise en charge : écriture ABAP SQL hors de la classe saver, `DELETE dbtab FROM @wa`, `WITH`, `SELECT … ENDSELECT` avec une liste de champs, `adjust_numbers`, EML sur une projection, `GET PERMISSIONS`, type dérivé ou handler hors périmètre |
 | ABP008 | erreur | Erreur interne (ABAP généré) ou erreur du transpiler |
 | ABP009 | erreur | Résultat d'un `SELECT` qu'abaplint ne type pas (littéral, agrégat autre que `COUNT(*)`, `MAX` et `MIN`, expression) en déclaration en ligne : déclarer la cible |
+| ABP010 | erreur | `AUTHORITY-CHECK` sur un champ que l'objet d'autorisation n'a pas |
+| ABP011 | avertissement | `AUTHORITY-CHECK` sur un objet d'autorisation ni dans les sources (SUSO), ni dans `rapt/authorizations.json` : aucun rôle ne l'accorde |
+| AUTH001 | erreur | Objet d'autorisation ou `rapt/authorizations.json` illisible ou mal formé |
+| AUTH002 | avertissement | Rôle accordant un objet d'autorisation inconnu (ses champs ne sont pas contrôlés) |
+| AUTH003 | erreur | Rôle donnant une valeur à un champ que l'objet d'autorisation n'a pas |
+| AUTH004 | avertissement | Rôle accordant une activité (`ACTVT`) que l'objet d'autorisation ne permet pas |
 | APP001 | erreur | Paquets du runtime introuvables (`dist/` non construit) pour l'application générée : `--runtime <dossier>` ou `pnpm build` |

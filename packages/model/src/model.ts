@@ -29,6 +29,67 @@ export interface Model {
   abap?: AbapModel;
   /** Texts of the message classes (MSAG) found in the sources: class → number → text. */
   messageClasses: Record<string, Record<string, string>>;
+  /** Authorization objects and roles (D34): `rapt/authorizations.json` next to the sources. */
+  authorizations?: AuthorizationsModel;
+  /** Access controls (DCL) of the exposed entities (D35). */
+  accessControls?: AccessControlModel[];
+}
+
+// ---------------------------------------------------------------------------------------------
+// Authorizations (D34, D35)
+
+/** An authorization object (SUSO): its fields, and the activities it permits (ACTVT). */
+export interface AuthorizationObjectModel {
+  name: string;
+  fields: string[];
+  activities?: string[];
+  description?: string;
+}
+
+/**
+ * A value of an authorization field in a role, as in PFCG: a value, a pattern ending with `*`
+ * (`*` alone: every value), a range, or the values of a claim of the user's token
+ * (`{claim:agency}`).
+ */
+export type AuthorizationValue = string | { from: string; to: string };
+
+/** One authorization of a role: an instance of an authorization object with its field values. */
+export interface RoleAuthorizationModel {
+  object: string;
+  fields: Record<string, AuthorizationValue[]>;
+}
+
+/** A role of the identity provider (a business role) and its authorizations. */
+export interface RoleModel {
+  name: string;
+  description?: string;
+  authorizations: RoleAuthorizationModel[];
+}
+
+export interface AuthorizationsModel {
+  objects: AuthorizationObjectModel[];
+  roles: RoleModel[];
+}
+
+/** A condition of an access control: a tree of comparisons on the elements of the entity. */
+export type AccessCondition =
+  | { kind: "and" | "or"; operands: AccessCondition[] }
+  | { kind: "not"; operand: AccessCondition }
+  | { kind: "compare"; element: string; operator: "=" | "<>" | "<" | "<=" | ">" | ">=" | "like"; value: string }
+  | { kind: "null"; element: string; negated: boolean }
+  /** `( E1, E2 ) = aspect pfcg_auth( OBJECT, FIELD1, FIELD2, ACTVT = '03' )`. */
+  | { kind: "pfcg"; elements: string[]; object: string; fields: string[]; filters: Record<string, string> }
+  /** `E = aspect user`; `?=` also grants the rows whose element is initial. */
+  | { kind: "user"; element: string; orInitial: boolean }
+  | { kind: "true" }
+  | { kind: "false" };
+
+/** `define role R { grant select on E where …; }`: the rows of E a user may read. */
+export interface AccessControlModel {
+  role: string;
+  entity: string;
+  /** One condition per `grant select`; a row is granted when one of them is true. */
+  conditions: AccessCondition[];
 }
 
 // ---------------------------------------------------------------------------------------------

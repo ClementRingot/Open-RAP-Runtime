@@ -1,4 +1,4 @@
-import { mkdtempSync, mkdirSync, readFileSync, readdirSync, copyFileSync, writeFileSync, rmSync } from "node:fs";
+import { cpSync, existsSync, mkdtempSync, mkdirSync, readFileSync, readdirSync, copyFileSync, writeFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -19,6 +19,10 @@ export function fixtureVariant(changes: Record<string, string | null | ((content
   copyFileSync(path.join(FIXTURE_DIR, ".abapgit.xml"), path.join(dir, ".abapgit.xml"));
   for (const file of readdirSync(path.join(FIXTURE_DIR, "src"))) {
     copyFileSync(path.join(FIXTURE_DIR, "src", file), path.join(dir, "src", file));
+  }
+  // the roles next to the sources (rapt/authorizations.json)
+  if (existsSync(path.join(FIXTURE_DIR, "rapt"))) {
+    cpSync(path.join(FIXTURE_DIR, "rapt"), path.join(dir, "rapt"), { recursive: true });
   }
   for (const [file, change] of Object.entries(changes)) {
     const target = path.join(dir, "src", file);

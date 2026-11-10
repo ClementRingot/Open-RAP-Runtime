@@ -5,7 +5,7 @@ import type { FastifyInstance } from "fastify";
 import { PGliteDialect } from "kysely";
 import pg from "pg";
 import { execFileSync } from "node:child_process";
-import { chownSync, copyFileSync, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { chownSync, copyFileSync, cpSync, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -71,8 +71,14 @@ export async function generatedVariant(changes: Record<string, string | ((conten
     for (const file of readdirSync(path.join(FIXTURE_DIR, "src"))) {
       copyFileSync(path.join(FIXTURE_DIR, "src", file), path.join(dir, "src", file));
     }
+    // the roles next to the sources (rapt/authorizations.json)
+    if (existsSync(path.join(FIXTURE_DIR, "rapt"))) {
+      cpSync(path.join(FIXTURE_DIR, "rapt"), path.join(dir, "rapt"), { recursive: true });
+    }
     for (const [file, change] of Object.entries(changes)) {
+      // a file of src/, or of the project root with "../" (rapt/authorizations.json)
       const target = path.join(dir, "src", file);
+      mkdirSync(path.dirname(target), { recursive: true });
       writeFileSync(target, typeof change === "function" ? change(readFileSync(target, "utf8")) : change);
     }
     const result = await generateApplication(loadProject(dir), { scaffold: false });

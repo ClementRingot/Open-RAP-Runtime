@@ -28,7 +28,7 @@ describe("BDEF parser: fixture", () => {
     expect(travel?.entity.text).toBe("ZRT_R_Travel");
     expect(travel?.alias?.text).toBe("Travel");
     expect(travel?.options.map((o) => o.kind)).toEqual(["persistentTable", "lockMaster", "authorizationMaster", "etagMaster"]);
-    expect(travel?.options[2]).toMatchObject({ kind: "authorizationMaster", values: ["global"] });
+    expect(travel?.options[2]).toMatchObject({ kind: "authorizationMaster", values: ["global", "instance"] });
     expect(items(travel, "operation").map((o) => o.op)).toEqual(["create", "update", "delete"]);
     expect(items(travel, "association")[0]).toMatchObject({ name: { text: "_Booking" }, create: { internal: false, options: [] } });
     expect(items(travel, "field").map((f) => [f.characteristics.map((c) => c.text), f.fields.length])).toEqual([

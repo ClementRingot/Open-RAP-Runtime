@@ -26,6 +26,7 @@ ajoutent ce que la fixture n'utilise pas : numérotation, feature control global
 | `etag dependent by` | ✅ | ETag du maître (`@odata.etag`, `Core.OptimisticConcurrency` par la navigation), contrôlé sur les modifications ; un changement de l'entité dépendante change l'ETag du maître (D32). Test `rap-variant-etag.test.ts`. |
 | `authorization master ( global )`, `( instance )`, `( global, instance )` | ✅ | Handlers appelés hors local mode ; refus → 403. |
 | `authorization dependent by` | ✅ | Contrôle du master (`%update`) pour les opérations de l'entité dépendante. |
+| `AUTHORITY-CHECK OBJECT … ID … FIELD …` (`DUMMY`, `sy-subrc` 0/4/12) | ✅ | Objets d'autorisation de abapGit (SUSO), rôles de `rapt/authorizations.json` donnés par les rôles du jeton OIDC, valeurs issues des claims (D34). Tests `rap-authorizations.test.ts`, `keycloak.test.ts`. |
 | `early numbering` managed (UUID) | ✅ | |
 | Numérotation externe (clé fournie, `mandatory : create`, `readonly : update`) | ✅ | |
 | `early numbering` non managed (handler `FOR NUMBERING`) | ✅ | Création directe (`rap-variant-features.test.ts`) et création par association, deep create compris (`FOR CREATE Travel\_Booking`, un appel pour tous les parents, `failed`/`reported` ; `rap-variant-numbering.test.ts`). |

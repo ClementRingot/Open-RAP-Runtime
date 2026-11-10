@@ -63,7 +63,7 @@ class Browser {
 const decode = (html: string): string => html.replace(/&amp;/g, "&").replace(/&#x3d;/gi, "=").replace(/&quot;/g, '"');
 
 /** Logs in through the Keycloak login form; returns the browser with its session cookie. */
-async function login(returnTo = "/ui/index.html"): Promise<{ browser: Browser; landed: Response; url: string }> {
+async function login(returnTo = "/ui/index.html", username = "alice", password = "alice"): Promise<{ browser: Browser; landed: Response; url: string }> {
   const browser = new Browser();
   const page = await browser.follow(`${APP}${returnTo}`);
   expect(page.url.startsWith(`${REALM}/protocol/openid-connect/auth?`), page.url).toBe(true);
@@ -73,7 +73,7 @@ async function login(returnTo = "/ui/index.html"): Promise<{ browser: Browser; l
   const submitted = await browser.get(decode(action as string), {
     method: "POST",
     headers: { "content-type": "application/x-www-form-urlencoded" },
-    body: new URLSearchParams({ username: "alice", password: "alice", credentialId: "" }).toString(),
+    body: new URLSearchParams({ username, password, credentialId: "" }).toString(),
   });
   expect(submitted.status, await submitted.clone().text()).toBe(302);
   const callback = submitted.headers.get("location") ?? "";
@@ -82,22 +82,43 @@ async function login(returnTo = "/ui/index.html"): Promise<{ browser: Browser; l
   return { browser, landed: response, url };
 }
 
-/** A bearer token of alice: a public client with the password grant, created by the administrator. */
-async function bearerToken(): Promise<string> {
+/** A token of the administrator of Keycloak (bootstrap administrator, realm master). */
+async function adminToken(): Promise<string> {
   const admin = await fetch(`${KEYCLOAK}/realms/master/protocol/openid-connect/token`, {
     method: "POST",
     headers: { "content-type": "application/x-www-form-urlencoded" },
     body: new URLSearchParams({ grant_type: "password", client_id: "admin-cli", username: ADMIN_USER, password: ADMIN_PASSWORD }).toString(),
   });
   expect(admin.status).toBe(200);
-  const adminToken = ((await admin.json()) as { access_token: string }).access_token;
+  return ((await admin.json()) as { access_token: string }).access_token;
+}
+
+/** A user created by the administrator, with realm roles and attributes. */
+async function createUser(username: string, roles: string[], attributes: Record<string, string[]>): Promise<void> {
+  const token = await adminToken();
+  const admin = { authorization: `Bearer ${token}`, "content-type": "application/json" };
+  const created = await fetch(`${KEYCLOAK}/admin/realms/rapt/users`, {
+    method: "POST",
+    headers: admin,
+    body: JSON.stringify({ username, enabled: true, firstName: username, lastName: "Example", email: `${username}@example.org`, emailVerified: true, attributes, credentials: [{ type: "password", value: username, temporary: false }] }),
+  });
+  expect([201, 409], await created.clone().text()).toContain(created.status);
+  const [user] = (await (await fetch(`${KEYCLOAK}/admin/realms/rapt/users?username=${username}&exact=true`, { headers: admin })).json()) as Array<{ id: string }>;
+  const representations = await Promise.all(roles.map(async (role) => (await fetch(`${KEYCLOAK}/admin/realms/rapt/roles/${role}`, { headers: admin })).json()));
+  const mapped = await fetch(`${KEYCLOAK}/admin/realms/rapt/users/${user?.id}/role-mappings/realm`, { method: "POST", headers: admin, body: JSON.stringify(representations) });
+  expect(mapped.status).toBe(204);
+}
+
+/** A bearer token of alice: a public client with the password grant, created by the administrator. */
+async function bearerToken(): Promise<string> {
+  const admin = await adminToken();
   const created = await fetch(`${KEYCLOAK}/admin/realms/rapt/clients`, {
     method: "POST",
-    headers: { authorization: `Bearer ${adminToken}`, "content-type": "application/json" },
+    headers: { authorization: `Bearer ${admin}`, "content-type": "application/json" },
     body: JSON.stringify({ clientId: `rapt-api-test-${Date.now()}`, publicClient: true, directAccessGrantsEnabled: true, standardFlowEnabled: false }),
   });
   expect([201, 409]).toContain(created.status);
-  const clientId = (await (await fetch(created.headers.get("location") ?? "", { headers: { authorization: `Bearer ${adminToken}` } })).json()) as { clientId: string };
+  const clientId = (await (await fetch(created.headers.get("location") ?? "", { headers: { authorization: `Bearer ${admin}` } })).json()) as { clientId: string };
   const token = await fetch(`${REALM}/protocol/openid-connect/token`, {
     method: "POST",
     headers: { "content-type": "application/x-www-form-urlencoded" },
@@ -146,6 +167,38 @@ describe.skipIf(APP === "" || KEYCLOAK === "")("OIDC with a real Keycloak", () =
     const again = await browser.get(`${APP}/ui/index.html`);
     expect(again.status).toBe(302);
     expect(again.headers.get("location")).toContain("/auth/login");
+  });
+
+  it("restricts an agent to the agency of its user attribute (AUTHORITY-CHECK, claim of the token)", async () => {
+    // alice has every role: she creates a travel of another agency
+    const alice = (await login()).browser;
+    const aliceToken = (await alice.get(`${APP}${SERVICE}`, { method: "HEAD", headers: { "x-csrf-token": "Fetch" } })).headers.get("x-csrf-token") ?? "";
+    const other = await alice.get(`${APP}${SERVICE}Travel`, {
+      method: "POST",
+      headers: { "content-type": "application/json", "x-csrf-token": aliceToken },
+      body: JSON.stringify({ TravelID: "00000502", AgencyID: "070002", CustomerID: "000001", BeginDate: "2027-05-01", EndDate: "2027-05-08", BookingFee: "40.00", CurrencyCode: "EUR" }),
+    });
+    expect(other.status, await other.clone().text()).toBe(201);
+    const otherKey = String(((await other.json()) as Record<string, unknown>)["TravelUUID"]);
+    const own = (await (await alice.get(`${APP}${SERVICE}Travel?$select=TravelUUID&$filter=TravelID eq '00000501'`)).json()) as { value: Array<{ TravelUUID: string }> };
+    const ownKey = own.value[0]?.TravelUUID ?? "";
+
+    // bob: travel agent of the agency 070001, an attribute of his Keycloak user
+    await createUser("bob", ["travel_agent"], { agency: ["070001"] });
+    const bob = (await login("/ui/index.html", "bob", "bob")).browser;
+    expect(await (await bob.get(`${APP}/auth/me`)).json()).toMatchObject({ roles: expect.arrayContaining(["travel_agent"]) });
+    const csrf = (await bob.get(`${APP}${SERVICE}`, { method: "HEAD", headers: { "x-csrf-token": "Fetch" } })).headers.get("x-csrf-token") ?? "";
+    const patch = (key: string): Promise<Response> =>
+      bob.get(`${APP}${SERVICE}Travel(${key})`, { method: "PATCH", headers: { "content-type": "application/json", "x-csrf-token": csrf, "if-match": "*" }, body: JSON.stringify({ Description: "by bob" }) });
+    expect((await patch(ownKey)).status).toBe(200);
+    expect((await patch(otherKey)).status).toBe(403);
+    // no activity 01: no creation
+    const created = await bob.get(`${APP}${SERVICE}Travel`, {
+      method: "POST",
+      headers: { "content-type": "application/json", "x-csrf-token": csrf },
+      body: JSON.stringify({ TravelID: "00000503", AgencyID: "070001", CustomerID: "000001", BeginDate: "2027-05-01", EndDate: "2027-05-08", BookingFee: "40.00", CurrencyCode: "EUR" }),
+    });
+    expect(created.status).toBe(403);
   });
 
   it("accepts the bearer tokens of Keycloak, checked with its JWKS", async () => {

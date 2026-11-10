@@ -4,9 +4,11 @@
  * - `PORT` (8080), `HOST` (0.0.0.0), `PUBLIC_URL` (http://localhost:<PORT>/), `LOG_LEVEL` (info);
  * - `DATABASE_URL` (PostgreSQL), or `PGLITE_DIR` for an embedded PGlite database (development);
  *   `SCHEMA=skip` to leave the database schema alone (default: applied at start-up, idempotent);
- * - `AUTH_MODE` = `none` (development user `DEV_USER`) or `oidc`: `OIDC_ISSUER`,
- *   `OIDC_DISCOVERY_URL`, `OIDC_AUDIENCE`, `OIDC_CLIENT_ID`, `OIDC_CLIENT_SECRET`,
- *   `OIDC_REQUIRED_ROLE`, `OIDC_ROLES_CLAIM`, `OIDC_USER_CLAIM`, `SESSION_SECRET`.
+ * - `AUTH_MODE` = `none` (development user `DEV_USER`, its roles `DEV_ROLES` — default: all —
+ *   and claims `DEV_ATTRIBUTES`) or `oidc`: `OIDC_ISSUER`, `OIDC_DISCOVERY_URL`, `OIDC_AUDIENCE`,
+ *   `OIDC_CLIENT_ID`, `OIDC_CLIENT_SECRET`, `OIDC_REQUIRED_ROLE`, `OIDC_ROLES_CLAIM`,
+ *   `OIDC_USER_CLAIM`, `SESSION_SECRET`;
+ * - `AUTHORIZATIONS_FILE`: roles replacing those of rapt/authorizations.json (D34).
  */
 
 import { existsSync, readFileSync } from "node:fs";
@@ -16,6 +18,7 @@ import { PGliteDialect, sql } from "kysely";
 import type { Model } from "@rap-transpiler/model";
 import { createApp } from "./app.js";
 import type { AuthOptions } from "./auth/auth.js";
+import { Authorizations, rolesFromJson } from "./auth/authorizations.js";
 import { applySchema, createDatabase, createPostgresDatabase, PGLITE_PARSERS, type Database } from "./db/database.js";
 import { RapRuntime } from "./rap/runtime.js";
 
@@ -37,15 +40,30 @@ export interface RunningServer {
   close(): Promise<void>;
 }
 
-function authFromEnvironment(env: Record<string, string | undefined>, publicUrl: string): AuthOptions {
+function authFromEnvironment(env: Record<string, string | undefined>, publicUrl: string, attributeClaims: string[]): AuthOptions {
   if ((env["AUTH_MODE"] ?? "none") === "none") {
-    return env["DEV_USER"] === undefined ? { mode: "none" } : { mode: "none", user: env["DEV_USER"] };
+    const auth: AuthOptions = { mode: "none" };
+    if (env["DEV_USER"] !== undefined) {
+      auth.user = env["DEV_USER"];
+    }
+    // the roles of the development user (default: all), its claims as JSON ({"agency":["070001"]})
+    if (env["DEV_ROLES"] !== undefined) {
+      auth.roles = env["DEV_ROLES"].split(",").map((r) => r.trim()).filter((r) => r !== "");
+    }
+    if (env["DEV_ATTRIBUTES"] !== undefined && env["DEV_ATTRIBUTES"] !== "") {
+      const attributes = JSON.parse(env["DEV_ATTRIBUTES"]) as Record<string, unknown>;
+      auth.attributes = Object.fromEntries(Object.entries(attributes).map(([k, v]) => [k, (Array.isArray(v) ? v : [v]).map(String)]));
+    }
+    return auth;
   }
   const issuer = env["OIDC_ISSUER"];
   if (issuer === undefined) {
     throw new Error("AUTH_MODE=oidc needs OIDC_ISSUER");
   }
   const auth: AuthOptions = { mode: "oidc", issuer };
+  if (attributeClaims.length > 0) {
+    auth.attributeClaims = attributeClaims;
+  }
   const optional: Array<[keyof typeof auth, string]> = [
     ["discoveryUrl", "OIDC_DISCOVERY_URL"],
     ["audience", "OIDC_AUDIENCE"],
@@ -99,12 +117,21 @@ export async function start(options: StartOptions): Promise<RunningServer> {
   const publicUrl = env["PUBLIC_URL"] ?? `http://localhost:${port}/`;
   const model = JSON.parse(readFileSync(path.join(dir, "model", "model.json"), "utf8")) as Model;
   const metadata = readFileSync(path.join(dir, "odata", "metadata.xml"), "utf8");
-  const auth = authFromEnvironment(env, publicUrl);
+  // the roles of rapt/authorizations.json, or of the file AUTHORIZATIONS_FILE (D34)
+  const file = env["AUTHORIZATIONS_FILE"];
+  const authorizations =
+    file === undefined || file === ""
+      ? new Authorizations(model.authorizations)
+      : new Authorizations({ objects: model.authorizations?.objects ?? [], roles: rolesFromJson(JSON.parse(readFileSync(path.resolve(file), "utf8"))) });
+  const auth = authFromEnvironment(env, publicUrl, authorizations.claims());
   const db = options.db ?? (await databaseFromEnvironment(env));
   if ((env["SCHEMA"] ?? "apply") !== "skip") {
     await applySchema(db, readFileSync(path.join(dir, "db", "schema.sql"), "utf8"));
   }
   const rap = model.abap === undefined ? undefined : await RapRuntime.load(model, path.join(dir, "abap"));
+  if (rap !== undefined) {
+    rap.authorizations = authorizations;
+  }
   const uiDir = path.join(dir, "ui");
   const app = await createApp({
     model,

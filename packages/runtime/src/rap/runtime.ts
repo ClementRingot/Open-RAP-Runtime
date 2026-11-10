@@ -13,6 +13,7 @@ import { ABAP_SQL_SCHEMA, type Model } from "@rap-transpiler/model";
 import { AbapBridge, loadAbap, setSystemFields } from "../abap/bridge.js";
 import { abapGlobal } from "../abap/convert.js";
 import { AbapSqlClient } from "../abap/sql.js";
+import { Authorizations } from "../auth/authorizations.js";
 import type { User } from "../auth/user.js";
 import { BoModel } from "./bo.js";
 import { installKernel } from "./kernel.js";
@@ -36,6 +37,8 @@ export interface LuwContext {
 export class RapRuntime {
   public readonly bo: BoModel;
   public readonly bridge: AbapBridge;
+  /** The authorizations of the users: AUTHORITY-CHECK (D34); the roles of the model by default. */
+  public authorizations: Authorizations;
   private readonly storage = new AsyncLocalStorage<LuwContext>();
   private tail: Promise<unknown> = Promise.resolve();
   private lastMicros = 0n;
@@ -43,6 +46,7 @@ export class RapRuntime {
   private constructor(public readonly model: Model) {
     this.bo = new BoModel(model);
     this.bridge = new AbapBridge(this.bo, model.messageClasses);
+    this.authorizations = new Authorizations(model.authorizations);
   }
 
   /**

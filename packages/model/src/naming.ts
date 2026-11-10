@@ -118,3 +118,21 @@ export function destinationKeys(name: string): string[] {
   const [first = "", ...rest] = name.split(".");
   return rest.length === 0 ? [variable(first)] : [variable(`${first}_${rest.join("_")}`), variable(first)];
 }
+
+/** The claims of the token that the values of the roles read: `{claim:agency}` → agency (D34). */
+export function authorizationClaims(authorizations: { roles: Array<{ authorizations: Array<{ fields: Record<string, Array<string | { from: string; to: string }>> }> }> } | undefined): string[] {
+  const names = new Set<string>();
+  for (const role of authorizations?.roles ?? []) {
+    for (const authorization of role.authorizations) {
+      for (const values of Object.values(authorization.fields)) {
+        for (const value of values) {
+          const claim = typeof value === "string" ? /^\{claim:([^}]+)\}$/.exec(value)?.[1] : undefined;
+          if (claim !== undefined) {
+            names.add(claim);
+          }
+        }
+      }
+    }
+  }
+  return [...names];
+}

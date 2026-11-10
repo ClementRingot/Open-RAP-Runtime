@@ -2557,7 +2557,7 @@
           "authorization": {
             "kind": "master",
             "global": true,
-            "instance": false
+            "instance": true
           },
           "etag": {
             "kind": "master",
@@ -2604,6 +2604,18 @@
             "params": {
               "failed": "failed",
               "reported": "reported",
+              "requested": "requested_authorizations",
+              "result": "result"
+            }
+          },
+          "instanceAuthorizationHandler": {
+            "classKey": "CLAS-ZBP_RT_R_TRAVEL-LHC_TRAVEL",
+            "className": "LHC_TRAVEL",
+            "method": "get_instance_authorizations",
+            "params": {
+              "failed": "failed",
+              "reported": "reported",
+              "keys": "keys",
               "requested": "requested_authorizations",
               "result": "result"
             }
@@ -2746,5 +2758,80 @@
       "001": "The discount must be between 1 and 100 %, not &1 %",
       "002": "Travel &1 accepted"
     }
+  },
+  "authorizations": {
+    "objects": [
+      {
+        "name": "ZAO_TRAVL",
+        "fields": [
+          "ACTVT",
+          "ZAGENCY"
+        ],
+        "activities": [
+          "01",
+          "02",
+          "03",
+          "06"
+        ],
+        "description": "Travels by agency"
+      }
+    ],
+    "roles": [
+      {
+        "name": "travel_manager",
+        "authorizations": [
+          {
+            "object": "ZAO_TRAVL",
+            "fields": {
+              "ACTVT": [
+                "01",
+                "02",
+                "03",
+                "06"
+              ],
+              "ZAGENCY": [
+                "*"
+              ]
+            }
+          }
+        ],
+        "description": "Manages the travels of every agency"
+      },
+      {
+        "name": "travel_agent",
+        "authorizations": [
+          {
+            "object": "ZAO_TRAVL",
+            "fields": {
+              "ACTVT": [
+                "02",
+                "03"
+              ],
+              "ZAGENCY": [
+                "{claim:agency}"
+              ]
+            }
+          }
+        ],
+        "description": "Changes the travels of their agency (claim agency of the token)"
+      },
+      {
+        "name": "travel_viewer",
+        "authorizations": [
+          {
+            "object": "ZAO_TRAVL",
+            "fields": {
+              "ACTVT": [
+                "03"
+              ],
+              "ZAGENCY": [
+                "07*"
+              ]
+            }
+          }
+        ],
+        "description": "Displays the travels of the agencies 07…"
+      }
+    ]
   }
 }

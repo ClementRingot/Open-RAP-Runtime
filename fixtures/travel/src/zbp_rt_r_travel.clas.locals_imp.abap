@@ -9,6 +9,9 @@ CLASS lhc_travel DEFINITION INHERITING FROM cl_abap_behavior_handler.
     METHODS get_global_authorizations FOR GLOBAL AUTHORIZATION
       IMPORTING REQUEST requested_authorizations FOR Travel RESULT result.
 
+    METHODS get_instance_authorizations FOR INSTANCE AUTHORIZATION
+      IMPORTING keys REQUEST requested_authorizations FOR Travel RESULT result.
+
     METHODS get_instance_features FOR INSTANCE FEATURES
       IMPORTING keys REQUEST requested_features FOR Travel RESULT result.
 
@@ -37,25 +40,48 @@ ENDCLASS.
 CLASS lhc_travel IMPLEMENTATION.
 
   METHOD get_global_authorizations.
-    " The reference fixture allows every operation.
+    " the activities of ZAO_TRAVL, whatever the agency (checked per instance)
     IF requested_authorizations-%create = if_abap_behv=>mk-on.
-      result-%create = if_abap_behv=>auth-allowed.
+      AUTHORITY-CHECK OBJECT 'ZAO_TRAVL' ID 'ACTVT' FIELD '01' ID 'ZAGENCY' DUMMY.
+      result-%create = COND #( WHEN sy-subrc = 0 THEN if_abap_behv=>auth-allowed ELSE if_abap_behv=>auth-unauthorized ).
+      result-%action-copyTravel = result-%create.
     ENDIF.
-    IF requested_authorizations-%update = if_abap_behv=>mk-on.
-      result-%update = if_abap_behv=>auth-allowed.
+    IF requested_authorizations-%update = if_abap_behv=>mk-on OR requested_authorizations-%action-acceptTravel = if_abap_behv=>mk-on
+       OR requested_authorizations-%action-deductDiscount = if_abap_behv=>mk-on.
+      AUTHORITY-CHECK OBJECT 'ZAO_TRAVL' ID 'ACTVT' FIELD '02' ID 'ZAGENCY' DUMMY.
+      result-%update = COND #( WHEN sy-subrc = 0 THEN if_abap_behv=>auth-allowed ELSE if_abap_behv=>auth-unauthorized ).
+      result-%action-acceptTravel = result-%update.
+      result-%action-deductDiscount = result-%update.
     ENDIF.
     IF requested_authorizations-%delete = if_abap_behv=>mk-on.
-      result-%delete = if_abap_behv=>auth-allowed.
-    ENDIF.
-    IF requested_authorizations-%action-acceptTravel = if_abap_behv=>mk-on.
-      result-%action-acceptTravel = if_abap_behv=>auth-allowed.
-    ENDIF.
-    IF requested_authorizations-%action-deductDiscount = if_abap_behv=>mk-on.
-      result-%action-deductDiscount = if_abap_behv=>auth-allowed.
+      AUTHORITY-CHECK OBJECT 'ZAO_TRAVL' ID 'ACTVT' FIELD '06' ID 'ZAGENCY' DUMMY.
+      result-%delete = COND #( WHEN sy-subrc = 0 THEN if_abap_behv=>auth-allowed ELSE if_abap_behv=>auth-unauthorized ).
     ENDIF.
     IF requested_authorizations-%action-copyTravel = if_abap_behv=>mk-on.
-      result-%action-copyTravel = if_abap_behv=>auth-allowed.
+      AUTHORITY-CHECK OBJECT 'ZAO_TRAVL' ID 'ACTVT' FIELD '01' ID 'ZAGENCY' DUMMY.
+      result-%action-copyTravel = COND #( WHEN sy-subrc = 0 THEN if_abap_behv=>auth-allowed ELSE if_abap_behv=>auth-unauthorized ).
     ENDIF.
+  ENDMETHOD.
+
+  METHOD get_instance_authorizations.
+    " the agency of each travel
+    READ ENTITIES OF zrt_r_travel IN LOCAL MODE
+      ENTITY Travel
+        FIELDS ( AgencyID ) WITH CORRESPONDING #( keys )
+      RESULT DATA(travels)
+      FAILED failed.
+
+    LOOP AT travels INTO DATA(travel).
+      AUTHORITY-CHECK OBJECT 'ZAO_TRAVL' ID 'ACTVT' FIELD '02' ID 'ZAGENCY' FIELD travel-AgencyID.
+      DATA(update) = COND #( WHEN sy-subrc = 0 THEN if_abap_behv=>auth-allowed ELSE if_abap_behv=>auth-unauthorized ).
+      AUTHORITY-CHECK OBJECT 'ZAO_TRAVL' ID 'ACTVT' FIELD '06' ID 'ZAGENCY' FIELD travel-AgencyID.
+      DATA(delete) = COND #( WHEN sy-subrc = 0 THEN if_abap_behv=>auth-allowed ELSE if_abap_behv=>auth-unauthorized ).
+      APPEND VALUE #( %tky                    = travel-%tky
+                      %update                 = update
+                      %delete                 = delete
+                      %action-acceptTravel    = update
+                      %action-deductDiscount  = update ) TO result.
+    ENDLOOP.
   ENDMETHOD.
 
   METHOD get_instance_features.

@@ -33,9 +33,6 @@ const DURATION_XML = `<?xml version="1.0" encoding="utf-8"?>
 `;
 
 const DEFINITIONS = `
-    METHODS get_instance_authorizations FOR INSTANCE AUTHORIZATION
-      IMPORTING keys REQUEST requested_authorizations FOR Travel RESULT result.
-
     METHODS precheck_update FOR PRECHECK
       IMPORTING entities FOR UPDATE Travel.
 
@@ -133,7 +130,6 @@ beforeAll(async () => {
       "zrt_a_duration.ddls.xml": DURATION_XML,
       "zrt_r_travel.bdef.asbdef": (c) =>
         edit(c, [
-          ["authorization master ( global )", "authorization master ( global, instance )"],
           ["  update;\n  delete;\n  association _Booking", "  update ( precheck );\n  delete;\n  association _Booking"],
           ["  factory action copyTravel [1];", "  factory action copyTravel [1];\n  static action createSample result [1] $self;\n  function calculateDuration result [1] ZRT_A_Duration;"],
           ["  validation validateDates on save", "  determination normalizeDescription on save { field Description; }\n  validation validateDates on save"],
@@ -141,8 +137,12 @@ beforeAll(async () => {
         ]),
       "zrt_c_travel.bdef.asbdef": (c) => edit(c, [["  use action copyTravel;", "  use action copyTravel;\n  use action createSample;\n  use function calculateDuration;"]]),
       [ABP]: (c) => {
-        const first = c.indexOf("ENDCLASS.");
-        const withDefinitions = `${c.slice(0, first)}${DEFINITIONS.trimStart()}${c.slice(first + "ENDCLASS.".length)}`;
+        // the instance authorization of this variant replaces the one of the fixture (by agency)
+        const start = c.indexOf("  METHOD get_instance_authorizations.");
+        const end = c.indexOf("  ENDMETHOD.", start) + "  ENDMETHOD.\n".length;
+        const withoutAuthorization = `${c.slice(0, start)}${c.slice(end)}`;
+        const first = withoutAuthorization.indexOf("ENDCLASS.");
+        const withDefinitions = `${withoutAuthorization.slice(0, first)}${DEFINITIONS.trimStart()}${withoutAuthorization.slice(first + "ENDCLASS.".length)}`;
         return edit(withDefinitions, [["ENDCLASS.\n\nCLASS lhc_booking DEFINITION", IMPLEMENTATIONS.trimStart()]]);
       },
     }),

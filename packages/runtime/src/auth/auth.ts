@@ -10,6 +10,10 @@ import { abapUserName, developmentUser, type User } from "./user.js";
 export interface DevelopmentAuthOptions {
   mode: "none";
   user?: string;
+  /** Roles of the development user (default: every role, `*`). */
+  roles?: string[];
+  /** Claims of the development user, for the values `{claim:x}` of the roles. */
+  attributes?: Record<string, string[]>;
 }
 
 export interface OidcAuthOptions {
@@ -24,6 +28,8 @@ export interface OidcAuthOptions {
   rolesClaim?: string;
   /** Role every user must have (optional). */
   requiredRole?: string;
+  /** Claims kept with the user, for the values `{claim:x}` of the roles (D34). */
+  attributeClaims?: string[];
   /** Key set, for tests or a fixed configuration (default: from the discovery document). */
   jwks?: JWTVerifyGetKey;
   /**
@@ -95,6 +101,10 @@ export class Authenticator {
     const user: User = { id, abapName: abapUserName(id), roles, authenticatedBy };
     if (typeof payload["name"] === "string") user.name = payload["name"];
     if (typeof payload["email"] === "string") user.email = payload["email"];
+    const attributes = attributesOf(payload, options.attributeClaims ?? []);
+    if (Object.keys(attributes).length > 0) {
+      user.attributes = attributes;
+    }
     return user;
   }
 
@@ -123,7 +133,7 @@ export class Authenticator {
   /** The user of a request from its Authorization header; undefined when there is none. */
   public async fromAuthorization(header: string | undefined): Promise<User | undefined> {
     if (this.options.mode === "none") {
-      return developmentUser(this.options.user);
+      return developmentUser(this.options.user, this.options.roles, this.options.attributes);
     }
     if (header === undefined) {
       return undefined;
@@ -134,6 +144,19 @@ export class Authenticator {
     }
     return this.verifyToken((match[1] as string).trim());
   }
+}
+
+/** The claims the authorizations read, as lists of strings (a claim path may have dots). */
+function attributesOf(payload: JWTPayload, claims: string[]): Record<string, string[]> {
+  const attributes: Record<string, string[]> = {};
+  for (const claim of claims) {
+    const value = claim.split(".").reduce<unknown>((o, k) => (o !== null && typeof o === "object" ? (o as Record<string, unknown>)[k] : undefined), payload);
+    if (value === undefined || value === null) {
+      continue;
+    }
+    attributes[claim] = (Array.isArray(value) ? value : [value]).map(String);
+  }
+  return attributes;
 }
 
 function rolesOf(payload: JWTPayload, claim: string | undefined): string[] {

@@ -489,3 +489,44 @@ et la conséquence. Les numéros D1 à D13 correspondent aux points 1 à 13 du �
   contre la distribution Keycloak 26.8.2 (Maven Central, Java 21) dans l'environnement de
   développement, et en CI contre l'image du `docker-compose.yml` généré (`--profile oidc`).
 - **CI** : le contrôle de santé du service PostgreSQL utilise `pg_isready -U postgres`.
+
+## D34 — Autorisations : objets d'autorisation, rôles OIDC, AUTHORITY-CHECK
+
+- **Problème** : l'ABAP environment répartit les autorisations entre l'IAM (IAM apps, business
+  catalogs, business roles avec leurs restrictions, affectés aux business users) et le code
+  (`AUTHORITY-CHECK` dans les handlers, contrôles d'accès DCL). Hors SAP, il n'y a pas d'IAM ;
+  OIDC authentifie et transporte des rôles, mais ne dit pas quelles valeurs d'objets
+  d'autorisation un rôle accorde. Le transpiler, lui, traduit `AUTHORITY-CHECK` en un appel à
+  une classe noyau `KERNEL_AUTHORITY_CHECK` que l'application ne fournissait pas : l'instruction
+  compilait mais échouait à l'exécution (500).
+- **Décision** :
+  - les objets d'autorisation viennent des sources abapGit (SUSO : champs `FIEL1…`, activités
+    `TACTZ`), ou de la section `objects` du fichier des rôles ;
+  - les rôles sont dans `rapt/authorizations.json`, à la racine du projet abapGit, versionné avec
+    les sources (hors du dossier `src/`, abapGit l'ignore) : nom du rôle de l'IdP → autorisations,
+    instances d'objets avec leurs valeurs, comme une business role et ses restrictions ;
+  - valeurs à la manière de PFCG : valeur, motif `07*`, `*`, plage `{ "from", "to" }`, et valeurs
+    issues d'un claim du jeton (`{claim:agency}` : l'agence de l'utilisateur, attribut de l'IdP),
+    pour ne pas créer un rôle par valeur ;
+  - `AUTHORITY-CHECK` est évalué par le noyau sur les rôles de l'utilisateur de la requête :
+    `sy-subrc` 0 quand une autorisation de l'objet accepte tous les champs vérifiés (`DUMMY` n'est
+    pas vérifié), 4 sinon, 12 sans autorisation pour l'objet, 40 pour `FOR USER` d'un autre
+    utilisateur ; le code ABAP reste celui de SAP ;
+  - l'IdP (Keycloak, Entra ID, SAP Cloud Identity Services…) affecte les rôles aux utilisateurs
+    (`OIDC_ROLES_CLAIM`) et porte les attributs ; l'application garde les claims lus par les rôles
+    (session comprise) ; `OIDC_REQUIRED_ROLE` reste le droit d'accès à l'application ;
+  - en développement (`AUTH_MODE=none`), l'utilisateur a toutes les autorisations (comme SAP_ALL
+    dans un système de développement), sauf si `DEV_ROLES` (et `DEV_ATTRIBUTES`) sont donnés ;
+    `AUTHORIZATIONS_FILE` remplace les rôles au déploiement ;
+  - le compilateur contrôle les rôles contre les objets (AUTH001…AUTH004) et les
+    `AUTHORITY-CHECK` du code (ABP010, ABP011) ; le realm Keycloak généré contient les rôles
+    (donnés à `alice`), un attribut utilisateur déclaré dans le profil et un mapper vers le jeton
+    pour chaque claim lu.
+- **Pourquoi** : le même behavior pool tourne sur SAP et ici ; la définition des rôles reste
+  revue et versionnée comme les objets IAM ; l'administration des utilisateurs reste dans l'IdP.
+- **Fixture** : le BO de référence vérifie l'objet `ZAO_TRAVL` (activité, agence) dans ses
+  autorisations globale et d'instance, comme le scénario de référence /DMO/ de SAP ; rôles
+  `travel_manager`, `travel_agent` (agence du claim `agency`), `travel_viewer`.
+- **Tests** : `rap-authorizations.test.ts` (jetons signés localement), `authorizations.test.ts`
+  (sémantique de `sy-subrc`), `authorizations.test.ts` du compilateur (diagnostics),
+  `keycloak.test.ts` (un agent créé dans Keycloak avec son attribut d'agence).

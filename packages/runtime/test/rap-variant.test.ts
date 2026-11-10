@@ -86,8 +86,8 @@ beforeAll(async () => {
             "    METHODS validateDates FOR VALIDATE ON SAVE\n      IMPORTING keys FOR Travel~validateDates.\n\n    METHODS validateAgency FOR VALIDATE ON SAVE\n      IMPORTING keys FOR Travel~validateAgency.",
           )
           .replace(
-            "    IF requested_authorizations-%delete = if_abap_behv=>mk-on.\n      result-%delete = if_abap_behv=>auth-allowed.\n    ENDIF.",
-            "    IF requested_authorizations-%delete = if_abap_behv=>mk-on.\n      result-%delete = if_abap_behv=>auth-unauthorized.\n    ENDIF.",
+            "      result-%delete = COND #( WHEN sy-subrc = 0 THEN if_abap_behv=>auth-allowed ELSE if_abap_behv=>auth-unauthorized ).",
+            "      result-%delete = if_abap_behv=>auth-unauthorized.",
           )
           .replace(
             `  METHOD setStatusOpen.

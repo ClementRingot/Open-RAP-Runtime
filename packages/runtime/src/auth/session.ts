@@ -198,19 +198,33 @@ export class OidcSessions {
         throw new AuthenticationError("the ID token has another nonce");
       }
       user = this.authenticator.userFromClaims(payload, "session");
-      // roles: Keycloak puts the realm roles in the access token
-      if (tokens.access_token !== undefined && user.roles.length === 0) {
+      // roles and attributes: Keycloak puts the realm roles (and mapped attributes) in the access token
+      if (tokens.access_token !== undefined && (user.roles.length === 0 || (this.options.attributeClaims ?? []).some((c) => user.attributes?.[c] === undefined))) {
         try {
           const access = await jwtVerify(tokens.access_token, this.jwks, { issuer: this.options.issuer });
-          user = { ...user, roles: this.authenticator.userFromClaims(access.payload, "session").roles };
+          const fromAccess = this.authenticator.userFromClaims(access.payload, "session");
+          const attributes = { ...(fromAccess.attributes ?? {}), ...(user.attributes ?? {}) };
+          user = { ...user, roles: user.roles.length === 0 ? fromAccess.roles : user.roles, ...(Object.keys(attributes).length === 0 ? {} : { attributes }) };
         } catch {
-          // an opaque access token: the roles of the ID token
+          // an opaque access token: the roles and claims of the ID token
         }
       }
     } catch (error) {
       return reply.status(error instanceof AuthenticationError ? error.status : 401).type("text/plain").send(`Login failed: ${(error as Error).message}`);
     }
-    const session: SessionPayload = { user: { id: user.id, abapName: user.abapName, roles: user.roles, authenticatedBy: "session", ...(user.name === undefined ? {} : { name: user.name }), ...(user.email === undefined ? {} : { email: user.email }) }, sid: b64(randomBytes(16)), exp: Math.floor(Date.now() / 1000) + this.maxAge };
+    const session: SessionPayload = {
+      user: {
+        id: user.id,
+        abapName: user.abapName,
+        roles: user.roles,
+        authenticatedBy: "session",
+        ...(user.name === undefined ? {} : { name: user.name }),
+        ...(user.email === undefined ? {} : { email: user.email }),
+        ...(user.attributes === undefined ? {} : { attributes: user.attributes }),
+      },
+      sid: b64(randomBytes(16)),
+      exp: Math.floor(Date.now() / 1000) + this.maxAge,
+    };
     reply.header("Set-Cookie", [this.cookie(SESSION_COOKIE, this.signer.sign(session), this.maxAge), this.cookie(STATE_COOKIE, "", 0)]);
     return reply.redirect(pending.returnTo);
   }

@@ -19,6 +19,7 @@ import { COMPILER_VERSION } from "../version.js";
 import { buildBehavior } from "./behaviors.js";
 import { Dictionary } from "./dictionary.js";
 import { EntityResolver } from "./entities.js";
+import { checkAuthorityChecks, loadAuthorizations } from "./authorizations.js";
 import { abaplintRegistry, attachHandlers, syntaxCheck } from "./handlers.js";
 import { selectService, type ServiceOptions } from "./service.js";
 
@@ -142,6 +143,9 @@ export function buildModel(project: Project, options: BuildOptions = {}): BuildR
 
   checkBusinessObjects([...required.values()], behaviors, diagnostics);
 
+  // ------------------------------------------------------- authorization objects and roles (D34)
+  const authorizations = loadAuthorizations(project, diagnostics);
+
   // --------------------------------------------------------------------- behavior pools (ABAP)
   const pools = behaviors.flatMap((b) => [b.implementationClass, ...b.entities.map((e) => e.implementationClass)]).filter((c): c is string => c !== undefined);
   if (pools.length > 0) {
@@ -150,6 +154,7 @@ export function buildModel(project: Project, options: BuildOptions = {}): BuildR
     for (const behavior of behaviors) {
       attachHandlers(behavior, registry, project, diagnostics, [...required.values()]);
     }
+    checkAuthorityChecks(registry, project, authorizations, diagnostics);
   }
 
   // --------------------------------------------------------------------------- tables, texts
@@ -208,6 +213,7 @@ export function buildModel(project: Project, options: BuildOptions = {}): BuildR
     entities: sortedEntities,
     behaviors: behaviors.sort((a, b) => a.name.localeCompare(b.name)),
     messageClasses,
+    ...(authorizations === undefined ? {} : { authorizations }),
   };
   return diagnostics.hasErrors() ? { diagnostics, model } : { diagnostics, model };
 }

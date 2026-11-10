@@ -284,6 +284,24 @@ export function installKernel(runtime: RapRuntime): void {
   installHttp(kernel);
   installODataClient(kernel);
 
+  // AUTHORITY-CHECK: the transpiler calls the kernel class KERNEL_AUTHORITY_CHECK (D34)
+  abap.Classes["KERNEL_AUTHORITY_CHECK"] = {
+    call: async (input: { object?: AbapData; user?: AbapData; fields?: Array<{ id?: AbapData; field?: AbapData; dummy?: boolean }> }): Promise<void> => {
+      const { user } = runtime.context();
+      const forUser = input.user === undefined ? undefined : abapString(input.user).trim().toUpperCase();
+      if (forUser !== undefined && forUser !== user.abapName) {
+        // FOR USER: only the user of the request is known (40: unknown user)
+        setSubrc(40);
+        return;
+      }
+      const fields = (input.fields ?? []).map((f) => {
+        const id = abapString(f.id).trim().toUpperCase();
+        return f.dummy === true ? { id } : { id, value: abapString(f.field).trimEnd() };
+      });
+      setSubrc(runtime.authorizations.check(user, abapString(input.object).trim().toUpperCase(), fields));
+    },
+  };
+
   // INSERT|UPDATE|MODIFY|DELETE dbtab FROM [TABLE] @source … MAPPING FROM ENTITY (save_modified)
   kernel.sql_write = async (input: Input): Promise<void> => {
     const operation = abapString(input?.["operation"]).toUpperCase();
