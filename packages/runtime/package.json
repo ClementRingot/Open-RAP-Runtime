@@ -25,6 +25,7 @@
     "@abaplint/runtime": "2.14.24",
     "@rap-transpiler/model": "workspace:*",
     "chevrotain": "13.2.0",
+    "fast-xml-parser": "5.12.0",
     "fastify": "5.12.8",
     "jose": "6.2.16",
     "kysely": "0.29.8",

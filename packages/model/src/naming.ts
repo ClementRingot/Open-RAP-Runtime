@@ -106,3 +106,15 @@ export function defaultServicePath(binding: string, serviceDefinition: string, v
 export function serviceNamespace(serviceDefinition: string, version: string): string {
   return `com.sap.gateway.srvd.${serviceDefinition.toLowerCase().replace(/\//g, "")}.v${version}`;
 }
+
+/**
+ * The environment variables of a destination of the behavior pools (D31), without their
+ * `DESTINATION_` prefix and `_URL` suffix: the name of create_by_cloud_destination, or the
+ * communication scenario of create_by_comm_arrangement (`SCENARIO.SERVICE`: the service first,
+ * then the scenario), in upper case, other characters than letters and digits as `_`.
+ */
+export function destinationKeys(name: string): string[] {
+  const variable = (text: string): string => text.toUpperCase().replace(/[^A-Z0-9]+/g, "_");
+  const [first = "", ...rest] = name.split(".");
+  return rest.length === 0 ? [variable(first)] : [variable(`${first}_${rest.join("_")}`), variable(first)];
+}

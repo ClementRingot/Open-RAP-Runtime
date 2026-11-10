@@ -69,8 +69,20 @@ const CATALOG: Record<string, Omit<AbapType, "dataElement">> = {
   SPRAS: t("lang", 1),
   LANGU: t("lang", 1),
   LAND1: t("char", 3),
+  // integers of the dictionary (int8 is a built-in type of ABAP)
+  INT1: t("int1"),
+  INT2: t("int2"),
+  INT4: t("int4"),
+  // dates and times with the database types (abap.datn, abap.timn: consumption model classes)
+  DATN: t("dats", 8),
+  TIMN: t("tims", 6),
   // texts
   STRING: t("string"),
+  // the service consumption models (D31): value controls, OData V2 date and time types
+  "/IWBEP/V4_VALUE_CONTROL": t("int1"),
+  RAP_CP_ODATA_VALUE_CONTROL: t("int1"),
+  RAP_CP_ODATA_V2_EDM_DATETIME: t("timestampl", 21, 7),
+  RAP_CP_ODATA_V2_EDM_TIME: t("tims", 6),
   // the ABAP flight reference scenario (/DMO/), used by many RAP tutorials
   "/DMO/TRAVEL_ID": t("numc", 8),
   "/DMO/AGENCY_ID": t("numc", 6),

@@ -36,17 +36,20 @@ Aucune dépendance externe.
 | `chevrotain` | 13.2.0 | Apache-2.0 | Grammaire des URL OData (`$filter`, `$orderby`, `$select`, `$expand`) | 2026-11-09 |
 | `jose` | 6.2.16 | MIT | Vérification des JWT et JWKS (OIDC) | 2026-11-09 |
 | `@abaplint/runtime` | 2.14.24 | MIT | Exécution du JavaScript transpilé de l'ABP (types et instructions ABAP) | 2026-11-09 |
+| `fast-xml-parser` | 5.12.0 | MIT | Lecture du `$metadata` des services OData distants (client proxy, D31) | 2026-11-10 |
 
 Dépendances transitives (production) : MIT pour la plupart (`avvio`, `find-my-way`,
 `fast-json-stringify`, `pino`, `ajv`…), plus `fast-uri`, `light-my-request`,
 `secure-json-parse` (BSD-3-Clause) et `fastq`, `pg-int8`, `semver`, `split2` (ISC) ;
 `temporal-polyfill`, `temporal-utils` (MIT) et `temporal-spec` (Apache-2.0), dépendances de
-`@abaplint/runtime`.
+`@abaplint/runtime` ; les dépendances de `fast-xml-parser` (`strnum`, `fast-xml-builder`,
+`@nodable/entities`, `is-unsafe`, `path-expression-matcher`, `xml-naming`, MIT).
 
 Le socle ABAP « clean-room » généré dans chaque application (`if_abap_behv`,
-`cl_abap_behavior_handler`, `cl_abap_context_info`, `zrap_eml`…) est écrit pour le projet à
-partir des signatures publiques documentées par SAP ; aucun code SAP n'est copié. Il est sous la
-licence MIT du dépôt.
+`cl_abap_behavior_handler`, `cl_abap_context_info`, `zrap_eml`, client HTTP
+`cl_web_http_client_manager` et client proxy `/iwbep/cl_cp_factory_remote`…) est écrit pour le
+projet à partir des signatures publiques documentées par SAP ; aucun code SAP n'est copié. Il est
+sous la licence MIT du dépôt.
 
 ### Interface générée (OpenUI5)
 

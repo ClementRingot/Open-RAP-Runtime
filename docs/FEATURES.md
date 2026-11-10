@@ -124,6 +124,18 @@ n'utilise pas.
 | `INSERT`, `UPDATE`, `MODIFY`, `DELETE` dans le saver (`save_modified`) | ✅ | `MAPPING FROM ENTITY` et `INDICATORS SET STRUCTURE %control` exacts (kernel) ; écritures classiques par les vues `rapt_abap` et leurs triggers (D30). |
 | `INSERT`, `UPDATE`, `MODIFY`, `DELETE` dans un handler ; `WITH` | ❌ | Diagnostic ABP007 : le runtime RAP écrit le BO, le modifier par EML. |
 
+## API distantes dans l'ABP (D31)
+
+| Fonctionnalité | Statut | Note |
+|---|---|---|
+| Client HTTP : `cl_http_destination_provider` (`create_by_url`, `create_by_comm_arrangement`, `create_by_cloud_destination`), `cl_web_http_client_manager`, `if_web_http_client`, `if_web_http_request`, `if_web_http_response` | ✅ | Chemin, requête, en-têtes, corps texte ou binaire, formulaire, basic/bearer, statut, en-têtes et corps de la réponse. Test `rap-variant-remote.test.ts`. |
+| Destinations | ✅ | Variables d'environnement `DESTINATION_<NOM>_URL`, `_USER`/`_PASSWORD`, `_TOKEN`, `_HEADERS` ; listées dans le `.env.example` généré. |
+| Client proxy OData V4 (`/iwbep/cl_cp_factory_remote`, `cl_web_odata_client_factory`) avec la classe d'un SCM2 | ✅ | Lecture de liste (`create_by_range`, `and`/`or`/`not`, `$select`, `$orderby`, `$top`, `$skip`, `$count`), lecture par clé, création, mise à jour, suppression, ETag, jeton CSRF. |
+| Client proxy OData V2 avec les entités abstraites d'un SCM | ✅ | `d.results`, `__count`, `/Date()/`, `$inlinecount`, `substringof`. |
+| Exceptions `cx_http_dest_provider_error`, `cx_web_http_client_error`, `/iwbep/cx_gateway`, `/iwbep/cx_cp_remote` | ✅ | `get_text( )`, `http_status_code`, `http_error_body`. |
+| `$batch`, `$expand`, deep insert, navigation par association, actions et fonctions distantes, value controls | ❌ | Voir KNOWN_GAPS.md. |
+| Communication targets, SOAP (`cl_soap_destination_provider`), RFC | ❌ | |
+
 ## Projection
 
 | Fonctionnalité | Statut | Note |

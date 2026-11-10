@@ -5,7 +5,7 @@ import path from "node:path";
 import type { Model } from "@rap-transpiler/model";
 import type { Diagnostics } from "./diagnostics.js";
 import { generateAbap } from "./gen/abap/generate.js";
-import { generateScaffold } from "./gen/app/index.js";
+import { findDestinations, generateScaffold } from "./gen/app/index.js";
 import { generateCsdl } from "./gen/csdl.js";
 import { generateSql } from "./gen/sql.js";
 import { generateUi } from "./gen/ui/index.js";
@@ -52,7 +52,8 @@ export async function generateApplication(project: Project, options: GenerateOpt
     ...generateUi(model).map((f) => ({ path: `ui/${f.path}`, content: f.content })),
   ];
   if (options.scaffold !== false) {
-    files.push(...generateScaffold(model, diagnostics, options.runtimeDir === undefined ? {} : { runtimeDir: options.runtimeDir }));
+    const destinations = findDestinations(abap.sources.filter((source) => source.original !== undefined));
+    files.push(...generateScaffold(model, diagnostics, { destinations, ...(options.runtimeDir === undefined ? {} : { runtimeDir: options.runtimeDir }) }));
     if (diagnostics.hasErrors()) {
       return { diagnostics, model, files: [] };
     }

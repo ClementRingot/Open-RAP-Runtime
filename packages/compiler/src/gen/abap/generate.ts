@@ -14,7 +14,7 @@ import type { Project, SourceFile } from "../../input/project.js";
 import { abaplintRegistry } from "../../ir/handlers.js";
 import { generateDerivedTypes } from "./derived-types.js";
 import { FRAMEWORK_SOURCES } from "./framework.js";
-import { BdefCatalog, findSaverClasses, poolBdefOf, rewriteAbapFile } from "./rewrite.js";
+import { BdefCatalog, findModelProviders, findSaverClasses, poolBdefOf, rewriteAbapFile } from "./rewrite.js";
 import { frameworkDictionary, shadowEntity, shadowTable } from "./shadow.js";
 
 export interface AbapSource {
@@ -95,7 +95,7 @@ export function abapSources(project: Project, model: Model, diagnostics: Diagnos
   for (const table of model.tables) {
     projectObjects.add(`TABL:${table.name.toUpperCase()}`);
   }
-  for (const entity of model.entities.filter((e) => e.sqlView !== undefined && !projectObjects.has(`TABL:${e.name.toUpperCase()}`))) {
+  for (const entity of model.entities.filter((e) => (e.sqlView !== undefined || e.kind === "abstract") && !projectObjects.has(`TABL:${e.name.toUpperCase()}`))) {
     const shadow = shadowEntity(entity);
     sources.push({ fileName: shadow.fileName, content: shadow.content });
     projectObjects.add(`TABL:${entity.name.toUpperCase()}`);
@@ -116,12 +116,13 @@ export function abapSources(project: Project, model: Model, diagnostics: Diagnos
     const main = files.find((f) => /\.(clas|intf)\.abap$/.test(f.getFilename()));
     const pool = poolBdefOf(catalog, name, main);
     const saverClasses = findSaverClasses(files);
+    const modelProviders = findModelProviders(files);
     for (const file of files) {
       if (/\.testclasses\.abap$/.test(file.getFilename())) {
         continue;
       }
       const original = project.files.find((f) => f.fileName === file.getFilename());
-      const content = rewriteAbapFile(file, { catalog, diagnostics, file: original?.path ?? file.getFilename(), saverClasses, ...(pool === undefined ? {} : { pool }) });
+      const content = rewriteAbapFile(file, { catalog, diagnostics, file: original?.path ?? file.getFilename(), saverClasses, modelProviders, ...(pool === undefined ? {} : { pool }) });
       sources.push({ fileName: file.getFilename(), content, ...(original === undefined ? {} : { original: original.path }) });
     }
     for (const xml of project.files.filter((f) => f.type === type && f.name === name && f.extension === "xml")) {

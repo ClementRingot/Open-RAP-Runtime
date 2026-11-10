@@ -45,6 +45,19 @@ Versions de référence : `@abaplint/core` 2.120.98, `@abaplint/transpiler` 2.14
 | Réponses d'une instruction EML | Remplacent le contenu des cibles `FAILED`/`REPORTED`/`MAPPED` données ; `sy-subrc` vaut 4 quand `failed` n'est pas vide (convention, non documentée par SAP). |
 | Septième décimale des `TIMESTAMPL` générés | Le runtime les génère à la microseconde (D8). |
 
+## API distantes (D31)
+
+| Écart | Statut |
+|---|---|
+| Client proxy : `$batch` (`create_request_for_batch`), `$expand`, deep insert, navigation par association (`navigate_to_many`…), actions et fonctions du service distant, `$search`, delta | Non pris en charge : méthodes absentes du socle (erreur de vérification ABAP). |
+| Value controls (`value_controls` des classes SCM2, champs `_vc` des entités abstraites) | Ni lus ni remplis : une valeur `null` du service donne la valeur initiale ; la mise à jour d'une valeur à `null` n'est pas possible. |
+| `comm_system_id`, `i_service_instance_name`, `i_authn_mode` | Ignorés : une destination est un jeu de variables d'environnement. Pas de propagation de l'utilisateur (principal propagation) ni d'OAuth client credentials : un jeton fixe peut être donné par `_TOKEN`. |
+| Paramètres `is_proxy_model_key`, `iv_service_definition_name` | Ignorés : le proxy lit le `$metadata` du service distant (un appel de plus par proxy). |
+| Destination nommée par une variable | Fonctionne, mais n'est pas listée dans le `.env.example` généré (seuls les littéraux le sont). |
+| Communication targets (COTA), SOAP (`cl_soap_destination_provider`), RFC | Non pris en charge. |
+| Proxy HTTP sortant | `fetch` de Node.js ne lit `HTTPS_PROXY` qu'avec `NODE_USE_ENV_PROXY=1` (ou `--use-env-proxy`). |
+| Appels distants et LUW | L'appel part pendant l'interaction (action, détermination…) : un rollback de la LUW n'annule pas ce qui a été écrit à distance, comme sur SAP. |
+
 ## CDS
 
 | Écart | Statut |

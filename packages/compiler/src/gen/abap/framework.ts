@@ -4,6 +4,8 @@
  * kernel: its methods are replaced at run time by the managed RAP runtime.
  */
 
+import { HTTP_FRAMEWORK_SOURCES, HTTP_KERNEL_DEFINITIONS, HTTP_KERNEL_IMPLEMENTATIONS } from "./framework-http.js";
+
 export interface FrameworkSource {
   fileName: string;
   source: string;
@@ -425,7 +427,7 @@ const ZRAP_EML = `CLASS zrap_eml DEFINITION PUBLIC ABSTRACT FINAL.
                 rows       TYPE ANY TABLE OPTIONAL
                 row        TYPE any OPTIONAL
                 indicators TYPE abap_bool DEFAULT abap_false.
-ENDCLASS.
+${HTTP_KERNEL_DEFINITIONS}ENDCLASS.
 
 CLASS zrap_eml IMPLEMENTATION.
   METHOD begin.
@@ -470,7 +472,8 @@ CLASS zrap_eml IMPLEMENTATION.
 
   METHOD sql_write.
   ENDMETHOD.
-ENDCLASS.
+
+${HTTP_KERNEL_IMPLEMENTATIONS}ENDCLASS.
 `;
 
 export const FRAMEWORK_SOURCES: FrameworkSource[] = [
@@ -489,6 +492,7 @@ export const FRAMEWORK_SOURCES: FrameworkSource[] = [
   { fileName: "cl_abap_behavior_saver_failed.clas.abap", source: CL_ABAP_BEHAVIOR_SAVER_FAILED },
   { fileName: "cl_abap_context_info.clas.abap", source: CL_ABAP_CONTEXT_INFO },
   { fileName: "zrap_eml.clas.abap", source: ZRAP_EML },
+  ...HTTP_FRAMEWORK_SOURCES,
 ];
 
 /** Name of the ABAP class of the EML kernel entry. */

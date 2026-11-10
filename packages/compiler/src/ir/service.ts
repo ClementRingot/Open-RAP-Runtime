@@ -46,17 +46,22 @@ export function selectService(project: Project, options: ServiceOptions, diagnos
     diagnostics.error("PRJ001", "no service definition (SRVD) in the sources");
     return undefined;
   } else {
-    diagnostics.error("PRJ001", `several service definitions, choose one with --service: ${parsed.map((p) => p.ast.name).join(", ")}`);
-    return undefined;
+    // the service definitions of service consumption models (SCM) have no binding: the one
+    // with a service binding is the service of the application
+    const bound = parsed.filter((p) => bindingsOf(project, p.ast.name).length > 0);
+    if (bound.length !== 1 || bound[0] === undefined) {
+      diagnostics.error("PRJ001", `several service definitions, choose one with --service: ${parsed.map((p) => p.ast.name).join(", ")}`);
+      return undefined;
+    }
+    chosen = bound[0];
+    const others = parsed.filter((p) => p !== chosen).map((p) => p.ast.name);
+    diagnostics.info("SRVD007", `several service definitions: ${chosen.ast.name} has a service binding and is built (not built: ${others.join(", ")})`, { file: chosen.file.path, line: chosen.ast.line });
   }
   if (chosen === undefined) {
     return undefined;
   }
   const name = chosen.ast.name.toUpperCase();
-  const bindings = filesOfType(project, "SRVB")
-    .filter((f) => f.extension === "xml")
-    .map((f) => ({ file: f, xml: readSrvbXml(f.content) }))
-    .filter((b) => (b.xml.serviceDefinition ?? "").toUpperCase() === name);
+  const bindings = bindingsOf(project, name);
   const binding = bindings[0];
   if (bindings.length > 1 && options.binding === undefined) {
     diagnostics.warning("SRVD002", `several service bindings for ${name}, using ${binding?.file.name ?? ""}`);
@@ -83,6 +88,14 @@ export function selectService(project: Project, options: ServiceOptions, diagnos
     names.add(set.name.toUpperCase());
   }
   return { service, ast: chosen.ast, file: chosen.file };
+}
+
+/** The service bindings (SRVB) of a service definition. */
+function bindingsOf(project: Project, service: string): Array<{ file: SourceFile; xml: ReturnType<typeof readSrvbXml> }> {
+  return filesOfType(project, "SRVB")
+    .filter((f) => f.extension === "xml")
+    .map((f) => ({ file: f, xml: readSrvbXml(f.content) }))
+    .filter((b) => (b.xml.serviceDefinition ?? "").toUpperCase() === service.toUpperCase());
 }
 
 function normalizePath(path: string): string {

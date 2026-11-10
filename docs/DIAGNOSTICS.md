@@ -14,6 +14,7 @@ Le code de retour est 1 dès qu'il y a une erreur (ou un avertissement avec
 | SRVD004 | erreur | Entity set exposé deux fois |
 | SRVD005 | erreur | Entité exposée introuvable |
 | SRVD006 | info | Association vers une entité non exposée : navigation omise |
+| SRVD007 | info | Plusieurs définitions de service : celle qui a un binding est construite (les autres, d'un service consumption model par exemple, ne le sont pas) |
 | CDS001 | erreur | Source CDS illisible |
 | CDS002 | erreur ou avertissement | Construction CDS non prise en charge |
 | CDS003 | erreur | Source de données ou entité projetée inconnue |

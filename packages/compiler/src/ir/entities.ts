@@ -43,7 +43,7 @@ export class EntityResolver {
   public constructor(
     project: Project,
     private readonly dictionary: Dictionary,
-    private readonly diagnostics: Diagnostics,
+    private diagnostics: Diagnostics,
   ) {
     for (const file of filesOfType(project, "DDLS").filter((f) => f.extension === "asddls")) {
       const result = parseCds(file.fileName, file.content);
@@ -75,6 +75,22 @@ export class EntityResolver {
 
   public has(name: string): boolean {
     return this.parsed.has(name.toUpperCase());
+  }
+
+  /** Names of the abstract entities of the project. */
+  public abstractNames(): string[] {
+    return [...this.parsed.values()].filter((p) => p.ast.kind === "abstract").map((p) => p.ast.name);
+  }
+
+  /** Resolves an entity with its diagnostics in `sink` (an entity the BO may not need). */
+  public resolveInto(name: string, sink: Diagnostics): EntityModel | undefined {
+    const previous = this.diagnostics;
+    this.diagnostics = sink;
+    try {
+      return this.resolve(name);
+    } finally {
+      this.diagnostics = previous;
+    }
   }
 
   public ast(name: string): ParsedEntity | undefined {

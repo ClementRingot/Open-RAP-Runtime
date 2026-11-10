@@ -53,6 +53,11 @@ Connexion OIDC (Keycloak fourni dans le profil `oidc` de docker-compose, utilisa
 `AUTH_MODE=oidc docker compose --profile oidc up --build`. Les variables sont décrites dans le
 `README.md` et le `.env.example` de l'application générée.
 
+Le behavior pool peut appeler des API distantes avec le client HTTP d'ABAP Cloud et le client
+proxy OData d'un service consumption model (SCM, SCM2) ; chaque destination se configure par
+variables d'environnement (`DESTINATION_<NOM>_URL`, `_USER`, `_PASSWORD`, `_TOKEN`, `_HEADERS`),
+listées dans le `.env.example` généré ([D31](docs/DECISIONS.md)).
+
 ## Application générée (`rapt build`)
 
 ```

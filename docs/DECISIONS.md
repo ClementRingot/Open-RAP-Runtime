@@ -383,3 +383,64 @@ et la conséquence. Les numéros D1 à D13 correspondent aux points 1 à 13 du �
 - **Pourquoi** : c'est le moyen RAP d'écrire des tables existantes ou de journaliser les
   changements d'un BO, fréquent dans les projets réels ; l'ABAP SQL du saver réutilise les vues de
   D26.
+
+## D31 — Consommation d'API distantes dans l'ABP (HTTP, client proxy OData, SCM et SCM2)
+
+- **Décision** : un behavior pool peut appeler des API distantes avec les API d'ABAP Cloud,
+  réécrites en clean-room d'après leurs signatures publiques :
+  - client HTTP : `cl_http_destination_provider` (`create_by_url`,
+    `create_by_comm_arrangement`, `create_by_cloud_destination`), `cl_web_http_client_manager`,
+    `if_web_http_client`, `if_web_http_request` (chemin, requête, en-têtes, corps texte ou
+    binaire, formulaire, authentification basic ou bearer), `if_web_http_response`,
+    `if_web_http_header`, `if_a4c_cp_service` ;
+  - client proxy OData du service consumption model : `/iwbep/cl_cp_factory_remote` et
+    `cl_web_odata_client_factory` (`create_v2_remote_proxy`, `create_v4_remote_proxy`) ;
+    lecture de liste (`create_by_range` des filtres combinés par `and`/`or`/`not`, `$select`,
+    `$orderby`, `$top`, `$skip`, `request_count`, `request_no_business_data`), lecture par clé
+    (`navigate_with_key`), création, mise à jour (`PATCH`/`PUT`, propriétés fournies,
+    `set_if_match`), suppression ;
+  - exceptions `cx_http_dest_provider_error`, `cx_web_http_client_error`,
+    `cx_web_message_error`, `/iwbep/cx_gateway`, `/iwbep/cx_cp_remote` (`http_status_code`,
+    `http_error_body`), avec le texte de l'erreur pour `get_text( )`.
+- **Destinations** : sur SAP, elles viennent du destination service de BTP ou d'un
+  communication arrangement ; l'application générée les lit dans son environnement :
+  `DESTINATION_<NOM>_URL`, puis `_USER` et `_PASSWORD` (basic), `_TOKEN` (bearer) ou `_HEADERS`
+  (objet JSON : clé d'API…). `<NOM>` est le nom de `create_by_cloud_destination`, ou
+  `<SCENARIO>_<SERVICE_ID>` puis `<SCENARIO>` pour `create_by_comm_arrangement`
+  (`comm_system_id` ignoré). Les identifiants restent dans le noyau : l'ABAP ne voit que l'URL.
+  `rapt build` liste les destinations nommées par des littéraux dans le `.env.example` et le
+  README de l'application.
+- **Service consumption model** :
+  - SCM2 : la classe de modèle de consommation (`INHERITING FROM
+    /iwbep/cl_v4_abs_pm_model_prov`) est gardée pour ses types (`tys_…`, `tyt_…`) et ses
+    constantes (`gcs_entity_set`, `gcs_entity_type`) ; la passe de réécriture retire la
+    définition du modèle (`define`, `def_…`), écrite avec les interfaces `/iwbep/if_v4_pm_*` de
+    SAP Gateway ;
+  - SCM : les entités abstraites générées (champs `_vc` de value control compris) typent les
+    données ; ce sont des structures pour l'ABAP (DDIC ombre). La définition de service générée
+    pour le client proxy n'a pas de binding : quand il y a plusieurs définitions, celle qui a un
+    binding est construite (SRVD007) ;
+  - le proxy lit le `$metadata` du service distant une fois : entity sets, clés, types des
+    propriétés. Les noms internes de l'ABAP (`TRAVEL_ID`, `'TRAVEL'`) sont rapprochés des noms
+    EDM sans tenir compte de la casse ni des `_` (`TravelID`). Les valeurs sont converties selon
+    le type EDM et le type ABAP : dates, heures, horodatages (`/Date(ms)/` en V2, ISO en V4 avec
+    la précision de la propriété), UUID, décimaux exacts en texte (`IEEE754Compatible=true` en
+    V4), booléens, binaire ; les blancs de fin des champs `c` ne sont pas envoyés ; l'ETag
+    (`@odata.etag`, `__metadata.etag`) remplit le composant `etag` des classes SCM2 ;
+  - requêtes modifiantes : jeton CSRF demandé par `HEAD` sur la racine du service
+    (`X-CSRF-Token: Fetch`, désactivable par `iv_do_fetch_csrf_token`), cookies de session
+    conservés, nouvel essai avec un nouveau jeton après `403` + `X-CSRF-Token: Required`, comme
+    SAP Gateway le demande.
+- **Réalisation** : l'ABAP garde l'état des objets (requête, en-têtes, filtres) ; le noyau
+  (`ZRAP_EML`) fait les appels réseau (`fetch` de Node.js, 60 s par défaut ou `i_timeout`), lit
+  le `$metadata` (fast-xml-parser, déjà utilisé par le compilateur) et convertit les valeurs.
+- **Pourquoi** : appeler une API depuis une action, une détermination ou une validation est un
+  besoin courant (extension side-by-side, enrichissement, contrôle d'un autre système) ; le
+  développeur garde le code qu'il écrit sur SAP. Les classes de SAP Gateway n'existent pas hors
+  d'un système SAP : elles sont réimplémentées, sans code SAP.
+- **Tests** : `rap-variant-remote.test.ts` (API REST : destination avec basic auth, en-têtes,
+  statut, destination absente, connexion refusée ; OData V4 avec une classe SCM2 vers
+  l'application de la fixture servie sur un port : filtre, `$select`, `$orderby`, `$top`,
+  `$count`, lecture par clé ; écritures V4 vers un service simulé : CSRF, cookies, ETags,
+  renouvellement du jeton, erreur 409 ; OData V2 avec l'entité abstraite d'un SCM :
+  `d.results`, `__count`, `/Date()/`), `http-client.test.ts`, `app-scaffold.test.ts`.

@@ -143,12 +143,13 @@ export function frameworkDictionary(projectObjects: Set<string>): ShadowFile[] {
   return files;
 }
 
-/** A CDS entity as a shadow table: its elements, with their types, in their order. */
+/** A CDS entity as a shadow table (an abstract entity as a structure): its elements, in order. */
 export function shadowEntity(entity: EntityModel): ShadowFile {
   return shadowTable({
     name: entity.name.toLowerCase(),
     description: `CDS entity ${entity.name}`,
     columns: entity.fields.map((f) => ({ name: f.name.toLowerCase(), type: f.type, key: f.key, notNull: false, client: false })),
+    ...(entity.kind === "abstract" ? { structure: true } : {}),
   });
 }
 

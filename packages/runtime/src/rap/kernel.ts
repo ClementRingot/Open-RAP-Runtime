@@ -7,6 +7,8 @@
 import { randomUUID } from "node:crypto";
 import { same, type ActionModel } from "@rap-transpiler/model";
 import { setSubrc } from "../abap/bridge.js";
+import { installHttp } from "../abap/http.js";
+import { installODataClient } from "../abap/odata-client.js";
 import { abapGlobal, abapString, appendRow, component, rowsOf, type AbapData } from "../abap/convert.js";
 import { isInitial } from "../values.js";
 import { entityOfTable, type BoEntity } from "./bo.js";
@@ -277,6 +279,10 @@ export function installKernel(runtime: RapRuntime): void {
   };
 
   kernel.uuid = async (): Promise<AbapData> => new abap.types.Hex({ length: 16 }).set(randomUUID().replace(/-/g, "").toUpperCase());
+
+  // consumption of remote APIs: HTTP client and OData client proxy (D31)
+  installHttp(kernel);
+  installODataClient(kernel);
 
   // INSERT|UPDATE|MODIFY|DELETE dbtab FROM [TABLE] @source … MAPPING FROM ENTITY (save_modified)
   kernel.sql_write = async (input: Input): Promise<void> => {

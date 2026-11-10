@@ -413,6 +413,11 @@ export class AbapBridge {
 
   /** Text of an exception: its T100 message with the attributes named by attr1…attr4. */
   public exceptionText(object: AbapData): string {
+    // the exceptions of the framework that carry a text of their own (HTTP, OData client proxy)
+    const own = object?.zrap_text === undefined ? "" : abapString(object.zrap_text);
+    if (own !== "") {
+      return own;
+    }
     const key = this.t100Key(object);
     if (key === undefined) {
       return "An exception was raised";
