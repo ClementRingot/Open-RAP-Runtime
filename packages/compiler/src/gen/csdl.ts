@@ -585,6 +585,9 @@ class CsdlBuilder {
     }
     if (type.etag !== undefined) {
       children.push(annotation("Core.OptimisticConcurrency", {}, collection(propertyPath(type.etag))));
+    } else if (type.etagPath !== undefined) {
+      // etag dependent by: the ETag property of the master, through the to-one navigations
+      children.push(annotation("Core.OptimisticConcurrency", {}, collection(propertyPath([...type.etagPath.navigations, type.etagPath.property].join("/")))));
     }
     this.annotations(`${SCHEMA_ALIAS}.${CONTAINER_NAME}/${set.name}`, children);
   }

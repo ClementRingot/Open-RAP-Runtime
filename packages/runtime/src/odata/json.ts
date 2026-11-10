@@ -23,11 +23,20 @@ export function stringify(value: JsonValue): string {
     .join(",")}}`;
 }
 
+/** Hidden member of the rows of an `etag dependent` entity: the ETag field of its master (D32). */
+export const DEPENDENT_ETAG = "__etag";
+
+/** The ETag of a row: its ETag field, or the one of its master (`etag dependent by`). */
 export function etagOf(info: TypeInfo, row: Row): string | undefined {
-  if (info.type.etag === undefined) {
+  const name = info.type.etag ?? (info.type.etagPath === undefined ? undefined : DEPENDENT_ETAG);
+  if (name === undefined) {
     return undefined;
   }
-  const value = row[info.type.etag];
+  return etagValue(row[name]);
+}
+
+/** The weak ETag of a value of an ETag field. */
+export function etagValue(value: unknown): string {
   return `W/"${value === null || value === undefined ? "0" : String(value)}"`;
 }
 

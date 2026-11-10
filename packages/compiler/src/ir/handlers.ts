@@ -4,7 +4,7 @@
  */
 
 import * as abaplint from "@abaplint/core";
-import { same, type BehaviorModel, type EntityBehaviorModel, type HandlerParamRole, type HandlerRef, type SaverModel } from "@rap-transpiler/model";
+import { same, type BehaviorModel, type EntityBehaviorModel, type EntityModel, type HandlerParamRole, type HandlerRef, type SaverModel } from "@rap-transpiler/model";
 import type { Diagnostics } from "../diagnostics.js";
 import type { Project } from "../input/project.js";
 
@@ -285,7 +285,14 @@ function attachSaver(behavior: BehaviorModel, pools: Set<string>, registry: abap
 }
 
 /** Links the handlers of the behavior pools to the BDEF elements and reports what is missing. */
-export function attachHandlers(behavior: BehaviorModel, registry: abaplint.Registry, project: Project, diagnostics: Diagnostics): void {
+/** The behavior, in the same BDEF, of the target of an association of `entity`. */
+function targetBehavior(behavior: BehaviorModel, entity: EntityBehaviorModel, association: string, entities: readonly EntityModel[]): EntityBehaviorModel | undefined {
+  const source = entities.find((e) => same(e.name, entity.entity));
+  const target = source?.associations.find((a) => same(a.name, association))?.target;
+  return target === undefined ? undefined : behavior.entities.find((e) => same(e.entity, target));
+}
+
+export function attachHandlers(behavior: BehaviorModel, registry: abaplint.Registry, project: Project, diagnostics: Diagnostics, entities: readonly EntityModel[] = []): void {
   if (behavior.implementationType !== "managed") {
     return;
   }
@@ -376,11 +383,28 @@ export function attachHandlers(behavior: BehaviorModel, registry: abaplint.Regis
       }
     }
     if (entity.earlyNumbering) {
+      // the numbering of the direct creation; an entity created by association only (a child)
+      // is numbered by the handlers of its parents' associations below
       const numbering = take(entity, (h) => h.what.kind === "numbering");
-      if (numbering === undefined) {
-        diagnostics.error("ABP002", `no handler method FOR NUMBERING for ${entity.alias}`, entity.src);
-      } else {
+      if (numbering !== undefined) {
         entity.earlyNumberingHandler = numbering;
+      } else if (entity.operations.some((o) => o.kind === "create")) {
+        diagnostics.error("ABP002", `no handler method FOR NUMBERING for ${entity.alias}`, entity.src);
+      }
+    }
+    // early numbering by association: FOR NUMBERING … FOR CREATE Travel\_Booking
+    for (const association of entity.associations.filter((a) => a.create)) {
+      const target = targetBehavior(behavior, entity, association.name, entities);
+      if (target === undefined || !target.earlyNumbering) {
+        continue;
+      }
+      const name = `${entity.alias}\\${association.name}`;
+      const handler = handlers.find((h) => h.what.kind === "numbering" && (same(h.what.alias, name) || same(h.what.alias, `${entity.entity}\\${association.name}`)));
+      if (handler === undefined) {
+        diagnostics.error("ABP002", `no handler method FOR NUMBERING for ${name}`, entity.src);
+      } else {
+        handler.used = true;
+        association.earlyNumberingHandler = handler.ref;
       }
     }
     for (const handler of handlers) {

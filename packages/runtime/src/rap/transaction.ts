@@ -104,6 +104,8 @@ export class Transaction {
   private readonly locked = new Set<string>();
   private source: string | undefined;
   private saved = false;
+  /** ETag masters whose ETag field changes with their `etag dependent` instances (D32). */
+  private readonly etagTouched = new Set<Instance>();
   /** The saver runs (save_modified, cleanup): the only place where ABAP SQL may write. */
   public inSaver = false;
 
@@ -489,7 +491,7 @@ export class Transaction {
     return true;
   }
 
-  public async create(bo: BoEntity, requests: CreateRequest[], mode: AccessMode, parent?: { association: BoAssociation; key: Row }): Promise<Responses> {
+  public async create(bo: BoEntity, requests: CreateRequest[], mode: AccessMode, parent?: { association: BoAssociation; key: Row; numbered?: Map<string, Row> }): Promise<Responses> {
     const responses = new Responses();
     const operation: FailedOperation = { kind: "create" };
     if (parent === undefined && !mode.local && mode.external && bo.behavior.operations.find((o) => o.kind === "create")?.internal === true) {
@@ -505,9 +507,9 @@ export class Transaction {
         return responses;
       }
     }
-    // early numbering by a handler
-    let numbered: Map<string, Row> | undefined;
-    if (bo.behavior.earlyNumberingHandler !== undefined) {
+    // early numbering by a handler: of the creation, or of the creation by association (parent)
+    let numbered: Map<string, Row> | undefined = parent?.numbered;
+    if (parent === undefined && bo.behavior.earlyNumberingHandler !== undefined) {
       numbered = await this.number(bo, requests, responses);
     }
     if (parent === undefined && bo.behavior.operations.some((o) => o.kind === "create" && o.precheck)) {
@@ -612,6 +614,36 @@ export class Transaction {
     responses.failed.push(...result.failed);
     responses.reported.push(...result.reported);
     return new Map(result.mapped.filter((m) => m.entity === bo.entity.name).map((m) => [m.cid, m.key]));
+  }
+
+  /**
+   * Early numbering of a creation by association (`FOR NUMBERING … FOR CREATE Travel\_Booking`):
+   * the handler gets the parent instances with their %target, and maps the %cid of the children.
+   */
+  private async numberByAssociation(bo: BoEntity, association: BoAssociation, parents: Array<{ key: Row; targets: CreateRequest[] }>, responses: Responses): Promise<Map<string, Row>> {
+    const handler = association.behavior?.earlyNumberingHandler as HandlerRef;
+    const entities = this.bridge.data(bo, derivedType.assocCreate(bo.index, association.index));
+    for (const { key, targets } of parents) {
+      appendRow(entities, (row) => {
+        this.bridge.fillKey(row, bo, key);
+        const target = component(row, "%target");
+        for (const t of targets) {
+          appendRow(target, (r) => {
+            component(r, "%cid")?.set(t.cid ?? "");
+            this.bridge.fillRow(r, association.target, t.values, t.fields);
+            this.bridge.fillControl(r, association.target, t.fields);
+          });
+        }
+      });
+    }
+    const mapped = this.bridge.response(bo, "mapped");
+    const failed = this.bridge.response(bo, "failed");
+    const reported = this.bridge.response(bo, "reported");
+    await this.call(handler, { entities, mapped, failed, reported });
+    const result = await this.bridge.readResponses(bo, failed, reported, mapped);
+    responses.failed.push(...result.failed);
+    responses.reported.push(...result.reported);
+    return new Map(result.mapped.filter((m) => m.entity === association.target.entity.name).map((m) => [m.cid, m.key]));
   }
 
   public async update(bo: BoEntity, requests: UpdateRequest[], mode: AccessMode): Promise<Responses> {
@@ -790,25 +822,36 @@ export class Transaction {
       responses.add(await this.precheck(bo, `create:${association.name.toLowerCase()}`, table, mode));
     }
     const prechecked = new Set(responses.failed.map((f) => (f.key === undefined ? "" : keyString(bo, f.key))));
-    for (const { request, key, instance } of targets) {
-      const k = keyString(bo, key);
+    const allowed: typeof targets = [];
+    for (const target of targets) {
+      const k = keyString(bo, target.key);
       if (prechecked.has(k)) {
         continue;
       }
       const cause: FailCause | undefined = denied.size > 0 || deniedInstances.has(k) ? "unauthorized" : features.disabled.has(`${k}|${operationId(operation)}`) ? "disabled" : undefined;
-      const locked = cause === undefined ? await this.lock(bo, key) : true;
+      const locked = cause === undefined ? await this.lock(bo, target.key) : true;
       if (cause !== undefined || !locked) {
-        this.failure(responses, bo, { cause: cause ?? "locked", key }, operation);
-        for (const target of request.targets) {
-          this.failure(responses, association.target, { cause: "dependency", ...(target.cid === undefined ? {} : { cid: target.cid }) }, { kind: "create" });
+        this.failure(responses, bo, { cause: cause ?? "locked", key: target.key }, operation);
+        for (const child of target.request.targets) {
+          this.failure(responses, association.target, { cause: "dependency", ...(child.cid === undefined ? {} : { cid: child.cid }) }, { kind: "create" });
         }
         continue;
       }
+      allowed.push(target);
+    }
+    // early numbering of the children: one call of the handler for all the parents
+    const numbered =
+      association.behavior?.earlyNumberingHandler === undefined || allowed.length === 0
+        ? undefined
+        : await this.numberByAssociation(bo, association, allowed.map((t) => ({ key: t.key, targets: t.request.targets })), responses);
+    const refused = new Set(responses.failed.filter((f) => f.entity === association.target.entity.name && f.cid !== undefined).map((f) => f.cid));
+    for (const { request, instance } of allowed) {
       const parentKey: Row = {};
       for (const pair of association.on) {
         parentKey[pair.source] = instance.row[bo.fields.find((f) => same(f.name, pair.source))?.name ?? pair.source] ?? null;
       }
-      responses.add(await this.create(association.target, request.targets, mode, { association, key: parentKey }));
+      const children = request.targets.filter((t) => t.cid === undefined || !refused.has(t.cid));
+      responses.add(await this.create(association.target, children, mode, { association, key: parentKey, ...(numbered === undefined ? {} : { numbered }) }));
     }
     return responses;
   }
@@ -1082,6 +1125,7 @@ export class Transaction {
     if (responses.hasFailed) {
       return responses;
     }
+    await this.refreshEtagMasters();
     await this.write();
     // additional and unmanaged save: save_modified, whose failed (cl_abap_behavior_saver_failed)
     // makes the caller roll the LUW back
@@ -1250,7 +1294,8 @@ export class Transaction {
         await sql`INSERT INTO ${sql.id(bo.table.name)} (${sql.join(names)}) VALUES (${sql.join(values)})`.execute(this.db);
         continue;
       }
-      const changed = columns.filter(([f]) => instance.changed.has(f) && !bo.keys.some((k) => k.name === f));
+      const touched = this.etagTouched.has(instance) ? bo.etagField : undefined;
+      const changed = columns.filter(([f]) => (instance.changed.has(f) || f === touched) && !bo.keys.some((k) => k.name === f));
       if (changed.length === 0 && keyString(bo, instance.persisted) === keyString(bo, key)) {
         continue;
       }
@@ -1268,9 +1313,86 @@ export class Transaction {
     return this.cids.get(cid);
   }
 
-  /** The current image of an instance, for ETag checks. */
-  public async current(bo: BoEntity, key: Row): Promise<Row | undefined> {
-    return (await this.instance(bo, keyOf(bo, key)))?.row;
+  /**
+   * The instance whose ETag field covers an instance (of `bo`, with the values `row`): itself
+   * for an `etag master`, the master reached by the `etag dependent by` associations otherwise.
+   */
+  private async etagMasterInstance(bo: BoEntity, row: Row): Promise<Instance | undefined> {
+    let current = bo;
+    let values: Row = row;
+    for (let depth = 0; depth < 20; depth++) {
+      const spec = current.behavior.etag;
+      if (spec === undefined) {
+        return undefined;
+      }
+      if (spec.kind === "master") {
+        return this.instance(current, keyOf(current, values));
+      }
+      const association = this.bo.association(current, spec.by);
+      if (association === undefined) {
+        return undefined;
+      }
+      const targetKey: Row = {};
+      for (const pair of association.on) {
+        const target = association.target.fields.find((f) => same(f.name, pair.target))?.name ?? pair.target;
+        targetKey[target] = values[current.fields.find((f) => same(f.name, pair.source))?.name ?? pair.source] ?? null;
+      }
+      const next = await this.instance(association.target, keyOf(association.target, targetKey));
+      if (next === undefined) {
+        return undefined;
+      }
+      current = association.target;
+      values = next.row;
+    }
+    return undefined;
+  }
+
+  /**
+   * The ETag value an If-Match is compared with: the ETag field of the instance or of its ETag
+   * master, as it was when the LUW began (the state the client has read: the requests of a change
+   * set carry the ETags read before it, and the changes of the LUW, a determination that updates
+   * the master for example, do not make them stale); undefined when the instance is not found.
+   */
+  public async etagValue(bo: BoEntity, key: Row): Promise<{ value: unknown } | undefined> {
+    const instance = await this.instance(bo, keyOf(bo, key));
+    if (instance === undefined) {
+      return undefined;
+    }
+    const master = await this.etagMasterInstance(bo, instance.row);
+    const field = master?.bo.etagField;
+    return { value: master === undefined || field === undefined ? undefined : (master.persisted ?? master.row)[field] };
+  }
+
+  /**
+   * `etag dependent by` (D32): the ETag field of a master changes with its dependent instances.
+   * The runtime sets it when it is an administrative time stamp it manages
+   * (`localInstanceLastChangedAt`, `lastChangedAt`) and writes the master; at save time, so that
+   * the requests of a change set check the ETag the client has read.
+   */
+  private async refreshEtagMasters(): Promise<void> {
+    const masters = new Set<Instance>();
+    for (const instance of [...this.instances.values()]) {
+      if (instance.bo.behavior.etag?.kind !== "dependent") {
+        continue;
+      }
+      const created = instance.persisted === undefined;
+      const changed = instance.deleted ? !created : created || instance.changed.size > 0;
+      if (!changed) {
+        continue;
+      }
+      const master = await this.etagMasterInstance(instance.bo, instance.deleted ? (instance.persisted ?? instance.row) : instance.row);
+      if (master !== undefined && !master.deleted) {
+        masters.add(master);
+      }
+    }
+    for (const master of masters) {
+      const field = master.bo.etagField;
+      if (field === undefined || master.bo.saving === "unmanaged" || (field !== master.bo.admin.localInstanceLastChangedAt && field !== master.bo.admin.lastChangedAt)) {
+        continue;
+      }
+      master.row[field] = this.services.now();
+      this.etagTouched.add(master);
+    }
   }
 
   /** Instance and global feature control of rows about to be read (GET): __EntityControl… */

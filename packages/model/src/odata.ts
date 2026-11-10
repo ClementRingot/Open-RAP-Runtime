@@ -59,6 +59,11 @@ export interface ODataEntityType {
   navigations: ODataNavigation[];
   /** Property holding the ETag (etag master). */
   etag?: string;
+  /**
+   * `etag dependent by _Assoc` (D32): the ETag is the one of the master instance, reached by these
+   * navigations (to-one), and its property.
+   */
+  etagPath?: { navigations: string[]; property: string };
   /** Feature control of update/delete (instance or global): __EntityControl. */
   entityControl?: { updatable: boolean; deletable: boolean };
   /** Actions and create-by-association navigations under instance feature control. */
@@ -169,6 +174,35 @@ export function projectedFieldName(model: Model, entity: EntityModel, baseField:
   return entity.fields.find((f) => same(baseFieldName(model, entity, f) ?? "", baseField))?.name;
 }
 
+/**
+ * The ETag of an `etag dependent by _Assoc` entity (D32): the navigations of the exposed entities
+ * that project the `by` associations, up to an `etag master`, and the master's ETag property.
+ * Undefined when a projection does not expose an association or the ETag of the master.
+ */
+export function dependentEtagPath(model: Model, entity: EntityModel): { navigations: string[]; property: string } | undefined {
+  const navigations: string[] = [];
+  let current: EntityModel | undefined = entity;
+  for (let depth = 0; depth < 10 && current !== undefined; depth++) {
+    const behavior = exposedBehavior(model, current);
+    const etag = behavior.base?.etag;
+    if (etag === undefined || (behavior.projection !== undefined && !behavior.projection.useEtag)) {
+      return undefined;
+    }
+    if (etag.kind === "master") {
+      const property = projectedFieldName(model, current, etag.field);
+      return property === undefined || navigations.length === 0 ? undefined : { navigations, property };
+    }
+    const association = current.associations.find((a) => same(a.baseAssociation ?? a.name, etag.by)) ?? current.associations.find((a) => same(a.name, etag.by));
+    const collection = association === undefined || association.cardinality.max === "*" || association.cardinality.max > 1;
+    if (association === undefined || collection || !model.service.entitySets.some((s) => same(s.entity, association.target))) {
+      return undefined;
+    }
+    navigations.push(association.name);
+    current = findEntity(model, association.target);
+  }
+  return undefined;
+}
+
 function publicOperation(behavior: ExposedBehavior, kind: "create" | "update" | "delete"): boolean {
   const base = behavior.base?.operations.find((o) => o.kind === kind && !o.internal);
   if (base === undefined) {
@@ -240,6 +274,11 @@ export function buildODataService(model: Model): ODataService {
       const projected = projectedFieldName(model, entity, etag.field);
       if (projected !== undefined) {
         entityType.etag = projected;
+      }
+    } else if (etag?.kind === "dependent" && etagAllowed) {
+      const path = dependentEtagPath(model, entity);
+      if (path !== undefined) {
+        entityType.etagPath = path;
       }
     }
     // instance and global feature control are both consumer hints of the instances (RAP)

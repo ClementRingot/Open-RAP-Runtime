@@ -116,6 +116,16 @@ describe("IR diagnostics", () => {
     ]);
   });
 
+  it("needs the numbering handler of a creation by association for an early numbered child", () => {
+    const items = diagnosticsOf({
+      [bdef]: (c) =>
+        c
+          .replace("persistent table zrt_booking\nlock dependent by _Travel", "persistent table zrt_booking\nearly numbering\nlock dependent by _Travel")
+          .replace("field ( numbering : managed, readonly ) BookingUUID;", "field ( readonly ) BookingUUID;"),
+    });
+    expect(items.map((d) => `${d.severity} ${d.code} ${d.message}`)).toEqual(["error ABP002 no handler method FOR NUMBERING for Travel\\_Booking"]);
+  });
+
   it("rejects draft", () => {
     const items = diagnosticsOf({ [bdef]: (c) => c.replace("strict ( 2 );", "strict ( 2 );\nwith draft;") });
     expect(items).toContainEqual(expect.objectContaining({ code: "BDEF002", message: "draft (with draft) is out of scope", line: 3 }));

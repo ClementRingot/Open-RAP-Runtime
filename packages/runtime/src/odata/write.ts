@@ -31,7 +31,7 @@ import { fromJson, toJson, type CanonicalValue, type JsonValue } from "../values
 import type { BatchResponsePart } from "./batch.js";
 import { badRequest, methodNotAllowed, notFound, ODataError, type ODataMessage, type Severity } from "./errors.js";
 import { ChangesetFailure, errorResponse, jsonResponse, sapMessagesHeader, toPart, type HandlerContext, type ODataRequest, type ODataResponse, type Target, type WriteHandler } from "./handler.js";
-import { etagOf, JsonWriter } from "./json.js";
+import { etagOf, etagValue, JsonWriter } from "./json.js";
 import type { ReadEngine } from "./read.js";
 import type { Key, ServiceRuntime, TypeInfo } from "./service.js";
 import type { QueryOptions } from "./uri/ast.js";
@@ -514,7 +514,7 @@ export class RapWriteHandler implements WriteHandler {
   /** If-Match against the current ETag of the instance (in the LUW). */
   private async checkEtag(tx: Transaction, request: ODataRequest, set: SetInfo, key: Row, required: boolean): Promise<void> {
     const etagProperty = set.info.type.etag;
-    if (etagProperty === undefined) {
+    if (etagProperty === undefined && set.info.type.etagPath === undefined) {
       return;
     }
     const header = request.headers["if-match"];
@@ -527,13 +527,14 @@ export class RapWriteHandler implements WriteHandler {
     if (header.trim() === "*") {
       return;
     }
-    const current = await tx.current(set.bo, key);
+    // the ETag field of the instance, or of its ETag master (etag dependent by, D32)
+    const current = await tx.etagValue(set.bo, key);
     if (current === undefined) {
       throw notFound(this.path(set, this.projectedKey(set, key)));
     }
-    const etag = etagOf(set.info, { [etagProperty]: current[set.toBase.get(etagProperty) ?? etagProperty] ?? null });
+    const etag = etagValue(current.value);
     const given = header.split(",").map((t) => t.trim());
-    if (etag === undefined || !given.includes(etag)) {
+    if (!given.includes(etag)) {
       throw new ODataError(412, "PRECONDITION_FAILED", `${this.path(set, this.projectedKey(set, key))} was changed in the meantime: reload it`);
     }
   }

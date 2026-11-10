@@ -824,3 +824,59 @@ export function remoteVariant(): Record<string, string | ((content: string) => s
     },
   };
 }
+
+// ---------------------------------------------------------------------------------------------
+// etag dependent by (D32)
+
+/** The bookings use the ETag of their travel: `etag dependent by _Travel`. */
+export function etagDependentVariant(): Record<string, string | ((content: string) => string)> {
+  return {
+    "zrt_r_travel.bdef.asbdef": (c) => edit(c, [["authorization dependent by _Travel\netag master LocalLastChangedAt", "authorization dependent by _Travel\netag dependent by _Travel"]]),
+  };
+}
+
+// ---------------------------------------------------------------------------------------------
+// early numbering by association
+
+const NUMBERING_DEFINITION = `
+    METHODS earlynumbering_cba_booking FOR NUMBERING
+      IMPORTING entities FOR CREATE Travel\\_Booking.
+ENDCLASS.`;
+
+const NUMBERING_IMPLEMENTATION = `
+  METHOD earlynumbering_cba_booking.
+    " the key of a new booking: the key of its travel, the booking ID at the end (deterministic)
+    LOOP AT entities INTO DATA(entity).
+      DATA(prefix) = substring( val = CONV string( entity-TravelUUID ) len = 28 ).
+      LOOP AT entity-%target INTO DATA(target).
+        IF target-BookingID = '9999'.
+          APPEND VALUE #( %cid = target-%cid ) TO failed-booking.
+          APPEND VALUE #( %cid = target-%cid
+                          %msg = new_message_with_text( text = 'The booking ID 9999 is reserved' ) ) TO reported-booking.
+          CONTINUE.
+        ENDIF.
+        APPEND VALUE #( %cid        = target-%cid
+                        BookingUUID = |{ prefix }{ target-BookingID }| ) TO mapped-booking.
+      ENDLOOP.
+    ENDLOOP.
+  ENDMETHOD.
+
+ENDCLASS.
+
+CLASS lhc_booking DEFINITION`;
+
+/** The bookings are numbered by the travel: `early numbering` and `FOR NUMBERING … FOR CREATE Travel\_Booking`. */
+export function numberingByAssociationVariant(): Record<string, string | ((content: string) => string)> {
+  return {
+    "zrt_r_travel.bdef.asbdef": (c) =>
+      edit(c, [
+        ["persistent table zrt_booking\nlock dependent by _Travel", "persistent table zrt_booking\nearly numbering\nlock dependent by _Travel"],
+        ["  field ( numbering : managed, readonly ) BookingUUID;", "  field ( readonly ) BookingUUID;"],
+      ]),
+    [ABP]: (c) => {
+      const first = c.indexOf("ENDCLASS.");
+      const withDefinition = `${c.slice(0, first)}${NUMBERING_DEFINITION.trimStart()}${c.slice(first + "ENDCLASS.".length)}`;
+      return edit(withDefinition, [["ENDCLASS.\n\nCLASS lhc_booking DEFINITION", NUMBERING_IMPLEMENTATION.trimStart()]]);
+    },
+  };
+}

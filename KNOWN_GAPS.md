@@ -40,7 +40,7 @@ Versions de référence : `@abaplint/core` 2.120.98, `@abaplint/transpiler` 2.14
 | Unmanaged save : contraintes de la base | Pas de clé étrangère enfant → parent (la BDEF n'a pas de table persistante) : `save_modified` supprime les enfants (`delete` les contient). |
 | EML sur une BDEF de projection (`MODIFY ENTITIES OF zc_travel`) | Diagnostic ABP007 : utiliser la BDEF de base. |
 | `MODIFY ENTITIES OPERATIONS` (EML dynamique), `RELATING TO`, `AUGMENTING`, `COMMIT ENTITIES RESPONSES`, `GET PERMISSIONS`, `SET LOCKS`, `RAISE ENTITY EVENT` | Diagnostics ABP005/ABP007. |
-| Numérotation anticipée par association (`FOR NUMBERING … FOR CREATE Travel\_Booking`), late numbering | Non pris en charge. |
+| Late numbering (`adjust_numbers`) | Non pris en charge (ABP007). La numérotation anticipée, directe ou par association, l'est. |
 | `COMMIT ENTITIES` et `ROLLBACK ENTITIES` dans un handler | Erreur à l'exécution, comme dans RAP. |
 | Réponses d'une instruction EML | Remplacent le contenu des cibles `FAILED`/`REPORTED`/`MAPPED` données ; `sy-subrc` vaut 4 quand `failed` n'est pas vide (convention, non documentée par SAP). |
 | Septième décimale des `TIMESTAMPL` générés | Le runtime les génère à la microseconde (D8). |
@@ -83,7 +83,8 @@ Versions de référence : `@abaplint/core` 2.120.98, `@abaplint/transpiler` 2.14
 |---|---|
 | Comparaisons `lt`/`le` sur une date initiale : en ABAP `00000000` est inférieure à toute date ; ici la valeur initiale est `NULL` et n'est retenue par aucune comparaison (sémantique OData de `null`). | Assumé |
 | `$filter` avec `any`/`all`, `$expand` imbriqué, `$apply`, JSON batch, `$value` | Réponse 501 ou 400 |
-| `If-Match` sur une entité `etag dependent by` | Non contrôlé : seule l'entité `etag master` expose son ETag. |
+| `etag dependent by` : maître en unmanaged save, ou champ ETag du maître qui n'est pas un horodatage administratif | Le runtime ne change pas l'ETag du maître quand une entité dépendante change : `save_modified` ou l'application doit le faire (D32). |
+| `etag dependent by` à travers une projection qui n'expose pas l'association | Pas d'ETag pour l'entité dépendante (ni `@odata.etag`, ni contrôle de `If-Match`). |
 | Feature control global (`features : global`) dans les lectures | Exposé comme le feature control d'instance (`__EntityControl`, `__OperationControl` : même valeur pour toutes les instances), recalculé à chaque requête, sans cache. Action statique : contrôlé à l'exécution seulement (pas d'instance pour `Core.OperationAvailable`). |
 
 ## Application générée

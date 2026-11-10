@@ -148,7 +148,7 @@ export function buildModel(project: Project, options: BuildOptions = {}): BuildR
     const registry = abaplintRegistry(project);
     syntaxCheck(project, registry, pools, diagnostics);
     for (const behavior of behaviors) {
-      attachHandlers(behavior, registry, project, diagnostics);
+      attachHandlers(behavior, registry, project, diagnostics, [...required.values()]);
     }
   }
 

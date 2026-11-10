@@ -444,3 +444,29 @@ et la conséquence. Les numéros D1 à D13 correspondent aux points 1 à 13 du �
   `$count`, lecture par clé ; écritures V4 vers un service simulé : CSRF, cookies, ETags,
   renouvellement du jeton, erreur 409 ; OData V2 avec l'entité abstraite d'un SCM :
   `d.results`, `__count`, `/Date()/`), `http-client.test.ts`, `app-scaffold.test.ts`.
+
+## D32 — ETag dépendant et ETag dans un change set
+
+- **Décision** : une entité `etag dependent by _Assoc` a l'ETag de son maître : l'ETag est la
+  valeur du champ ETag de l'instance maître atteinte par les associations `by` (une ou plusieurs,
+  jusqu'à un `etag master`). Le service l'expose (`@odata.etag` des instances, en-tête `ETag`,
+  `Core.OptimisticConcurrency` avec le chemin `_Travel/LocalLastChangedAt`) et contrôle
+  `If-Match` sur les modifications de l'entité dépendante (428 sans en-tête, 412 si périmé).
+- **Le maître change avec ses dépendants** : la règle SAP veut que le champ ETag soit mis à jour
+  à chaque changement de l'instance qu'il couvre ; quand une instance dépendante est créée,
+  modifiée ou supprimée, le runtime met à jour le champ ETag du maître s'il le gère (horodatage
+  administratif `localInstanceLastChangedAt` ou `lastChangedAt`, maître écrit par le runtime),
+  une fois par LUW, au moment de la sauvegarde. Un maître en unmanaged save ou avec un autre
+  champ ETag doit être mis à jour par l'application.
+- **`If-Match` dans un change set** : il est comparé à l'ETag de l'instance au début de la LUW,
+  l'état que le client a lu. Les requêtes d'un change set portent les ETags lus avant lui : une
+  modification antérieure du même change set (la requête précédente, ou une détermination qui
+  recalcule le voyage quand une réservation change) ne les rend pas périmés. Les modifications
+  des autres clients restent détectées : la LUW verrouille les instances qu'elle modifie.
+- **Pourquoi** : sans cela, l'Object Page d'un BO non draft qui enregistre un voyage et ses
+  réservations dans un même change set échouerait en 412 dès qu'une détermination touche le
+  voyage ; et une entité dépendante n'aurait aucune protection de concurrence.
+- **Réalisation** : modèle OData (`etagPath`), CSDL, lecture (sous-requêtes scalaires le long des
+  navigations, dans les listes, les lectures unitaires et `$expand`), contrôle d'écriture
+  (`Transaction.etagValue`), mise à jour du maître (`refreshEtagMasters`, avant l'écriture).
+  Tests : `rap-variant-etag.test.ts`.

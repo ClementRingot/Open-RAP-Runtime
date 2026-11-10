@@ -21,13 +21,13 @@ n'utilise pas.
 | `define root behavior for` / entité enfant, `alias` | ✅ | |
 | `persistent table`, `mapping for … corresponding` | ✅ | |
 | `lock master`, `lock dependent by` | ✅ | Verrou de ligne PostgreSQL sur l'instance du lock master (`FOR UPDATE NOWAIT`, cause `locked`, 409) ; un LUW à la fois par processus (D11). Conflit avec une autre transaction testé sur PostgreSQL (`rap-locks.test.ts`), y compris un verrou refusé en EML : la LUW continue. |
-| `etag master` | ✅ | `If-Match` exigé (428), ETag périmé 412, `*` accepté. |
-| `etag dependent by` | 🟡 | Pas d'ETag exposé pour l'entité dépendante : `If-Match` n'y est pas contrôlé. |
+| `etag master` | ✅ | `If-Match` exigé (428), ETag périmé 412, `*` accepté ; dans un change set, comparé à l'état lu avant lui (D32). |
+| `etag dependent by` | ✅ | ETag du maître (`@odata.etag`, `Core.OptimisticConcurrency` par la navigation), contrôlé sur les modifications ; un changement de l'entité dépendante change l'ETag du maître (D32). Test `rap-variant-etag.test.ts`. |
 | `authorization master ( global )`, `( instance )`, `( global, instance )` | ✅ | Handlers appelés hors local mode ; refus → 403. |
 | `authorization dependent by` | ✅ | Contrôle du master (`%update`) pour les opérations de l'entité dépendante. |
 | `early numbering` managed (UUID) | ✅ | |
 | Numérotation externe (clé fournie, `mandatory : create`, `readonly : update`) | ✅ | |
-| `early numbering` non managed (handler `FOR NUMBERING`) | 🟡 | Création directe : ✅ (`rap-variant-features.test.ts`). Création par association (`FOR CREATE Travel\_Booking`) : non prise en charge. |
+| `early numbering` non managed (handler `FOR NUMBERING`) | ✅ | Création directe (`rap-variant-features.test.ts`) et création par association, deep create compris (`FOR CREATE Travel\_Booking`, un appel pour tous les parents, `failed`/`reported` ; `rap-variant-numbering.test.ts`). |
 | `late numbering` | ❌ | Nécessite la phase `adjust_numbers` d'un saver. |
 | `with additional save`, `with unmanaged save` (en-tête ou entité, `with full data`) | ✅ | Classe saver `lsc_…` : `save_modified` et `cleanup` ; unmanaged : lecture et verrous par la vue CDS (D30). Tests `rap-variant-additional-save`, `rap-variant-unmanaged-save`. |
 | Saver hérité de `cl_abap_behavior_saver_failed` (`failed` dans `save_modified`) | ✅ | Annule la LUW, écriture managed comprise ; message renvoyé au client. |

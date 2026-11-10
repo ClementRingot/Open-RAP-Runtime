@@ -204,6 +204,8 @@ export interface BehaviorAssociationModel {
   internal: boolean;
   /** Projection BDEF: `use association _X`. */
   use?: boolean;
+  /** Early numbering of the target: `FOR NUMBERING … FOR CREATE Parent\_X`. */
+  earlyNumberingHandler?: HandlerRef;
 }
 
 export type FieldCharacteristic =

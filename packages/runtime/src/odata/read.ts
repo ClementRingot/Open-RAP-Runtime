@@ -8,6 +8,7 @@ import type { AbapType, EdmType } from "@rap-transpiler/model";
 import type { Database } from "../db/database.js";
 import { fromSql, literalToCanonical, toSql, type CanonicalValue, type UrlLiteral } from "../values.js";
 import { badRequest, notImplemented } from "./errors.js";
+import { DEPENDENT_ETAG } from "./json.js";
 import type { Key, ServiceRuntime, TypeInfo } from "./service.js";
 import type { ExpandItem, Expr, OrderItem, QueryOptions } from "./uri/ast.js";
 
@@ -305,7 +306,49 @@ export class ReadEngine {
       const { field } = this.service.property(info, name);
       row[name] = fromSql(field.type, raw[name]);
     }
+    const etag = this.dependentEtag(info, "t0");
+    if (etag !== undefined) {
+      row[DEPENDENT_ETAG] = fromSql(etag.type, raw[DEPENDENT_ETAG]);
+    }
     return row;
+  }
+
+  /**
+   * The ETag of an `etag dependent` entity (D32): the ETag field of the master instance, read by
+   * scalar sub-queries along the to-one navigations of the path.
+   */
+  private dependentEtag(info: TypeInfo, alias: string): { sql: RawBuilder<unknown>; type: AbapType } | undefined {
+    const path = info.type.etagPath;
+    if (path === undefined) {
+      return undefined;
+    }
+    const hops: Array<{ on: Array<{ source: string; target: string }>; view: string; inner: string; outer: string }> = [];
+    let current = info;
+    let outer = alias;
+    path.navigations.forEach((name, i) => {
+      const { navigation, target } = this.service.navigationTarget(current, name);
+      const inner = `${alias}_etag${i}`;
+      hops.push({ on: navigation.on, view: target.view, inner, outer });
+      current = target;
+      outer = inner;
+    });
+    const { property, field } = this.service.property(current, path.property);
+    let expression: RawBuilder<unknown> = sql.ref(`${outer}.${property.name}`);
+    for (const hop of [...hops].reverse()) {
+      const conditions = hop.on.map((p) => sql`${sql.ref(`${hop.inner}.${p.target}`)} = ${sql.ref(`${hop.outer}.${p.source}`)}`);
+      expression = sql`(SELECT ${expression} FROM ${sql.table(hop.view)} AS ${sql.id(hop.inner)} WHERE ${sql.join(conditions, sql` AND `)} LIMIT 1)`;
+    }
+    return { sql: expression, type: field.type };
+  }
+
+  /** The columns of a query: the properties, and the ETag of an `etag dependent` entity. */
+  private columns(info: TypeInfo, alias: string, properties: string[]): RawBuilder<unknown> {
+    const columns = properties.map((p) => sql.ref(`${alias}.${p}`) as RawBuilder<unknown>);
+    const etag = this.dependentEtag(info, alias);
+    if (etag !== undefined) {
+      columns.push(sql`${etag.sql} AS ${sql.id(DEPENDENT_ETAG)}`);
+    }
+    return sql.join(columns);
   }
 
   /** Conditions selecting one instance on the alias t0. */
@@ -325,7 +368,7 @@ export class ReadEngine {
     const alias = "t0";
     const needed = this.neededForExpand(info, options.expand);
     const properties = this.selectedProperties(info, options, needed);
-    const columns = sql.join(properties.map((p) => sql.ref(`${alias}.${p}`)));
+    const columns = this.columns(info, alias, properties);
     const where = this.where(info, alias, options, scope);
     const limit = Math.min(options.top ?? MAX_PAGE_SIZE, MAX_PAGE_SIZE);
     const query = sql<Record<string, unknown>>`SELECT ${columns} FROM ${sql.table(info.view)} AS ${sql.id(alias)} ${where} ${this.orderBy(info, alias, options.orderby)} LIMIT ${limit} OFFSET ${options.skip ?? 0}`;
@@ -416,7 +459,7 @@ export class ReadEngine {
         distinct.map((t) => sql`(${sql.join(t.map((v, i) => sql`${toSql(this.service.property(target, targetFields[i] as string).field.type, v)}`))})`),
       )})`;
       const where = this.where(target, alias, item.options, [inCondition]);
-      const columns = sql.join(properties.map((p) => sql.ref(`${alias}.${p}`)));
+      const columns = this.columns(target, alias, properties);
       let query: RawBuilder<Record<string, unknown>>;
       if (navigation.collection && (item.options.top !== undefined || item.options.skip !== undefined)) {
         const partition = sql.join(targetFields.map((f) => sql.ref(`${alias}.${f}`)));
@@ -448,6 +491,9 @@ function strip(row: Row, properties: string[], needed: string[]): Row {
   const copy: Row = {};
   for (const p of properties) {
     copy[p] = row[p];
+  }
+  if (row[DEPENDENT_ETAG] !== undefined) {
+    copy[DEPENDENT_ETAG] = row[DEPENDENT_ETAG];
   }
   return copy;
 }
