@@ -43,8 +43,8 @@ describe("UI layout from the UI annotations", () => {
     expect(bookings?.kind === "table" ? bookings.table : undefined).toMatchObject({ set: "Booking", navigation: "_Booking", insertable: true });
     expect(travel?.actions.map((a) => [a.name, a.dynamic, a.factory])).toEqual([
       ["acceptTravel", true, false],
-      ["deductDiscount", false, false],
-      ["copyTravel", false, true],
+      ["deductDiscount", true, false],
+      ["copyTravel", true, true],
     ]);
     expect(travel?.actions[1]?.parameters).toEqual([{ name: "DiscountPercent", label: "Discount (%)", kind: "integer", edm: "Edm.Byte" }]);
   });

@@ -110,3 +110,31 @@ describe("access controls (DCL) on the reads", () => {
     expect((await t.app.inject({ method: "GET", url: `${SERVICE}Booking/$count`, headers: { authorization: `Bearer ${nobody}` } })).body).toBe("0");
   });
 });
+
+describe("authorizations in the controls of the instances (D36)", () => {
+  it("disables the operations the user may not perform, per instance", async () => {
+    const select = `Travel?$select=TravelID,__EntityControl,__OperationControl&$filter=TravelID eq '00000001'`;
+    const agent = await tokenOf("alice", ["travel_agent"], { agency: "070001" });
+    const [own] = (await as(agent, "GET", select)).body["value"] as Array<Record<string, unknown>>;
+    // the agent changes the travels of his agency, without deleting or copying them
+    expect(own).toMatchObject({ __EntityControl: { Updatable: true, Deletable: false }, __OperationControl: { deductDiscount: true, copyTravel: false } });
+    const viewer = await tokenOf("victor", ["travel_viewer"]);
+    const [seen] = (await as(viewer, "GET", select)).body["value"] as Array<Record<string, unknown>>;
+    expect(seen).toMatchObject({ __EntityControl: { Updatable: false, Deletable: false }, __OperationControl: { acceptTravel: false, deductDiscount: false, copyTravel: false, _Booking: false } });
+  });
+
+  it("checks the creation of bookings by the authorization of their travel (%assoc)", async () => {
+    const booking = { BookingID: "0007", CarrierID: "LH", ConnectionID: "0400", FlightDate: "2026-06-03", FlightPrice: "10.00", CurrencyCode: "EUR" };
+    const viewer = await tokenOf("victor", ["travel_viewer"]);
+    expect((await as(viewer, "POST", `Travel(${T1})/_Booking`, booking)).status).toBe(403);
+    const agent = await tokenOf("alice", ["travel_agent"], { agency: "070001" });
+    expect((await as(agent, "POST", `Travel(${T1})/_Booking`, booking)).status).toBe(201);
+    expect((await as(agent, "POST", `Travel(${T2})/_Booking`, { ...booking, BookingID: "0008" })).status).toBe(403);
+  });
+
+  it("tells the UI whether the user may create", async () => {
+    const permissions = async (token: string): Promise<unknown> => JSON.parse((await t.app.inject({ method: "GET", url: `${SERVICE}$permissions`, headers: { authorization: `Bearer ${token}` } })).body);
+    expect(await permissions(await tokenOf("mona", ["travel_manager"]))).toEqual({ Travel: { create: true } });
+    expect(await permissions(await tokenOf("alice", ["travel_agent"], { agency: "070001" }))).toEqual({ Travel: { create: false } });
+  });
+});

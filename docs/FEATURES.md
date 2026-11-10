@@ -202,6 +202,7 @@ ajoutent ce que la fixture n'utilise pas : numérotation, feature control global
 | Feature control : actions (`__OperationControl`), Edit/Delete (`__EntityControl`), champs (`__FieldControl`) | ✅ | Instance et global ; testé dans le navigateur (`ui-features.test.ts`). |
 | Champs en lecture seule, obligatoires, modifiables à la création seulement | ✅ | Depuis les caractéristiques de champ de la BDEF. |
 | Messages (erreurs, succès) | ✅ | `MessageBox`, `MessageToast`, `MessagePopover`. |
+| Boutons selon les autorisations de l'utilisateur | ✅ | Create masqué sans autorisation globale de création (`$permissions`) ; Edit, Delete, actions et création d'enfants désactivés par instance (`__EntityControl`, `__OperationControl`, D36). Test `ui-authorizations.test.ts`. |
 | Aide à la saisie (value help), variantes, personnalisation de table | ❌ | Prévu après le MVP. |
 
 ## Application générée et exploitation

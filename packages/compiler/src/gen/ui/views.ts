@@ -143,7 +143,7 @@ function listReport(page: UiPage): string {
           <OverflowToolbar>
             <Title id="tableTitle" text="${esc(page.typeNamePlural)}" level="H3"/>
             <ToolbarSpacer/>
-            ${table.insertable ? `<Button id="create" text="Create" type="Transparent" press=".onCreate"/>` : ""}
+            ${table.insertable ? `<Button id="create" text="Create" type="Transparent" press=".onCreate" visible="${esc(`{= %{ui>/permissions/${page.set}/create} !== false }`)}"/>` : ""}
             ${table.deletable ? `<Button id="delete" text="Delete" type="Transparent" press=".onDelete" enabled="{ui>/tableSelected}"/>` : ""}
             ${table.actions.map((a) => actionButton(a, "table", "list")).join("\n            ")}
           </OverflowToolbar>

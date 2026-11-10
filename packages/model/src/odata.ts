@@ -203,6 +203,23 @@ export function dependentEtagPath(model: Model, entity: EntityModel): { navigati
   return undefined;
 }
 
+/**
+ * Whether the authorization handlers of the BO decide on the instances of an entity: an
+ * authorization master with a global or instance handler, or an entity dependent on one (D36).
+ */
+function authorizationControlled(model: Model, behavior: ExposedBehavior): boolean {
+  const base = behavior.base;
+  if (base?.authorization === undefined) {
+    return false;
+  }
+  const handlers = (e: EntityBehaviorModel): boolean => e.authorization?.kind === "master" && (e.globalAuthorizationHandler !== undefined || e.instanceAuthorizationHandler !== undefined);
+  if (base.authorization.kind === "master") {
+    return handlers(base);
+  }
+  const bdef = model.behaviors.find((b) => b.entities.includes(base));
+  return bdef?.entities.some(handlers) ?? false;
+}
+
 function publicOperation(behavior: ExposedBehavior, kind: "create" | "update" | "delete"): boolean {
   const base = behavior.base?.operations.find((o) => o.kind === kind && !o.internal);
   if (base === undefined) {
@@ -281,9 +298,11 @@ export function buildODataService(model: Model): ODataService {
         entityType.etagPath = path;
       }
     }
-    // instance and global feature control are both consumer hints of the instances (RAP)
-    const updateDynamic = behavior.base?.operations.some((o) => o.kind === "update" && o.features !== undefined) ?? false;
-    const deleteDynamic = behavior.base?.operations.some((o) => o.kind === "delete" && o.features !== undefined) ?? false;
+    // instance and global feature control are both consumer hints of the instances (RAP), and so
+    // are the authorizations of the user (D36)
+    const authorized = authorizationControlled(model, behavior);
+    const updateDynamic = (behavior.base?.operations.some((o) => o.kind === "update" && o.features !== undefined) ?? false) || (authorized && publicOperation(behavior, "update"));
+    const deleteDynamic = (behavior.base?.operations.some((o) => o.kind === "delete" && o.features !== undefined) ?? false) || (authorized && publicOperation(behavior, "delete"));
     if (updateDynamic || deleteDynamic) {
       entityType.entityControl = { updatable: updateDynamic, deletable: deleteDynamic };
     }
@@ -318,7 +337,7 @@ export function buildODataService(model: Model): ODataService {
         constraints: association.kind === "toParent" ? association.on.map((p) => ({ property: p.source, referencedProperty: p.target })) : [],
         on: association.on,
         insertable,
-        insertableDynamic: insertable && baseAssociation?.createFeatures === "instance",
+        insertableDynamic: insertable && (baseAssociation?.createFeatures === "instance" || authorized),
       };
       if (partner !== undefined) {
         navigation.partner = partner.name;
@@ -338,7 +357,7 @@ export function buildODataService(model: Model): ODataService {
         behaviorEntity: behavior.baseEntity.name,
         action: action.name,
         factory: action.factory,
-        dynamic: action.features === "instance" || (action.features === "global" && !action.static),
+        dynamic: action.features === "instance" || (action.features === "global" && !action.static) || (authorized && !action.static),
       };
       if (action.parameter !== undefined && action.parameter.toLowerCase() !== "$self") {
         const parameterEntity = findEntity(model, action.parameter);

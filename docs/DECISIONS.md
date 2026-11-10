@@ -558,3 +558,23 @@ et la conséquence. Les numéros D1 à D13 correspondent aux points 1 à 13 du �
 - **Fixture** : rôles `ZRT_R_TRAVEL` (agence par `pfcg_auth( ZAO_TRAVL, ZAGENCY, ACTVT = '03' )`),
   `ZRT_C_TRAVEL` (hérite de la vue de base), `ZRT_C_BOOKING` (agence du voyage,
   `_Travel.AgencyID`).
+
+## D36 — Autorisations dans les indications aux consommateurs (UI)
+
+- **Décision** : comme RAP, qui présente le feature control et le contrôle d'autorisation sous
+  forme d'indications aux consommateurs, les entités dont le BO a des handlers d'autorisation
+  (maître avec handler global ou d'instance, ou entité dépendante d'un tel maître) exposent
+  `__EntityControl` (`Updatable`, `Deletable`) et `__OperationControl` (actions d'instance,
+  création par association) ; leurs valeurs combinent, pour l'utilisateur de la requête, les
+  feature controls et les autorisations globale et d'instance. Le `$metadata` les annonce
+  (`UpdateRestrictions`, `DeleteRestrictions`, `NavigationRestrictions` par chemin,
+  `Core.OperationAvailable`), utilisables aussi par une application Fiori elements.
+- **Création** : elle ne dépend d'aucune instance ; le service répond à `GET <racine>$permissions`
+  (créations permises par entity set : autorisation globale et feature control global) et l'UI
+  générée masque Create quand elle est refusée.
+- **Création par association** : pour l'entité maître, elle a son propre indicateur
+  (`%assoc-_Booking`), comme sur SAP ; pour une entité dépendante, l'autorisation d'update du
+  maître s'applique. La fixture accorde la création des réservations avec l'update du voyage.
+- **Tests** : `rap-authorizations.test.ts` (contrôles par profil, `$permissions`, création de
+  réservations), `ui-authorizations.test.ts` (navigateur : un viewer ne voit pas Create, Edit,
+  Delete et l'action sont désactivés).

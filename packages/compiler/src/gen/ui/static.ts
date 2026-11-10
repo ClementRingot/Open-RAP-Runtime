@@ -95,8 +95,15 @@ export const COMPONENT = `sap.ui.define([
 
     init: function () {
       UIComponent.prototype.init.apply(this, arguments);
-      this.setModel(new JSONModel({ editMode: false, createMode: false, busy: false, tableSelected: false, childSelected: false }), "ui");
+      var oUi = new JSONModel({ editMode: false, createMode: false, busy: false, tableSelected: false, childSelected: false, permissions: {} });
+      this.setModel(oUi, "ui");
       this.setModel(Messaging.getMessageModel(), "message");
+      // the creations the user may perform (global authorization): Create is hidden otherwise
+      var sService = this.getManifestEntry("/sap.app/dataSources/mainService/uri");
+      fetch(sService + "$permissions", { credentials: "same-origin", headers: { accept: "application/json" } })
+        .then(function (oResponse) { return oResponse.ok ? oResponse.json() : {}; })
+        .then(function (oPermissions) { oUi.setProperty("/permissions", oPermissions); })
+        .catch(function () { /* the permissions stay unknown: every button is shown */ });
       this.getRouter().initialize();
     },
 

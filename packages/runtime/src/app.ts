@@ -143,6 +143,11 @@ export async function createApp(options: AppOptions): Promise<FastifyInstance> {
     if (request.method === "HEAD") {
       return send(reply, { status: 200, headers: { "OData-Version": "4.0", ...extra } });
     }
+    if (odataRequest.path === "$permissions" && request.method === "GET") {
+      // the operations of the entity sets the user may perform (creation), for the UI (D36)
+      const permissions = writes instanceof RapWriteHandler ? await withReader(user, () => writes.permissions(ctx)) : {};
+      return send(reply, { status: 200, headers: { "Content-Type": "application/json", "Cache-Control": "no-store", ...extra }, body: JSON.stringify(permissions) });
+    }
     const response = await withReader(user, () => handler.handle(odataRequest, ctx));
     response.headers = { ...response.headers, ...extra };
     return send(reply, response);

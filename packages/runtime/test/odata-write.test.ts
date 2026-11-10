@@ -161,11 +161,13 @@ describe("OData writes on the managed runtime", () => {
   });
 
   it("returns the instance feature control with the rows read", async () => {
+    // the actions and the creation of bookings: instance features and authorizations (D36)
     const list = await get(`Travel?$select=TravelUUID,OverallStatus,__OperationControl&$orderby=TravelID`);
+    const allowed = { _Booking: true, deductDiscount: true, copyTravel: true };
     expect(list.body["value"]).toEqual([
-      expect.objectContaining({ TravelUUID: T1, __OperationControl: { acceptTravel: true } }),
-      expect.objectContaining({ TravelUUID: T2, __OperationControl: { acceptTravel: false } }),
-      expect.objectContaining({ TravelUUID: T3, __OperationControl: { acceptTravel: true } }),
+      expect.objectContaining({ TravelUUID: T1, __OperationControl: { ...allowed, acceptTravel: true } }),
+      expect.objectContaining({ TravelUUID: T2, __OperationControl: { ...allowed, acceptTravel: false } }),
+      expect.objectContaining({ TravelUUID: T3, __OperationControl: { ...allowed, acceptTravel: true } }),
     ]);
   });
 

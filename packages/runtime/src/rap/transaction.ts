@@ -1395,11 +1395,32 @@ export class Transaction {
     }
   }
 
-  /** Instance and global feature control of rows about to be read (GET): __EntityControl… */
+  /**
+   * Instance and global feature control of rows about to be read (GET): __EntityControl… The
+   * global and instance authorizations of the user disable the operations they refuse, as RAP
+   * presents both to its consumers (D36).
+   */
   public async features(bo: BoEntity, keys: Row[], operations: FailedOperation[], fields: string[]): Promise<{ disabled: Set<string>; readonly: Map<string, Set<string>>; global: Set<string> }> {
-    const instance = await this.instanceFeatures(bo, keys, { operations, fields }, { local: false, privileged: false, external: true });
-    const global = await this.globalFeatures(bo, operations, { local: false, privileged: false, external: true });
+    const mode: AccessMode = { local: false, privileged: false, external: true };
+    const instance = await this.instanceFeatures(bo, keys, { operations, fields }, mode);
+    const global = await this.globalFeatures(bo, operations, mode);
+    for (const id of await this.globalAuthorization(bo, operations, mode)) {
+      global.add(id);
+    }
+    for (const operation of operations) {
+      for (const key of await this.instanceAuthorization(bo, keys, operation, mode)) {
+        instance.disabled.add(`${key}|${operationId(operation)}`);
+      }
+    }
     return { ...instance, global };
+  }
+
+  /** The operations of an entity the user may perform: global authorization and global features (D36). */
+  public async allowed(bo: BoEntity, operations: FailedOperation[]): Promise<Set<string>> {
+    const mode: AccessMode = { local: false, privileged: false, external: true };
+    const denied = await this.globalAuthorization(bo, operations, mode);
+    const disabled = await this.globalFeatures(bo, operations, mode);
+    return new Set(operations.map(operationId).filter((id) => !denied.has(id) && !disabled.has(id)));
   }
 }
 

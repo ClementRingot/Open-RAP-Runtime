@@ -781,6 +781,22 @@ export class RapWriteHandler implements WriteHandler {
   }
 
   // -------------------------------------------------------------------------------------------
+  // permissions of the user (the UI shows the creation it may perform, D36)
+
+  /** Whether the user may create instances of each entity set that allows creation. */
+  public async permissions(ctx: HandlerContext): Promise<Record<string, { create: boolean }>> {
+    const result: Record<string, { create: boolean }> = {};
+    for (const [name, set] of this.sets) {
+      if (!set.info.set.insertable) {
+        continue;
+      }
+      const allowed = await this.rap.transaction(this.db, ctx.user, ctx.language, (tx) => tx.allowed(set.bo, [{ kind: "create" }]));
+      result[name] = { create: allowed.has("create") };
+    }
+    return result;
+  }
+
+  // -------------------------------------------------------------------------------------------
   // feature control of the rows read
 
   public async enrich(info: TypeInfo, rows: Array<Record<string, unknown>>, options: QueryOptions, ctx: HandlerContext): Promise<void> {

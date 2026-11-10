@@ -37,6 +37,7 @@
         <Property Name="LastChangedBy" Type="Edm.String" MaxLength="12" Nullable="false"/>
         <Property Name="LastChangedAt" Type="Edm.DateTimeOffset" Precision="7"/>
         <Property Name="LocalLastChangedAt" Type="Edm.DateTimeOffset" Precision="7"/>
+        <Property Name="__EntityControl" Type="SAP__self.EntityControl"/>
         <Property Name="__OperationControl" Type="SAP__self.TravelOperationControl"/>
         <NavigationProperty Name="_Booking" Type="Collection(SAP__self.BookingType)" Partner="_Travel"/>
       </EntityType>
@@ -55,12 +56,20 @@
         <Property Name="CurrencyCode" Type="Edm.String" MaxLength="5" Nullable="false"/>
         <Property Name="BookingStatus" Type="Edm.String" MaxLength="1" Nullable="false"/>
         <Property Name="LocalLastChangedAt" Type="Edm.DateTimeOffset" Precision="7"/>
+        <Property Name="__EntityControl" Type="SAP__self.EntityControl"/>
         <NavigationProperty Name="_Travel" Type="SAP__self.TravelType" Nullable="false" Partner="_Booking">
           <ReferentialConstraint Property="TravelUUID" ReferencedProperty="TravelUUID"/>
         </NavigationProperty>
       </EntityType>
+      <ComplexType Name="EntityControl">
+        <Property Name="Deletable" Type="Edm.Boolean" Nullable="false"/>
+        <Property Name="Updatable" Type="Edm.Boolean" Nullable="false"/>
+      </ComplexType>
       <ComplexType Name="TravelOperationControl">
+        <Property Name="_Booking" Type="Edm.Boolean" Nullable="false"/>
         <Property Name="acceptTravel" Type="Edm.Boolean" Nullable="false"/>
+        <Property Name="deductDiscount" Type="Edm.Boolean" Nullable="false"/>
+        <Property Name="copyTravel" Type="Edm.Boolean" Nullable="false"/>
       </ComplexType>
       <Action Name="acceptTravel" IsBound="true" EntitySetPath="_it">
         <Parameter Name="_it" Type="SAP__self.TravelType" Nullable="false"/>
@@ -330,12 +339,12 @@
         </Annotation>
         <Annotation Term="Capabilities.UpdateRestrictions">
           <Record Type="Capabilities.UpdateRestrictionsType">
-            <PropertyValue Property="Updatable" Bool="true"/>
+            <PropertyValue Property="Updatable" Path="__EntityControl/Updatable"/>
           </Record>
         </Annotation>
         <Annotation Term="Capabilities.DeleteRestrictions">
           <Record Type="Capabilities.DeleteRestrictionsType">
-            <PropertyValue Property="Deletable" Bool="true"/>
+            <PropertyValue Property="Deletable" Path="__EntityControl/Deletable"/>
           </Record>
         </Annotation>
         <Annotation Term="Capabilities.SearchRestrictions">
@@ -351,7 +360,7 @@
                   <PropertyValue Property="NavigationProperty" NavigationPropertyPath="_Booking"/>
                   <PropertyValue Property="InsertRestrictions">
                     <Record Type="Capabilities.InsertRestrictionsType">
-                      <PropertyValue Property="Insertable" Bool="true"/>
+                      <PropertyValue Property="Insertable" Path="__OperationControl/_Booking"/>
                     </Record>
                   </PropertyValue>
                 </Record>
@@ -502,12 +511,12 @@
         </Annotation>
         <Annotation Term="Capabilities.UpdateRestrictions">
           <Record Type="Capabilities.UpdateRestrictionsType">
-            <PropertyValue Property="Updatable" Bool="true"/>
+            <PropertyValue Property="Updatable" Path="__EntityControl/Updatable"/>
           </Record>
         </Annotation>
         <Annotation Term="Capabilities.DeleteRestrictions">
           <Record Type="Capabilities.DeleteRestrictionsType">
-            <PropertyValue Property="Deletable" Bool="true"/>
+            <PropertyValue Property="Deletable" Path="__EntityControl/Deletable"/>
           </Record>
         </Annotation>
         <Annotation Term="Capabilities.SearchRestrictions">
@@ -524,8 +533,14 @@
       <Annotations Target="SAP__self.acceptTravel(SAP__self.TravelType)">
         <Annotation Term="Core.OperationAvailable" Path="_it/__OperationControl/acceptTravel"/>
       </Annotations>
+      <Annotations Target="SAP__self.deductDiscount(SAP__self.TravelType)">
+        <Annotation Term="Core.OperationAvailable" Path="_it/__OperationControl/deductDiscount"/>
+      </Annotations>
       <Annotations Target="SAP__self.deductDiscount(SAP__self.TravelType)/DiscountPercent">
         <Annotation Term="Common.Label" String="Discount (%)"/>
+      </Annotations>
+      <Annotations Target="SAP__self.copyTravel(SAP__self.TravelType)">
+        <Annotation Term="Core.OperationAvailable" Path="_it/__OperationControl/copyTravel"/>
       </Annotations>
     </Schema>
   </edmx:DataServices>
