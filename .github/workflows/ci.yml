@@ -15,7 +15,7 @@ jobs:
         ports:
           - 5432:5432
         options: >-
-          --health-cmd pg_isready
+          --health-cmd "pg_isready -U postgres"
           --health-interval 5s
           --health-timeout 5s
           --health-retries 10
@@ -70,3 +70,23 @@ jobs:
         if: always()
         working-directory: out/travel
         run: docker compose down -v
+      # the same application with AUTH_MODE=oidc and the Keycloak of its compose profile
+      - name: docker compose up with Keycloak
+        working-directory: out/travel
+        env:
+          AUTH_MODE: oidc
+        run: |
+          docker compose --profile oidc up -d --build --wait --wait-timeout 180
+          for i in $(seq 1 90); do
+            curl -fsS -o /dev/null http://localhost:8180/realms/rapt/.well-known/openid-configuration && break
+            sleep 2
+          done
+      - name: OIDC with Keycloak
+        env:
+          RAPT_E2E_OIDC_APP: http://localhost:8080
+          RAPT_E2E_OIDC_KEYCLOAK: http://localhost:8180
+        run: pnpm vitest run packages/runtime/test/keycloak.test.ts
+      - name: docker compose down (oidc)
+        if: always()
+        working-directory: out/travel
+        run: AUTH_MODE=oidc docker compose --profile oidc down -v

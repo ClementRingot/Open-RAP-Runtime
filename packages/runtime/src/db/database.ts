@@ -70,10 +70,64 @@ export async function withSavepoint<T, DB>(db: Kysely<DB>, fn: () => Promise<T>)
   return result;
 }
 
-/** Applies the generated schema (idempotent) in one transaction. */
+/**
+ * The statements of an SQL script: split at the semicolons outside literals, quoted identifiers,
+ * dollar-quoted bodies (PL/pgSQL functions) and comments.
+ */
+export function splitStatements(script: string): string[] {
+  const statements: string[] = [];
+  let start = 0;
+  let i = 0;
+  const push = (end: number): void => {
+    const text = script.slice(start, end).trim();
+    if (text.replace(/--[^\n]*/g, "").trim() !== "") {
+      statements.push(text);
+    }
+  };
+  while (i < script.length) {
+    const c = script[i];
+    if (c === "'" || c === '"') {
+      // a literal or a quoted identifier: a doubled quote stays inside
+      i++;
+      while (i < script.length && !(script[i] === c && script[i + 1] !== c)) {
+        i += script[i] === c ? 2 : 1;
+      }
+      i++;
+    } else if (c === "-" && script[i + 1] === "-") {
+      const end = script.indexOf("\n", i);
+      i = end < 0 ? script.length : end + 1;
+    } else if (c === "/" && script[i + 1] === "*") {
+      const end = script.indexOf("*/", i + 2);
+      i = end < 0 ? script.length : end + 2;
+    } else if (c === "$") {
+      const tag = /^\$[A-Za-z_]*\$/.exec(script.slice(i))?.[0];
+      if (tag === undefined) {
+        i++;
+      } else {
+        const end = script.indexOf(tag, i + tag.length);
+        i = end < 0 ? script.length : end + tag.length;
+      }
+    } else if (c === ";") {
+      push(i);
+      i++;
+      start = i;
+    } else {
+      i++;
+    }
+  }
+  push(script.length);
+  return statements;
+}
+
+/**
+ * Applies the generated schema (idempotent) in one transaction, one statement at a time: the
+ * extended protocol of PGlite (and of prepared statements) takes one command per query.
+ */
 export async function applySchema(db: Database, schema: string): Promise<void> {
   await db.transaction().execute(async (trx) => {
     await sql.raw("SET LOCAL TIME ZONE 'UTC'").execute(trx);
-    await sql.raw(schema).execute(trx);
+    for (const statement of splitStatements(schema)) {
+      await sql.raw(statement).execute(trx);
+    }
   });
 }

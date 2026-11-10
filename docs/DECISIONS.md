@@ -470,3 +470,22 @@ et la conséquence. Les numéros D1 à D13 correspondent aux points 1 à 13 du �
   navigations, dans les listes, les lectures unitaires et `$expand`), contrôle d'écriture
   (`Transaction.etagValue`), mise à jour du maître (`refreshEtagMasters`, avant l'écriture).
   Tests : `rap-variant-etag.test.ts`.
+
+## D33 — PGlite et Keycloak éprouvés de bout en bout
+
+- **PGlite** (`PGLITE_DIR`) : le test e2e démarre l'application générée sur sa base embarquée,
+  crée un voyage, l'arrête et la redémarre : le schéma est réappliqué (idempotent) et les données
+  sont là. Le test a révélé que l'application ne démarrait pas sur PGlite : le schéma était
+  envoyé en une requête de plusieurs instructions, que le protocole étendu de PGlite refuse
+  (`cannot insert multiple commands into a prepared statement`). Il est désormais découpé en
+  instructions (`splitStatements` : littéraux, identifiants, corps `$f$…$f$` et commentaires
+  respectés) et appliqué dans une transaction.
+- **Keycloak** : `keycloak.test.ts` joue le navigateur contre un vrai Keycloak avec le realm
+  généré : redirection vers Keycloak, envoi du formulaire de connexion d'`alice`, retour sur
+  `/auth/callback` (code d'autorisation avec PKCE), session sur l'UI et sur le service OData
+  (jeton CSRF, création attribuée à `ALICE`), déconnexion vers le point de fin de session de
+  Keycloak ; puis un jeton porteur émis par Keycloak (client public créé par l'API
+  d'administration, password grant) vérifié par le JWKS, et un jeton falsifié refusé. Exécuté
+  contre la distribution Keycloak 26.8.2 (Maven Central, Java 21) dans l'environnement de
+  développement, et en CI contre l'image du `docker-compose.yml` généré (`--profile oidc`).
+- **CI** : le contrôle de santé du service PostgreSQL utilise `pg_isready -U postgres`.

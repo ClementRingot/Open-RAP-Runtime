@@ -27,8 +27,8 @@ let server: ChildProcess | undefined;
 let base = "";
 let stopDatabase: (() => void) | undefined;
 
-async function request(method: string, url: string, body?: unknown, headers: Record<string, string> = {}): Promise<{ status: number; headers: Headers; json: Record<string, unknown> }> {
-  const response = await fetch(`${base}${url}`, {
+async function request(method: string, url: string, body?: unknown, headers: Record<string, string> = {}, at = base): Promise<{ status: number; headers: Headers; json: Record<string, unknown> }> {
+  const response = await fetch(`${at}${url}`, {
     method,
     headers: { accept: "application/json", ...(body === undefined ? {} : { "content-type": "application/json" }), ...headers },
     ...(body === undefined ? {} : { body: JSON.stringify(body) }),
@@ -49,15 +49,20 @@ beforeAll(async () => {
     databaseUrl = server?.url;
     stopDatabase = server?.stop;
   }
-  const env: Record<string, string> = { ...(process.env as Record<string, string>), PORT: "0", HOST: "127.0.0.1", LOG_LEVEL: "warn" };
-  if (databaseUrl !== undefined) {
-    env["DATABASE_URL"] = databaseUrl;
-  } else {
-    env["PGLITE_DIR"] = path.join(WORK, "pglite");
+  const started = await startServer(databaseUrl === undefined ? { PGLITE_DIR: path.join(WORK, "pglite") } : { DATABASE_URL: databaseUrl });
+  server = started.process;
+  base = started.base;
+}, 300_000);
+
+/** `node server.mjs` of the generated application with these variables; resolves when it is ready. */
+async function startServer(variables: Record<string, string>): Promise<{ process: ChildProcess; base: string }> {
+  const env: Record<string, string> = { ...(process.env as Record<string, string>), PORT: "0", HOST: "127.0.0.1", LOG_LEVEL: "warn", ...variables };
+  if (variables["DATABASE_URL"] === undefined) {
+    delete env["DATABASE_URL"];
   }
   delete env["NODE_OPTIONS"];
-  server = spawn(process.execPath, ["server.mjs"], { cwd: APP, env, stdio: ["ignore", "pipe", "pipe"] });
-  base = await new Promise<string>((resolve, reject) => {
+  const child = spawn(process.execPath, ["server.mjs"], { cwd: APP, env, stdio: ["ignore", "pipe", "pipe"] });
+  const url = await new Promise<string>((resolve, reject) => {
     let output = "";
     const timer = setTimeout(() => reject(new Error(`the server did not start: ${output}`)), 60_000);
     const read = (chunk: Buffer): void => {
@@ -68,15 +73,35 @@ beforeAll(async () => {
         resolve((m[1] as string).replace(/\/$/, ""));
       }
     };
-    server?.stdout?.on("data", read);
-    server?.stderr?.on("data", read);
-    server?.on("exit", (code) => reject(new Error(`the server stopped (${code}): ${output}`)));
+    child.stdout?.on("data", read);
+    child.stderr?.on("data", read);
+    child.on("exit", (code) => reject(new Error(`the server stopped (${code}): ${output}`)));
   });
-}, 300_000);
+  return { process: child, base: url };
+}
+
+/** Stops a server and waits for its exit (the embedded database is closed). */
+async function stopServer(child: ChildProcess): Promise<void> {
+  if (child.exitCode !== null) {
+    return;
+  }
+  await new Promise<void>((resolve) => {
+    const timer = setTimeout(() => {
+      child.kill("SIGKILL");
+      resolve();
+    }, 10_000);
+    child.once("exit", () => {
+      clearTimeout(timer);
+      resolve();
+    });
+    child.kill("SIGTERM");
+  });
+}
 
 afterAll(async () => {
-  server?.kill("SIGTERM");
-  await new Promise((resolve) => setTimeout(resolve, 500));
+  if (server !== undefined) {
+    await stopServer(server);
+  }
   stopDatabase?.();
   rmSync(WORK, { recursive: true, force: true });
 });
@@ -156,4 +181,25 @@ describe.skipIf(!BUILT)("generated application, end to end", () => {
       await browser.close();
     }
   }, 120_000);
+});
+
+describe.skipIf(!BUILT)("generated application on its embedded database (PGLITE_DIR)", () => {
+  it("starts on PGlite and keeps its data across restarts", async () => {
+    const variables = { PGLITE_DIR: path.join(WORK, "pglite-restarts") };
+    const first = await startServer(variables);
+    try {
+      const created = await request("POST", `${SERVICE_PATH}Travel`, { TravelID: "00000042", AgencyID: "070001", CustomerID: "000001", BeginDate: "2027-05-01", EndDate: "2027-05-08", BookingFee: "40.00", CurrencyCode: "EUR", Description: "On PGlite" }, {}, first.base);
+      expect(created.status, JSON.stringify(created.json)).toBe(201);
+    } finally {
+      await stopServer(first.process);
+    }
+    // the schema is applied again (idempotent) and the data is still there
+    const second = await startServer(variables);
+    try {
+      const read = await request("GET", `${SERVICE_PATH}Travel?$select=TravelID,Description,TotalPrice`, undefined, {}, second.base);
+      expect(read.json["value"]).toEqual([expect.objectContaining({ TravelID: "00000042", Description: "On PGlite", TotalPrice: 40 })]);
+    } finally {
+      await stopServer(second.process);
+    }
+  }, 180_000);
 });

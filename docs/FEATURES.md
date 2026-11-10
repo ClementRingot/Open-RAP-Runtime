@@ -209,9 +209,9 @@ n'utilise pas.
 | `package.json`, `server.mjs`, runtime embarqué (`vendor/`), `npm install` | ✅ | Test e2e. |
 | Configuration par variables d'environnement (`.env.example`) | ✅ | |
 | PostgreSQL (`DATABASE_URL`), schéma appliqué au démarrage | ✅ | Test e2e sur PostgreSQL 16. |
-| PGlite embarqué (`PGLITE_DIR`) pour le développement | 🟡 | Repli du test e2e quand aucun PostgreSQL n'est disponible. |
+| PGlite embarqué (`PGLITE_DIR`) pour le développement | ✅ | Test e2e : démarrage, données conservées après un redémarrage (D33). |
 | Dockerfile multi-étapes, `docker-compose.yml` (app + PostgreSQL) | ✅ | Image construite et `docker compose up` vérifié (service OData, actions, UI) ; job CI `docker`. |
-| Profil Keycloak (realm importé : client `rapt-app`, utilisateur `alice`) | 🟡 | Non exécuté contre un vrai Keycloak ; le flux est testé avec un fournisseur simulé. |
+| Profil Keycloak (realm importé : client `rapt-app`, utilisateur `alice`) | ✅ | `keycloak.test.ts` contre un vrai Keycloak : formulaire de connexion, PKCE, session, CSRF, déconnexion, jetons porteurs (JWKS) ; en CI avec le profil `oidc` du docker-compose généré (D33). |
 | OIDC : jetons porteurs (JWKS), sessions navigateur (code + PKCE), CSRF, déconnexion | ✅ | |
 | Rôle obligatoire (`OIDC_REQUIRED_ROLE`) | ✅ | Rôles Keycloak (`realm_access.roles`) ou revendication configurable. |
 | Bundle UI5 optimisé (`ui5 build`) | ❌ | Ressources servies depuis les sources npm (D27). |
