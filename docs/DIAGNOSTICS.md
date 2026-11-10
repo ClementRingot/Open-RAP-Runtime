@@ -66,5 +66,7 @@ Le code de retour est 1 dès qu'il y a une erreur (ou un avertissement avec
 | ABP004 | erreur | Erreur ABAP (abaplint) : syntaxe des sources d'origine, contrôle complet des sources réécrites, à la ligne d'origine |
 | ABP005 | erreur | Instruction EML mal formée ou forme non prise en charge (`OPERATIONS`, `RELATING TO`…) |
 | ABP006 | erreur | Nom inconnu dans l'EML ou un type dérivé : BDEF, entité, champ, association, action |
-| ABP007 | erreur | Construction non prise en charge : ABAP SQL, EML sur une projection, `GET PERMISSIONS`, type dérivé ou handler hors périmètre |
+| ABP007 | erreur | Construction non prise en charge : écriture ABAP SQL (`INSERT`, `UPDATE`, `MODIFY`, `DELETE` sur une table), `WITH`, `SELECT … ENDSELECT` avec une liste de champs, EML sur une projection, `GET PERMISSIONS`, type dérivé ou handler hors périmètre |
 | ABP008 | erreur | Erreur interne (ABAP généré) ou erreur du transpiler |
+| ABP009 | erreur | Résultat d'un `SELECT` qu'abaplint ne type pas (littéral, agrégat autre que `COUNT(*)`, `MAX` et `MIN`, expression) en déclaration en ligne : déclarer la cible |
+| APP001 | erreur | Paquets du runtime introuvables (`dist/` non construit) pour l'application générée : `--runtime <dossier>` ou `pnpm build` |

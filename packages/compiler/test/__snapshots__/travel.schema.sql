@@ -115,3 +115,106 @@ CREATE VIEW "zrt_c_travel" AS SELECT
   "LastChangedAt" AS "LastChangedAt",
   "LocalLastChangedAt" AS "LocalLastChangedAt"
 FROM "zrt_r_travel";
+
+-- ABAP SQL of the behavior pools (values in ABAP form)
+DROP SCHEMA IF EXISTS "rapt_abap" CASCADE;
+CREATE SCHEMA "rapt_abap";
+
+CREATE VIEW "rapt_abap"."zrt_booking" AS SELECT
+  coalesce(upper(replace("booking_uuid"::text, '-', '')), '00000000000000000000000000000000')::bpchar AS "booking_uuid",
+  coalesce(upper(replace("parent_uuid"::text, '-', '')), '00000000000000000000000000000000')::bpchar AS "parent_uuid",
+  "booking_id"::bpchar AS "booking_id",
+  coalesce(to_char("booking_date", 'YYYYMMDD'), '00000000')::bpchar AS "booking_date",
+  "carrier_id"::bpchar AS "carrier_id",
+  "connection_id"::bpchar AS "connection_id",
+  coalesce(to_char("flight_date", 'YYYYMMDD'), '00000000')::bpchar AS "flight_date",
+  "flight_price" AS "flight_price",
+  "currency_code"::bpchar AS "currency_code",
+  "booking_status"::bpchar AS "booking_status",
+  coalesce(to_char("local_last_changed_at" AT TIME ZONE 'UTC', 'YYYYMMDDHH24MISS.US')::numeric(21,7), 0) AS "local_last_changed_at"
+FROM "zrt_booking";
+
+CREATE VIEW "rapt_abap"."zrt_travel" AS SELECT
+  coalesce(upper(replace("travel_uuid"::text, '-', '')), '00000000000000000000000000000000')::bpchar AS "travel_uuid",
+  "travel_id"::bpchar AS "travel_id",
+  "agency_id"::bpchar AS "agency_id",
+  "customer_id"::bpchar AS "customer_id",
+  coalesce(to_char("begin_date", 'YYYYMMDD'), '00000000')::bpchar AS "begin_date",
+  coalesce(to_char("end_date", 'YYYYMMDD'), '00000000')::bpchar AS "end_date",
+  "booking_fee" AS "booking_fee",
+  "total_price" AS "total_price",
+  "currency_code"::bpchar AS "currency_code",
+  "description"::bpchar AS "description",
+  "overall_status"::bpchar AS "overall_status",
+  "created_by"::bpchar AS "created_by",
+  coalesce(to_char("created_at" AT TIME ZONE 'UTC', 'YYYYMMDDHH24MISS.US')::numeric(21,7), 0) AS "created_at",
+  "last_changed_by"::bpchar AS "last_changed_by",
+  coalesce(to_char("last_changed_at" AT TIME ZONE 'UTC', 'YYYYMMDDHH24MISS.US')::numeric(21,7), 0) AS "last_changed_at",
+  coalesce(to_char("local_last_changed_at" AT TIME ZONE 'UTC', 'YYYYMMDDHH24MISS.US')::numeric(21,7), 0) AS "local_last_changed_at"
+FROM "zrt_travel";
+
+CREATE VIEW "rapt_abap"."zrt_r_booking" AS SELECT
+  coalesce(upper(replace("BookingUUID"::text, '-', '')), '00000000000000000000000000000000')::bpchar AS "bookinguuid",
+  coalesce(upper(replace("TravelUUID"::text, '-', '')), '00000000000000000000000000000000')::bpchar AS "traveluuid",
+  "BookingID"::bpchar AS "bookingid",
+  coalesce(to_char("BookingDate", 'YYYYMMDD'), '00000000')::bpchar AS "bookingdate",
+  "CarrierID"::bpchar AS "carrierid",
+  "ConnectionID"::bpchar AS "connectionid",
+  coalesce(to_char("FlightDate", 'YYYYMMDD'), '00000000')::bpchar AS "flightdate",
+  "FlightPrice" AS "flightprice",
+  "CurrencyCode"::bpchar AS "currencycode",
+  "BookingStatus"::bpchar AS "bookingstatus",
+  coalesce(to_char("LocalLastChangedAt" AT TIME ZONE 'UTC', 'YYYYMMDDHH24MISS.US')::numeric(21,7), 0) AS "locallastchangedat"
+FROM "zrt_r_booking";
+
+CREATE VIEW "rapt_abap"."zrt_c_booking" AS SELECT
+  coalesce(upper(replace("BookingUUID"::text, '-', '')), '00000000000000000000000000000000')::bpchar AS "bookinguuid",
+  coalesce(upper(replace("TravelUUID"::text, '-', '')), '00000000000000000000000000000000')::bpchar AS "traveluuid",
+  "BookingID"::bpchar AS "bookingid",
+  coalesce(to_char("BookingDate", 'YYYYMMDD'), '00000000')::bpchar AS "bookingdate",
+  "CarrierID"::bpchar AS "carrierid",
+  "ConnectionID"::bpchar AS "connectionid",
+  coalesce(to_char("FlightDate", 'YYYYMMDD'), '00000000')::bpchar AS "flightdate",
+  "FlightPrice" AS "flightprice",
+  "CurrencyCode"::bpchar AS "currencycode",
+  "BookingStatus"::bpchar AS "bookingstatus",
+  coalesce(to_char("LocalLastChangedAt" AT TIME ZONE 'UTC', 'YYYYMMDDHH24MISS.US')::numeric(21,7), 0) AS "locallastchangedat"
+FROM "zrt_c_booking";
+
+CREATE VIEW "rapt_abap"."zrt_r_travel" AS SELECT
+  coalesce(upper(replace("TravelUUID"::text, '-', '')), '00000000000000000000000000000000')::bpchar AS "traveluuid",
+  "TravelID"::bpchar AS "travelid",
+  "AgencyID"::bpchar AS "agencyid",
+  "CustomerID"::bpchar AS "customerid",
+  coalesce(to_char("BeginDate", 'YYYYMMDD'), '00000000')::bpchar AS "begindate",
+  coalesce(to_char("EndDate", 'YYYYMMDD'), '00000000')::bpchar AS "enddate",
+  "BookingFee" AS "bookingfee",
+  "TotalPrice" AS "totalprice",
+  "CurrencyCode"::bpchar AS "currencycode",
+  "Description"::bpchar AS "description",
+  "OverallStatus"::bpchar AS "overallstatus",
+  "CreatedBy"::bpchar AS "createdby",
+  coalesce(to_char("CreatedAt" AT TIME ZONE 'UTC', 'YYYYMMDDHH24MISS.US')::numeric(21,7), 0) AS "createdat",
+  "LastChangedBy"::bpchar AS "lastchangedby",
+  coalesce(to_char("LastChangedAt" AT TIME ZONE 'UTC', 'YYYYMMDDHH24MISS.US')::numeric(21,7), 0) AS "lastchangedat",
+  coalesce(to_char("LocalLastChangedAt" AT TIME ZONE 'UTC', 'YYYYMMDDHH24MISS.US')::numeric(21,7), 0) AS "locallastchangedat"
+FROM "zrt_r_travel";
+
+CREATE VIEW "rapt_abap"."zrt_c_travel" AS SELECT
+  coalesce(upper(replace("TravelUUID"::text, '-', '')), '00000000000000000000000000000000')::bpchar AS "traveluuid",
+  "TravelID"::bpchar AS "travelid",
+  "AgencyID"::bpchar AS "agencyid",
+  "CustomerID"::bpchar AS "customerid",
+  coalesce(to_char("BeginDate", 'YYYYMMDD'), '00000000')::bpchar AS "begindate",
+  coalesce(to_char("EndDate", 'YYYYMMDD'), '00000000')::bpchar AS "enddate",
+  "BookingFee" AS "bookingfee",
+  "TotalPrice" AS "totalprice",
+  "CurrencyCode"::bpchar AS "currencycode",
+  "Description"::bpchar AS "description",
+  "OverallStatus"::bpchar AS "overallstatus",
+  "CreatedBy"::bpchar AS "createdby",
+  coalesce(to_char("CreatedAt" AT TIME ZONE 'UTC', 'YYYYMMDDHH24MISS.US')::numeric(21,7), 0) AS "createdat",
+  "LastChangedBy"::bpchar AS "lastchangedby",
+  coalesce(to_char("LastChangedAt" AT TIME ZONE 'UTC', 'YYYYMMDDHH24MISS.US')::numeric(21,7), 0) AS "lastchangedat",
+  coalesce(to_char("LocalLastChangedAt" AT TIME ZONE 'UTC', 'YYYYMMDDHH24MISS.US')::numeric(21,7), 0) AS "locallastchangedat"
+FROM "zrt_c_travel";

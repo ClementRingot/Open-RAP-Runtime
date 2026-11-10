@@ -86,6 +86,13 @@ export function sqlName(name: string): string {
   return name.toLowerCase();
 }
 
+/**
+ * Schema of the views that give the ABAP SQL of the behavior pools the tables and CDS entities with
+ * their values in ABAP form (decision D26): dates `YYYYMMDD`, UUIDs as 32 hexadecimal digits,
+ * booleans `X`, time stamps as packed numbers.
+ */
+export const ABAP_SQL_SCHEMA = "rapt_abap";
+
 /** Default service path, the one of an OData V4 RAP service binding. */
 export function defaultServicePath(binding: string, serviceDefinition: string, version: string): string {
   return `/sap/opu/odata4/sap/${binding.toLowerCase()}/srvd/sap/${serviceDefinition.toLowerCase()}/${version}/`;

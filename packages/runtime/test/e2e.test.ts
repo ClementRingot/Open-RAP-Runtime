@@ -9,12 +9,12 @@
  */
 
 import { execFileSync, spawn, type ChildProcess } from "node:child_process";
-import { existsSync, mkdirSync, readdirSync, rmSync, chownSync } from "node:fs";
+import { existsSync, mkdirSync, rmSync } from "node:fs";
 import { createRequire } from "node:module";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { FIXTURE_DIR } from "./helpers.js";
+import { FIXTURE_DIR, startPostgresServer } from "./helpers.js";
 
 const ROOT = fileURLToPath(new URL("../../../", import.meta.url));
 const CLI = path.join(ROOT, "packages/compiler/dist/cli.js");
@@ -26,32 +26,6 @@ const SERVICE_PATH = "/sap/opu/odata4/sap/zrt_ui_travel_o4/srvd/sap/zrt_ui_trave
 let server: ChildProcess | undefined;
 let base = "";
 let stopDatabase: (() => void) | undefined;
-
-/** A PostgreSQL server for the test: initdb in the work folder, as the postgres user. */
-function startPostgres(): string | undefined {
-  const versions = existsSync("/usr/lib/postgresql") ? readdirSync("/usr/lib/postgresql").sort() : [];
-  const bin = versions.length === 0 ? undefined : `/usr/lib/postgresql/${versions[versions.length - 1]}/bin`;
-  if (bin === undefined || process.getuid?.() !== 0) {
-    return undefined;
-  }
-  try {
-    const data = path.join(WORK, "pgdata");
-    mkdirSync(data, { recursive: true });
-    const uid = Number(execFileSync("id", ["-u", "postgres"]).toString().trim());
-    const gid = Number(execFileSync("id", ["-g", "postgres"]).toString().trim());
-    chownSync(data, uid, gid);
-    const port = 54000 + (process.pid % 900);
-    const asPostgres = (command: string): void => {
-      execFileSync("su", ["postgres", "-s", "/bin/sh", "-c", command], { stdio: "ignore" });
-    };
-    asPostgres(`${bin}/initdb -D ${data} -U postgres --auth=trust -E UTF8`);
-    asPostgres(`${bin}/pg_ctl -D ${data} -o '-p ${port} -k ${data} -c listen_addresses=127.0.0.1' -l ${data}/log.txt -w start`);
-    stopDatabase = () => asPostgres(`${bin}/pg_ctl -D ${data} -m fast stop`);
-    return `postgres://postgres@127.0.0.1:${port}/postgres`;
-  } catch {
-    return undefined;
-  }
-}
 
 async function request(method: string, url: string, body?: unknown, headers: Record<string, string> = {}): Promise<{ status: number; headers: Headers; json: Record<string, unknown> }> {
   const response = await fetch(`${base}${url}`, {
@@ -69,7 +43,12 @@ beforeAll(async () => {
   mkdirSync(WORK, { recursive: true });
   execFileSync(process.execPath, [CLI, "build", FIXTURE_DIR, "--out", APP], { stdio: "pipe" });
   execFileSync("npm", ["install", "--no-audit", "--no-fund", "--prefer-offline"], { cwd: APP, stdio: "pipe" });
-  const databaseUrl = process.env["RAPT_E2E_DATABASE_URL"] ?? startPostgres();
+  let databaseUrl = process.env["RAPT_E2E_DATABASE_URL"];
+  if (databaseUrl === undefined) {
+    const server = startPostgresServer(WORK);
+    databaseUrl = server?.url;
+    stopDatabase = server?.stop;
+  }
   const env: Record<string, string> = { ...(process.env as Record<string, string>), PORT: "0", HOST: "127.0.0.1", LOG_LEVEL: "warn" };
   if (databaseUrl !== undefined) {
     env["DATABASE_URL"] = databaseUrl;
@@ -152,7 +131,7 @@ describe.skipIf(!BUILT)("generated application, end to end", () => {
 
   it("shows the data in the UI", async () => {
     const require = createRequire(import.meta.url);
-    let chromium: { launch(): Promise<{ newPage(): Promise<{ goto(u: string): Promise<unknown>; waitForSelector(s: string, o: { timeout: number }): Promise<unknown>; textContent(s: string): Promise<string | null> }>; close(): Promise<void> }> } | undefined;
+    let chromium: { launch(): Promise<{ newPage(): Promise<{ goto(u: string): Promise<unknown>; waitForFunction(f: string, a: unknown, o: { timeout: number }): Promise<unknown>; textContent(s: string): Promise<string | null> }>; close(): Promise<void> }> } | undefined;
     for (const id of [process.env["PLAYWRIGHT_MODULE"], "playwright", "/opt/node-tools/node_modules/playwright"]) {
       try {
         if (id !== undefined) {
@@ -170,7 +149,8 @@ describe.skipIf(!BUILT)("generated application, end to end", () => {
     try {
       const page = await browser.newPage();
       await page.goto(`${base}/`);
-      await page.waitForSelector("tr.sapMLIB.sapMListTblRow", { timeout: 60_000 });
+      // the table shows "No data" until the first response is there: wait for the row of the travel
+      await page.waitForFunction(`[...document.querySelectorAll("tr.sapMLIB.sapMListTblRow")].some((row) => row.textContent.includes("May 1, 2027"))`, undefined, { timeout: 60_000 });
       expect(await page.textContent("tr.sapMLIB.sapMListTblRow")).toContain("May 1, 2027");
     } finally {
       await browser.close();

@@ -40,7 +40,7 @@ import {
   type Operand,
 } from "./eml.js";
 import { KERNEL_CLASS } from "./framework.js";
-import { joinTokens, SourceEdits, toks, type Tok } from "./tokens.js";
+import { adjacent, joinTokens, SourceEdits, toks, type Tok } from "./tokens.js";
 
 // ---------------------------------------------------------------------------------------------
 // Catalog of the managed BDEFs
@@ -412,8 +412,14 @@ export function rewriteAbapFile(file: abaplint.ABAPFile, context: RewriteContext
   return edits.size === 0 ? file.getRaw() : edits.apply();
 }
 
-/** abaplint statements of ABAP SQL. */
-const SQL_STATEMENTS = new Set(["Select", "SelectLoop", "InsertDatabase", "UpdateDatabase", "ModifyDatabase", "DeleteDatabase", "OpenCursor", "FetchNextCursor", "CloseCursor", "WithLoop", "With"]);
+/**
+ * abaplint statements of ABAP SQL that a behavior pool cannot use (decision D26): the writes (a
+ * managed business object is written by the RAP runtime, the code changes it with EML) and the
+ * common table expressions, which the transpiler does not translate. SELECT and the cursors read
+ * the tables and CDS entities of the application.
+ */
+const SQL_WRITES = new Set(["InsertDatabase", "UpdateDatabase", "ModifyDatabase", "DeleteDatabase"]);
+const SQL_CTE = new Set(["WithLoop", "With"]);
 
 function rewriteStatement(kind: string, tokens: Tok[], edits: SourceEdits, context: RewriteContext): void {
   const last = tokens[tokens.length - 1] as Tok;
@@ -425,8 +431,21 @@ function rewriteStatement(kind: string, tokens: Tok[], edits: SourceEdits, conte
     edits.replace(tokens[0] as Tok, last, emlCode(statement, context));
     return;
   }
-  if (SQL_STATEMENTS.has(kind)) {
-    throw new RewriteError("ABP007", "ABAP SQL is not supported in a behavior pool: the generated application gives the ABAP code no database access (read the business object with EML)", tokens[0]);
+  if (SQL_WRITES.has(kind)) {
+    throw new RewriteError("ABP007", `${tokens[0]?.upper ?? ""} on a database table is not supported in a behavior pool: the RAP runtime writes the business object, change it with EML (MODIFY ENTITIES)`, tokens[0]);
+  }
+  if (SQL_CTE.has(kind)) {
+    throw new RewriteError("ABP007", "common table expressions (WITH) are not supported by the transpiler", tokens[0]);
+  }
+  if (kind === "SelectLoop" && !selectsAllFields(tokens)) {
+    throw new RewriteError("ABP007", "SELECT … ENDSELECT with a field list is not supported by the transpiler (the loop reads whole rows into the target): use SELECT *, or INTO TABLE and LOOP AT", tokens[0]);
+  }
+  if (kind === "Select" || kind === "SelectLoop") {
+    hostComponentsAsExpressions(tokens, edits);
+    if (kind === "Select") {
+      declareSelectTarget(tokens, edits);
+    }
+    return;
   }
   const head = `${tokens[0]?.upper ?? ""} ${tokens[1]?.upper ?? ""}`;
   if (head === "GET PERMISSIONS" || head === "SET LOCKS" || (head === "RAISE ENTITY" && tokens[2]?.upper === "EVENT")) {
@@ -443,6 +462,102 @@ function rewriteStatement(kind: string, tokens: Tok[], edits: SourceEdits, conte
     return;
   }
   rewriteDerivedTypes(tokens, edits, context);
+}
+
+/** Host variables that are targets or the table of FOR ALL ENTRIES, not operands. */
+const HOST_TARGETS = new Set(["INTO", "APPENDING", "TABLE", "OF", "IN", "TO", "OFFSET"]);
+
+/**
+ * In a SELECT with alias fields (`t~col`), @abaplint/transpiler reads a host variable with a
+ * component (`@ls-comp`) as a subtraction (`ls - comp`). The rewrite writes it as the equivalent
+ * host expression `@( ls-comp )`, which it translates right. Targets of INTO and the table of
+ * FOR ALL ENTRIES are left as they are.
+ */
+function hostComponentsAsExpressions(tokens: Tok[], edits: SourceEdits): void {
+  if (!tokens.some((t) => t.str.includes("~"))) {
+    return;
+  }
+  const entries = tokens.findIndex((t, n) => t.upper === "ENTRIES" && tokens[n - 1]?.upper === "ALL" && tokens[n + 1]?.upper === "IN");
+  const driver = entries < 0 ? undefined : tokens[entries + 3]?.upper;
+  for (let i = 0; i < tokens.length; i++) {
+    const at = tokens[i] as Tok;
+    const name = tokens[i + 1];
+    if (at.str !== "@" || name === undefined || !adjacent(at, name) || !/^[A-Za-z_%/]/.test(name.str) || HOST_TARGETS.has(tokens[i - 1]?.upper ?? "") || name.upper === driver) {
+      continue;
+    }
+    let last = i + 1;
+    while (tokens[last + 1]?.str === "-" && adjacent(tokens[last] as Tok, tokens[last + 1] as Tok) && tokens[last + 2] !== undefined && adjacent(tokens[last + 1] as Tok, tokens[last + 2] as Tok)) {
+      last += 2;
+    }
+    if (last > i + 1) {
+      edits.replace(at, tokens[last] as Tok, `@( ${joinTokens(tokens.slice(i + 1, last + 1))} )`);
+    }
+    i = last;
+  }
+}
+
+/** `SELECT *` or `SELECT FROM … FIELDS *`. */
+function selectsAllFields(tokens: Tok[]): boolean {
+  let i = 1;
+  while (tokens[i]?.upper === "SINGLE" || tokens[i]?.upper === "DISTINCT") {
+    i++;
+  }
+  if (tokens[i]?.upper !== "FROM") {
+    return tokens[i]?.str === "*";
+  }
+  const fields = tokens.findIndex((t) => t.upper === "FIELDS");
+  return fields >= 0 && tokens[fields + 1]?.str === "*";
+}
+
+const SELECT_CLAUSES = new Set(["WHERE", "GROUP", "HAVING", "ORDER", "INTO", "APPENDING", "UP", "FOR", "BYPASSING", "CLIENT", "USING", "%_HINTS"]);
+
+/**
+ * The result of a SELECT that abaplint does not type, in its two most common forms (decision
+ * D26): the literal of an existence check (`SELECT SINGLE @abap_true … INTO @DATA(exists)`) and a
+ * single MAX or MIN of one table or entity (`SELECT SINGLE FROM t FIELDS MAX( id ) INTO
+ * @DATA(max_id)`). The inline declaration becomes a declaration in front of the statement, on the
+ * same line, with the type ABAP gives the result: abap_boolean, the column's type. Other untyped
+ * results are reported by the check (ABP009).
+ */
+function declareSelectTarget(tokens: Tok[], edits: SourceEdits): void {
+  const into = tokens.findIndex((t, n) => t.upper === "INTO" && tokens[n + 1]?.str === "@" && (tokens[n + 2]?.upper === "DATA" || tokens[n + 2]?.upper === "FINAL") && tokens[n + 3]?.str === "(" && tokens[n + 5]?.str === ")");
+  const from = tokens.findIndex((t) => t.upper === "FROM");
+  const name = tokens[into + 4];
+  const source = tokens[from + 1];
+  if (into < 0 || from < 0 || name === undefined || source === undefined || tokens.some((t) => t.upper === "JOIN")) {
+    return;
+  }
+  const alias = tokens[from + 2]?.upper === "AS" ? tokens[from + 3]?.upper : undefined;
+  const fields = tokens.findIndex((t) => t.upper === "FIELDS");
+  let list: Tok[];
+  if (fields >= 0) {
+    const end = tokens.findIndex((t, n) => n > fields && SELECT_CLAUSES.has(t.upper));
+    list = tokens.slice(fields + 1, end < 0 ? tokens.length - 1 : end);
+  } else {
+    list = tokens.slice(tokens[1]?.upper === "SINGLE" ? 2 : 1, from);
+  }
+  if (list.length === 4 || list.length === 2) {
+    // an alias of the result does not change its type
+  } else if (list.length === 6 && list[4]?.upper === "AS") {
+    list = list.slice(0, 4);
+  } else {
+    return;
+  }
+  let type: string | undefined;
+  const [first, second, column, close] = list;
+  if (list.length === 2 && first?.str === "@" && (second?.upper === "ABAP_TRUE" || second?.upper === "ABAP_FALSE")) {
+    type = "abap_boolean";
+  } else if ((first?.upper === "MAX" || first?.upper === "MIN") && second?.str === "(" && close?.str === ")" && column !== undefined) {
+    const [prefix, field] = column.str.includes("~") ? column.str.split("~") : [undefined, column.str];
+    if (prefix === undefined || prefix.toUpperCase() === alias || prefix.toUpperCase() === source.upper) {
+      type = `${source.str}-${field}`;
+    }
+  }
+  if (type === undefined) {
+    return;
+  }
+  edits.replace(tokens[into + 1] as Tok, tokens[into + 5] as Tok, `@${name.str}`);
+  edits.replace(tokens[0] as Tok, tokens[0] as Tok, `DATA ${name.str} TYPE ${type}. ${tokens[0]?.str ?? "SELECT"}`);
 }
 
 /** `TYPE TABLE FOR UPDATE zr_travel\\travel` → `TYPE zrap_dt_zr_travel=>tt_e1_upd`. */

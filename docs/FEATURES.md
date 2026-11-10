@@ -20,7 +20,7 @@ n'utilise pas.
 | `strict`, `strict ( 2 )` | ✅ | Accepté ; les règles strictes sont celles de SAP, l'outil ne les revérifie pas toutes. |
 | `define root behavior for` / entité enfant, `alias` | ✅ | |
 | `persistent table`, `mapping for … corresponding` | ✅ | |
-| `lock master`, `lock dependent by` | 🟡 | Verrou de ligne PostgreSQL sur l'instance du lock master (`FOR UPDATE NOWAIT`, cause `locked`) ; un LUW à la fois par processus (D11). Conflit entre processus : test e2e en J6. |
+| `lock master`, `lock dependent by` | ✅ | Verrou de ligne PostgreSQL sur l'instance du lock master (`FOR UPDATE NOWAIT`, cause `locked`, 409) ; un LUW à la fois par processus (D11). Conflit avec une autre transaction testé sur PostgreSQL (`rap-locks.test.ts`), y compris un verrou refusé en EML : la LUW continue. |
 | `etag master` | ✅ | `If-Match` exigé (428), ETag périmé 412, `*` accepté. |
 | `etag dependent by` | 🟡 | Pas d'ETag exposé pour l'entité dépendante : `If-Match` n'y est pas contrôlé. |
 | `authorization master ( global )`, `( instance )`, `( global, instance )` | ✅ | Handlers appelés hors local mode ; refus → 403. |
@@ -29,7 +29,7 @@ n'utilise pas.
 | Numérotation externe (clé fournie, `mandatory : create`, `readonly : update`) | ✅ | |
 | `early numbering` non managed (handler `FOR NUMBERING`) | 🟡 | Création directe : implémenté, non couvert par un test. Création par association (`FOR CREATE Travel\_Booking`) : non prise en charge. |
 | `late numbering` | ❌ | Nécessite la phase `adjust_numbers` d'un saver. |
-| `with additional save`, `with unmanaged save` | ❌ | Le saver ferait de l'ABAP SQL, exclu du périmètre ABP (D26). |
+| `with additional save`, `with unmanaged save` | ❌ | Le saver écrirait en ABAP SQL : l'ABP ne fait que lire (D26). |
 | `with draft` | ❌ | Exclu par le cahier des charges. |
 | Implémentation `unmanaged` | ❌ | Hors cible (BO managed). |
 | `with privileged mode` | ✅ | `PRIVILEGED` saute les contrôles d'autorisation. |
@@ -108,7 +108,19 @@ n'utilise pas.
 | `IN LOCAL MODE`, `PRIVILEGED` | ✅ | Local mode : ni autorisation ni feature control, champs en lecture seule modifiables. |
 | `COMMIT ENTITIES`, `ROLLBACK ENTITIES` dans un handler | ✅ | Interdits, comme dans RAP (erreur à l'exécution). |
 | `GET PERMISSIONS`, `SET LOCKS`, `MODIFY … OPERATIONS`, `RELATING TO`, `AUGMENTING`, `RAISE ENTITY EVENT` | ❌ | Diagnostic ABP005/ABP007. |
-| ABAP SQL (`SELECT`…) dans l'ABP | ❌ | Diagnostic ABP007 (D26). |
+
+## ABAP SQL dans l'ABP
+
+| Fonctionnalité | Statut | Note |
+|---|---|---|
+| `SELECT` sur les tables et entités CDS du projet : `SINGLE`, `INTO TABLE`, `APPENDING`, `CORRESPONDING`, `WHERE` (dont `IN` sur un range, `LIKE`, `BETWEEN`, `EXISTS`), `ORDER BY` (dont `PRIMARY KEY`), `UP TO n ROWS`, `GROUP BY`/`HAVING`, agrégats, jointures, `FOR ALL ENTRIES` | ✅ | Vues au format ABAP du schéma `rapt_abap`, dans la transaction de la LUW (D26). Test `rap-variant-sql.test.ts`. |
+| Test d'existence `SELECT SINGLE @abap_true … INTO @DATA(x)`, `MAX`/`MIN` en déclaration en ligne | ✅ | Déclarés par la passe de réécriture (abaplint ne les type pas). |
+| Autres littéraux, agrégats ou expressions en déclaration en ligne | ❌ | Diagnostic ABP009 : déclarer la cible. |
+| `SELECT … ENDSELECT` | 🟡 | Avec `SELECT *` seulement (ABP007 sinon). |
+| `OPEN CURSOR`, `FETCH NEXT CURSOR` | 🟡 | Hors ABAP Cloud (refusés par la vérification, comme sur SAP) ; pris en charge par le runtime. |
+| Types des entités CDS dans l'ABP (`DATA ls TYPE zr_travel`) | ✅ | Tables « ombre » (D19, D26). |
+| `MESSAGE … INTO` | ✅ | Textes des classes de messages du projet. |
+| `INSERT`, `UPDATE`, `MODIFY`, `DELETE` sur une table ; `WITH` | ❌ | Diagnostic ABP007 : le runtime RAP écrit le BO, le modifier par EML. |
 
 ## Projection
 

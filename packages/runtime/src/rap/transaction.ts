@@ -11,6 +11,7 @@ import { abapName, derivedType, same, type ActionModel, type DeterminationModel,
 import type { AbapBridge } from "../abap/bridge.js";
 import { appendRow, component, isFlagOn, rowsOf, setFlag, type AbapData } from "../abap/convert.js";
 import type { User } from "../auth/user.js";
+import { withSavepoint } from "../db/database.js";
 import { fromSql, initialValue, isInitial, toSql } from "../values.js";
 import { keyOf, keyString, type BoAssociation, type BoEntity, type BoModel } from "./bo.js";
 import { RapRuntimeError, Responses, type AccessMode, type FailCause, type FailedOperation, type Row } from "./types.js";
@@ -260,7 +261,7 @@ export class Transaction {
     }
     const conditions = master.keys.map((k) => sql`${sql.id(master.columns.get(k.name) ?? abapName(k.name))} = ${toSql(k.type, masterKey[k.name] ?? null)}`);
     try {
-      await sql`SELECT 1 FROM ${sql.id(master.table.name)} WHERE ${sql.join(conditions, sql` AND `)} FOR UPDATE NOWAIT`.execute(this.db);
+      await withSavepoint(this.db, () => sql`SELECT 1 FROM ${sql.id(master.table.name)} WHERE ${sql.join(conditions, sql` AND `)} FOR UPDATE NOWAIT`.execute(this.db));
     } catch (error) {
       if ((error as { code?: string }).code === "55P03") {
         return false;

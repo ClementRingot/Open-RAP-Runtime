@@ -148,7 +148,39 @@ describe("ABAP generation of the fixture", () => {
     expect(projection.diagnostics).toContainEqual(expect.objectContaining({ code: "ABP007", message: expect.stringContaining("projection ZRT_C_TRAVEL") }));
     const permissions = await generate({ [ABP]: (c) => c.replace("    DELETE travels WHERE OverallStatus IS NOT INITIAL.", "    GET PERMISSIONS ONLY GLOBAL AUTHORIZATION ENTITY zrt_r_travel REQUEST VALUE #( %update = if_abap_behv=>mk-on ) RESULT DATA(p).\n    DELETE travels WHERE OverallStatus IS NOT INITIAL.") });
     expect(permissions.diagnostics).toContainEqual(expect.objectContaining({ code: "ABP007", message: "GET PERMISSIONS is not supported" }));
-    const select = await generate({ [ABP]: (c) => c.replace("    DELETE travels WHERE OverallStatus IS NOT INITIAL.", "    SELECT SINGLE travel_id FROM zrt_travel INTO @DATA(first_id).\n    DELETE travels WHERE OverallStatus IS NOT INITIAL.") });
-    expect(select.diagnostics).toContainEqual(expect.objectContaining({ code: "ABP007", message: expect.stringContaining("ABAP SQL is not supported") }));
+    const write = await generate({ [ABP]: (c) => c.replace("    DELETE travels WHERE OverallStatus IS NOT INITIAL.", "    UPDATE zrt_travel SET description = 'x' WHERE travel_id = '1'.\n    DELETE travels WHERE OverallStatus IS NOT INITIAL.") });
+    expect(write.diagnostics).toContainEqual(expect.objectContaining({ code: "ABP007", message: expect.stringContaining("UPDATE on a database table is not supported") }));
+    const loop = await generate({ [ABP]: (c) => c.replace("    DELETE travels WHERE OverallStatus IS NOT INITIAL.", "    SELECT travel_id FROM zrt_travel INTO @DATA(one_id).\n    ENDSELECT.\n    DELETE travels WHERE OverallStatus IS NOT INITIAL.") });
+    expect(loop.diagnostics).toContainEqual(expect.objectContaining({ code: "ABP007", message: expect.stringContaining("SELECT … ENDSELECT with a field list") }));
+  });
+
+  it("accepts ABAP SQL reads of the tables and CDS entities of the project (D26)", async () => {
+    const reads = [
+      "    SELECT SINGLE travel_id FROM zrt_travel WHERE travel_uuid = @( VALUE sysuuid_x16( ) ) INTO @DATA(first_id).",
+      "    SELECT FROM zrt_r_booking FIELDS BookingID, FlightPrice WHERE TravelUUID IS NOT NULL ORDER BY BookingID INTO TABLE @DATA(bookings_db).",
+      "    DATA count_db TYPE int8.",
+      "    SELECT COUNT(*) FROM zrt_c_travel INTO @count_db.",
+      "    DATA ls_travel TYPE zrt_r_travel.",
+      "    SELECT SINGLE @abap_true FROM zrt_travel WHERE travel_id = '00000001' INTO @DATA(exists).",
+      "    SELECT SINGLE FROM zrt_travel AS t FIELDS MAX( t~travel_id ) AS max_id INTO @FINAL(max_id).",
+      "    SELECT MIN( BeginDate ) FROM zrt_r_travel INTO @DATA(first_date).",
+      "    IF exists = abap_true AND max_id > first_date. ENDIF.",
+      "    SELECT FROM zrt_r_travel AS t INNER JOIN zrt_r_booking AS b ON b~TravelUUID = t~TravelUUID FIELDS t~TravelID, b~BookingID",
+      "      FOR ALL ENTRIES IN @keys WHERE t~TravelUUID = @keys-TravelUUID AND b~BookingID <> @ls_travel-TravelID INTO TABLE @DATA(joined).",
+    ].join("\n");
+    const { diagnostics, rewritten } = await generate({ [ABP]: (c) => c.replace("    DELETE travels WHERE OverallStatus IS NOT INITIAL.", `${reads}\n    DELETE travels WHERE OverallStatus IS NOT INITIAL.`) });
+    expect(diagnostics.filter((d) => d.severity === "error")).toEqual([]);
+    // the targets abaplint does not type are declared, host components after an alias are expressions
+    expect(rewritten).toContain("DATA exists TYPE abap_boolean. SELECT SINGLE @abap_true FROM zrt_travel WHERE travel_id = '00000001' INTO @exists.");
+    expect(rewritten).toContain("DATA max_id TYPE zrt_travel-travel_id. SELECT SINGLE FROM zrt_travel AS t FIELDS MAX( t~travel_id ) AS max_id INTO @max_id.");
+    expect(rewritten).toContain("WHERE t~TravelUUID = @keys-TravelUUID AND b~BookingID <> @( ls_travel-TravelID ) INTO TABLE @DATA(joined).");
+  });
+
+  it("reports SELECT results that abaplint cannot type and unknown tables", async () => {
+    const line = readFixture(ABP).split("\n").findIndex((l) => l === "    DELETE travels WHERE OverallStatus IS NOT INITIAL.") + 1;
+    const untyped = await generate({ [ABP]: (c) => c.replace("    DELETE travels WHERE OverallStatus IS NOT INITIAL.", "    SELECT SINGLE FROM zrt_travel FIELDS SUM( booking_fee ) INTO @DATA(fees). DELETE travels WHERE OverallStatus IS NOT INITIAL.") });
+    expect(untyped.diagnostics).toContainEqual(expect.objectContaining({ code: "ABP009", message: expect.stringContaining("inline declaration fees"), file: `src/${ABP}`, line }));
+    const unknown = await generate({ [ABP]: (c) => c.replace("    DELETE travels WHERE OverallStatus IS NOT INITIAL.", "    SELECT SINGLE carrier_id FROM zrt_carrier INTO @DATA(carrier). DELETE travels WHERE OverallStatus IS NOT INITIAL.") });
+    expect(unknown.diagnostics).toContainEqual(expect.objectContaining({ code: "ABP004", file: `src/${ABP}`, line }));
   });
 });

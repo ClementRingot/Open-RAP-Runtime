@@ -1,10 +1,12 @@
 /**
  * "Shadow" dictionary objects given to the transpiler (decision D19): the tables of the model,
  * with built-in types only, so that neither the standard data elements of SAP (ABP_*,
- * SYSUUID_X16…) nor CDS associations are needed to type the ABAP code.
+ * SYSUUID_X16…) nor CDS associations are needed to type the ABAP code. The CDS entities are given
+ * as tables of the same name and elements (decision D26): the ABAP SQL of the behavior pools reads
+ * them, and the ABAP code can type data with them.
  */
 
-import type { AbapType, TableModel } from "@rap-transpiler/model";
+import type { AbapType, EntityModel, TableModel } from "@rap-transpiler/model";
 import { catalogDataElements } from "../../ddic/catalog.js";
 
 export interface ShadowFile {
@@ -141,8 +143,19 @@ export function frameworkDictionary(projectObjects: Set<string>): ShadowFile[] {
   return files;
 }
 
+/** A CDS entity as a shadow table: its elements, with their types, in their order. */
+export function shadowEntity(entity: EntityModel): ShadowFile {
+  return shadowTable({
+    name: entity.name.toLowerCase(),
+    description: `CDS entity ${entity.name}`,
+    columns: entity.fields.map((f) => ({ name: f.name.toLowerCase(), type: f.type, key: f.key, notNull: false, client: false })),
+  });
+}
+
+/** A table (without its client column: the database has none, decision D9) or a structure. */
 export function shadowTable(table: TableModel & { structure?: boolean }): ShadowFile {
-  const fields = table.columns.map((column) => {
+  const columns = table.structure === true ? table.columns : table.columns.filter((c) => !c.client);
+  const fields = columns.map((column) => {
     const t = ddicType(column.type);
     return [
       "    <DD03P>",

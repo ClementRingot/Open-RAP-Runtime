@@ -15,7 +15,7 @@ import { abaplintRegistry } from "../../ir/handlers.js";
 import { generateDerivedTypes } from "./derived-types.js";
 import { FRAMEWORK_SOURCES } from "./framework.js";
 import { BdefCatalog, poolBdefOf, rewriteAbapFile } from "./rewrite.js";
-import { frameworkDictionary, shadowTable } from "./shadow.js";
+import { frameworkDictionary, shadowEntity, shadowTable } from "./shadow.js";
 
 export interface AbapSource {
   fileName: string;
@@ -95,6 +95,11 @@ export function abapSources(project: Project, model: Model, diagnostics: Diagnos
   for (const table of model.tables) {
     projectObjects.add(`TABL:${table.name.toUpperCase()}`);
   }
+  for (const entity of model.entities.filter((e) => e.sqlView !== undefined && !projectObjects.has(`TABL:${e.name.toUpperCase()}`))) {
+    const shadow = shadowEntity(entity);
+    sources.push({ fileName: shadow.fileName, content: shadow.content });
+    projectObjects.add(`TABL:${entity.name.toUpperCase()}`);
+  }
   for (const file of frameworkDictionary(projectObjects)) {
     sources.push({ fileName: file.fileName, content: file.content });
   }
@@ -149,7 +154,50 @@ export function checkAbap(sources: AbapSource[], diagnostics: Diagnostics): abap
       diagnostics.error("ABP008", `internal error in the generated ABAP ${issue.getFilename()}:${line}: ${message} (${issue.getKey()})`);
     }
   }
+  if (!diagnostics.hasErrors()) {
+    untypedSelectTargets(registry, byFile, diagnostics);
+  }
   return registry;
+}
+
+type AbapTypeOf = ReturnType<abaplint.TypedIdentifier["getType"]>;
+
+/** abaplint types the result of some SELECTs as void ("SELECT_todo…"), alone or as table rows. */
+function isUntypedSelectResult(type: AbapTypeOf): boolean {
+  const t = type instanceof abaplint.BasicTypes.TableType ? type.getRowType() : type;
+  return t instanceof abaplint.BasicTypes.VoidType && (t.getVoided() ?? "").startsWith("SELECT_todo");
+}
+
+/**
+ * Inline declarations of SELECT results that abaplint cannot type (a literal, an aggregate other
+ * than COUNT(*), an expression in the field list): the transpiled method would throw when it
+ * starts. Reported on the original line, the target has to be declared.
+ */
+function untypedSelectTargets(registry: abaplint.Registry, byFile: Map<string, AbapSource>, diagnostics: Diagnostics): void {
+  const seen = new Set<string>();
+  for (const object of registry.getObjects()) {
+    if (!(object instanceof abaplint.ABAPObject) || !object.getABAPFiles().some((f) => byFile.get(f.getFilename())?.original !== undefined)) {
+      continue;
+    }
+    const { spaghetti } = new abaplint.SyntaxLogic(registry, object).run();
+    const visit = (node: abaplint.ISpaghettiScopeNode): void => {
+      for (const id of Object.values(node.getData().vars)) {
+        const source = byFile.get(id.getFilename());
+        const key = `${id.getFilename()}:${id.getStart().getRow()}:${id.getName()}`;
+        if (source?.original === undefined || seen.has(key) || !isUntypedSelectResult(id.getType())) {
+          continue;
+        }
+        seen.add(key);
+        diagnostics.error(
+          "ABP009",
+          `abaplint cannot type the inline declaration ${id.getName()} of this SELECT (literal, aggregate or expression in the field list): declare the target with DATA … TYPE …`,
+          { file: source.original, line: id.getStart().getRow(), column: id.getStart().getCol() },
+        );
+      }
+      node.getChildren().forEach(visit);
+    };
+    visit(spaghetti.getTop());
+  }
 }
 
 /** Namespaced objects (/DMO/…) give module names with `#`, imported as `%23`: plain names are safer. */

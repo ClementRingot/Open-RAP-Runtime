@@ -3,7 +3,9 @@ import { buildModel, generateApplication, generateCsdl, generateSql, loadProject
 import type { Model } from "@rap-transpiler/model";
 import type { FastifyInstance } from "fastify";
 import { PGliteDialect } from "kysely";
-import { copyFileSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import pg from "pg";
+import { execFileSync } from "node:child_process";
+import { chownSync, copyFileSync, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -222,4 +224,77 @@ export function batchResponses(body: string): Array<{ status: number; headers: R
     results.push(result);
   }
   return results;
+}
+
+/** The binaries of an installed PostgreSQL server (Debian/Ubuntu layout), when the tests run as root. */
+function postgresBinaries(): string | undefined {
+  const versions = existsSync("/usr/lib/postgresql") ? readdirSync("/usr/lib/postgresql").sort() : [];
+  const version = versions[versions.length - 1];
+  return version === undefined || process.getuid?.() !== 0 ? undefined : `/usr/lib/postgresql/${version}/bin`;
+}
+
+/** Whether a real PostgreSQL is available: RAPT_E2E_DATABASE_URL, or a server the tests can start. */
+export const POSTGRES_AVAILABLE = process.env["RAPT_E2E_DATABASE_URL"] !== undefined || postgresBinaries() !== undefined;
+
+/** A PostgreSQL server for a test: initdb in `work`, started as the postgres user. */
+export function startPostgresServer(work: string): { url: string; stop: () => void } | undefined {
+  const bin = postgresBinaries();
+  if (bin === undefined) {
+    return undefined;
+  }
+  try {
+    const data = path.join(work, "pgdata");
+    mkdirSync(data, { recursive: true });
+    const uid = Number(execFileSync("id", ["-u", "postgres"]).toString().trim());
+    const gid = Number(execFileSync("id", ["-g", "postgres"]).toString().trim());
+    chownSync(data, uid, gid);
+    const port = 54000 + (process.pid % 900);
+    const asPostgres = (command: string): void => {
+      execFileSync("su", ["postgres", "-s", "/bin/sh", "-c", command], { stdio: "ignore" });
+    };
+    asPostgres(`${bin}/initdb -D ${data} -U postgres --auth=trust -E UTF8`);
+    asPostgres(`${bin}/pg_ctl -D ${data} -o '-p ${port} -k ${data} -c listen_addresses=127.0.0.1' -l ${data}/log.txt -w start`);
+    return { url: `postgres://postgres@127.0.0.1:${port}/postgres`, stop: () => asPostgres(`${bin}/pg_ctl -D ${data} -m fast stop`) };
+  } catch {
+    return undefined;
+  }
+}
+
+/**
+ * A database of its own for a test that needs a real PostgreSQL (concurrent transactions): created
+ * on the server of RAPT_E2E_DATABASE_URL, else on a server started for the test.
+ */
+export async function postgresDatabase(name: string): Promise<{ url: string; close: () => Promise<void> } | undefined> {
+  const shared = process.env["RAPT_E2E_DATABASE_URL"];
+  if (shared === undefined) {
+    const work = fileURLToPath(new URL(`./.generated/${name}-${process.pid}`, import.meta.url));
+    rmSync(work, { recursive: true, force: true });
+    mkdirSync(work, { recursive: true });
+    const server = startPostgresServer(work);
+    if (server === undefined) {
+      return undefined;
+    }
+    return {
+      url: server.url,
+      close: async () => {
+        server.stop();
+        rmSync(work, { recursive: true, force: true });
+      },
+    };
+  }
+  const database = `rapt_${name}_${process.pid}`;
+  const admin = async (statement: string): Promise<void> => {
+    const client = new pg.Client({ connectionString: shared });
+    await client.connect();
+    try {
+      await client.query(statement);
+    } finally {
+      await client.end();
+    }
+  };
+  await admin(`DROP DATABASE IF EXISTS "${database}"`);
+  await admin(`CREATE DATABASE "${database}"`);
+  const url = new URL(shared);
+  url.pathname = `/${database}`;
+  return { url: url.toString(), close: () => admin(`DROP DATABASE IF EXISTS "${database}" WITH (FORCE)`) };
 }

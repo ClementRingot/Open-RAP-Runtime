@@ -185,8 +185,12 @@ et la conséquence. Les numéros D1 à D13 correspondent aux points 1 à 13 du �
 - **Pourquoi** : la couche SQL du transpiler échoue sur les associations et ne connaît pas les
   éléments de données SAP standard ; les types de l'ABP viennent de l'interface dérivée (D2) ;
   notre SQL vient de l'IR.
-- **Conséquence** : un type `TYPE zr_travel` (vue CDS) n'est pas disponible dans l'ABP
-  (KNOWN_GAPS.md) ; les types dérivés et les tables le sont.
+- **Conséquence** : un type `TYPE zr_travel` (vue CDS) n'était pas disponible dans l'ABP ; les
+  types dérivés et les tables l'étaient.
+- **Ajusté (D26)** : les entités CDS sont données comme tables « ombre » de mêmes nom et éléments
+  (types prédéfinis, sans associations), pour l'ABAP SQL ; `TYPE zr_travel` est donc typé. Les
+  tables ombre n'ont plus de colonne mandant (D9). Les vues CDS elles-mêmes restent hors du
+  registre du transpiler.
 
 ## D20 — `field ( mandatory )` sans contrôle à l'exécution
 
@@ -252,14 +256,50 @@ et la conséquence. Les numéros D1 à D13 correspondent aux points 1 à 13 du �
 - **Pourquoi** : c'est le comportement attendu par l'ODataModel V4 de Fiori elements ; le calcul
   du feature control appelle l'ABP et ne doit pas pénaliser les lectures qui ne l'utilisent pas.
 
-## D26 — ABAP SQL hors du périmètre de l'ABP
+## D26 — ABAP SQL en lecture dans l'ABP
 
-- **Décision** : une instruction ABAP SQL (`SELECT`, `INSERT`, `UPDATE`, `MODIFY`, `DELETE` sur une
-  table) dans un behavior pool est une erreur de compilation (ABP007).
-- **Pourquoi** : le runtime abaplint n'a pas de connexion à la base de l'application, et le
-  modèle de persistance d'un BO managed passe par l'EML. Une erreur à la génération vaut mieux
-  qu'une erreur à l'exécution. L'accès SQL en lecture (contrôle d'existence d'une agence, par
-  exemple) est une évolution possible (KNOWN_GAPS.md).
+- **Décision initiale** : toute instruction ABAP SQL dans un behavior pool était une erreur de
+  compilation (ABP007), faute de connexion à la base pour le runtime abaplint.
+- **Décision révisée** : `SELECT` (simple, `SINGLE`, `INTO TABLE`, `FOR ALL ENTRIES`, jointures,
+  agrégats, sous-requêtes, `SELECT … ENDSELECT` avec `SELECT *`) lit les tables et les entités
+  CDS du projet. Les écritures (`INSERT`, `UPDATE`, `MODIFY`, `DELETE` sur une table) et les
+  expressions de table communes (`WITH`) restent refusées (ABP007) : un BO managed est écrit par
+  le runtime RAP, le code le modifie par EML.
+- **Réalisation** :
+  - le SQL que génère `@abaplint/transpiler` suppose des colonnes au format ABAP (ses propres
+    schémas stockent les dates en `NCHAR(8)`, les UUID en 32 chiffres hexadécimaux). Le schéma
+    généré ajoute donc un schéma `rapt_abap` de vues, une par table (sans colonne mandant, D9) et
+    par entité CDS, noms de colonnes en minuscules : dates `YYYYMMDD`, heures `HHMMSS`, UUID et
+    binaires en hexadécimal majuscule, booléens `X`/espace, horodatages en nombres packed
+    (`YYYYMMDDhhmmss.fffffff`), valeurs initiales ABAP à la place des `NULL`. Les types caractère
+    de longueur fixe deviennent `bpchar`, dont les comparaisons ignorent les blancs finaux comme
+    ABAP. `abap.dbo.schemaPrefix` (option du runtime abaplint) fait lire ces vues au code transpilé ;
+  - le runtime enregistre un client de base de données en lecture seule (`DatabaseClient` du
+    runtime abaplint) qui exécute la requête dans la transaction de la LUW en cours, après une
+    traduction vers PostgreSQL : `UP TO n ROWS` → `LIMIT`, `ORDER BY PRIMARY KEY`, `ASCENDING`,
+    opérateurs `EQ`/`GE`…, `alias~champ`, identifiants en minuscules. Seules les vues de
+    `rapt_abap` sont lisibles. Chaque requête s'exécute dans un savepoint : une erreur SQL laisse
+    la transaction de la LUW utilisable. `COMMIT WORK`/`ROLLBACK WORK` sont une erreur à
+    l'exécution, comme dans RAP ;
+  - les entités CDS sont données au transpiler comme tables « ombre » de mêmes nom et éléments
+    (D19) : `SELECT FROM zr_travel` et `DATA ls TYPE zr_travel` sont typés ;
+  - abaplint ne type pas la déclaration en ligne du résultat d'un littéral, d'un agrégat autre
+    que `COUNT(*)` ou d'une expression : la méthode transpilée échouerait à son démarrage. La
+    passe de réécriture déclare les deux formes les plus courantes (test d'existence
+    `SELECT SINGLE @abap_true … INTO @DATA(x)` : `abap_boolean` ; `MAX( col )`/`MIN( col )` d'une
+    seule source, motif de numérotation du tutoriel RAP100 : le type de la colonne) ; les autres
+    sont signalées à la compilation (ABP009) ;
+  - `MESSAGE … INTO` prend ses textes dans les classes de messages du projet.
+- **Sémantique** : comme dans RAP, `SELECT` lit la base, pas le buffer transactionnel : les
+  changements non sauvegardés de la LUW n'y sont pas visibles (lire le BO par EML pour cela).
+- **Pourquoi** : la lecture SQL de tables de contrôle, l'unicité d'un identifiant ou la
+  numérotation par `MAX` sont courantes dans les behavior pools réels ; des vues au format ABAP
+  laissent le SQL du transpiler presque intact et donnent la sémantique ABAP des comparaisons.
+  Contrepartie : une condition sur une colonne convertie (date, UUID, horodatage) ne peut pas
+  utiliser d'index (KNOWN_GAPS.md).
+- **Correction associée** : l'échec d'un verrou (`FOR UPDATE NOWAIT`) laissait la transaction
+  PostgreSQL de la LUW en état d'erreur ; il est lui aussi isolé dans un savepoint (test
+  `rap-locks.test.ts` sur un vrai PostgreSQL).
 
 ## D27 — Ressources OpenUI5 servies depuis les paquets npm
 

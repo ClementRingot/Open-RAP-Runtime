@@ -9,8 +9,10 @@
 
 import { AsyncLocalStorage } from "node:async_hooks";
 import type { Kysely } from "kysely";
-import type { Model } from "@rap-transpiler/model";
+import { ABAP_SQL_SCHEMA, type Model } from "@rap-transpiler/model";
 import { AbapBridge, loadAbap, setSystemFields } from "../abap/bridge.js";
+import { abapGlobal } from "../abap/convert.js";
+import { AbapSqlClient } from "../abap/sql.js";
 import type { User } from "../auth/user.js";
 import { BoModel } from "./bo.js";
 import { installKernel } from "./kernel.js";
@@ -43,11 +45,24 @@ export class RapRuntime {
     this.bridge = new AbapBridge(this.bo, model.messageClasses);
   }
 
-  /** Loads the transpiled behavior pools of the model (`abap/` folder) and installs the kernel. */
+  /**
+   * Loads the transpiled behavior pools of the model (`abap/` folder), installs the kernel and the
+   * database of the ABAP SQL (decision D26) and the texts of the message classes (MESSAGE … INTO).
+   */
   public static async load(model: Model, abapDir: string): Promise<RapRuntime> {
     await loadAbap(abapDir, model.abap?.modules[0] ?? "init.mjs");
     const runtime = new RapRuntime(model);
     installKernel(runtime);
+    const abap = abapGlobal();
+    abap.dbo.schemaPrefix = ABAP_SQL_SCHEMA;
+    abap.context.databaseConnections["DEFAULT"] = new AbapSqlClient(() => {
+      const context = runtime.storage.getStore();
+      if (context === undefined) {
+        throw new Error("ABAP SQL outside of a RAP transaction");
+      }
+      return context.tx.db;
+    });
+    abap.MSAG = model.messageClasses;
     return runtime;
   }
 

@@ -49,6 +49,27 @@ export function createDatabase(dialect: Dialect): Database {
   return new Kysely({ dialect });
 }
 
+let savepoints = 0;
+
+/**
+ * Runs `fn` in a savepoint of the transaction `db`: when it fails (a lock that is not available,
+ * a SELECT of the ABAP code), PostgreSQL would otherwise refuse every further statement of the
+ * transaction. Rolled back to the savepoint, the transaction goes on.
+ */
+export async function withSavepoint<T, DB>(db: Kysely<DB>, fn: () => Promise<T>): Promise<T> {
+  const name = `rapt_${++savepoints}`;
+  await sql.raw(`SAVEPOINT ${name}`).execute(db);
+  let result: T;
+  try {
+    result = await fn();
+  } catch (error) {
+    await sql.raw(`ROLLBACK TO SAVEPOINT ${name}`).execute(db);
+    throw error;
+  }
+  await sql.raw(`RELEASE SAVEPOINT ${name}`).execute(db);
+  return result;
+}
+
 /** Applies the generated schema (idempotent) in one transaction. */
 export async function applySchema(db: Database, schema: string): Promise<void> {
   await db.transaction().execute(async (trx) => {
