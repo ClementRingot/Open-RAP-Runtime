@@ -27,7 +27,7 @@ n'utilise pas.
 | `authorization dependent by` | ✅ | Contrôle du master (`%update`) pour les opérations de l'entité dépendante. |
 | `early numbering` managed (UUID) | ✅ | |
 | Numérotation externe (clé fournie, `mandatory : create`, `readonly : update`) | ✅ | |
-| `early numbering` non managed (handler `FOR NUMBERING`) | 🟡 | Création directe : implémenté, non couvert par un test. Création par association (`FOR CREATE Travel\_Booking`) : non prise en charge. |
+| `early numbering` non managed (handler `FOR NUMBERING`) | 🟡 | Création directe : ✅ (`rap-variant-features.test.ts`). Création par association (`FOR CREATE Travel\_Booking`) : non prise en charge. |
 | `late numbering` | ❌ | Nécessite la phase `adjust_numbers` d'un saver. |
 | `with additional save`, `with unmanaged save` | ❌ | Le saver écrirait en ABAP SQL : l'ABP ne fait que lire (D26). |
 | `with draft` | ❌ | Exclu par le cahier des charges. |
@@ -44,7 +44,7 @@ n'utilise pas.
 | Suppression en cascade des compositions | ✅ | |
 | `association _X { create; }` (create par association) | ✅ | OData (navigation, deep insert) et EML. |
 | `( features : instance )` sur les opérations | ✅ | `__EntityControl`, `__OperationControl` ; opération refusée → 409. |
-| `( features : global )` | 🟡 | Implémenté (handler `FOR GLOBAL FEATURES`), non couvert par un test. |
+| `( features : global )` | ✅ | Handler `FOR GLOBAL FEATURES` ; opération refusée → 409 ; exposé comme le feature control d'instance (`__EntityControl`), bouton Delete désactivé dans l'UI. |
 | `( precheck )` | ✅ | create, update, delete, actions, create par association. |
 
 ## Champs
@@ -55,7 +55,7 @@ n'utilise pas.
 | `mandatory` | ✅ | Pas de contrôle runtime, comme RAP (D20). |
 | `numbering : managed` | ✅ | |
 | `readonly : update`, `mandatory : create` | ✅ | |
-| `features : instance` (feature control dynamique des champs) | 🟡 | `__FieldControl` et refus d'une modification d'un champ en lecture seule ; non couvert par un test. |
+| `features : instance` (feature control dynamique des champs) | ✅ | `__FieldControl` (`Common.FieldControl`), modification d'un champ en lecture seule refusée (400), champ non modifiable dans l'UI. |
 | `suppress` | ✅ | Propriété absente du service. |
 
 ## Actions et fonctions
@@ -64,15 +64,15 @@ n'utilise pas.
 |---|---|---|
 | Action d'instance, `result [1] $self` | ✅ | |
 | Action sans résultat | ✅ | 204 en OData. |
-| Résultat `entity …`, cardinalités `[0..*]` | 🟡 | Implémenté (collection, entité d'un autre entity set), non couvert par un test. |
+| Résultat `entity …`, cardinalités `[0..*]` | ✅ | Collection d'entités d'un autre entity set. |
 | `internal action` | ✅ | Disponible en EML, non exposée en OData. |
 | `static action` | ✅ | Liée à la collection ; résultat `$self` = l'instance créée. |
 | `factory action` | ✅ | Le résultat est l'instance de `mapped` pour le `%cid` de l'appel. |
 | Paramètre d'action (`parameter` vers une entité abstraite) | ✅ | |
 | `( features : instance )` sur une action | ✅ | `Core.OperationAvailable` via `__OperationControl`. |
-| `( features : global )` sur une action | 🟡 | Implémenté, non couvert par un test. |
+| `( features : global )` sur une action | ✅ | Action d'instance : `Core.OperationAvailable` via `__OperationControl` (valeur commune à toutes les instances) ; action statique : contrôle à l'exécution seulement. |
 | `function` d'instance | ✅ | GET ; résultat entité abstraite (type complexe). |
-| `static function` | 🟡 | Implémenté, non couvert par un test. |
+| `static function` | ✅ | GET sur la collection. |
 | `determine action` | ❌ | Prévu après le MVP. |
 
 ## Déterminations et validations
@@ -80,7 +80,7 @@ n'utilise pas.
 | Fonctionnalité | Statut | Note |
 |---|---|---|
 | `determination … on modify` (triggers `create`, `field`) | ✅ | Sémantique D21, par tours ; une action interne exécutée depuis une détermination. |
-| Triggers `update`, `delete` | 🟡 | Implémentés, non couverts par un test. |
+| Triggers `update`, `delete` | ✅ | `delete` : la détermination reçoit les clés des instances supprimées (encore en base jusqu'à la sauvegarde). |
 | `determination … on save` | ✅ | |
 | `validation … on save` | ✅ | Échec → 400 et annulation du LUW. |
 
@@ -142,7 +142,7 @@ n'utilise pas.
 | Entités abstraites (paramètres et résultats d'actions et de fonctions) | ✅ | |
 | Expressions CDS (CASE, CAST, calculs, littéraux) | ❌ | Prévu après le MVP. |
 | Contrôle d'accès DCL | ❌ | `@AccessControl.authorizationCheck` est ignoré. |
-| Side effects (`side effects { … }`) | 🟡 | Générés en `Common.SideEffects` ; non couverts par un test. |
+| Side effects (`side effects { … }`) | ✅ | `Common.SideEffects` dans le `$metadata` ; l'UI générée ne les exploite pas encore (rechargement de l'objet après sauvegarde). |
 
 ## Service OData V4
 
@@ -181,9 +181,9 @@ n'utilise pas.
 | Suppression, actions de la table (`#FOR_ACTION` dans `UI.lineItem`) | ✅ | Sur la ligne sélectionnée. |
 | Object Page : en-tête (`UI.headerInfo`), sections (`UI.facet` : identification, groupes de champs, tables) | ✅ | `sap.uxap.ObjectPageLayout`. |
 | Édition et sauvegarde (PATCH dans un change set, `If-Match`) | ✅ | Annulation par `resetChanges`. |
-| Tables des compositions, création et suppression d'enfants en mode édition | 🟡 | Affichage et navigation testés ; création et suppression d'enfants non couvertes par un test navigateur. |
-| Actions d'en-tête (`UI.identification`), paramètres (dialogue), actions factory | 🟡 | Action sans paramètre testée dans le navigateur ; paramètres et factory testés en OData. |
-| Feature control : actions (`__OperationControl`), Edit/Delete (`__EntityControl`), champs (`__FieldControl`) | 🟡 | Actions testées dans le navigateur. |
+| Tables des compositions, création et suppression d'enfants en mode édition | ✅ | Nouvelle ligne en tête de table, création et suppression envoyées dans le même change set à l'enregistrement. |
+| Actions d'en-tête (`UI.identification`), paramètres (dialogue), actions factory | ✅ | Dialogue des paramètres, message d'erreur de l'action, ouverture de l'instance créée par une action factory. |
+| Feature control : actions (`__OperationControl`), Edit/Delete (`__EntityControl`), champs (`__FieldControl`) | ✅ | Instance et global ; testé dans le navigateur (`ui-features.test.ts`). |
 | Champs en lecture seule, obligatoires, modifiables à la création seulement | ✅ | Depuis les caractéristiques de champ de la BDEF. |
 | Messages (erreurs, succès) | ✅ | `MessageBox`, `MessageToast`, `MessagePopover`. |
 | Aide à la saisie (value help), variantes, personnalisation de table | ❌ | Prévu après le MVP. |

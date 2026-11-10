@@ -251,8 +251,12 @@ et la conséquence. Les numéros D1 à D13 correspondent aux points 1 à 13 du �
   d'administration envoyés par un client OData sont ignorés (comme `Core.Computed` le prévoit) ;
   une propriété inconnue donne 400. Les opérations non exposées (`use create` absent, opération
   `internal`) donnent 405. Les clés d'une entité ne changent pas par PATCH (400).
-  Le feature control d'instance (`__EntityControl`, `__OperationControl`, `__FieldControl`) n'est
-  calculé que si la requête sélectionne ces propriétés (ou n'a pas de `$select`).
+  Le feature control (`__EntityControl`, `__OperationControl`, `__FieldControl`) n'est calculé que
+  si la requête sélectionne ces propriétés (ou n'a pas de `$select`). Le feature control global
+  d'`update`, de `delete` et des actions d'instance y figure aussi, avec la même valeur pour toutes
+  les instances : RAP le présente comme le feature control d'instance (« consumer hint »).
+  Dans les vues générées, ces valeurs sont lues par `%{…}` (valeur brute) : `${…}` donnerait le
+  texte formaté par le type OData (`"1"` pour un Edm.Byte), et la comparaison échouerait.
 - **Pourquoi** : c'est le comportement attendu par l'ODataModel V4 de Fiori elements ; le calcul
   du feature control appelle l'ABP et ne doit pas pénaliser les lectures qui ne l'utilisent pas.
 

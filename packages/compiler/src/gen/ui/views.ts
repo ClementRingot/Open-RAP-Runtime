@@ -21,7 +21,8 @@ function editable(field: UiField): string {
     conditions.push("${ui>/createMode}");
   }
   if (field.dynamic) {
-    conditions.push(`\${__FieldControl/${field.property}} !== 1`);
+    // %{…}: the value itself; ${…} would give the text formatted by the OData type ("1")
+    conditions.push(`%{__FieldControl/${field.property}} !== 1`);
   }
   return esc(`{= ${conditions.join(" && ")} }`);
 }
@@ -85,7 +86,7 @@ function actionButton(action: UiAction, owner: string, scope: "object" | "list" 
   const press = `.onAction`;
   const enabled =
     scope === "object" && action.dynamic && !action.static
-      ? ` enabled="${esc(`{= \${__OperationControl/${action.name}} !== false && !\${ui>/editMode} }`)}"`
+      ? ` enabled="${esc(`{= %{__OperationControl/${action.name}} !== false && !\${ui>/editMode} }`)}"`
       : scope === "object"
         ? ` enabled="${esc("{= !${ui>/editMode} }")}"`
         : action.static
@@ -221,10 +222,10 @@ function section(s: UiSection): string {
 function objectPage(page: UiPage): string {
   const title = page.title === undefined ? `<Title text="${esc(page.typeName)}" wrapping="true"/>` : `<Title text="{${page.title}}" wrapping="true"/>`;
   const edit = page.updatable
-    ? `<Button id="edit" text="Edit" type="Emphasized" press=".onEdit" visible="{= !\${ui>/editMode} }"${page.updatableDynamic ? ` enabled="${esc("{= ${__EntityControl/Updatable} !== false }")}"` : ""}/>`
+    ? `<Button id="edit" text="Edit" type="Emphasized" press=".onEdit" visible="{= !\${ui>/editMode} }"${page.updatableDynamic ? ` enabled="${esc("{= %{__EntityControl/Updatable} !== false }")}"` : ""}/>`
     : "";
   const remove = page.deletable
-    ? `<Button id="deleteObject" text="Delete" type="Transparent" press=".onDelete" visible="{= !\${ui>/editMode} }"${page.deletableDynamic ? ` enabled="${esc("{= ${__EntityControl/Deletable} !== false }")}"` : ""}/>`
+    ? `<Button id="deleteObject" text="Delete" type="Transparent" press=".onDelete" visible="{= !\${ui>/editMode} }"${page.deletableDynamic ? ` enabled="${esc("{= %{__EntityControl/Deletable} !== false }")}"` : ""}/>`
     : "";
   return `<mvc:View controllerName="rapt.app.controller.Object" xmlns:mvc="sap.ui.core.mvc" xmlns="sap.m" xmlns:uxap="sap.uxap" xmlns:form="sap.ui.layout.form" xmlns:core="sap.ui.core">
   <uxap:ObjectPageLayout id="page" showFooter="{ui>/editMode}" upperCaseAnchorBar="false" busy="{ui>/busy}" busyIndicatorDelay="0">

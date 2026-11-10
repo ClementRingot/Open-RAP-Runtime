@@ -1,52 +1,14 @@
 /**
  * The generated OpenUI5 UI in a browser (Playwright, Chromium): List Report, Object Page, edit
- * and save, action under feature control, creation of a travel.
+ * and save, action under feature control, creation of a travel, creation and deletion of child
+ * entities in edit mode, action parameters in a dialog, factory action.
  */
 
-import { createRequire } from "node:module";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { generatedFixture, SERVICE, T3, writableApp, type TestApp } from "./helpers.js";
-
-interface Locator {
-  click(): Promise<void>;
-  fill(value: string): Promise<void>;
-  press(key: string): Promise<void>;
-  count(): Promise<number>;
-  first(): Locator;
-  last(): Locator;
-  waitFor(options?: { state?: string; timeout?: number }): Promise<void>;
-  textContent(): Promise<string | null>;
-  isEnabled(): Promise<boolean>;
-}
-interface Page {
-  goto(url: string): Promise<unknown>;
-  locator(selector: string): Locator;
-  getByText(text: string, options?: { exact?: boolean }): Locator;
-  waitForFunction(fn: string, arg?: unknown, options?: { timeout?: number }): Promise<unknown>;
-  on(event: string, listener: (value: unknown) => void): void;
-  screenshot(options: { path: string; fullPage?: boolean }): Promise<unknown>;
-  waitForTimeout(ms: number): Promise<void>;
-}
-interface Browser {
-  newPage(options?: { viewport?: { width: number; height: number } }): Promise<Page>;
-  close(): Promise<void>;
-}
-
-/** Playwright from the project, or the copy pre-installed in the development container. */
-function chromium(): { launch(): Promise<Browser> } | undefined {
-  const require = createRequire(import.meta.url);
-  for (const id of [process.env["PLAYWRIGHT_MODULE"], "playwright", "/opt/node-tools/node_modules/playwright"]) {
-    if (id === undefined) continue;
-    try {
-      return (require(id) as { chromium: { launch(): Promise<Browser> } }).chromium;
-    } catch {
-      // next
-    }
-  }
-  return undefined;
-}
+import { chromium, id, ROWS, type Browser, type Locator, type Page } from "./browser.js";
+import { generatedFixture, SERVICE, T1, T2, T3, writableApp, type TestApp } from "./helpers.js";
 
 const browserType = chromium();
 const RUNTIME_DIR = fileURLToPath(new URL("..", import.meta.url));
@@ -75,9 +37,6 @@ async function odata(pathAndQuery: string): Promise<Record<string, unknown>> {
   return JSON.parse(response.body) as Record<string, unknown>;
 }
 
-const id = (view: string, control: string): string => `#container-rapt---${view}--${control}`;
-/** The data rows of the tables (not the column headers). */
-const ROWS = "tr.sapMLIB.sapMListTblRow";
 
 async function open(): Promise<Page> {
   const page = await browser.newPage({ viewport: { width: 1400, height: 900 } });
@@ -146,6 +105,65 @@ describe.skipIf(browserType === undefined)("generated UI (OpenUI5)", () => {
     await page.getByText("Accept Travel: done").first().waitFor({ timeout: 30_000 });
     expect((await odata(`Travel(${T3})`))["OverallStatus"]).toBe("A");
     await page.waitForFunction(`document.querySelector('${id("TravelObject", "objectAction_acceptTravel")}').classList.contains('sapMBtnDisabled')`, undefined, { timeout: 30_000 });
+  }, 120_000);
+
+  it("creates and deletes child entities in edit mode, saved together", async () => {
+    const page = await open();
+    await page.locator(ROWS, { hasText: "Jun 1, 2026" }).first().click();
+    const table = id("TravelObject", "table_Booking");
+    await page.waitForFunction(`document.querySelectorAll('${table} tr.sapMLIB').length === 3`, undefined, { timeout: 30_000 });
+    // booking 0001 is the flight with AF (the table shows the digit sequences without leading zeros)
+    const first = (await page.evaluate(`[...document.querySelectorAll('${table} tr.sapMLIB')].findIndex((row) => row.textContent.includes("AF"))`)) as number;
+    expect(first).toBeGreaterThanOrEqual(0);
+    await page.locator(id("TravelObject", "edit")).click();
+    await page.locator(`${table}_create`).click();
+    await page.waitForFunction(`document.querySelectorAll('${table} tr.sapMLIB').length === 4`, undefined, { timeout: 30_000 });
+    // the new row comes first; its columns: BookingID, BookingDate, CarrierID, ConnectionID, FlightDate, FlightPrice, BookingStatus
+    const cells = page.locator(`${table} tr.sapMLIB`).first().locator("input:not([type=radio])");
+    const values: Array<[number, string]> = [[0, "0004"], [2, "LH"], [3, "0400"], [4, "Jun 3, 2026"], [5, "10.00"]];
+    for (const [index, value] of values) {
+      await cells.nth(index).fill(value);
+      await cells.nth(index).press("Tab");
+    }
+    // booking 0001 is deleted: one place further down, below the new row
+    await page.locator(`${table} tr.sapMLIB`).nth(first + 1).locator(".sapMRb").click();
+    await page.locator(`${table}_delete`).click();
+    await page.waitForFunction(`document.querySelectorAll('${table} tr.sapMLIB').length === 3`, undefined, { timeout: 30_000 });
+    await page.locator(id("TravelObject", "save")).click();
+    await page.getByText("Changes saved").first().waitFor({ timeout: 30_000 });
+    const bookings = (await odata(`Travel(${T1})/_Booking?$orderby=BookingID&$select=BookingID,FlightDate,FlightPrice`))["value"] as Array<Record<string, unknown>>;
+    expect(bookings.map((b) => b["BookingID"])).toEqual(["0002", "0003", "0004"]);
+    expect(bookings[2]).toMatchObject({ FlightDate: "2026-06-03", FlightPrice: 10 });
+  }, 120_000);
+
+  it("asks for the parameters of an action in a dialog and shows its error message", async () => {
+    const page = await open();
+    await page.locator(ROWS, { hasText: "Jul 1, 2026" }).first().click();
+    const action = page.locator(id("TravelObject", "objectAction_deductDiscount"));
+    await action.waitFor({ timeout: 30_000 });
+    const run = async (percent: string): Promise<void> => {
+      await action.click();
+      await page.locator(".sapMDialog input").first().fill(percent);
+      await page.locator(".sapMDialog footer button, .sapMDialog .sapMDialogFooter button", { hasText: "Deduct Discount" }).first().click();
+    };
+    await run("150");
+    await page.getByText("The discount must be between 1 and 100 %, not 150 %").first().waitFor({ timeout: 30_000 });
+    await page.locator(".sapMMessageBox button", { hasText: "Close" }).first().click();
+    await run("50");
+    await page.getByText("Deduct Discount: done").first().waitFor({ timeout: 30_000 });
+    expect((await odata(`Travel(${T2})`))["BookingFee"]).toBe(5);
+  }, 120_000);
+
+  it("runs a factory action and opens the new instance", async () => {
+    const page = await open();
+    await page.locator(ROWS, { hasText: "Jul 1, 2026" }).first().click();
+    const copy = page.locator(id("TravelObject", "objectAction_copyTravel"));
+    await copy.waitFor({ timeout: 30_000 });
+    await copy.click();
+    await page.getByText("Copy of Business trip to Berlin").first().waitFor({ timeout: 30_000 });
+    const copies = (await odata("Travel?$filter=Description eq 'Copy of Business trip to Berlin'"))["value"] as Array<Record<string, unknown>>;
+    expect(copies).toHaveLength(1);
+    expect(copies[0]).toMatchObject({ OverallStatus: "O", BookingFee: 5 });
   }, 120_000);
 
   it("creates a travel from the List Report", async () => {

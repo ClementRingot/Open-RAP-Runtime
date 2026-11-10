@@ -66,7 +66,7 @@ describe("UI files", () => {
       expect(XMLValidator.validate(view.content), view.path).toBe(true);
     }
     expect(file("view/TravelList.view.xml")).toContain("items=\"{path: '/Travel', parameters: {$count: true, $orderby: 'TravelID desc'}}\"");
-    expect(file("view/TravelObject.view.xml")).toContain("enabled=\"{= ${__OperationControl/acceptTravel} !== false &amp;&amp; !${ui&gt;/editMode} }\"");
+    expect(file("view/TravelObject.view.xml")).toContain("enabled=\"{= %{__OperationControl/acceptTravel} !== false &amp;&amp; !${ui&gt;/editMode} }\"");
   });
 
   it("routes the List Report and the Object Pages", () => {

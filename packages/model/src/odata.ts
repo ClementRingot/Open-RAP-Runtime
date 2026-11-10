@@ -59,7 +59,7 @@ export interface ODataEntityType {
   navigations: ODataNavigation[];
   /** Property holding the ETag (etag master). */
   etag?: string;
-  /** Instance feature control: update/delete under features : instance. */
+  /** Feature control of update/delete (instance or global): __EntityControl. */
   entityControl?: { updatable: boolean; deletable: boolean };
   /** Actions and create-by-association navigations under instance feature control. */
   operationControl: string[];
@@ -98,7 +98,7 @@ export interface ODataOperation {
   behaviorEntity: string;
   action: string;
   factory: boolean;
-  /** features : instance → Core.OperationAvailable through __OperationControl. */
+  /** features : instance or global (instance actions) → Core.OperationAvailable through __OperationControl. */
   dynamic: boolean;
 }
 
@@ -242,8 +242,9 @@ export function buildODataService(model: Model): ODataService {
         entityType.etag = projected;
       }
     }
-    const updateDynamic = behavior.base?.operations.some((o) => o.kind === "update" && o.features === "instance") ?? false;
-    const deleteDynamic = behavior.base?.operations.some((o) => o.kind === "delete" && o.features === "instance") ?? false;
+    // instance and global feature control are both consumer hints of the instances (RAP)
+    const updateDynamic = behavior.base?.operations.some((o) => o.kind === "update" && o.features !== undefined) ?? false;
+    const deleteDynamic = behavior.base?.operations.some((o) => o.kind === "delete" && o.features !== undefined) ?? false;
     if (updateDynamic || deleteDynamic) {
       entityType.entityControl = { updatable: updateDynamic, deletable: deleteDynamic };
     }
@@ -298,7 +299,7 @@ export function buildODataService(model: Model): ODataService {
         behaviorEntity: behavior.baseEntity.name,
         action: action.name,
         factory: action.factory,
-        dynamic: action.features === "instance",
+        dynamic: action.features === "instance" || (action.features === "global" && !action.static),
       };
       if (action.parameter !== undefined && action.parameter.toLowerCase() !== "$self") {
         const parameterEntity = findEntity(model, action.parameter);
