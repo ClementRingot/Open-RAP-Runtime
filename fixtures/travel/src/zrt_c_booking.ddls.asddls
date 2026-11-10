@@ -1,4 +1,4 @@
-@AccessControl.authorizationCheck: #NOT_REQUIRED
+@AccessControl.authorizationCheck: #CHECK
 @EndUserText.label: 'Booking'
 @Metadata.allowExtensions: true
 define view entity ZRT_C_Booking

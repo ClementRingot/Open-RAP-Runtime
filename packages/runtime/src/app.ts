@@ -6,6 +6,8 @@ import { AuthenticationError, Authenticator, type AuthOptions } from "./auth/aut
 import { OidcSessions } from "./auth/session.js";
 import type { User } from "./auth/user.js";
 import type { Database } from "./db/database.js";
+import { Authorizations } from "./auth/authorizations.js";
+import { AccessControls, withReader } from "./odata/access.js";
 import { CsrfTokens } from "./odata/csrf.js";
 import { errorResponse, isIeee754, ODataHandler, type HandlerContext, type ODataRequest, type ODataResponse, type WriteHandler } from "./odata/handler.js";
 import { ReadEngine } from "./odata/read.js";
@@ -29,6 +31,8 @@ export interface AppOptions {
   writes?: (service: ServiceRuntime, read: ReadEngine, db: Database) => WriteHandler;
   /** The managed RAP runtime (transpiled behavior pools): writes, actions and feature control. */
   rap?: RapRuntime;
+  /** The authorizations of the users (D34); default: those of the RAP runtime, or of the model. */
+  authorizations?: Authorizations;
   /** The generated UI (`ui/` folder) and the OpenUI5 resources. */
   ui?: UiOptions;
   /** Extra plugins (UI, login routes), registered after the service. */
@@ -69,7 +73,9 @@ function send(reply: FastifyReply, response: ODataResponse): FastifyReply {
 export async function createApp(options: AppOptions): Promise<FastifyInstance> {
   const app = Fastify({ logger: options.logger ?? false, bodyLimit: 20 * 1024 * 1024, return503OnClosing: true });
   const service = new ServiceRuntime(options.model);
-  const read = new ReadEngine(service, () => options.db);
+  const authorizations = options.authorizations ?? options.rap?.authorizations ?? new Authorizations(options.model.authorizations);
+  // the access controls (DCL) of the reads, for the user of each request (D35)
+  const read = new ReadEngine(service, () => options.db, new AccessControls(options.model.accessControls, authorizations));
   const writes = options.writes?.(service, read, options.db) ?? (options.rap === undefined ? undefined : new RapWriteHandler(service, read, options.db as unknown as Kysely<unknown>, options.rap));
   const handler = new ODataHandler(service, read, options.metadata, writes);
   const servicePath = options.model.service.path;
@@ -137,7 +143,7 @@ export async function createApp(options: AppOptions): Promise<FastifyInstance> {
     if (request.method === "HEAD") {
       return send(reply, { status: 200, headers: { "OData-Version": "4.0", ...extra } });
     }
-    const response = await handler.handle(odataRequest, ctx);
+    const response = await withReader(user, () => handler.handle(odataRequest, ctx));
     response.headers = { ...response.headers, ...extra };
     return send(reply, response);
   };

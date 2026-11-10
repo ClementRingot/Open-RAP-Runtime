@@ -4,10 +4,11 @@
  */
 
 import { sql, type RawBuilder } from "kysely";
-import type { AbapType, EdmType } from "@rap-transpiler/model";
+import type { AbapType, EdmType, FieldModel } from "@rap-transpiler/model";
 import type { Database } from "../db/database.js";
 import { fromSql, literalToCanonical, toSql, type CanonicalValue, type UrlLiteral } from "../values.js";
 import { badRequest, notImplemented } from "./errors.js";
+import type { AccessControls } from "./access.js";
 import { DEPENDENT_ETAG } from "./json.js";
 import type { Key, ServiceRuntime, TypeInfo } from "./service.js";
 import type { ExpandItem, Expr, OrderItem, QueryOptions } from "./uri/ast.js";
@@ -32,6 +33,8 @@ export class ReadEngine {
   public constructor(
     private readonly service: ServiceRuntime,
     private readonly db: () => Database,
+    /** The access controls (DCL) of the entities, for the user of the request (D35). */
+    private readonly access?: AccessControls,
   ) {}
 
   // -------------------------------------------------------------------------------------------
@@ -242,8 +245,39 @@ export class ReadEngine {
   // -------------------------------------------------------------------------------------------
   // queries
 
+  /** The condition of the access controls of the entity for the user of the request, if any. */
+  private accessCondition(info: TypeInfo, alias: string): RawBuilder<unknown> | undefined {
+    const fieldOf = (entity: TypeInfo["entity"], name: string): FieldModel => {
+      const field = entity.fields.find((f) => f.name === name) ?? entity.fields.find((f) => f.name.toLowerCase() === name.toLowerCase());
+      if (field === undefined) {
+        throw new Error(`access control: ${entity.name} has no element ${name}`);
+      }
+      return field;
+    };
+    return this.access?.condition(info.entity.name, (element) => {
+      const [association, name] = element.split(".");
+      if (name === undefined) {
+        const field = fieldOf(info.entity, element);
+        return { sql: sql.ref(`${alias}.${field.name}`), type: field.type };
+      }
+      // a path through a to-one association (_Travel.AgencyID): scalar sub-query on the target view
+      const { navigation, target } = this.service.navigationTarget(info, association as string);
+      const field = fieldOf(target.entity, name);
+      const inner = `${alias}_dcl_${(association as string).replace(/\W/g, "")}`;
+      const conditions = navigation.on.map((p) => sql`${sql.ref(`${inner}.${p.target}`)} = ${sql.ref(`${alias}.${p.source}`)}`);
+      return {
+        sql: sql`(SELECT ${sql.ref(`${inner}.${field.name}`)} FROM ${sql.table(target.view)} AS ${sql.id(inner)} WHERE ${sql.join(conditions, sql` AND `)} LIMIT 1)`,
+        type: field.type,
+      };
+    });
+  }
+
   private where(info: TypeInfo, alias: string, options: QueryOptions, extra: RawBuilder<unknown>[]): RawBuilder<unknown> {
     const conditions = [...extra];
+    const access = this.accessCondition(info, alias);
+    if (access !== undefined) {
+      conditions.push(access);
+    }
     if (options.filter !== undefined) {
       conditions.push(this.condition(info, alias, options.filter));
     }

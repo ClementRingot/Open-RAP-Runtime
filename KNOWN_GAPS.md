@@ -66,7 +66,9 @@ Versions de référence : `@abaplint/core` 2.120.98, `@abaplint/transpiler` 2.14
 | Chemins d'association dans la liste de sélection (`_Agency.Name`) | Diagnostic CDS002 |
 | Jointures, clause WHERE | Diagnostic CDS002 (WHERE ignoré avec avertissement) |
 | Vues avec paramètres, unions, hiérarchies, entités custom | Diagnostic CDS002 |
-| Contrôle d'accès DCL | `@AccessControl.authorizationCheck` ignoré |
+| Contrôle d'accès DCL : EML et ABAP SQL du behavior pool | Non filtrés (comme `WITH PRIVILEGED ACCESS`) ; seules les lectures OData le sont (D35). Comme dans RAP, les modifications passent par l'autorisation d'instance, pas par le DCL. |
+| Contrôle d'accès DCL : autres aspects (`bypass when`, aspects définis par l'utilisateur), chemins de plusieurs associations, `$filter` sur une navigation | Une condition non évaluée n'accorde aucune ligne (DCL002) ; la sous-requête d'un `$filter` sur `_Travel/…` lit la cible sans son DCL. |
+| `@AccessControl.authorizationCheck` | Informatif : un rôle s'applique s'il existe, quelle que soit la valeur. |
 | Structures incluses (`.INCLUDE`) dans les tables | Diagnostic DDIC003 |
 | Conversion exits (ALPHA…), conversion ISO des langues | Non gérés |
 

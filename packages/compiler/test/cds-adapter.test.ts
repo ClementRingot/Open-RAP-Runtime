@@ -14,7 +14,7 @@ describe("CDS adapter over abaplint", () => {
   it("reads a root view entity with a composition", () => {
     const travel = entity("zrt_r_travel.ddls.asddls");
     expect(travel).toMatchObject({ kind: "view", name: "ZRT_R_Travel", root: true, source: "zrt_travel", hasJoin: false, hasWhere: false });
-    expect(travel.annotations).toEqual({ accesscontrol: { authorizationcheck: "#NOT_REQUIRED" }, endusertext: { label: "Travel" } });
+    expect(travel.annotations).toEqual({ accesscontrol: { authorizationcheck: "#CHECK" }, endusertext: { label: "Travel" } });
     expect(travel.associations).toEqual([
       { kind: "composition", target: "ZRT_R_Booking", alias: "_Booking", cardinality: { min: 0, max: "*" }, on: [], loc: expect.anything() },
     ]);

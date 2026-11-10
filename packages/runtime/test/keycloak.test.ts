@@ -2,7 +2,8 @@
  * OIDC against a real Keycloak (D28): the generated application with AUTH_MODE=oidc and the realm
  * it generates (docker compose --profile oidc). The browser login (authorization code with PKCE,
  * the Keycloak login form), the session cookie on the UI and the OData service with its CSRF
- * token, the logout; and bearer tokens issued by Keycloak, checked with its JWKS.
+ * token, the logout; bearer tokens issued by Keycloak, checked with its JWKS; and an agent whose
+ * agency, a Keycloak user attribute, restricts AUTHORITY-CHECK and the access controls (D34, D35).
  *
  * Runs when RAPT_E2E_OIDC_APP (the application) and RAPT_E2E_OIDC_KEYCLOAK (Keycloak) are set,
  * e.g. by the docker job of the CI; RAPT_E2E_OIDC_ADMIN (`user:password`, default admin:admin)
@@ -187,6 +188,9 @@ describe.skipIf(APP === "" || KEYCLOAK === "")("OIDC with a real Keycloak", () =
     await createUser("bob", ["travel_agent"], { agency: ["070001"] });
     const bob = (await login("/ui/index.html", "bob", "bob")).browser;
     expect(await (await bob.get(`${APP}/auth/me`)).json()).toMatchObject({ roles: expect.arrayContaining(["travel_agent"]) });
+    // the access control (DCL) shows him the travels of his agency only
+    const visible = (await (await bob.get(`${APP}${SERVICE}Travel?$select=TravelID`)).json()) as { value: Array<{ TravelID: string }> };
+    expect(visible.value.map((v) => v.TravelID)).toEqual(["00000501"]);
     const csrf = (await bob.get(`${APP}${SERVICE}`, { method: "HEAD", headers: { "x-csrf-token": "Fetch" } })).headers.get("x-csrf-token") ?? "";
     const patch = (key: string): Promise<Response> =>
       bob.get(`${APP}${SERVICE}Travel(${key})`, { method: "PATCH", headers: { "content-type": "application/json", "x-csrf-token": csrf, "if-match": "*" }, body: JSON.stringify({ Description: "by bob" }) });

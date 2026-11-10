@@ -1,0 +1,6 @@
+@EndUserText.label: 'Travels (projection): as the travels'
+@MappingRole: true
+define role ZRT_C_TRAVEL {
+  grant select on ZRT_C_Travel
+    where inheriting conditions from entity ZRT_R_Travel;
+}

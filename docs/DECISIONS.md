@@ -530,3 +530,31 @@ et la conséquence. Les numéros D1 à D13 correspondent aux points 1 à 13 du �
 - **Tests** : `rap-authorizations.test.ts` (jetons signés localement), `authorizations.test.ts`
   (sémantique de `sy-subrc`), `authorizations.test.ts` du compilateur (diagnostics),
   `keycloak.test.ts` (un agent créé dans Keycloak avec son attribut d'agence).
+
+## D35 — Contrôles d'accès (DCL) sur les lectures
+
+- **Décision** : les rôles CDS des sources abapGit (objets DCLS : `define role R { grant select
+  on E where … ; }`) restreignent les lignes que le service OData renvoie à l'utilisateur de la
+  requête, dans les listes, `$count`, les lectures unitaires, `$expand` et les navigations. Une
+  ligne est accordée quand une condition d'un rôle de l'entité est vraie ; une entité sans rôle
+  est lisible entièrement (comme en ABAP CDS).
+- **Conditions évaluées** : `( E1, E2 ) = aspect pfcg_auth( OBJ, F1, F2, ACTVT = '03' )` sur les
+  autorisations de l'utilisateur (D34 : valeurs, motifs, plages, claims ; aucune autorisation →
+  aucune ligne), `E ?= aspect user` / `= aspect user` (nom ABAP de l'utilisateur), comparaisons à
+  des littéraux (format ABAP : dates `YYYYMMDD`), `like`, `is [not] null`, `and`, `or`, `not`,
+  parenthèses, chemins d'une association to-one (`_Travel.AgencyID`, lu par une sous-requête sur
+  la vue cible) et `inheriting conditions from entity B` : une projection reprend les
+  conditions de sa vue de base, ses éléments renommés comme elle les expose.
+- **Sécurité** : ce qui n'est pas évaluable (autres aspects, chemins plus longs, élément non
+  exposé par la projection) n'accorde rien (refus par défaut), avec un diagnostic (DCL002,
+  DCL003). Une lecture hors requête n'accorde rien. L'utilisateur de développement sans
+  `DEV_ROLES` n'est pas restreint.
+- **Ce qui n'est pas filtré** : l'EML et l'ABAP SQL du behavior pool (comme `WITH PRIVILEGED
+  ACCESS`) ; les modifications passent par l'autorisation d'instance, comme dans RAP.
+- **Réalisation** : parseur DCL (`dcl/parser.ts`), résolution pour les entités exposées
+  (`ir/access-controls.ts`, conditions dans `model.accessControls`), condition SQL calculée par
+  requête (`odata/access.ts`, utilisateur porté par un `AsyncLocalStorage`) et ajoutée au `WHERE`
+  du moteur de lecture.
+- **Fixture** : rôles `ZRT_R_TRAVEL` (agence par `pfcg_auth( ZAO_TRAVL, ZAGENCY, ACTVT = '03' )`),
+  `ZRT_C_TRAVEL` (hérite de la vue de base), `ZRT_C_BOOKING` (agence du voyage,
+  `_Travel.AgencyID`).

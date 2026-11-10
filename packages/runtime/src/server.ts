@@ -140,6 +140,7 @@ export async function start(options: StartOptions): Promise<RunningServer> {
     auth,
     logger: { level: env["LOG_LEVEL"] ?? "info" },
     ...(rap === undefined ? {} : { rap }),
+    authorizations,
     ...(env["SESSION_SECRET"] === undefined ? {} : { csrfSecret: env["SESSION_SECRET"] }),
     ...(existsSync(uiDir) && env["UI"] !== "off" ? { ui: { dir: uiDir, resourcesFrom: dir } } : {}),
   });

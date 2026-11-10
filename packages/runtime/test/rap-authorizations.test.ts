@@ -76,3 +76,37 @@ describe("AUTHORITY-CHECK with the roles of the token", () => {
     expect((await as(lost, "PATCH", `Travel(${T2})`, { Description: "by nobody" })).status).toBe(403);
   });
 });
+
+describe("access controls (DCL) on the reads", () => {
+  const ids = (body: Record<string, unknown>, field = "TravelID"): string[] => ((body["value"] as Array<Record<string, unknown>>) ?? []).map((r) => String(r[field])).sort();
+
+  it("shows an agent the travels and bookings of the agency of the token only", async () => {
+    const agent = await tokenOf("alice", ["travel_agent"], { agency: "070001" });
+    const travels = await as(agent, "GET", "Travel?$select=TravelID,AgencyID&$count=true");
+    expect(travels.status).toBe(200);
+    expect(((travels.body["value"] as Array<Record<string, unknown>>) ?? []).every((t) => t["AgencyID"] === "070001")).toBe(true);
+    expect(ids(travels.body)).toContain("00000001");
+    expect(ids(travels.body)).not.toContain("00000002");
+    expect(travels.body["@odata.count"]).toBe(ids(travels.body).length);
+    // a travel of another agency is not found; its bookings neither (the agency of their travel)
+    expect((await as(agent, "GET", `Travel(${T2})`)).status).toBe(404);
+    const bookings = await as(agent, "GET", "Booking?$select=BookingUUID,TravelUUID");
+    expect(((bookings.body["value"] as Array<Record<string, unknown>>) ?? []).every((b) => b["TravelUUID"] === T1 || b["TravelUUID"] !== T2)).toBe(true);
+    expect(((bookings.body["value"] as Array<Record<string, unknown>>) ?? []).some((b) => b["TravelUUID"] === T2)).toBe(false);
+    const expanded = await as(agent, "GET", `Travel(${T1})?$select=TravelID&$expand=_Booking($select=BookingID)`);
+    expect((expanded.body["_Booking"] as unknown[]).length).toBe(3);
+  });
+
+  it("shows a viewer the agencies of its pattern, a manager every travel, a user without role none", async () => {
+    const viewer = await tokenOf("victor", ["travel_viewer"]);
+    expect(ids((await as(viewer, "GET", "Travel?$select=TravelID")).body)).toEqual(expect.arrayContaining(["00000001", "00000002", "00000003"]));
+    const manager = await tokenOf("mona", ["travel_manager"]);
+    expect(ids((await as(manager, "GET", "Travel?$select=TravelID")).body)).toEqual(expect.arrayContaining(["00000001", "00000002", "00000003"]));
+    const nobody = await tokenOf("nina", []);
+    const none = await as(nobody, "GET", "Travel?$select=TravelID&$count=true");
+    expect(none.status).toBe(200);
+    expect(none.body).toMatchObject({ "@odata.count": 0, value: [] });
+    expect((await as(nobody, "GET", `Travel(${T1})`)).status).toBe(404);
+    expect((await t.app.inject({ method: "GET", url: `${SERVICE}Booking/$count`, headers: { authorization: `Bearer ${nobody}` } })).body).toBe("0");
+  });
+});

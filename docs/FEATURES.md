@@ -157,7 +157,7 @@ ajoutent ce que la fixture n'utilise pas : numérotation, feature control global
 | Métadonnées d'extension (DDLX) et fusion des annotations | ✅ | |
 | Entités abstraites (paramètres et résultats d'actions et de fonctions) | ✅ | |
 | Expressions CDS (CASE, CAST, calculs, littéraux) | ❌ | Prévu après le MVP. |
-| Contrôle d'accès DCL | ❌ | `@AccessControl.authorizationCheck` est ignoré. |
+| Contrôle d'accès DCL (`define role … grant select on … where …`) | ✅ | Lectures OData filtrées pour l'utilisateur : `aspect pfcg_auth` (filtres `ACTVT = '03'`, n-uplets), `aspect user`, `?=`, comparaisons, `like`, `is [not] null`, `and`/`or`/`not`, chemins `_Assoc.Element` (to-one), `inheriting conditions from entity` (D35). Tests `rap-authorizations.test.ts`, `dcl.test.ts`. |
 | Side effects (`side effects { … }`) | ✅ | `Common.SideEffects` dans le `$metadata` ; l'UI générée ne les exploite pas encore (rechargement de l'objet après sauvegarde). |
 
 ## Service OData V4

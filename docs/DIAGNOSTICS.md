@@ -73,6 +73,10 @@ Le code de retour est 1 dès qu'il y a une erreur (ou un avertissement avec
 | ABP009 | erreur | Résultat d'un `SELECT` qu'abaplint ne type pas (littéral, agrégat autre que `COUNT(*)`, `MAX` et `MIN`, expression) en déclaration en ligne : déclarer la cible |
 | ABP010 | erreur | `AUTHORITY-CHECK` sur un champ que l'objet d'autorisation n'a pas |
 | ABP011 | avertissement | `AUTHORITY-CHECK` sur un objet d'autorisation ni dans les sources (SUSO), ni dans `rapt/authorizations.json` : aucun rôle ne l'accorde |
+| DCL001 | erreur | Contrôle d'accès (DCL) illisible, ou héritage circulaire |
+| DCL002 | avertissement | Condition d'un contrôle d'accès que l'application n'évalue pas : elle n'accorde aucune ligne |
+| DCL003 | avertissement | Élément, association ou entité inconnu dans un contrôle d'accès, ou non exposé par la projection : la condition n'accorde aucune ligne |
+| DCL004 | erreur ou avertissement | `aspect pfcg_auth` sur un champ que l'objet d'autorisation n'a pas (erreur), ou sur un objet inconnu (avertissement) |
 | AUTH001 | erreur | Objet d'autorisation ou `rapt/authorizations.json` illisible ou mal formé |
 | AUTH002 | avertissement | Rôle accordant un objet d'autorisation inconnu (ses champs ne sont pas contrôlés) |
 | AUTH003 | erreur | Rôle donnant une valeur à un champ que l'objet d'autorisation n'a pas |

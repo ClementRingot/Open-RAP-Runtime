@@ -778,7 +778,7 @@
       ],
       "annotations": {
         "accesscontrol": {
-          "authorizationcheck": "#NOT_REQUIRED"
+          "authorizationcheck": "#CHECK"
         },
         "endusertext": {
           "label": "Booking"
@@ -1397,7 +1397,7 @@
       ],
       "annotations": {
         "accesscontrol": {
-          "authorizationcheck": "#NOT_REQUIRED"
+          "authorizationcheck": "#CHECK"
         },
         "endusertext": {
           "label": "Travel"
@@ -2093,7 +2093,7 @@
       ],
       "annotations": {
         "accesscontrol": {
-          "authorizationcheck": "#NOT_REQUIRED"
+          "authorizationcheck": "#CHECK"
         },
         "endusertext": {
           "label": "Travel"
@@ -2833,5 +2833,47 @@
         "description": "Displays the travels of the agencies 07…"
       }
     ]
-  }
+  },
+  "accessControls": [
+    {
+      "role": "ZRT_C_TRAVEL",
+      "entity": "ZRT_C_Travel",
+      "conditions": [
+        {
+          "kind": "pfcg",
+          "elements": [
+            "AgencyID"
+          ],
+          "object": "ZAO_TRAVL",
+          "fields": [
+            "ZAGENCY"
+          ],
+          "filters": {
+            "ACTVT": "03"
+          },
+          "orInitial": false
+        }
+      ]
+    },
+    {
+      "role": "ZRT_C_BOOKING",
+      "entity": "ZRT_C_Booking",
+      "conditions": [
+        {
+          "kind": "pfcg",
+          "elements": [
+            "_Travel.AgencyID"
+          ],
+          "object": "ZAO_TRAVL",
+          "fields": [
+            "ZAGENCY"
+          ],
+          "filters": {
+            "ACTVT": "03"
+          },
+          "orInitial": false
+        }
+      ]
+    }
+  ]
 }

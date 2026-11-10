@@ -77,8 +77,8 @@ export type AccessCondition =
   | { kind: "not"; operand: AccessCondition }
   | { kind: "compare"; element: string; operator: "=" | "<>" | "<" | "<=" | ">" | ">=" | "like"; value: string }
   | { kind: "null"; element: string; negated: boolean }
-  /** `( E1, E2 ) = aspect pfcg_auth( OBJECT, FIELD1, FIELD2, ACTVT = '03' )`. */
-  | { kind: "pfcg"; elements: string[]; object: string; fields: string[]; filters: Record<string, string> }
+  /** `( E1, E2 ) = aspect pfcg_auth( OBJECT, FIELD1, FIELD2, ACTVT = '03' )`; `?=` also grants initial values. */
+  | { kind: "pfcg"; elements: string[]; object: string; fields: string[]; filters: Record<string, string>; orInitial: boolean }
   /** `E = aspect user`; `?=` also grants the rows whose element is initial. */
   | { kind: "user"; element: string; orInitial: boolean }
   | { kind: "true" }

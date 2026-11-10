@@ -19,6 +19,7 @@ import { COMPILER_VERSION } from "../version.js";
 import { buildBehavior } from "./behaviors.js";
 import { Dictionary } from "./dictionary.js";
 import { EntityResolver } from "./entities.js";
+import { loadAccessControls } from "./access-controls.js";
 import { checkAuthorityChecks, loadAuthorizations } from "./authorizations.js";
 import { abaplintRegistry, attachHandlers, syntaxCheck } from "./handlers.js";
 import { selectService, type ServiceOptions } from "./service.js";
@@ -215,6 +216,11 @@ export function buildModel(project: Project, options: BuildOptions = {}): BuildR
     messageClasses,
     ...(authorizations === undefined ? {} : { authorizations }),
   };
+  // access controls (DCL) of the exposed entities (D35)
+  const accessControls = loadAccessControls(project, model, authorizations, diagnostics);
+  if (accessControls.length > 0) {
+    model.accessControls = accessControls;
+  }
   return diagnostics.hasErrors() ? { diagnostics, model } : { diagnostics, model };
 }
 
