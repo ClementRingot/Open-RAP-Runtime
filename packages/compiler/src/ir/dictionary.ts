@@ -98,8 +98,16 @@ export class Dictionary {
     return standard === undefined ? undefined : { type: standard };
   }
 
-  /** The table model of a dictionary table, with diagnostics on the TABL file; cached. */
-  public table(name: string): TableModel | undefined {
+  /** Names of the transparent tables of the project (not the structures). */
+  public transparentTableNames(): string[] {
+    return [...this.tables.values()].filter((t) => t.xml.tableClass === "TRANSP").map((t) => t.xml.name);
+  }
+
+  /**
+   * The table model of a dictionary table, with diagnostics on the TABL file (or on `sink`);
+   * cached.
+   */
+  public table(name: string, sink: Diagnostics = this.diagnostics): TableModel | undefined {
     const upper = name.toUpperCase();
     if (this.built.has(upper)) {
       return this.built.get(upper);
@@ -114,14 +122,14 @@ export class Dictionary {
     xml.fields.forEach((field, index) => {
       const location = { file: file.path, line: lineOf(file.content, field.fieldName, index) };
       if (field.include !== undefined || field.fieldName.startsWith(".")) {
-        this.diagnostics.error("DDIC003", `${xml.name}: include structures (${field.fieldName} ${field.include ?? ""}) are not supported`, location);
+        sink.error("DDIC003", `${xml.name}: include structures (${field.fieldName} ${field.include ?? ""}) are not supported`, location);
         return;
       }
       let type: AbapType | undefined;
       if (field.rollName !== undefined && field.rollName !== "") {
         type = this.dataElement(field.rollName)?.type;
         if (type === undefined) {
-          this.diagnostics.error(
+          sink.error(
             "DDIC001",
             `${xml.name}-${field.fieldName}: unknown data element ${field.rollName} (add its DTEL to the sources)`,
             location,
@@ -131,7 +139,7 @@ export class Dictionary {
       } else if (field.dataType !== undefined) {
         const kind = ddicTypeKind(field.dataType);
         if (kind === undefined) {
-          this.diagnostics.error("DDIC002", `${xml.name}-${field.fieldName}: unsupported data type ${field.dataType}`, location);
+          sink.error("DDIC002", `${xml.name}-${field.fieldName}: unsupported data type ${field.dataType}`, location);
           return;
         }
         type = { kind };
@@ -142,7 +150,7 @@ export class Dictionary {
           type.decimals = field.decimals;
         }
       } else {
-        this.diagnostics.error("DDIC002", `${xml.name}-${field.fieldName}: no type`, location);
+        sink.error("DDIC002", `${xml.name}-${field.fieldName}: no type`, location);
         return;
       }
       const column: ColumnModel = {
@@ -158,7 +166,7 @@ export class Dictionary {
       columns.push(column);
     });
     if (xml.tableClass !== "TRANSP") {
-      this.diagnostics.warning("DDIC004", `${xml.name}: table class ${xml.tableClass} handled as a transparent table`, { file: file.path, line: 1 });
+      sink.warning("DDIC004", `${xml.name}: table class ${xml.tableClass} handled as a transparent table`, { file: file.path, line: 1 });
     }
     const table: TableModel = { name: sqlName(xml.name), columns, src: { file: file.path, line: 1, column: 1 } };
     if (xml.description !== undefined) {

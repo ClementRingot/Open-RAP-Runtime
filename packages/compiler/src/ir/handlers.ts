@@ -4,7 +4,7 @@
  */
 
 import * as abaplint from "@abaplint/core";
-import { same, type BehaviorModel, type EntityBehaviorModel, type HandlerParamRole, type HandlerRef } from "@rap-transpiler/model";
+import { same, type BehaviorModel, type EntityBehaviorModel, type HandlerParamRole, type HandlerRef, type SaverModel } from "@rap-transpiler/model";
 import type { Diagnostics } from "../diagnostics.js";
 import type { Project } from "../input/project.js";
 
@@ -202,6 +202,88 @@ function findHandlers(registry: abaplint.Registry, poolName: string, project: Pr
   return found;
 }
 
+interface FoundSaver {
+  saver: SaverModel;
+  /** Saver methods redefined, lower case. */
+  methods: Map<string, number>;
+  file: string;
+  line: number;
+}
+
+/** The local saver class of a behavior pool (`INHERITING FROM cl_abap_behavior_saver[_failed]`). */
+function findSaver(registry: abaplint.Registry, poolName: string, project: Project): FoundSaver | undefined {
+  const object = registry.getObject("CLAS", poolName);
+  if (!(object instanceof abaplint.Objects.Class)) {
+    return undefined;
+  }
+  for (const file of object.getABAPFiles()) {
+    const sourceFile = project.files.find((f) => f.fileName === file.getFilename());
+    for (const definition of file.getStructure()?.findAllStructures(abaplint.Structures.ClassDefinition) ?? []) {
+      const header = definition.findFirstStatement(abaplint.Statements.ClassDefinition);
+      const headerText = (header?.concatTokens() ?? "").replace(/\s+/g, " ");
+      const superMatch = /INHERITING FROM (\S+)/i.exec(headerText);
+      const superclass = (superMatch?.[1] ?? "").replace(/\.$/, "").toUpperCase();
+      if (superclass !== "CL_ABAP_BEHAVIOR_SAVER" && superclass !== "CL_ABAP_BEHAVIOR_SAVER_FAILED") {
+        continue;
+      }
+      const className = (/^CLASS (\S+) DEFINITION/i.exec(headerText)?.[1] ?? "").toUpperCase();
+      const methods = new Map<string, number>();
+      for (const statement of definition.findAllStatements(abaplint.Statements.MethodDef)) {
+        const name = statement.getTokens()[1]?.getStr().toLowerCase();
+        if (name !== undefined) {
+          methods.set(name, statement.getStart().getRow());
+        }
+      }
+      return {
+        saver: { classKey: `CLAS-${poolName.toUpperCase()}-${className}`, className, withFailed: superclass === "CL_ABAP_BEHAVIOR_SAVER_FAILED" },
+        methods,
+        file: sourceFile?.path ?? file.getFilename(),
+        line: header?.getStart().getRow() ?? 1,
+      };
+    }
+  }
+  return undefined;
+}
+
+/** The saver class for additional and unmanaged save (save_modified, cleanup). */
+function attachSaver(behavior: BehaviorModel, pools: Set<string>, registry: abaplint.Registry, project: Project, diagnostics: Diagnostics): void {
+  const needed = behavior.saving !== undefined || behavior.entities.some((e) => e.saving !== undefined);
+  let found: FoundSaver | undefined;
+  for (const pool of pools) {
+    found ??= findSaver(registry, pool, project);
+  }
+  if (found === undefined) {
+    if (needed) {
+      diagnostics.error("ABP002", `${behavior.name}: with additional or unmanaged save, the behavior pool needs a saver class (INHERITING FROM cl_abap_behavior_saver) with save_modified`, behavior.src);
+    }
+    return;
+  }
+  if (!needed) {
+    diagnostics.warning("ABP003", `saver class ${found.saver.className} is not called: the BDEF has no with additional save or with unmanaged save`, { file: found.file, line: found.line });
+    return;
+  }
+  const ref = (method: string): HandlerRef => ({
+    classKey: found.saver.classKey,
+    className: found.saver.className,
+    method,
+    params: { reported: "reported", ...(found.saver.withFailed ? { failed: "failed" } : {}) },
+  });
+  if (found.methods.has("save_modified")) {
+    found.saver.saveModified = ref("save_modified");
+  } else {
+    diagnostics.error("ABP002", `saver class ${found.saver.className} must redefine save_modified`, { file: found.file, line: found.line });
+  }
+  if (found.methods.has("cleanup")) {
+    found.saver.cleanup = { ...ref("cleanup"), params: {} };
+  }
+  for (const [method, line] of found.methods) {
+    if (method !== "save_modified" && method !== "cleanup") {
+      diagnostics.warning("ABP003", `saver method ${method} is not available in a managed BO with additional or unmanaged save and is not called`, { file: found.file, line });
+    }
+  }
+  behavior.saver = found.saver;
+}
+
 /** Links the handlers of the behavior pools to the BDEF elements and reports what is missing. */
 export function attachHandlers(behavior: BehaviorModel, registry: abaplint.Registry, project: Project, diagnostics: Diagnostics): void {
   if (behavior.implementationType !== "managed") {
@@ -225,6 +307,7 @@ export function attachHandlers(behavior: BehaviorModel, registry: abaplint.Regis
     }
     handlers.push(...findHandlers(registry, pool, project));
   }
+  attachSaver(behavior, pools, registry, project, diagnostics);
   const take = (entity: EntityBehaviorModel, predicate: (h: FoundHandler) => boolean): HandlerRef | undefined => {
     const handler = handlers.find((h) => "alias" in h.what && (same(h.what.alias, entity.alias) || same(h.what.alias, entity.entity)) && predicate(h));
     if (handler !== undefined) {

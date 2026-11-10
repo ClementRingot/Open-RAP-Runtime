@@ -155,8 +155,32 @@ export interface BehaviorModel {
   implementationClass?: string;
   strict?: number;
   privilegedMode: boolean;
+  /** `managed with additional save` / `managed with unmanaged save` of the header. */
+  saving?: SavingModel;
+  /** The saver class of the behavior pool (`lsc_…`), for additional and unmanaged save. */
+  saver?: SaverModel;
   entities: EntityBehaviorModel[];
   src?: SourceRef;
+}
+
+/**
+ * Additional save: the managed runtime writes the persistent tables and calls save_modified too.
+ * Unmanaged save: save_modified writes; the entity has no persistent table.
+ */
+export interface SavingModel {
+  kind: "additional" | "unmanaged";
+  /** `with full data`: the update rows hold every field (they always do here). */
+  fullData: boolean;
+}
+
+export interface SaverModel {
+  /** Runtime class key of the local saver class: `CLAS-ZBP_R_TRAVEL-LSC_ZR_TRAVEL`. */
+  classKey: string;
+  className: string;
+  saveModified?: HandlerRef;
+  cleanup?: HandlerRef;
+  /** Inherits from cl_abap_behavior_saver_failed: save_modified has a failed parameter. */
+  withFailed: boolean;
 }
 
 export type FeatureControl = "instance" | "global";
@@ -276,6 +300,8 @@ export interface EntityBehaviorModel {
   root: boolean;
   persistentTable?: string;
   implementationClass?: string;
+  /** `with additional save` / `with unmanaged save` of the entity (else the header's). */
+  saving?: SavingModel;
   lock?: { kind: "master" } | { kind: "dependent"; by: string };
   etag?: { kind: "master"; field: string } | { kind: "dependent"; by: string };
   authorization?: { kind: "master"; global: boolean; instance: boolean } | { kind: "dependent"; by: string };

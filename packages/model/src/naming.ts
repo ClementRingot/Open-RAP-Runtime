@@ -43,6 +43,8 @@ export const derivedType = {
   update: (e: number) => `tt_e${e}_upd`,
   updateRow: (e: number) => `ts_e${e}_upd`,
   delete: (e: number) => `tt_e${e}_del`,
+  change: (e: number) => `tt_e${e}_chg`,
+  changeRow: (e: number) => `ts_e${e}_chg`,
   readImport: (e: number) => `tt_e${e}_rimp`,
   readResult: (e: number) => `tt_e${e}_rres`,
   readResultRow: (e: number) => `ts_e${e}_rres`,
@@ -74,6 +76,8 @@ export const derivedType = {
   reportedLate: "ts_reported_late",
   mappedEarly: "ts_mapped_early",
   mappedLate: "ts_mapped_late",
+  requestChange: "ts_request_change",
+  requestDelete: "ts_request_delete",
 } as const;
 
 /** ABAP component name of a CDS element or alias: ABAP is case-insensitive, the runtime uses lower case. */

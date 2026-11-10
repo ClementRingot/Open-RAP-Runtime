@@ -148,3 +148,200 @@ export function featuresVariant(): Record<string, string | ((content: string) =>
     },
   };
 }
+
+// ---------------------------------------------------------------------------------------------
+// savers
+
+/** The saver of the unmanaged save: the travels through MAPPING FROM ENTITY, the bookings in plain ABAP SQL. */
+const UNMANAGED_SAVER = `
+CLASS lsc_zrt_r_travel DEFINITION INHERITING FROM cl_abap_behavior_saver.
+  PROTECTED SECTION.
+    METHODS save_modified REDEFINITION.
+    METHODS cleanup REDEFINITION.
+ENDCLASS.
+
+CLASS lsc_zrt_r_travel IMPLEMENTATION.
+  METHOD save_modified.
+    IF create-travel IS NOT INITIAL.
+      INSERT zrt_travel FROM TABLE @create-travel MAPPING FROM ENTITY.
+    ENDIF.
+    IF update-travel IS NOT INITIAL.
+      UPDATE zrt_travel FROM TABLE @update-travel INDICATORS SET STRUCTURE %control MAPPING FROM ENTITY.
+    ENDIF.
+    IF delete-travel IS NOT INITIAL.
+      DELETE zrt_travel FROM TABLE @delete-travel MAPPING FROM ENTITY.
+    ENDIF.
+
+    " the bookings in plain ABAP SQL, the mapping written by hand
+    DATA bookings TYPE STANDARD TABLE OF zrt_booking WITH EMPTY KEY.
+    bookings = VALUE #( FOR b IN create-booking ( booking_uuid   = b-BookingUUID
+                                                  parent_uuid    = b-TravelUUID
+                                                  booking_id     = b-BookingID
+                                                  booking_date   = b-BookingDate
+                                                  carrier_id     = b-CarrierID
+                                                  connection_id  = b-ConnectionID
+                                                  flight_date    = b-FlightDate
+                                                  flight_price   = b-FlightPrice
+                                                  currency_code  = b-CurrencyCode
+                                                  booking_status = b-BookingStatus ) ).
+    IF bookings IS NOT INITIAL.
+      INSERT zrt_booking FROM TABLE @bookings.
+    ENDIF.
+    LOOP AT update-booking INTO DATA(changed) WHERE %control-FlightPrice = if_abap_behv=>mk-on.
+      UPDATE zrt_booking SET flight_price = @changed-FlightPrice WHERE booking_uuid = @changed-BookingUUID.
+    ENDLOOP.
+    LOOP AT delete-booking INTO DATA(deleted).
+      DELETE FROM zrt_booking WHERE booking_uuid = @deleted-BookingUUID.
+    ENDLOOP.
+
+    APPEND new_message_with_text( severity = if_abap_behv_message=>severity-success
+                                  text     = |Saved by save_modified| ) TO reported-%other.
+  ENDMETHOD.
+
+  METHOD cleanup.
+  ENDMETHOD.
+ENDCLASS.
+`;
+
+/**
+ * Unmanaged save: no persistent tables, save_modified writes the travels (MAPPING FROM ENTITY,
+ * INDICATORS) and the bookings (plain INSERT, UPDATE, DELETE).
+ */
+export function unmanagedSaveVariant(): Record<string, string | ((content: string) => string)> {
+  return {
+    "zrt_r_travel.bdef.asbdef": (c) =>
+      edit(c, [
+        ["managed implementation in class zbp_rt_r_travel unique;", "managed with unmanaged save implementation in class zbp_rt_r_travel unique;"],
+        ["persistent table zrt_travel\n", ""],
+        ["persistent table zrt_booking\n", ""],
+      ]),
+    [ABP]: (c) => `${c.trimEnd()}\n${UNMANAGED_SAVER}`,
+  };
+}
+
+const TRAVEL_LOG_TABLE = `<?xml version="1.0" encoding="utf-8"?>
+<abapGit version="v1.0.0" serializer="LCL_OBJECT_TABL" serializer_version="v1.0.0">
+ <asx:abap xmlns:asx="http://www.sap.com/abapxml" version="1.0">
+  <asx:values>
+   <DD02V>
+    <TABNAME>ZRT_TRAVEL_LOG</TABNAME>
+    <DDLANGUAGE>E</DDLANGUAGE>
+    <TABCLASS>TRANSP</TABCLASS>
+    <DDTEXT>Changes of the travels</DDTEXT>
+    <CONTFLAG>A</CONTFLAG>
+   </DD02V>
+   <DD03P_TABLE>
+    <DD03P>
+     <FIELDNAME>LOG_UUID</FIELDNAME>
+     <KEYFLAG>X</KEYFLAG>
+     <ROLLNAME>SYSUUID_X16</ROLLNAME>
+     <NOTNULL>X</NOTNULL>
+     <COMPTYPE>E</COMPTYPE>
+    </DD03P>
+    <DD03P>
+     <FIELDNAME>TRAVEL_UUID</FIELDNAME>
+     <ROLLNAME>SYSUUID_X16</ROLLNAME>
+     <COMPTYPE>E</COMPTYPE>
+    </DD03P>
+    <DD03P>
+     <FIELDNAME>OPERATION</FIELDNAME>
+     <INTTYPE>C</INTTYPE>
+     <INTLEN>000002</INTLEN>
+     <DATATYPE>CHAR</DATATYPE>
+     <LENG>000001</LENG>
+     <MASK>  CHAR</MASK>
+    </DD03P>
+    <DD03P>
+     <FIELDNAME>DESCRIPTION</FIELDNAME>
+     <INTTYPE>C</INTTYPE>
+     <INTLEN>000512</INTLEN>
+     <DATATYPE>CHAR</DATATYPE>
+     <LENG>000256</LENG>
+     <MASK>  CHAR</MASK>
+    </DD03P>
+    <DD03P>
+     <FIELDNAME>LOGGED_BY</FIELDNAME>
+     <INTTYPE>C</INTTYPE>
+     <INTLEN>000024</INTLEN>
+     <DATATYPE>CHAR</DATATYPE>
+     <LENG>000012</LENG>
+     <MASK>  CHAR</MASK>
+    </DD03P>
+    <DD03P>
+     <FIELDNAME>LOGGED_ON</FIELDNAME>
+     <INTTYPE>D</INTTYPE>
+     <INTLEN>000016</INTLEN>
+     <DATATYPE>DATS</DATATYPE>
+     <LENG>000008</LENG>
+     <MASK>  DATS</MASK>
+    </DD03P>
+   </DD03P_TABLE>
+  </asx:values>
+ </asx:abap>
+</abapGit>
+`;
+
+/**
+ * The saver of the additional save: one log row per changed travel, in plain ABAP SQL; as a
+ * cl_abap_behavior_saver_failed, it refuses one description (failed rolls the LUW back).
+ */
+const ADDITIONAL_SAVER = `
+CLASS lsc_zrt_r_travel DEFINITION INHERITING FROM cl_abap_behavior_saver_failed.
+  PROTECTED SECTION.
+    METHODS save_modified REDEFINITION.
+ENDCLASS.
+
+CLASS lsc_zrt_r_travel IMPLEMENTATION.
+  METHOD save_modified.
+    DATA log TYPE STANDARD TABLE OF zrt_travel_log WITH EMPTY KEY.
+    DATA entry TYPE zrt_travel_log.
+
+    entry-logged_by = sy-uname.
+    entry-logged_on = cl_abap_context_info=>get_system_date( ).
+    TRY.
+        LOOP AT create-travel INTO DATA(created).
+          entry-log_uuid = cl_system_uuid=>create_uuid_x16_static( ).
+          entry-travel_uuid = created-TravelUUID.
+          entry-operation = 'C'.
+          entry-description = created-Description.
+          APPEND entry TO log.
+        ENDLOOP.
+        LOOP AT update-travel INTO DATA(updated).
+          IF updated-Description = 'Refused by the saver'.
+            APPEND VALUE #( %tky = updated-%tky ) TO failed-travel.
+            APPEND VALUE #( %tky = updated-%tky
+                            %msg = new_message_with_text( text = 'The saver refuses this description' ) ) TO reported-travel.
+            RETURN.
+          ENDIF.
+          entry-log_uuid = cl_system_uuid=>create_uuid_x16_static( ).
+          entry-travel_uuid = updated-TravelUUID.
+          entry-operation = 'U'.
+          entry-description = COND #( WHEN updated-%control-Description = if_abap_behv=>mk-on THEN updated-Description ).
+          APPEND entry TO log.
+        ENDLOOP.
+        LOOP AT delete-travel INTO DATA(deleted).
+          entry-log_uuid = cl_system_uuid=>create_uuid_x16_static( ).
+          entry-travel_uuid = deleted-TravelUUID.
+          entry-operation = 'D'.
+          CLEAR entry-description.
+          APPEND entry TO log.
+        ENDLOOP.
+      CATCH cx_uuid_error.
+        RETURN.
+    ENDTRY.
+
+    IF log IS NOT INITIAL.
+      INSERT zrt_travel_log FROM TABLE @log.
+    ENDIF.
+  ENDMETHOD.
+ENDCLASS.
+`;
+
+/** Additional save: the RAP runtime writes the BO, save_modified writes a log table. */
+export function additionalSaveVariant(): Record<string, string | ((content: string) => string)> {
+  return {
+    "zrt_travel_log.tabl.xml": TRAVEL_LOG_TABLE,
+    "zrt_r_travel.bdef.asbdef": (c) => edit(c, [["managed implementation in class zbp_rt_r_travel unique;", "managed with additional save implementation in class zbp_rt_r_travel unique;"]]),
+    [ABP]: (c) => `${c.trimEnd()}\n${ADDITIONAL_SAVER}`,
+  };
+}

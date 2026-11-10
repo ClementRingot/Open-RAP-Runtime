@@ -60,7 +60,7 @@ export class RapRuntime {
       if (context === undefined) {
         throw new Error("ABAP SQL outside of a RAP transaction");
       }
-      return context.tx.db;
+      return { db: context.tx.db, writable: context.tx.inSaver };
     });
     abap.MSAG = model.messageClasses;
     return runtime;

@@ -104,6 +104,8 @@ export class Transaction {
   private readonly locked = new Set<string>();
   private source: string | undefined;
   private saved = false;
+  /** The saver runs (save_modified, cleanup): the only place where ABAP SQL may write. */
+  public inSaver = false;
 
   public constructor(
     private readonly services: TransactionServices,
@@ -1081,13 +1083,158 @@ export class Transaction {
       return responses;
     }
     await this.write();
-    this.saved = true;
+    // additional and unmanaged save: save_modified, whose failed (cl_abap_behavior_saver_failed)
+    // makes the caller roll the LUW back
+    responses.add(await this.saveModified());
+    this.saved = !responses.hasFailed;
+    return responses;
+  }
+
+  /** The changes of the LUW for save_modified: created, updated and deleted instances. */
+  private changes(bo: BoEntity): { created: Instance[]; updated: Instance[]; deleted: Instance[] } {
+    const result = { created: [] as Instance[], updated: [] as Instance[], deleted: [] as Instance[] };
+    for (const instance of this.instances.values()) {
+      if (instance.bo !== bo) {
+        continue;
+      }
+      if (instance.deleted) {
+        if (instance.persisted !== undefined) {
+          result.deleted.push(instance);
+        }
+      } else if (instance.persisted === undefined) {
+        result.created.push(instance);
+      } else if (instance.changed.size > 0) {
+        result.updated.push(instance);
+      }
+    }
+    return result;
+  }
+
+  /**
+   * `INSERT|UPDATE|MODIFY|DELETE dbtab FROM [TABLE] @source [INDICATORS SET STRUCTURE %control]
+   * MAPPING FROM ENTITY` in save_modified: the rows of the entity are written to the table of its
+   * BDEF mapping. sy-subrc 4 when a row is not found (UPDATE, DELETE) or already there (INSERT of
+   * a work area); an INSERT FROM TABLE with a duplicate key is a runtime error, as in ABAP.
+   */
+  public async writeMapped(bo: BoEntity, operation: string, rows: Array<{ values: Row; control: Set<string> | undefined }>, single: boolean, indicators: boolean): Promise<{ subrc: number; dbcnt: number }> {
+    if (!this.inSaver) {
+      throw new RapRuntimeError(`${operation} on a database table is only possible in save_modified (with additional or unmanaged save)`);
+    }
+    const mapped = bo.mapped;
+    if (mapped === undefined) {
+      throw new RapRuntimeError(`${bo.entity.name} has no table mapping`);
+    }
+    const table = sql.id(mapped.table.name);
+    const columns = [...mapped.columns.entries()];
+    const isKey = (field: string): boolean => bo.keys.some((k) => k.name === field);
+    const typeOf = (field: string): FieldModel["type"] => (this.bo.field(bo, field) as FieldModel).type;
+    let dbcnt = 0;
+    let missing = false;
+    for (const { values, control } of rows) {
+      const value = (field: string) => toSql(typeOf(field), values[field] ?? null);
+      const where = sql.join(columns.filter(([f]) => isKey(f)).map(([f, c]) => sql`${sql.id(c)} = ${value(f)}`), sql` AND `);
+      const names = sql.join(columns.map(([, c]) => sql.id(c)));
+      const list = sql.join(columns.map(([f]) => value(f)));
+      if (operation === "INSERT") {
+        try {
+          await withSavepoint(this.db, () => sql`INSERT INTO ${table} (${names}) VALUES (${list})`.execute(this.db));
+          dbcnt++;
+        } catch (error) {
+          if ((error as { code?: string }).code !== "23505") {
+            throw error;
+          }
+          if (!single) {
+            throw new RapRuntimeError(`INSERT ${mapped.table.name} FROM TABLE: a row with the same key exists (CX_SY_OPEN_SQL_DB)`);
+          }
+          missing = true;
+        }
+      } else if (operation === "UPDATE") {
+        const sets = columns.filter(([f]) => !isKey(f) && (!indicators || control?.has(f) === true)).map(([f, c]) => sql`${sql.id(c)} = ${value(f)}`);
+        if (sets.length === 0) {
+          continue;
+        }
+        const result = await sql`UPDATE ${table} SET ${sql.join(sets)} WHERE ${where}`.execute(this.db);
+        const count = Number(result.numAffectedRows ?? 0n);
+        dbcnt += count;
+        missing ||= count === 0;
+      } else if (operation === "MODIFY") {
+        const keys = sql.join(columns.filter(([f]) => isKey(f)).map(([, c]) => sql.id(c)));
+        const sets = columns.filter(([f]) => !isKey(f)).map(([, c]) => sql`${sql.id(c)} = EXCLUDED.${sql.id(c)}`);
+        await sql`INSERT INTO ${table} (${names}) VALUES (${list}) ON CONFLICT (${keys}) DO ${sets.length === 0 ? sql`NOTHING` : sql`UPDATE SET ${sql.join(sets)}`}`.execute(this.db);
+        dbcnt++;
+      } else if (operation === "DELETE") {
+        const result = await sql`DELETE FROM ${table} WHERE ${where}`.execute(this.db);
+        const count = Number(result.numAffectedRows ?? 0n);
+        dbcnt += count;
+        missing ||= count === 0;
+      } else {
+        throw new RapRuntimeError(`unknown ABAP SQL operation ${operation}`);
+      }
+    }
+    return { subrc: missing ? 4 : 0, dbcnt };
+  }
+
+  /** save_modified (and cleanup) of the BDEFs with additional or unmanaged save. */
+  private async saveModified(): Promise<Responses> {
+    const responses = new Responses();
+    for (const bdef of new Set(this.bo.entities.map((e) => e.bdef))) {
+      const saver = bdef.saver;
+      const entities = this.bo.entities.filter((e) => e.bdef === bdef && e.saving !== "managed");
+      const first = entities[0];
+      if (saver?.saveModified === undefined || first === undefined) {
+        continue;
+      }
+      const create = this.bridge.data(first, derivedType.requestChange);
+      const update = this.bridge.data(first, derivedType.requestChange);
+      const remove = this.bridge.data(first, derivedType.requestDelete);
+      let changed = false;
+      for (const bo of entities) {
+        const alias = abapName(bo.behavior.alias);
+        const { created, updated, deleted } = this.changes(bo);
+        changed ||= created.length + updated.length + deleted.length > 0;
+        for (const instance of created) {
+          appendRow(component(create, alias), (row) => {
+            this.bridge.fillRow(row, bo, instance.row);
+            this.bridge.fillControl(row, bo, new Set([...instance.changed, ...bo.keys.map((k) => k.name)]));
+          });
+        }
+        // the rows hold every field (with full data), %control the changed ones
+        for (const instance of updated) {
+          appendRow(component(update, alias), (row) => {
+            this.bridge.fillRow(row, bo, instance.row);
+            this.bridge.fillControl(row, bo, instance.changed);
+          });
+        }
+        for (const instance of deleted) {
+          appendRow(component(remove, alias), (row) => this.bridge.fillKey(row, bo, keyOf(bo, instance.persisted as Row)));
+        }
+      }
+      if (!changed) {
+        continue;
+      }
+      const reported = this.bridge.response(first, "reported", true);
+      const failed = saver.withFailed ? this.bridge.response(first, "failed", true) : undefined;
+      this.inSaver = true;
+      try {
+        await this.bridge.call(saver.saveModified, { create, update, delete: remove, reported, ...(failed === undefined ? {} : { failed }) });
+        if (saver.cleanup !== undefined) {
+          await this.bridge.call(saver.cleanup, {});
+        }
+      } finally {
+        this.inSaver = false;
+      }
+      responses.add(await this.bridge.readResponses(first, failed, reported));
+    }
     return responses;
   }
 
   private async write(): Promise<void> {
     for (const instance of this.instances.values()) {
       const { bo } = instance;
+      if (bo.saving === "unmanaged") {
+        // save_modified writes these instances
+        continue;
+      }
       const columns = [...bo.columns.entries()];
       const key = keyOf(bo, instance.row);
       const where = (row: Row) => sql.join(bo.keys.map((k) => sql`${sql.id(bo.columns.get(k.name) ?? abapName(k.name))} = ${toSql(k.type, row[k.name] ?? null)}`), sql` AND `);

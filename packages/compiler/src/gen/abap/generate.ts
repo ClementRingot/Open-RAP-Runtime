@@ -14,7 +14,7 @@ import type { Project, SourceFile } from "../../input/project.js";
 import { abaplintRegistry } from "../../ir/handlers.js";
 import { generateDerivedTypes } from "./derived-types.js";
 import { FRAMEWORK_SOURCES } from "./framework.js";
-import { BdefCatalog, poolBdefOf, rewriteAbapFile } from "./rewrite.js";
+import { BdefCatalog, findSaverClasses, poolBdefOf, rewriteAbapFile } from "./rewrite.js";
 import { frameworkDictionary, shadowEntity, shadowTable } from "./shadow.js";
 
 export interface AbapSource {
@@ -115,12 +115,13 @@ export function abapSources(project: Project, model: Model, diagnostics: Diagnos
     const files = object.getABAPFiles();
     const main = files.find((f) => /\.(clas|intf)\.abap$/.test(f.getFilename()));
     const pool = poolBdefOf(catalog, name, main);
+    const saverClasses = findSaverClasses(files);
     for (const file of files) {
       if (/\.testclasses\.abap$/.test(file.getFilename())) {
         continue;
       }
       const original = project.files.find((f) => f.fileName === file.getFilename());
-      const content = rewriteAbapFile(file, { catalog, diagnostics, file: original?.path ?? file.getFilename(), ...(pool === undefined ? {} : { pool }) });
+      const content = rewriteAbapFile(file, { catalog, diagnostics, file: original?.path ?? file.getFilename(), saverClasses, ...(pool === undefined ? {} : { pool }) });
       sources.push({ fileName: file.getFilename(), content, ...(original === undefined ? {} : { original: original.path }) });
     }
     for (const xml of project.files.filter((f) => f.type === type && f.name === name && f.extension === "xml")) {

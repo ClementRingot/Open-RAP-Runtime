@@ -9,6 +9,7 @@ import {
   findEntity,
   findTable,
   same,
+  savingOf,
   type AdminSemantics,
   type AssociationModel,
   type BehaviorModel,
@@ -41,9 +42,14 @@ export interface BoEntity {
   index: number;
   /** Name of the derived types interface (upper case, the key of abap.Classes). */
   iface: string;
+  /** Where the instances are read and locked: the persistent table, or the CDS view (unmanaged save). */
   table: TableModel;
-  /** CDS field → column of the persistent table (lower case). */
+  /** CDS field → column of `table` (lower case for a table). */
   columns: Map<string, string>;
+  /** Who writes the instances: the runtime, the runtime and save_modified, save_modified alone. */
+  saving: "managed" | "additional" | "unmanaged";
+  /** The table of `mapping for` (or the persistent table), for INSERT … MAPPING FROM ENTITY. */
+  mapped?: { table: TableModel; columns: Map<string, string> };
   keys: FieldModel[];
   fields: FieldModel[];
   associations: BoAssociation[];
@@ -63,17 +69,34 @@ export class BoModel {
     for (const bdef of model.behaviors.filter((b) => b.implementationType === "managed")) {
       bdef.entities.forEach((behavior, i) => {
         const entity = findEntity(model, behavior.entity);
-        const table = behavior.persistentTable === undefined ? undefined : findTable(model, behavior.persistentTable);
-        if (entity === undefined || table === undefined) {
+        const saving = savingOf(bdef, behavior);
+        const persistent = behavior.persistentTable === undefined ? undefined : findTable(model, behavior.persistentTable);
+        const mappingTable = persistent ?? (behavior.mapping === undefined ? undefined : findTable(model, behavior.mapping.table));
+        if (entity === undefined) {
           return;
         }
-        const columns = new Map<string, string>();
-        for (const field of entity.fields) {
-          const mapped = Object.entries(behavior.mapping?.fields ?? {}).find(([f]) => same(f, field.name))?.[1];
-          const column = (mapped ?? field.column ?? field.name).toLowerCase();
-          if (table.columns.some((c) => c.name === column)) {
-            columns.set(field.name, column);
+        const columnsOf = (table: TableModel): Map<string, string> => {
+          const columns = new Map<string, string>();
+          for (const field of entity.fields) {
+            const mapped = Object.entries(behavior.mapping?.fields ?? {}).find(([f]) => same(f, field.name))?.[1];
+            const column = (mapped ?? field.column ?? field.name).toLowerCase();
+            if (table.columns.some((c) => c.name === column)) {
+              columns.set(field.name, column);
+            }
           }
+          return columns;
+        };
+        let table: TableModel;
+        let columns: Map<string, string>;
+        if (persistent !== undefined && saving !== "unmanaged") {
+          table = persistent;
+          columns = columnsOf(persistent);
+        } else if (saving === "unmanaged" && entity.sqlView !== undefined) {
+          // no persistent table: the instances are read through the CDS view
+          table = { name: entity.sqlView, columns: entity.fields.map((f) => ({ name: f.name, type: f.type, key: f.key, notNull: false, client: false })) };
+          columns = new Map(entity.fields.map((f) => [f.name, f.name]));
+        } else {
+          return;
         }
         const admin: Partial<Record<AdminSemantics, string>> = {};
         for (const field of entity.fields) {
@@ -89,6 +112,8 @@ export class BoModel {
           iface: derivedTypesInterfaceName(bdef.name),
           table,
           columns,
+          saving,
+          ...(mappingTable === undefined ? {} : { mapped: { table: mappingTable, columns: columnsOf(mappingTable) } }),
           keys: entity.fields.filter((f) => f.key),
           fields: entity.fields,
           associations: [],
@@ -204,6 +229,11 @@ function fieldName(entity: EntityModel, name: string): string {
 }
 
 /** Canonical key string of an instance (its key values in key order). */
+/** The entity whose BDEF mapping (or persistent table) is the table `name`. */
+export function entityOfTable(model: BoModel, name: string): BoEntity | undefined {
+  return model.entities.find((e) => e.mapped !== undefined && same(e.mapped.table.name, name));
+}
+
 export function keyString(bo: BoEntity, row: Row): string {
   return JSON.stringify(bo.keys.map((k) => row[k.name] ?? null));
 }

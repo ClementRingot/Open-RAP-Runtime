@@ -140,9 +140,9 @@ et la conséquence. Les numéros D1 à D13 correspondent aux points 1 à 13 du �
   factory, internes et avec paramètre, déterminations on save, precheck, side effects (CSDL),
   messages T100, lectures et créations par association dans l'ABP.
 - **Restent hors périmètre**, avec leur raison dans FEATURES.md : draft (exclu par le cahier des
-  charges), implémentation unmanaged, late numbering, `with additional save` et
-  `with unmanaged save` (il faudrait de l'ABAP SQL dans le saver), événements, change documents,
-  extensions, analytique.
+  charges), implémentation unmanaged, late numbering, événements, change documents, extensions,
+  analytique. `with additional save` et `with unmanaged save`, d'abord exclus, sont pris en
+  charge depuis D30.
 
 ## D15 — Runtime générique piloté par l'IR
 
@@ -266,9 +266,10 @@ et la conséquence. Les numéros D1 à D13 correspondent aux points 1 à 13 du �
   compilation (ABP007), faute de connexion à la base pour le runtime abaplint.
 - **Décision révisée** : `SELECT` (simple, `SINGLE`, `INTO TABLE`, `FOR ALL ENTRIES`, jointures,
   agrégats, sous-requêtes, `SELECT … ENDSELECT` avec `SELECT *`) lit les tables et les entités
-  CDS du projet. Les écritures (`INSERT`, `UPDATE`, `MODIFY`, `DELETE` sur une table) et les
-  expressions de table communes (`WITH`) restent refusées (ABP007) : un BO managed est écrit par
-  le runtime RAP, le code le modifie par EML.
+  CDS du projet. Les écritures (`INSERT`, `UPDATE`, `MODIFY`, `DELETE` sur une table) sont
+  refusées dans les handlers (ABP007) : un BO managed est écrit par le runtime RAP, le code le
+  modifie par EML. Elles sont permises dans le saver (`save_modified`) d'un BO avec additional ou
+  unmanaged save (D30). Les expressions de table communes (`WITH`) restent refusées.
 - **Réalisation** :
   - le SQL que génère `@abaplint/transpiler` suppose des colonnes au format ABAP (ses propres
     schémas stockent les dates en `NCHAR(8)`, les UUID en 32 chiffres hexadécimaux). Le schéma
@@ -346,3 +347,39 @@ et la conséquence. Les numéros D1 à D13 correspondent aux points 1 à 13 du �
   JavaScript compilé (dist) le montre, Vitest compilant les sources autrement. Le test e2e, qui
   exécute le dist, l'a révélé ; le code évite cette forme.
 
+## D30 — Additional et unmanaged save dans un BO managed
+
+- **Décision** : `managed with additional save` et `managed with unmanaged save` (en-tête de la
+  BDEF, ou `with additional save` / `with unmanaged save` par entité, `with full data` accepté)
+  sont pris en charge, avec la classe saver locale du behavior pool (`lsc_…` héritant de
+  `cl_abap_behavior_saver` ou `cl_abap_behavior_saver_failed`) : `save_modified` (obligatoire) et
+  `cleanup`. Additional save : le runtime écrit les tables persistantes, puis appelle
+  `save_modified`. Unmanaged save : l'entité n'a pas de table persistante, le runtime lit et
+  verrouille les instances à travers la vue CDS et `save_modified` les écrit.
+- **Réalisation** :
+  - types dérivés `TYPE TABLE FOR CHANGE`, `TYPE REQUEST FOR CHANGE` et `TYPE REQUEST FOR DELETE` ;
+    la passe de réécriture déclare `save_modified` avec ses paramètres (`create`, `update`,
+    `delete`, `reported`, et `failed` pour `cl_abap_behavior_saver_failed`) ; `adjust_numbers`
+    (late numbering) est refusé (ABP007) ;
+  - les écritures ABAP SQL ne sont permises que dans la classe saver (ABP007 ailleurs) et, à
+    l'exécution, pendant `save_modified` seulement. Les formes propres à RAP
+    (`… FROM [TABLE] @source [INDICATORS SET STRUCTURE %control] MAPPING FROM ENTITY`), que le
+    transpiler ne connaît pas, sont abaissées vers le kernel, qui applique le mapping de la BDEF
+    et écrit avec les types de la base, valeurs exactes ;
+  - les autres écritures passent par le transpiler et les vues du schéma `rapt_abap` (D26) : un
+    trigger `INSTEAD OF` par table écrit la table, valeurs reconverties depuis leur forme ABAP
+    (fonctions `rapt_abap.to_date`, `to_uuid`, `to_timestamp`…) ;
+  - les lignes de `update` portent toutes les valeurs (comme `with full data`), `%control` les
+    champs modifiés ; `delete` contient aussi les compositions supprimées en cascade ;
+  - un `failed` du saver (`cl_abap_behavior_saver_failed`) annule la LUW, comme une validation ;
+    les messages de `reported` sont renvoyés au client ;
+  - toutes les tables transparentes du projet entrent dans le modèle (base et types du
+    transpiler), pas seulement celles des vues CDS et des tables persistantes : une table de log
+    ou de contrôle est lisible et inscriptible par l'ABAP SQL. Une table qu'aucune entité
+    n'utilise et qui ne peut être construite est laissée de côté (information DDIC005).
+- **Défaut du transpiler contourné** : `DELETE dbtab FROM @wa` lui fait perdre la ligne, et la
+  requête supprimerait toute la table : refusé à la compilation (ABP007) et, par sécurité, un
+  `DELETE` sans condition est refusé à l'exécution.
+- **Pourquoi** : c'est le moyen RAP d'écrire des tables existantes ou de journaliser les
+  changements d'un BO, fréquent dans les projets réels ; l'ABAP SQL du saver réutilise les vues de
+  D26.

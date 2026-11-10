@@ -1,6 +1,7 @@
 /**
- * The database of the ABAP SQL of the behavior pools (decision D26): a read-only database client
- * of @abaplint/runtime over the transaction of the running LUW.
+ * The database of the ABAP SQL of the behavior pools (decision D26): a database client of
+ * @abaplint/runtime over the transaction of the running LUW. It reads anywhere and writes in the
+ * saver only (save_modified of a BO with additional or unmanaged save).
  *
  * @abaplint/transpiler turns a SELECT into SQL text with its values in ABAP form (dates
  * `YYYYMMDD`, UUIDs as hexadecimal digits) and a few ABAP keywords (`UP TO n ROWS`, `EQ`,
@@ -150,6 +151,28 @@ export function translateSelect(text: string, primaryKey: string[] = []): string
   return limit > 0 ? `${translated} LIMIT ${limit}` : translated;
 }
 
+/** A condition or SET list of the transpiler's ABAP SQL as PostgreSQL (identifiers, `~`, EQ…). */
+export function translateFragment(text: string): string {
+  return tokenize(text)
+    .map((t) => {
+      if (t.kind === "symbol" && t.text === "~") {
+        return ".";
+      }
+      return t.kind === "word" ? (COMPARISONS[t.text.toUpperCase()] ?? t.text) : t.text;
+    })
+    .join("")
+    .trim();
+}
+
+/** The view of a table in the ABAP SQL schema, as `abap.buildDbTableName` gives it. */
+function viewOf(table: string): string {
+  const prefix = `${SCHEMA}.`;
+  if (!table.toLowerCase().startsWith(prefix)) {
+    throw new AbapSqlError(`ABAP SQL: ${table} is not a table of the application`);
+  }
+  return `${prefix}${table.slice(prefix.length).toLowerCase()}`;
+}
+
 /** A value of a result row as @abaplint/runtime sets it into ABAP data objects. */
 function abapValue(value: unknown): AbapSqlValue {
   if (value === null || value === undefined) {
@@ -170,16 +193,45 @@ function abapValue(value: unknown): AbapSqlValue {
   return String(value);
 }
 
-const READ_ONLY = "ABAP SQL in a behavior pool only reads (decision D26): the RAP runtime writes the business objects";
+const READ_ONLY = "ABAP SQL writes are only possible in save_modified (with additional or unmanaged save): the RAP runtime writes the business objects, the handlers change them with EML";
+
+/** The transaction of the running LUW, and whether its saver runs (writes allowed). */
+export interface AbapSqlLuw {
+  db: Kysely<unknown>;
+  writable: boolean;
+}
 
 /**
  * The DEFAULT database connection of the transpiled code (`DatabaseClient` of @abaplint/runtime).
- * `connection` gives the transaction of the running LUW.
+ * `luw` gives the transaction of the running LUW. The writes go to the views of the ABAP SQL
+ * schema, whose triggers write the tables (values converted back from their ABAP form).
  */
 export class AbapSqlClient {
   public readonly name = "postgres";
 
-  public constructor(private readonly connection: () => Kysely<unknown>) {}
+  public constructor(private readonly luw: () => AbapSqlLuw) {}
+
+  private connection(): Kysely<unknown> {
+    return this.luw().db;
+  }
+
+  /** A write of the saver: sy-subrc 4 when no row is affected or the key exists (INSERT). */
+  private async write(text: string): Promise<{ subrc: number; dbcnt: number }> {
+    const { db, writable } = this.luw();
+    if (!writable) {
+      throw new AbapSqlError(READ_ONLY);
+    }
+    try {
+      const result = await withSavepoint(db, () => sql.raw(text).execute(db));
+      const dbcnt = Number(result.numAffectedRows ?? 0n);
+      return { subrc: dbcnt > 0 ? 0 : 4, dbcnt };
+    } catch (error) {
+      if ((error as { code?: string }).code === "23505") {
+        return { subrc: 4, dbcnt: 0 };
+      }
+      throw error;
+    }
+  }
 
   public async connect(): Promise<void> {}
 
@@ -197,20 +249,27 @@ export class AbapSqlClient {
     throw new AbapSqlError("ROLLBACK WORK is not allowed in a behavior pool: the RAP runtime ends the LUW");
   }
 
+  /** Native SQL (EXEC SQL, ADBC): not available. */
   public async execute(): Promise<void> {
-    throw new AbapSqlError(READ_ONLY);
+    throw new AbapSqlError("native SQL is not available in a behavior pool");
   }
 
-  public async insert(): Promise<never> {
-    throw new AbapSqlError(READ_ONLY);
+  public async insert(options: { table: string; columns: string[]; values: Array<string | number> }): Promise<{ subrc: number; dbcnt: number }> {
+    const columns = options.columns.map((c) => `"${c.toLowerCase().replace(/"/g, '""')}"`).join(", ");
+    return this.write(`INSERT INTO ${viewOf(options.table)} (${columns}) VALUES (${options.values.join(", ")})`);
   }
 
-  public async update(): Promise<never> {
-    throw new AbapSqlError(READ_ONLY);
+  public async update(options: { table: string; where: string; set: string[] }): Promise<{ subrc: number; dbcnt: number }> {
+    const where = options.where.trim() === "" ? "" : ` WHERE ${translateFragment(options.where)}`;
+    return this.write(`UPDATE ${viewOf(options.table)} SET ${options.set.map(translateFragment).join(", ")}${where}`);
   }
 
-  public async delete(): Promise<never> {
-    throw new AbapSqlError(READ_ONLY);
+  public async delete(options: { table: string; where: string }): Promise<{ subrc: number; dbcnt: number }> {
+    if (options.where.trim() === "") {
+      // DELETE dbtab FROM @wa reaches the database without its row (a transpiler defect): refused
+      throw new AbapSqlError(`ABAP SQL: DELETE on ${options.table} without a condition is not supported`);
+    }
+    return this.write(`DELETE FROM ${viewOf(options.table)} WHERE ${translateFragment(options.where)}`);
   }
 
   public async select(options: AbapSelectOptions): Promise<{ rows: AbapSqlRow[] }> {

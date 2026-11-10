@@ -29,7 +29,8 @@ n'utilise pas.
 | Numérotation externe (clé fournie, `mandatory : create`, `readonly : update`) | ✅ | |
 | `early numbering` non managed (handler `FOR NUMBERING`) | 🟡 | Création directe : ✅ (`rap-variant-features.test.ts`). Création par association (`FOR CREATE Travel\_Booking`) : non prise en charge. |
 | `late numbering` | ❌ | Nécessite la phase `adjust_numbers` d'un saver. |
-| `with additional save`, `with unmanaged save` | ❌ | Le saver écrirait en ABAP SQL : l'ABP ne fait que lire (D26). |
+| `with additional save`, `with unmanaged save` (en-tête ou entité, `with full data`) | ✅ | Classe saver `lsc_…` : `save_modified` et `cleanup` ; unmanaged : lecture et verrous par la vue CDS (D30). Tests `rap-variant-additional-save`, `rap-variant-unmanaged-save`. |
+| Saver hérité de `cl_abap_behavior_saver_failed` (`failed` dans `save_modified`) | ✅ | Annule la LUW, écriture managed comprise ; message renvoyé au client. |
 | `with draft` | ❌ | Exclu par le cahier des charges. |
 | Implémentation `unmanaged` | ❌ | Hors cible (BO managed). |
 | `with privileged mode` | ✅ | `PRIVILEGED` saute les contrôles d'autorisation. |
@@ -120,7 +121,8 @@ n'utilise pas.
 | `OPEN CURSOR`, `FETCH NEXT CURSOR` | 🟡 | Hors ABAP Cloud (refusés par la vérification, comme sur SAP) ; pris en charge par le runtime. |
 | Types des entités CDS dans l'ABP (`DATA ls TYPE zr_travel`) | ✅ | Tables « ombre » (D19, D26). |
 | `MESSAGE … INTO` | ✅ | Textes des classes de messages du projet. |
-| `INSERT`, `UPDATE`, `MODIFY`, `DELETE` sur une table ; `WITH` | ❌ | Diagnostic ABP007 : le runtime RAP écrit le BO, le modifier par EML. |
+| `INSERT`, `UPDATE`, `MODIFY`, `DELETE` dans le saver (`save_modified`) | ✅ | `MAPPING FROM ENTITY` et `INDICATORS SET STRUCTURE %control` exacts (kernel) ; écritures classiques par les vues `rapt_abap` et leurs triggers (D30). |
+| `INSERT`, `UPDATE`, `MODIFY`, `DELETE` dans un handler ; `WITH` | ❌ | Diagnostic ABP007 : le runtime RAP écrit le BO, le modifier par EML. |
 
 ## Projection
 

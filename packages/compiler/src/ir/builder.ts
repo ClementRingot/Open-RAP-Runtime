@@ -4,6 +4,7 @@ import {
   findEntityBehavior,
   MODEL_FORMAT_VERSION,
   same,
+  sqlName,
   type BehaviorModel,
   type EntityModel,
   type Model,
@@ -156,7 +157,23 @@ export function buildModel(project: Project, options: BuildOptions = {}): BuildR
   }
   for (const behavior of behaviors) {
     for (const entity of behavior.entities) {
-      addTable(entity.persistentTable);
+      addTable(entity.persistentTable ?? entity.mapping?.table);
+    }
+  }
+  // the other transparent tables of the project, for the ABAP SQL of the behavior pools (D26):
+  // one that cannot be built is left out, the BO does not need it
+  for (const name of dictionary.transparentTableNames()) {
+    const lower = sqlName(name);
+    if (tables.has(lower)) {
+      continue;
+    }
+    const quiet = new Diagnostics();
+    const table = dictionary.table(lower, quiet);
+    const problem = quiet.items.find((d) => d.severity === "error");
+    if (table !== undefined && problem === undefined) {
+      tables.set(lower, table);
+    } else {
+      diagnostics.info("DDIC005", `${name}: not created in the database (${problem?.message ?? "not readable"}); no CDS entity or BDEF uses it`, problem?.file === undefined ? undefined : { file: problem.file, line: problem.line ?? 1 });
     }
   }
   const messageClasses: Record<string, Record<string, string>> = {};

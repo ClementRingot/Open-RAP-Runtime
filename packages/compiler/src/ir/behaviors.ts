@@ -59,6 +59,13 @@ export function buildBehavior(name: string, ast: BdefAst, file: SourceFile, ctx:
   if (implementation.className !== undefined) {
     behavior.implementationClass = implementation.className.text.toUpperCase();
   }
+  if (implementation.saving !== undefined) {
+    if (implementation.type !== "managed") {
+      diagnostics.error("BDEF012", `with ${implementation.saving.variant} save is only possible in a managed BDEF`, at(implementation.loc));
+    } else {
+      behavior.saving = { kind: implementation.saving.variant, fullData: implementation.saving.fullData };
+    }
+  }
   for (const header of ast.headers) {
     switch (header.kind) {
       case "implementation":
@@ -223,7 +230,11 @@ function buildEntityBehavior(
         model.implementationClass = option.className.text.toUpperCase();
         break;
       case "withSave":
-        diagnostics.error("BDEF002", `with ${option.variant} save is not supported (the saver would need ABAP SQL)`, at(option.loc));
+        if (isProjection) {
+          diagnostics.error("BDEF012", `with ${option.variant} save is only possible in a managed BDEF`, at(option.loc));
+        } else {
+          model.saving = { kind: option.variant, fullData: option.fullData };
+        }
         break;
       case "useEtag":
         if (!isProjection) {
@@ -245,8 +256,12 @@ function buildEntityBehavior(
     if (entity.kind !== "view") {
       diagnostics.error("BDEF013", `${entity.name}: a managed BDEF must be defined on a view entity, not a ${entity.kind}`, at(ast.entity.loc));
     }
-    if (model.persistentTable === undefined) {
-      diagnostics.error("BDEF014", `${entity.name}: a managed entity needs a persistent table`, at(ast.loc));
+    const unmanagedSave = (model.saving ?? behavior.saving)?.kind === "unmanaged";
+    if (model.persistentTable === undefined && !unmanagedSave) {
+      diagnostics.error("BDEF014", `${entity.name}: a managed entity needs a persistent table (or with unmanaged save)`, at(ast.loc));
+    }
+    if (model.persistentTable !== undefined && unmanagedSave) {
+      diagnostics.warning("BDEF003", `${entity.name}: with unmanaged save, the persistent table is not written by the RAP runtime (save_modified writes)`, at(ast.loc));
     }
     if (model.lock === undefined) {
       diagnostics.error("BDEF015", `${entity.name}: lock master or lock dependent is required`, at(ast.loc));

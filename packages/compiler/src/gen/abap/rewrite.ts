@@ -214,7 +214,11 @@ function derivedTypeName(catalog: BdefCatalog, shape: string, words: string[], p
     throw new RewriteError("ABP007", `TYPE ${shape} FOR ${key} is not supported`, pathToken);
   };
   if (shape === "REQUEST") {
-    return fail();
+    if (key !== "CHANGE" && key !== "DELETE") {
+      return fail();
+    }
+    const path = resolvePath(catalog, pathToken, pool);
+    return `${path.entity.bdef.iface}=>${key === "CHANGE" ? derivedType.requestChange : derivedType.requestDelete}`;
   }
   if (shape === "RESPONSE") {
     const m = /^(FAILED|REPORTED|MAPPED)(?: (EARLY|LATE))?$/.exec(key);
@@ -236,6 +240,9 @@ function derivedTypeName(catalog: BdefCatalog, shape: string, words: string[], p
   const response = key.replace(/ (EARLY|LATE)$/, "");
   let name: string;
   switch (response) {
+    case "CHANGE":
+      name = table ? derivedType.change(e) : derivedType.changeRow(e);
+      break;
     case "CREATE":
       name = b === undefined ? (table ? derivedType.create(e) : derivedType.createRow(e)) : table ? derivedType.assocCreate(e, b) : `ts_e${e}_b${b}_cre`;
       break;
@@ -381,6 +388,28 @@ export interface RewriteContext {
   file: string;
   /** The BDEF the behavior pool implements, for the paths written with an alias only. */
   pool?: BdefInfo;
+  /** Saver classes of the object (upper case) and whether they inherit from cl_abap_behavior_saver_failed. */
+  saverClasses?: Map<string, boolean>;
+  /** The class whose definition or implementation is being rewritten. */
+  current?: { name: string; part: "definition" | "implementation" } | undefined;
+}
+
+/** Local saver classes of an object: `INHERITING FROM cl_abap_behavior_saver[_failed]`. */
+export function findSaverClasses(files: readonly abaplint.ABAPFile[]): Map<string, boolean> {
+  const savers = new Map<string, boolean>();
+  for (const file of files) {
+    for (const statement of file.getStatements()) {
+      if (statement.get().constructor.name !== "ClassDefinition") {
+        continue;
+      }
+      const text = statement.concatTokens().replace(/\s+/g, " ");
+      const m = /^CLASS (\S+) DEFINITION .*INHERITING FROM (CL_ABAP_BEHAVIOR_SAVER(?:_FAILED)?)\b/i.exec(text);
+      if (m !== null) {
+        savers.set((m[1] ?? "").toUpperCase(), (m[2] ?? "").toUpperCase().endsWith("_FAILED"));
+      }
+    }
+  }
+  return savers;
 }
 
 const KERNEL = KERNEL_CLASS.toLowerCase();
@@ -395,8 +424,14 @@ export function rewriteAbapFile(file: abaplint.ABAPFile, context: RewriteContext
     if (tokens.length === 0) {
       continue;
     }
+    const kind = statement.get().constructor.name;
+    if (kind === "ClassDefinition" || kind === "ClassImplementation") {
+      context.current = { name: (tokens[1]?.str ?? "").toUpperCase(), part: kind === "ClassDefinition" ? "definition" : "implementation" };
+    } else if (kind === "EndClass") {
+      context.current = undefined;
+    }
     try {
-      rewriteStatement(statement.get().constructor.name, tokens, edits, context);
+      rewriteStatement(kind, tokens, edits, context);
     } catch (error) {
       if (error instanceof RewriteError) {
         const at = error.token ?? tokens[0];
@@ -431,8 +466,21 @@ function rewriteStatement(kind: string, tokens: Tok[], edits: SourceEdits, conte
     edits.replace(tokens[0] as Tok, last, emlCode(statement, context));
     return;
   }
+  const inSaver = context.current !== undefined && context.saverClasses?.has(context.current.name) === true;
   if (SQL_WRITES.has(kind)) {
-    throw new RewriteError("ABP007", `${tokens[0]?.upper ?? ""} on a database table is not supported in a behavior pool: the RAP runtime writes the business object, change it with EML (MODIFY ENTITIES)`, tokens[0]);
+    if (!inSaver || context.current?.part !== "implementation") {
+      throw new RewriteError("ABP007", `${tokens[0]?.upper ?? ""} on a database table is only possible in the saver class (save_modified, with additional or unmanaged save): the RAP runtime writes the business object, change it with EML (MODIFY ENTITIES)`, tokens[0]);
+    }
+    const mapping = tokens.some((t, n) => t.upper === "MAPPING" && tokens[n + 1]?.upper === "FROM" && tokens[n + 2]?.upper === "ENTITY");
+    if (kind === "DeleteDatabase" && !mapping && tokens[2]?.upper === "FROM" && tokens[3]?.str === "@") {
+      // the transpiler drops the work area of DELETE dbtab FROM @wa: the statement would delete every row
+      throw new RewriteError("ABP007", "DELETE dbtab FROM @wa is not supported by the transpiler (it would delete every row): use DELETE FROM dbtab WHERE …, DELETE dbtab FROM TABLE @itab or MAPPING FROM ENTITY", tokens[0]);
+    }
+    lowerEntityMapping(tokens, edits);
+    return;
+  }
+  if (kind === "MethodDef" && inSaver && context.current?.part === "definition" && rewriteSaverMethod(tokens, edits, context)) {
+    return;
   }
   if (SQL_CTE.has(kind)) {
     throw new RewriteError("ABP007", "common table expressions (WITH) are not supported by the transpiler", tokens[0]);
@@ -494,6 +542,74 @@ function hostComponentsAsExpressions(tokens: Tok[], edits: SourceEdits): void {
     }
     i = last;
   }
+}
+
+/**
+ * The saver methods of a managed BO with additional or unmanaged save, declared by redefinition:
+ * save_modified gets its parameters typed with the derived types of the BDEF (REQUEST FOR CHANGE,
+ * REQUEST FOR DELETE, RESPONSE FOR REPORTED/FAILED LATE), the others become plain methods.
+ */
+function rewriteSaverMethod(tokens: Tok[], edits: SourceEdits, context: RewriteContext): boolean {
+  const name = tokens[1];
+  const redefinition = tokens[2];
+  if (name === undefined || redefinition?.upper !== "REDEFINITION") {
+    return false;
+  }
+  const method = name.upper;
+  if (method === "ADJUST_NUMBERS") {
+    throw new RewriteError("ABP007", "adjust_numbers (late numbering) is not supported", name);
+  }
+  if (method !== "SAVE_MODIFIED") {
+    edits.replace(redefinition, redefinition, "");
+    return true;
+  }
+  const pool = context.pool;
+  if (pool === undefined) {
+    throw new RewriteError("ABP007", "save_modified outside of the behavior pool of a BDEF", name);
+  }
+  const t = (type: string): string => `${pool.iface}=>${type}`;
+  const failed = context.saverClasses?.get(context.current?.name ?? "") === true ? ` failed TYPE ${t(derivedType.failedLate)}` : "";
+  edits.replace(
+    redefinition,
+    redefinition,
+    `IMPORTING create TYPE ${t(derivedType.requestChange)} update TYPE ${t(derivedType.requestChange)} delete TYPE ${t(derivedType.requestDelete)} CHANGING reported TYPE ${t(derivedType.reportedLate)}${failed}`,
+  );
+  return true;
+}
+
+/**
+ * `INSERT|UPDATE|MODIFY|DELETE dbtab FROM [TABLE] @src [INDICATORS SET STRUCTURE %control]
+ * MAPPING FROM ENTITY`: the BDEF mapping of the entity to the table is applied by the kernel, which
+ * writes the rows (the transpiler does not know these RAP additions). Other writes are left to the
+ * transpiler.
+ */
+function lowerEntityMapping(tokens: Tok[], edits: SourceEdits): void {
+  const mapping = tokens.findIndex((t, n) => t.upper === "MAPPING" && tokens[n + 1]?.upper === "FROM" && tokens[n + 2]?.upper === "ENTITY");
+  if (mapping < 0) {
+    return;
+  }
+  const operation = tokens[0]?.upper ?? "";
+  const table = tokens[1];
+  const from = tokens[2];
+  if (table === undefined || from?.upper !== "FROM") {
+    throw new RewriteError("ABP007", `${operation} … MAPPING FROM ENTITY: only the form ${operation} dbtab FROM [TABLE] @source is supported`, tokens[0]);
+  }
+  const isTable = tokens[3]?.upper === "TABLE";
+  const sourceStart = isTable ? 4 : 3;
+  const indicators = tokens.findIndex((t, n) => t.upper === "INDICATORS" && n > sourceStart);
+  const sourceEnd = indicators >= 0 ? indicators : mapping;
+  const source = tokens.slice(sourceStart, sourceEnd);
+  if (source[0]?.str !== "@" || source.length < 2) {
+    throw new RewriteError("ABP007", `${operation} … MAPPING FROM ENTITY: the source must be a host variable (@source)`, tokens[sourceStart]);
+  }
+  let operand = joinTokens(source.slice(1));
+  if (source[1]?.str === "(" && source[source.length - 1]?.str === ")") {
+    operand = joinTokens(source.slice(2, -1));
+  }
+  const last = tokens[tokens.length - 1] as Tok;
+  const end = last.str === "." ? (tokens[tokens.length - 2] as Tok) : last;
+  const flags = indicators >= 0 ? " indicators = abap_true" : "";
+  edits.replace(tokens[0] as Tok, end, `${KERNEL}=>sql_write( operation = ${literal(operation)} table = ${literal(table.str)} ${isTable ? "rows" : "row"} = ${operand}${flags} )`);
 }
 
 /** `SELECT *` or `SELECT FROM … FIELDS *`. */

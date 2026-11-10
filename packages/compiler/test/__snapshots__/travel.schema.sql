@@ -120,6 +120,23 @@ FROM "zrt_r_travel";
 DROP SCHEMA IF EXISTS "rapt_abap" CASCADE;
 CREATE SCHEMA "rapt_abap";
 
+CREATE FUNCTION "rapt_abap"."to_date"(v text) RETURNS date LANGUAGE sql IMMUTABLE AS
+  $f$ SELECT CASE WHEN coalesce(btrim(v), '') IN ('', '00000000') THEN NULL ELSE to_date(v, 'YYYYMMDD') END $f$;
+CREATE FUNCTION "rapt_abap"."to_time"(v text) RETURNS time LANGUAGE sql IMMUTABLE AS
+  $f$ SELECT CASE WHEN coalesce(btrim(v), '') = '' THEN NULL ELSE to_timestamp(v, 'HH24MISS')::time END $f$;
+CREATE FUNCTION "rapt_abap"."to_timestamp"(v numeric) RETURNS timestamptz LANGUAGE sql IMMUTABLE AS
+  $f$ SELECT CASE WHEN coalesce(v, 0) = 0 THEN NULL ELSE make_timestamptz(
+    substr(lpad(trunc(v)::text, 14, '0'), 1, 4)::int, substr(lpad(trunc(v)::text, 14, '0'), 5, 2)::int,
+    substr(lpad(trunc(v)::text, 14, '0'), 7, 2)::int, substr(lpad(trunc(v)::text, 14, '0'), 9, 2)::int,
+    substr(lpad(trunc(v)::text, 14, '0'), 11, 2)::int, (substr(lpad(trunc(v)::text, 14, '0'), 13, 2)::numeric + (v - trunc(v)))::double precision,
+    'UTC') END $f$;
+CREATE FUNCTION "rapt_abap"."to_utclong"(v text) RETURNS timestamptz LANGUAGE sql IMMUTABLE AS
+  $f$ SELECT CASE WHEN coalesce(btrim(v), '') = '' THEN NULL ELSE (v || 'Z')::timestamptz END $f$;
+CREATE FUNCTION "rapt_abap"."to_uuid"(v text) RETURNS uuid LANGUAGE sql IMMUTABLE AS
+  $f$ SELECT CASE WHEN coalesce(btrim(v), '') = '' OR btrim(v) ~ '^0+$' THEN NULL ELSE btrim(v)::uuid END $f$;
+CREATE FUNCTION "rapt_abap"."to_bytea"(v text) RETURNS bytea LANGUAGE sql IMMUTABLE AS
+  $f$ SELECT CASE WHEN coalesce(btrim(v), '') = '' OR btrim(v) ~ '^0+$' THEN NULL ELSE decode(btrim(v), 'hex') END $f$;
+
 CREATE VIEW "rapt_abap"."zrt_booking" AS SELECT
   coalesce(upper(replace("booking_uuid"::text, '-', '')), '00000000000000000000000000000000')::bpchar AS "booking_uuid",
   coalesce(upper(replace("parent_uuid"::text, '-', '')), '00000000000000000000000000000000')::bpchar AS "parent_uuid",
@@ -133,6 +150,22 @@ CREATE VIEW "rapt_abap"."zrt_booking" AS SELECT
   "booking_status"::bpchar AS "booking_status",
   coalesce(to_char("local_last_changed_at" AT TIME ZONE 'UTC', 'YYYYMMDDHH24MISS.US')::numeric(21,7), 0) AS "local_last_changed_at"
 FROM "zrt_booking";
+
+CREATE FUNCTION "rapt_abap"."zrt_booking$write"() RETURNS trigger LANGUAGE plpgsql SET search_path FROM CURRENT AS $f$
+BEGIN
+  IF TG_OP = 'INSERT' THEN
+    INSERT INTO "zrt_booking" ("booking_uuid", "parent_uuid", "booking_id", "booking_date", "carrier_id", "connection_id", "flight_date", "flight_price", "currency_code", "booking_status", "local_last_changed_at")
+      VALUES ("rapt_abap"."to_uuid"(NEW."booking_uuid"::text), "rapt_abap"."to_uuid"(NEW."parent_uuid"::text), coalesce(nullif(btrim(NEW."booking_id"::text), ''), '0000'), "rapt_abap"."to_date"(NEW."booking_date"::text), coalesce(NEW."carrier_id"::text, ''), coalesce(nullif(btrim(NEW."connection_id"::text), ''), '0000'), "rapt_abap"."to_date"(NEW."flight_date"::text), coalesce(NEW."flight_price", 0), coalesce(NEW."currency_code"::text, ''), coalesce(NEW."booking_status"::text, ''), "rapt_abap"."to_timestamp"(NEW."local_last_changed_at"::numeric));
+    RETURN NEW;
+  ELSIF TG_OP = 'UPDATE' THEN
+    UPDATE "zrt_booking" SET "booking_uuid" = "rapt_abap"."to_uuid"(NEW."booking_uuid"::text), "parent_uuid" = "rapt_abap"."to_uuid"(NEW."parent_uuid"::text), "booking_id" = coalesce(nullif(btrim(NEW."booking_id"::text), ''), '0000'), "booking_date" = "rapt_abap"."to_date"(NEW."booking_date"::text), "carrier_id" = coalesce(NEW."carrier_id"::text, ''), "connection_id" = coalesce(nullif(btrim(NEW."connection_id"::text), ''), '0000'), "flight_date" = "rapt_abap"."to_date"(NEW."flight_date"::text), "flight_price" = coalesce(NEW."flight_price", 0), "currency_code" = coalesce(NEW."currency_code"::text, ''), "booking_status" = coalesce(NEW."booking_status"::text, ''), "local_last_changed_at" = "rapt_abap"."to_timestamp"(NEW."local_last_changed_at"::numeric)
+      WHERE "booking_uuid" = "rapt_abap"."to_uuid"(OLD."booking_uuid"::text);
+    RETURN NEW;
+  END IF;
+  DELETE FROM "zrt_booking" WHERE "booking_uuid" = "rapt_abap"."to_uuid"(OLD."booking_uuid"::text);
+  RETURN OLD;
+END $f$;
+CREATE TRIGGER "zrt_booking$write" INSTEAD OF INSERT OR UPDATE OR DELETE ON "rapt_abap"."zrt_booking" FOR EACH ROW EXECUTE FUNCTION "rapt_abap"."zrt_booking$write"();
 
 CREATE VIEW "rapt_abap"."zrt_travel" AS SELECT
   coalesce(upper(replace("travel_uuid"::text, '-', '')), '00000000000000000000000000000000')::bpchar AS "travel_uuid",
@@ -152,6 +185,22 @@ CREATE VIEW "rapt_abap"."zrt_travel" AS SELECT
   coalesce(to_char("last_changed_at" AT TIME ZONE 'UTC', 'YYYYMMDDHH24MISS.US')::numeric(21,7), 0) AS "last_changed_at",
   coalesce(to_char("local_last_changed_at" AT TIME ZONE 'UTC', 'YYYYMMDDHH24MISS.US')::numeric(21,7), 0) AS "local_last_changed_at"
 FROM "zrt_travel";
+
+CREATE FUNCTION "rapt_abap"."zrt_travel$write"() RETURNS trigger LANGUAGE plpgsql SET search_path FROM CURRENT AS $f$
+BEGIN
+  IF TG_OP = 'INSERT' THEN
+    INSERT INTO "zrt_travel" ("travel_uuid", "travel_id", "agency_id", "customer_id", "begin_date", "end_date", "booking_fee", "total_price", "currency_code", "description", "overall_status", "created_by", "created_at", "last_changed_by", "last_changed_at", "local_last_changed_at")
+      VALUES ("rapt_abap"."to_uuid"(NEW."travel_uuid"::text), coalesce(nullif(btrim(NEW."travel_id"::text), ''), '00000000'), coalesce(nullif(btrim(NEW."agency_id"::text), ''), '000000'), coalesce(nullif(btrim(NEW."customer_id"::text), ''), '000000'), "rapt_abap"."to_date"(NEW."begin_date"::text), "rapt_abap"."to_date"(NEW."end_date"::text), coalesce(NEW."booking_fee", 0), coalesce(NEW."total_price", 0), coalesce(NEW."currency_code"::text, ''), coalesce(NEW."description"::text, ''), coalesce(NEW."overall_status"::text, ''), coalesce(NEW."created_by"::text, ''), "rapt_abap"."to_timestamp"(NEW."created_at"::numeric), coalesce(NEW."last_changed_by"::text, ''), "rapt_abap"."to_timestamp"(NEW."last_changed_at"::numeric), "rapt_abap"."to_timestamp"(NEW."local_last_changed_at"::numeric));
+    RETURN NEW;
+  ELSIF TG_OP = 'UPDATE' THEN
+    UPDATE "zrt_travel" SET "travel_uuid" = "rapt_abap"."to_uuid"(NEW."travel_uuid"::text), "travel_id" = coalesce(nullif(btrim(NEW."travel_id"::text), ''), '00000000'), "agency_id" = coalesce(nullif(btrim(NEW."agency_id"::text), ''), '000000'), "customer_id" = coalesce(nullif(btrim(NEW."customer_id"::text), ''), '000000'), "begin_date" = "rapt_abap"."to_date"(NEW."begin_date"::text), "end_date" = "rapt_abap"."to_date"(NEW."end_date"::text), "booking_fee" = coalesce(NEW."booking_fee", 0), "total_price" = coalesce(NEW."total_price", 0), "currency_code" = coalesce(NEW."currency_code"::text, ''), "description" = coalesce(NEW."description"::text, ''), "overall_status" = coalesce(NEW."overall_status"::text, ''), "created_by" = coalesce(NEW."created_by"::text, ''), "created_at" = "rapt_abap"."to_timestamp"(NEW."created_at"::numeric), "last_changed_by" = coalesce(NEW."last_changed_by"::text, ''), "last_changed_at" = "rapt_abap"."to_timestamp"(NEW."last_changed_at"::numeric), "local_last_changed_at" = "rapt_abap"."to_timestamp"(NEW."local_last_changed_at"::numeric)
+      WHERE "travel_uuid" = "rapt_abap"."to_uuid"(OLD."travel_uuid"::text);
+    RETURN NEW;
+  END IF;
+  DELETE FROM "zrt_travel" WHERE "travel_uuid" = "rapt_abap"."to_uuid"(OLD."travel_uuid"::text);
+  RETURN OLD;
+END $f$;
+CREATE TRIGGER "zrt_travel$write" INSTEAD OF INSERT OR UPDATE OR DELETE ON "rapt_abap"."zrt_travel" FOR EACH ROW EXECUTE FUNCTION "rapt_abap"."zrt_travel$write"();
 
 CREATE VIEW "rapt_abap"."zrt_r_booking" AS SELECT
   coalesce(upper(replace("BookingUUID"::text, '-', '')), '00000000000000000000000000000000')::bpchar AS "bookinguuid",

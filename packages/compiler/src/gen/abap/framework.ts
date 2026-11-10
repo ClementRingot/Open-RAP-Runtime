@@ -236,7 +236,8 @@ CLASS zrap_cl_message IMPLEMENTATION.
 ENDCLASS.
 `;
 
-const CL_ABAP_BEHAVIOR_HANDLER = `CLASS cl_abap_behavior_handler DEFINITION PUBLIC ABSTRACT.
+/** Base of the handler and saver classes: the messages of the RAP responses. */
+const CL_ABAP_BEHV = `CLASS cl_abap_behv DEFINITION PUBLIC ABSTRACT.
   PUBLIC SECTION.
   PROTECTED SECTION.
     METHODS new_message
@@ -254,7 +255,7 @@ const CL_ABAP_BEHAVIOR_HANDLER = `CLASS cl_abap_behavior_handler DEFINITION PUBL
       RETURNING VALUE(obj)    TYPE REF TO if_abap_behv_message.
 ENDCLASS.
 
-CLASS cl_abap_behavior_handler IMPLEMENTATION.
+CLASS cl_abap_behv IMPLEMENTATION.
   METHOD new_message.
     DATA t1 TYPE string.
     DATA t2 TYPE string.
@@ -315,6 +316,36 @@ CLASS cl_abap_context_info IMPLEMENTATION.
   METHOD get_user_language_abap_format.
     rv_language = sy-langu.
   ENDMETHOD.
+ENDCLASS.
+`;
+
+/** Base class of the handler classes (`lhc_…`). */
+const CL_ABAP_BEHAVIOR_HANDLER = `CLASS cl_abap_behavior_handler DEFINITION PUBLIC ABSTRACT INHERITING FROM cl_abap_behv.
+  PUBLIC SECTION.
+ENDCLASS.
+
+CLASS cl_abap_behavior_handler IMPLEMENTATION.
+ENDCLASS.
+`;
+
+/**
+ * Base classes of the saver of a managed BO with additional or unmanaged save. The saver methods
+ * are declared by the rewrite pass with their parameters (save_modified), so the base classes
+ * declare none.
+ */
+const CL_ABAP_BEHAVIOR_SAVER = `CLASS cl_abap_behavior_saver DEFINITION PUBLIC ABSTRACT INHERITING FROM cl_abap_behv.
+  PUBLIC SECTION.
+ENDCLASS.
+
+CLASS cl_abap_behavior_saver IMPLEMENTATION.
+ENDCLASS.
+`;
+
+const CL_ABAP_BEHAVIOR_SAVER_FAILED = `CLASS cl_abap_behavior_saver_failed DEFINITION PUBLIC ABSTRACT INHERITING FROM cl_abap_behavior_saver.
+  PUBLIC SECTION.
+ENDCLASS.
+
+CLASS cl_abap_behavior_saver_failed IMPLEMENTATION.
 ENDCLASS.
 `;
 
@@ -387,6 +418,13 @@ const ZRAP_EML = `CLASS zrap_eml DEFINITION PUBLIC ABSTRACT FINAL.
       RETURNING VALUE(text) TYPE string.
     CLASS-METHODS uuid
       RETURNING VALUE(uuid) TYPE sysuuid_x16.
+    "! INSERT|UPDATE|MODIFY|DELETE dbtab FROM [TABLE] @source MAPPING FROM ENTITY (saver only).
+    CLASS-METHODS sql_write
+      IMPORTING operation  TYPE string
+                table      TYPE string
+                rows       TYPE ANY TABLE OPTIONAL
+                row        TYPE any OPTIONAL
+                indicators TYPE abap_bool DEFAULT abap_false.
 ENDCLASS.
 
 CLASS zrap_eml IMPLEMENTATION.
@@ -429,6 +467,9 @@ CLASS zrap_eml IMPLEMENTATION.
 
   METHOD uuid.
   ENDMETHOD.
+
+  METHOD sql_write.
+  ENDMETHOD.
 ENDCLASS.
 `;
 
@@ -442,7 +483,10 @@ export const FRAMEWORK_SOURCES: FrameworkSource[] = [
   ...EXCEPTIONS.map(([name, superclass, abstract]) => ({ fileName: `${name}.clas.abap`, source: exceptionClass(name, superclass, abstract) })),
   { fileName: "cl_system_uuid.clas.abap", source: CL_SYSTEM_UUID },
   { fileName: "zrap_cl_message.clas.abap", source: ZRAP_CL_MESSAGE },
+  { fileName: "cl_abap_behv.clas.abap", source: CL_ABAP_BEHV },
   { fileName: "cl_abap_behavior_handler.clas.abap", source: CL_ABAP_BEHAVIOR_HANDLER },
+  { fileName: "cl_abap_behavior_saver.clas.abap", source: CL_ABAP_BEHAVIOR_SAVER },
+  { fileName: "cl_abap_behavior_saver_failed.clas.abap", source: CL_ABAP_BEHAVIOR_SAVER_FAILED },
   { fileName: "cl_abap_context_info.clas.abap", source: CL_ABAP_CONTEXT_INFO },
   { fileName: "zrap_eml.clas.abap", source: ZRAP_EML },
 ];

@@ -129,6 +129,26 @@ class BdefParser extends EmbeddedActionsParser {
               { ALT: () => this.CONSUME(K.projection) },
               { ALT: () => this.CONSUME(K.interface) },
             ]);
+            // managed with additional save / with unmanaged save [with full data] [and cleanup]
+            let saving: { variant: "additional" | "unmanaged"; fullData: boolean } | undefined;
+            this.OPTION7(() => {
+              this.CONSUME2(K.with);
+              const variant = this.OR7([
+                { ALT: () => this.CONSUME(K.additional) },
+                { ALT: () => this.CONSUME1(K.unmanaged) },
+              ]);
+              this.CONSUME(K.save);
+              let fullData = false;
+              this.MANY7({
+                GATE: () => ["and", "cleanup", "full", "data"].includes(lowerImage(this.LA(1))) || (isWord(this.LA(1), "with") && isWord(this.LA(2), "full")),
+                DEF: () => {
+                  if (lowerImage(this.CONSUME7(Name)) === "full") {
+                    fullData = true;
+                  }
+                },
+              });
+              saving = { variant: isWord(variant, "additional") ? "additional" : "unmanaged", fullData };
+            });
             let className: NameAst | undefined;
             let unique = false;
             this.OPTION(() => {
@@ -145,6 +165,9 @@ class BdefParser extends EmbeddedActionsParser {
             const item: HeaderItemAst = { kind: "implementation", type: lowerImage(type) as ImplementationKind, unique, loc: start };
             if (className !== undefined) {
               item.className = className;
+            }
+            if (saving !== undefined) {
+              item.saving = saving;
             }
             return item;
           },
@@ -431,11 +454,16 @@ class BdefParser extends EmbeddedActionsParser {
             ]);
             this.CONSUME(K.save);
             // "and cleanup", "with full data"
+            let fullData = false;
             this.MANY({
               GATE: () => ["and", "cleanup", "full", "data"].includes(lowerImage(this.LA(1))) || (isWord(this.LA(1), "with") && isWord(this.LA(2), "full")),
-              DEF: () => this.CONSUME8(Name),
+              DEF: () => {
+                if (lowerImage(this.CONSUME8(Name)) === "full") {
+                  fullData = true;
+                }
+              },
             });
-            return { kind: "withSave", variant: isWord(variant, "additional") ? "additional" : "unmanaged", loc: start };
+            return { kind: "withSave", variant: isWord(variant, "additional") ? "additional" : "unmanaged", fullData, loc: start };
           },
         },
         {

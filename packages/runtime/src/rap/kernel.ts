@@ -9,7 +9,7 @@ import { same, type ActionModel } from "@rap-transpiler/model";
 import { setSubrc } from "../abap/bridge.js";
 import { abapGlobal, abapString, appendRow, component, rowsOf, type AbapData } from "../abap/convert.js";
 import { isInitial } from "../values.js";
-import type { BoEntity } from "./bo.js";
+import { entityOfTable, type BoEntity } from "./bo.js";
 import type { RapRuntime, Statement } from "./runtime.js";
 import type { CreateRequest } from "./transaction.js";
 import { RapRuntimeError, Responses, type Row } from "./types.js";
@@ -277,4 +277,20 @@ export function installKernel(runtime: RapRuntime): void {
   };
 
   kernel.uuid = async (): Promise<AbapData> => new abap.types.Hex({ length: 16 }).set(randomUUID().replace(/-/g, "").toUpperCase());
+
+  // INSERT|UPDATE|MODIFY|DELETE dbtab FROM [TABLE] @source … MAPPING FROM ENTITY (save_modified)
+  kernel.sql_write = async (input: Input): Promise<void> => {
+    const operation = abapString(input?.["operation"]).toUpperCase();
+    const table = abapString(input?.["table"]);
+    const bo = entityOfTable(model, table);
+    if (bo === undefined) {
+      throw new RapRuntimeError(`${operation} ${table} … MAPPING FROM ENTITY: no entity of a BDEF is mapped to ${table}`);
+    }
+    const single = input?.["rows"] === undefined;
+    const source = single ? [input?.["row"]] : rowsOf(input?.["rows"]);
+    const rows = source.map((row) => ({ values: bridge.readRow(row, bo), control: bridge.readControl(row, bo) }));
+    const { subrc, dbcnt } = await runtime.context().tx.writeMapped(bo, operation, rows, single, isTrue(input?.["indicators"]));
+    setSubrc(subrc);
+    abap.builtin.sy.get().dbcnt.set(dbcnt);
+  };
 }

@@ -149,7 +149,7 @@ describe("ABAP generation of the fixture", () => {
     const permissions = await generate({ [ABP]: (c) => c.replace("    DELETE travels WHERE OverallStatus IS NOT INITIAL.", "    GET PERMISSIONS ONLY GLOBAL AUTHORIZATION ENTITY zrt_r_travel REQUEST VALUE #( %update = if_abap_behv=>mk-on ) RESULT DATA(p).\n    DELETE travels WHERE OverallStatus IS NOT INITIAL.") });
     expect(permissions.diagnostics).toContainEqual(expect.objectContaining({ code: "ABP007", message: "GET PERMISSIONS is not supported" }));
     const write = await generate({ [ABP]: (c) => c.replace("    DELETE travels WHERE OverallStatus IS NOT INITIAL.", "    UPDATE zrt_travel SET description = 'x' WHERE travel_id = '1'.\n    DELETE travels WHERE OverallStatus IS NOT INITIAL.") });
-    expect(write.diagnostics).toContainEqual(expect.objectContaining({ code: "ABP007", message: expect.stringContaining("UPDATE on a database table is not supported") }));
+    expect(write.diagnostics).toContainEqual(expect.objectContaining({ code: "ABP007", message: expect.stringContaining("UPDATE on a database table is only possible in the saver class") }));
     const loop = await generate({ [ABP]: (c) => c.replace("    DELETE travels WHERE OverallStatus IS NOT INITIAL.", "    SELECT travel_id FROM zrt_travel INTO @DATA(one_id).\n    ENDSELECT.\n    DELETE travels WHERE OverallStatus IS NOT INITIAL.") });
     expect(loop.diagnostics).toContainEqual(expect.objectContaining({ code: "ABP007", message: expect.stringContaining("SELECT … ENDSELECT with a field list") }));
   });
@@ -174,6 +174,40 @@ describe("ABAP generation of the fixture", () => {
     expect(rewritten).toContain("DATA exists TYPE abap_boolean. SELECT SINGLE @abap_true FROM zrt_travel WHERE travel_id = '00000001' INTO @exists.");
     expect(rewritten).toContain("DATA max_id TYPE zrt_travel-travel_id. SELECT SINGLE FROM zrt_travel AS t FIELDS MAX( t~travel_id ) AS max_id INTO @max_id.");
     expect(rewritten).toContain("WHERE t~TravelUUID = @keys-TravelUUID AND b~BookingID <> @( ls_travel-TravelID ) INTO TABLE @DATA(joined).");
+  });
+
+  it("types the saver of an additional or unmanaged save and allows its ABAP SQL writes", async () => {
+    const saver = [
+      "CLASS lsc_zrt_r_travel DEFINITION INHERITING FROM cl_abap_behavior_saver.",
+      "  PROTECTED SECTION.",
+      "    METHODS save_modified REDEFINITION.",
+      "    METHODS cleanup REDEFINITION.",
+      "ENDCLASS.",
+      "CLASS lsc_zrt_r_travel IMPLEMENTATION.",
+      "  METHOD save_modified.",
+      "    INSERT zrt_travel FROM TABLE @create-travel MAPPING FROM ENTITY.",
+      "    UPDATE zrt_travel FROM TABLE @update-travel INDICATORS SET STRUCTURE %control MAPPING FROM ENTITY.",
+      "    DELETE zrt_booking FROM TABLE @delete-booking MAPPING FROM ENTITY.",
+      "    DATA ls_travel TYPE zrt_travel.",
+      "    UPDATE zrt_travel SET description = @ls_travel-description WHERE travel_uuid = @ls_travel-travel_uuid.",
+      "    APPEND new_message_with_text( text = 'saved' ) TO reported-%other.",
+      "  ENDMETHOD.",
+      "  METHOD cleanup.",
+      "  ENDMETHOD.",
+      "ENDCLASS.",
+    ].join("\n");
+    const additional = (c: string): string => c.replace("managed implementation in class", "managed with additional save implementation in class");
+    const { diagnostics, rewritten } = await generate({ "zrt_r_travel.bdef.asbdef": additional, [ABP]: (c) => `${c}\n${saver}\n` });
+    expect(diagnostics.filter((d) => d.severity === "error")).toEqual([]);
+    expect(rewritten).toContain("METHODS save_modified IMPORTING create TYPE zrap_dt_zrt_r_travel=>ts_request_change update TYPE zrap_dt_zrt_r_travel=>ts_request_change delete TYPE zrap_dt_zrt_r_travel=>ts_request_delete CHANGING reported TYPE zrap_dt_zrt_r_travel=>ts_reported_late.");
+    expect(rewritten).toContain("zrap_eml=>sql_write( operation = `UPDATE` table = `ZRT_TRAVEL` rows = update-travel indicators = abap_true ).");
+    // no saver, a saver without save option, DELETE … FROM @wa
+    const missing = await generate({ "zrt_r_travel.bdef.asbdef": additional });
+    expect(missing.diagnostics).toContainEqual(expect.objectContaining({ code: "ABP002", message: expect.stringContaining("needs a saver class") }));
+    const unused = await generate({ [ABP]: (c) => `${c}\n${saver}\n` });
+    expect(unused.diagnostics).toContainEqual(expect.objectContaining({ code: "ABP003", message: expect.stringContaining("is not called") }));
+    const wa = await generate({ "zrt_r_travel.bdef.asbdef": additional, [ABP]: (c) => `${c}\n${saver.replace("    DATA ls_travel TYPE zrt_travel.", "    DATA ls_travel TYPE zrt_travel.\n    DELETE zrt_travel FROM @ls_travel.")}\n` });
+    expect(wa.diagnostics).toContainEqual(expect.objectContaining({ code: "ABP007", message: expect.stringContaining("DELETE dbtab FROM @wa") }));
   });
 
   it("reports SELECT results that abaplint cannot type and unknown tables", async () => {

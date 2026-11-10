@@ -112,3 +112,8 @@ export function baseFieldOf(model: Pick<Model, "entities">, entity: EntityModel,
   }
   return currentField;
 }
+
+/** How an entity of a managed BO is saved: by the runtime, the runtime and save_modified, save_modified alone. */
+export function savingOf(behavior: Pick<BehaviorModel, "saving">, entity: Pick<EntityBehaviorModel, "saving">): "managed" | "additional" | "unmanaged" {
+  return (entity.saving ?? behavior.saving)?.kind ?? "managed";
+}

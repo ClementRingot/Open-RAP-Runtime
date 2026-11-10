@@ -213,6 +213,12 @@ export function generateDerivedTypes(model: Model, behavior: BehaviorModel): Der
       derivedType.update(e),
     );
     w.structure(`ts_e${e}_del`, [{ component: "%cid_ref", type: "cid" }, { include: derivedType.tky(e), as: "%tky" }], derivedType.delete(e));
+    // save_modified of additional and unmanaged save: TYPE TABLE FOR CHANGE
+    w.structure(
+      derivedType.changeRow(e),
+      [{ include: derivedType.tky(e), as: "%tky" }, ...(hasData ? [{ include: derivedType.data(e), as: "%data" }] : []), { component: "%control", type: derivedType.control(e) }],
+      derivedType.change(e),
+    );
     w.structure(`ts_e${e}_rimp`, [{ include: derivedType.tky(e), as: "%tky" }, { component: "%control", type: derivedType.control(e) }], derivedType.readImport(e));
     w.structure(derivedType.readResultRow(e), [{ include: derivedType.tky(e), as: "%tky" }, ...(hasData ? [{ include: derivedType.data(e), as: "%data" }] : [])], derivedType.readResult(e));
     w.structure(`ts_e${e}_keys`, [{ include: derivedType.tky(e), as: "%tky" }], derivedType.keys(e));
@@ -306,6 +312,9 @@ export function generateDerivedTypes(model: Model, behavior: BehaviorModel): Der
   w.alias(derivedType.reportedLate, derivedType.reportedEarly);
   w.structure(derivedType.mappedEarly, perEntity(derivedType.mappedRows));
   w.alias(derivedType.mappedLate, derivedType.mappedEarly);
+  // the parameters of save_modified: TYPE REQUEST FOR CHANGE / FOR DELETE
+  w.structure(derivedType.requestChange, perEntity(derivedType.change));
+  w.structure(derivedType.requestDelete, perEntity(derivedType.delete));
 
   const source = `INTERFACE ${interfaceName.toLowerCase()} PUBLIC.\n${w.text()}\nENDINTERFACE.\n`;
   return { interfaceName, source };

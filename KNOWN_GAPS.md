@@ -27,14 +27,17 @@ Versions de référence : `@abaplint/core` 2.120.98, `@abaplint/transpiler` 2.14
 
 | Écart | Statut |
 |---|---|
-| Écriture ABAP SQL (`INSERT`, `UPDATE`, `MODIFY`, `DELETE` sur une table), `WITH` | Diagnostic ABP007 (D26) : le runtime RAP écrit le BO, le modifier par EML. La lecture (`SELECT`) est prise en charge. |
+| Écriture ABAP SQL (`INSERT`, `UPDATE`, `MODIFY`, `DELETE` sur une table) hors du saver, `WITH` | Diagnostic ABP007 (D26) : le runtime RAP écrit le BO, le modifier par EML. Permise dans `save_modified` (D30). |
+| Écritures ABAP SQL classiques de nombres packed (dont `TIMESTAMPL`) | Le runtime abaplint passe les valeurs par des nombres JavaScript : environ 15 chiffres significatifs, les microsecondes d'un horodatage sont perdues. `MAPPING FROM ENTITY` (kernel) est exact. |
+| `DELETE dbtab FROM @wa` | Le transpiler perd la ligne (la requête viderait la table) : diagnostic ABP007 ; `DELETE FROM dbtab WHERE …`, `FROM TABLE` ou `MAPPING FROM ENTITY`. Un `DELETE` sans condition est refusé à l'exécution. |
 | Tables et vues hors du projet dans un `SELECT` (`/dmo/agency`, tables SAP) | Erreur ABP004 : seules les tables et entités CDS du projet existent dans la base générée. |
 | `SELECT` et changements non sauvegardés de la LUW | Non visibles, comme dans RAP : `SELECT` lit la base (lire le BO par EML pour voir le buffer). |
 | Conditions `SELECT` sur une date, un UUID, un horodatage ou un booléen | Évaluées sur la forme ABAP calculée par la vue : pas d'index utilisable, lecture séquentielle de la table (D26). |
 | Fonctions SQL ABAP (`concat`, `division`, `dats_days_between`, `tstmp_*`…) | Transmises telles quelles : seules celles qui existent sous le même nom en PostgreSQL fonctionnent. |
 | Erreur SQL à l'exécution | Erreur d'exécution (500), pas d'exception `CX_SY_OPEN_SQL_DB` capturable ; la transaction de la LUW reste utilisable (savepoint). |
 | `SELECT … FOR UPDATE`, `OFFSET`, `CLIENT SPECIFIED`, `USING CLIENT`, connexions secondaires | Non pris en charge par le transpiler ou sans objet (mono-tenant, D9). |
-| Classes locales de sauvegarde (`lsc_…` héritant de `cl_abap_behavior_saver`) | Non prises en charge (sauvegarde additionnelle ou unmanaged hors périmètre). |
+| Classe saver (`lsc_…`) | `save_modified` et `cleanup` pour additional et unmanaged save (D30). `adjust_numbers` (late numbering) : ABP007 ; les autres méthodes ne sont pas appelées (ABP003). Les lignes de `update` portent toujours toutes les valeurs. |
+| Unmanaged save : contraintes de la base | Pas de clé étrangère enfant → parent (la BDEF n'a pas de table persistante) : `save_modified` supprime les enfants (`delete` les contient). |
 | EML sur une BDEF de projection (`MODIFY ENTITIES OF zc_travel`) | Diagnostic ABP007 : utiliser la BDEF de base. |
 | `MODIFY ENTITIES OPERATIONS` (EML dynamique), `RELATING TO`, `AUGMENTING`, `COMMIT ENTITIES RESPONSES`, `GET PERMISSIONS`, `SET LOCKS`, `RAISE ENTITY EVENT` | Diagnostics ABP005/ABP007. |
 | Numérotation anticipée par association (`FOR NUMBERING … FOR CREATE Travel\_Booking`), late numbering | Non pris en charge. |

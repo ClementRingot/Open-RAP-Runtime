@@ -19,7 +19,7 @@ export interface Cardinality {
 export type ImplementationKind = "managed" | "unmanaged" | "abstract" | "projection" | "interface";
 
 export type HeaderItemAst =
-  | { kind: "implementation"; type: ImplementationKind; className?: Name; unique: boolean; loc: Loc }
+  | { kind: "implementation"; type: ImplementationKind; className?: Name; unique: boolean; saving?: { variant: "additional" | "unmanaged"; fullData: boolean }; loc: Loc }
   | { kind: "strict"; version: number; loc: Loc }
   | { kind: "withDraft"; loc: Loc }
   | { kind: "privilegedMode"; disabling?: Name; loc: Loc }
@@ -40,7 +40,7 @@ export type EntityOptionAst =
   | { kind: "earlyNumbering"; loc: Loc }
   | { kind: "lateNumbering"; inPlace: boolean; loc: Loc }
   | { kind: "implementationInClass"; className: Name; unique: boolean; loc: Loc }
-  | { kind: "withSave"; variant: "additional" | "unmanaged"; loc: Loc }
+  | { kind: "withSave"; variant: "additional" | "unmanaged"; fullData: boolean; loc: Loc }
   | { kind: "useEtag"; loc: Loc }
   | { kind: "unknown"; text: string; loc: Loc };
 
