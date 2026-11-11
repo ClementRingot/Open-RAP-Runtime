@@ -78,7 +78,9 @@ function input(field: UiField, id: string | undefined): string {
     case "time":
       return `<TimePicker ${common}${required} value="{${field.property}}"/>`;
     default:
-      return `<Input ${common}${required} value="{${field.property}}"${field.unit === undefined ? "" : ` description="{${field.unit}}"`}/>`;
+      return `<Input ${common}${required} value="{${field.property}}"${field.unit === undefined ? "" : ` description="{${field.unit}}"`}${
+        field.valueHelp === undefined ? "/>" : ` showValueHelp="true" valueHelpRequest=".onValueHelp"><customData><core:CustomData key="property" value="${esc(field.property)}"/></customData></Input>`
+      }`;
   }
 }
 
@@ -103,53 +105,79 @@ function columns(table: UiTable): string {
     .join("\n            ");
 }
 
+/** The control of a filter field: conditions (tokens), date range or yes/no. */
+function filterControl(f: UiField): string {
+  const controlId = `filter_${idOf(f.property)}`;
+  switch (f.kind) {
+    case "date":
+    case "datetime":
+      return `<DateRangeSelection id="${controlId}" width="100%" change=".onFilterChange"/>`;
+    case "boolean":
+      return `<Select id="${controlId}" width="100%" change=".onFilterChange"><core:Item key="" text=""/><core:Item key="true" text="Yes"/><core:Item key="false" text="No"/></Select>`;
+    default:
+      return `<MultiInput id="${controlId}" width="100%" submit=".onFilterSubmit" tokenUpdate=".onFilterChange" showValueHelp="${f.valueHelp === undefined ? "false" : "true"}" valueHelpRequest=".onFilterValueHelp" placeholder="${esc(placeholderOf(f))}"><customData><core:CustomData key="property" value="${esc(f.property)}"/></customData></MultiInput>`;
+  }
+}
+
+/** A hint of the condition syntax of a filter field. */
+function placeholderOf(f: UiField): string {
+  return f.kind === "text" ? "contains, =, *, !=" : "=, >, <, a...b";
+}
+
 function listReport(page: UiPage): string {
   const list = page.list as NonNullable<UiPage["list"]>;
   const table = list.table;
   const parameters = [`$count: true`, ...(table.orderby === undefined ? [] : [`$orderby: '${table.orderby}'`])];
-  const filters = list.selectionFields
-    .map((f) => {
-      const control =
-        f.kind === "date"
-          ? `<DatePicker id="filter_${idOf(f.property)}" width="12rem" change=".onSearch"/>`
-          : f.kind === "boolean"
-            ? `<Select id="filter_${idOf(f.property)}" width="8rem" change=".onSearch"><core:Item key="" text=""/><core:Item key="true" text="Yes"/><core:Item key="false" text="No"/></Select>`
-            : `<Input id="filter_${idOf(f.property)}" width="12rem" submit=".onSearch"/>`;
-      return `<VBox class="sapUiSmallMarginEnd"><Label text="${esc(f.label)}" labelFor="filter_${idOf(f.property)}"/>${control}</VBox>`;
-    })
-    .join("\n              ");
-  const search = list.searchable ? `<VBox class="sapUiSmallMarginEnd"><Label text="Search" labelFor="search"/><SearchField id="search" width="14rem" search=".onSearch"/></VBox>` : "";
+  const filters = list.filterFields
+    .map((f) => `<VBox id="filterItem_${idOf(f.property)}" class="raptFilterItem" width="12rem" visible="{= %{lr>/visible/${f.property}} === true }"><Label text="${esc(f.label)}" labelFor="filter_${idOf(f.property)}"/>${filterControl(f)}</VBox>`)
+    .join("\n          ");
+  const search = list.searchable
+    ? `<VBox class="raptFilterItem" width="12rem"><Label text="Search" labelFor="search"/><SearchField id="search" width="100%" search=".onSearch"/></VBox>`
+    : "";
   return `<mvc:View controllerName="rapt.app.controller.List" xmlns:mvc="sap.ui.core.mvc" xmlns="sap.m" xmlns:f="sap.f" xmlns:core="sap.ui.core">
-  <f:DynamicPage id="page" toggleHeaderOnTitleClick="false">
+  <f:DynamicPage id="page" toggleHeaderOnTitleClick="true" headerPinned="false">
     <f:customData><core:CustomData key="set" value="${esc(page.set)}"/></f:customData>
     <f:title>
       <f:DynamicPageTitle>
-        <f:heading><Title text="${esc(page.typeNamePlural)}" level="H2"/></f:heading>
+        <f:heading>
+          <VariantManagement id="variants" level="H2" titleStyle="H2" supportPublic="false" supportContexts="false" supportApplyAutomatically="false"
+            selectedKey="{lr>/variant}" defaultKey="{lr>/defaultVariant}" modified="{lr>/modified}"
+            select=".onVariantSelect" save=".onVariantSave" manage=".onVariantManage"
+            items="{path: 'lr>/variants', templateShareable: false}">
+            <items><VariantItem key="{lr>key}" title="{lr>title}" author="{lr>author}" rename="{lr>changeable}" remove="{lr>changeable}" changeable="{lr>changeable}" favorite="{lr>favorite}"/></items>
+          </VariantManagement>
+        </f:heading>
+        <f:snappedContent><Text id="filterSummary" text="{lr>/summary}"/></f:snappedContent>
       </f:DynamicPageTitle>
     </f:title>
     <f:header>
-      <f:DynamicPageHeader pinnable="false">
-        <HBox wrap="Wrap" alignItems="End">
-              ${search}
-              ${filters}
-          <Button id="go" text="Go" type="Emphasized" press=".onSearch" class="sapUiSmallMarginBottom"/>
-        </HBox>
+      <f:DynamicPageHeader pinnable="true">
+        <FlexBox id="filterBar" wrap="Wrap" alignItems="End" class="raptFilterBar">
+          ${search}
+          ${filters}
+          <HBox id="filterButtons" class="raptFilterItem raptFilterButtons">
+            <Button id="go" text="Go" type="Emphasized" press=".onSearch"/>
+            <Button id="clearFilters" text="Clear" type="Transparent" press=".onClearFilters" class="sapUiTinyMarginBegin"/>
+            <Button id="adaptFilters" text="{= 'Adapt Filters' + (\${lr>/active} > 0 ? ' (' + \${lr>/active} + ')' : '') }" type="Transparent" press=".onAdaptFilters" class="sapUiTinyMarginBegin"/>
+          </HBox>
+        </FlexBox>
       </f:DynamicPageHeader>
     </f:header>
     <f:content>
-      <Table id="table" growing="true" growingThreshold="25" growingScrollToLoad="true" mode="SingleSelectLeft" selectionChange=".onSelectionChange" sticky="ColumnHeaders,HeaderToolbar"
+      <Table id="table" growing="true" growingThreshold="25" growingScrollToLoad="true" mode="SingleSelectLeft" selectionChange=".onSelectionChange" updateFinished=".onUpdateFinished" sticky="ColumnHeaders,HeaderToolbar"
         items="{path: '/${esc(page.set)}', parameters: {${esc(parameters.join(", "))}}}">
         <headerToolbar>
           <OverflowToolbar>
-            <Title id="tableTitle" text="${esc(page.typeNamePlural)}" level="H3"/>
+            <Title id="tableTitle" text="{lr>/tableTitle}" level="H3"><customData><core:CustomData key="plural" value="${esc(page.typeNamePlural)}"/></customData></Title>
             <ToolbarSpacer/>
             ${table.insertable ? `<Button id="create" text="Create" type="Transparent" press=".onCreate" visible="${esc(`{= %{ui>/permissions/${page.set}/create} !== false }`)}"/>` : ""}
             ${table.deletable ? `<Button id="delete" text="Delete" type="Transparent" press=".onDelete" enabled="{ui>/tableSelected}"/>` : ""}
             ${table.actions.map((a) => actionButton(a, "table", "list")).join("\n            ")}
+            <Button id="tableSettings" icon="sap-icon://action-settings" tooltip="Table settings" type="Transparent" press=".onTableSettings"/>
           </OverflowToolbar>
         </headerToolbar>
         <columns>
-            ${columns(table)}
+            ${listColumns(table)}
         </columns>
         <items>
           <ColumnListItem type="Navigation" press=".onItemPress">
@@ -163,6 +191,13 @@ function listReport(page: UiPage): string {
   </f:DynamicPage>
 </mvc:View>
 `;
+}
+
+/** The columns of the list report: their visibility is a setting of the user (variants). */
+function listColumns(table: UiTable): string {
+  return table.columns
+    .map((c) => `<Column id="${esc(`${idOf(table.set)}Col_${idOf(c.property)}`)}" visible="{= %{lr>/columns/${c.property}} !== false }"${c.importance === "Low" ? ' demandPopin="true" minScreenWidth="Tablet"' : ""}${c.kind === "amount" || c.kind === "decimal" || c.kind === "integer" ? ' hAlign="End"' : ""}><Text text="${esc(c.label)}"/></Column>`)
+    .join("\n            ");
 }
 
 function form(section: Extract<UiSection, { kind: "form" }>): string {
@@ -219,7 +254,25 @@ function section(s: UiSection): string {
     </uxap:ObjectPageSection>`;
 }
 
-function objectPage(page: UiPage): string {
+/** Breadcrumbs of an object page: the list report, then the parent object (back). */
+function breadcrumbs(page: UiPage, layout: UiLayout): string {
+  const start = layout.pages.find((p) => p.set === layout.start);
+  const parent = layout.pages.find((p) => p.set !== page.set && p.sections.some((s) => tablesOf(s).some((t) => t.set === page.set)));
+  const links = [];
+  if (start?.list !== undefined) {
+    links.push(`<Link id="crumbList" text="${esc(start.typeNamePlural)}" press=".onNavList"/>`);
+  }
+  if (parent !== undefined) {
+    links.push(`<Link id="crumbParent" text="${esc(parent.typeName)}" press=".onNavBack"/>`);
+  }
+  return links.length === 0 ? "" : `<uxap:breadcrumbs><Breadcrumbs id="breadcrumbs">${links.join("")}</Breadcrumbs></uxap:breadcrumbs>`;
+}
+
+function tablesOf(section: UiSection): UiTable[] {
+  return section.kind === "table" ? [section.table] : section.kind === "collection" ? section.sections.flatMap(tablesOf) : [];
+}
+
+function objectPage(page: UiPage, layout: UiLayout): string {
   const title = page.title === undefined ? `<Title text="${esc(page.typeName)}" wrapping="true"/>` : `<Title text="{${page.title}}" wrapping="true"/>`;
   const edit = page.updatable
     ? `<Button id="edit" text="Edit" type="Emphasized" press=".onEdit" visible="{= !\${ui>/editMode} }"${page.updatableDynamic ? ` enabled="${esc("{= %{__EntityControl/Updatable} !== false }")}"` : ""}/>`
@@ -232,6 +285,7 @@ function objectPage(page: UiPage): string {
     <uxap:customData><core:CustomData key="set" value="${esc(page.set)}"/></uxap:customData>
     <uxap:headerTitle>
       <uxap:ObjectPageDynamicHeaderTitle id="headerTitle">
+        ${breadcrumbs(page, layout)}
         <uxap:heading>${title}</uxap:heading>
         <uxap:snappedTitleOnMobile><Title text="${esc(page.typeName)}"/></uxap:snappedTitleOnMobile>
         <uxap:expandedContent>${page.description === undefined ? `<Text text="${esc(page.typeName)}"/>` : `<Text text="{${page.description}}"/>`}</uxap:expandedContent>
@@ -264,7 +318,7 @@ export function views(layout: UiLayout): Array<{ path: string; content: string }
     if (page.list !== undefined) {
       files.push({ path: `view/${page.set}List.view.xml`, content: listReport(page) });
     }
-    files.push({ path: `view/${page.set}Object.view.xml`, content: objectPage(page) });
+    files.push({ path: `view/${page.set}Object.view.xml`, content: objectPage(page, layout) });
   }
   return files;
 }

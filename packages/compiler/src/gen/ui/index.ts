@@ -2,7 +2,7 @@
 
 import type { Model } from "@rap-transpiler/model";
 import { buildUiLayout } from "./layout.js";
-import { APP_CONTROLLER, APP_VIEW, COMPONENT, indexHtml, LIST_CONTROLLER, manifest, OBJECT_CONTROLLER, SUPPORT } from "./static.js";
+import { APP_CONTROLLER, APP_VIEW, COMPONENT, FILTERS, indexHtml, LIST_CONTROLLER, manifest, OBJECT_CONTROLLER, STYLE, SUPPORT, VARIANTS } from "./static.js";
 import { views } from "./views.js";
 
 export { buildUiLayout, type UiLayout } from "./layout.js";
@@ -19,6 +19,9 @@ export function generateUi(model: Model): Array<{ path: string; content: string 
     { path: "controller/List.controller.js", content: LIST_CONTROLLER },
     { path: "controller/Object.controller.js", content: OBJECT_CONTROLLER },
     { path: "controller/support.js", content: SUPPORT },
+    { path: "controller/filters.js", content: FILTERS },
+    { path: "controller/variants.js", content: VARIANTS },
+    { path: "css/style.css", content: STYLE },
     { path: "model/layout.json", content: `${JSON.stringify(layout, null, 2)}\n` },
   ];
 }

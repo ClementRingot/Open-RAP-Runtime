@@ -42,6 +42,19 @@ export interface UiField {
   /** Under instance feature control (`__FieldControl`). */
   dynamic: boolean;
   importance?: "High" | "Medium" | "Low";
+  /** Value help of the field (`@Consumption.valueHelpDefinition`, `Common.ValueList`). */
+  valueHelp?: UiValueHelp;
+}
+
+/** A value help: the entity set listing the values, its key element and its other columns. */
+export interface UiValueHelp {
+  /** Entity set of the value help in the service (exposed automatically, like RAP). */
+  set: string;
+  /** Element of the value help entity giving the value of the field. */
+  element: string;
+  label: string;
+  /** Columns of the value help dialog (the element first). */
+  columns: Array<{ property: string; label: string }>;
 }
 
 export interface UiParameter {
@@ -96,7 +109,14 @@ export interface UiPage {
   title?: string;
   description?: string;
   /** List report of a root entity set. */
-  list?: { table: UiTable; selectionFields: UiField[]; searchable: boolean };
+  list?: {
+    table: UiTable;
+    /** Filters shown by default (`@UI.selectionField`). */
+    selectionFields: UiField[];
+    /** Every field the user may filter by ("Adapt Filters"): the selection fields, then the columns. */
+    filterFields: UiField[];
+    searchable: boolean;
+  };
   sections: UiSection[];
   /** Object page header actions (identification). */
   actions: UiAction[];
@@ -338,9 +358,17 @@ class LayoutBuilder {
     if (entity.root) {
       const table = this.table(set);
       if (table !== undefined) {
+        const selectionFields = this.dataFields(type, entity, "UI.selectionField").fields;
+        const filterFields = [...selectionFields];
+        for (const column of table.columns) {
+          if (!filterFields.some((f) => f.property === column.property)) {
+            filterFields.push(column);
+          }
+        }
         page.list = {
           table,
-          selectionFields: this.dataFields(type, entity, "UI.selectionField").fields,
+          selectionFields,
+          filterFields,
           searchable: entitySet?.searchable === true,
         };
       }

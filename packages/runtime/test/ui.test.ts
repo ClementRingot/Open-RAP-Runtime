@@ -13,6 +13,7 @@ import { generatedFixture, SERVICE, T1, T2, T3, writableApp, type TestApp } from
 const browserType = chromium();
 const RUNTIME_DIR = fileURLToPath(new URL("..", import.meta.url));
 const SHOTS = process.env["RAPT_SCREENSHOTS"];
+const JSON_HEADERS = { "content-type": "application/json;charset=UTF-8", accept: "application/json" };
 
 let t: TestApp;
 let browser: Browser;
@@ -37,6 +38,9 @@ async function odata(pathAndQuery: string): Promise<Record<string, unknown>> {
   return JSON.parse(response.body) as Record<string, unknown>;
 }
 
+async function count(filter: string): Promise<number> {
+  return ((await odata(`Travel?$filter=${encodeURIComponent(filter)}`))["value"] as unknown[]).length;
+}
 
 async function open(): Promise<Page> {
   const page = await browser.newPage({ viewport: { width: 1400, height: 900 } });
@@ -192,5 +196,91 @@ describe.skipIf(browserType === undefined)("generated UI (OpenUI5)", () => {
     const created = (await odata("Travel?$filter=TravelID eq '00000042'"))["value"] as Array<Record<string, unknown>>;
     expect(created).toHaveLength(1);
     expect(created[0]).toMatchObject({ Description: "Created in the browser", BeginDate: "2027-03-01", EndDate: "2027-03-09", OverallStatus: "O", TotalPrice: 12.5 });
+  }, 120_000);
+
+  it("filters with conditions (range, several values), clears the filters and adapts them", async () => {
+    const page = await open();
+    const rows = `${id("TravelList", "table")} ${ROWS}`;
+    // digit sequences without their leading zeros: a range of agencies, then a range of travel IDs
+    await page.locator(`${id("TravelList", "filter_AgencyID")}-inner`).fill("70001...70002");
+    await page.locator(`${id("TravelList", "filter_AgencyID")}-inner`).press("Enter");
+    await page.locator(`${id("TravelList", "filter_TravelID")}-inner`).fill("1");
+    await page.locator(`${id("TravelList", "filter_TravelID")}-inner`).press("Enter");
+    await page.locator(`${id("TravelList", "filter_TravelID")}-inner`).fill("2");
+    await page.locator(`${id("TravelList", "filter_TravelID")}-inner`).press("Enter");
+    const agencies = "AgencyID ge '070001' and AgencyID le '070002'";
+    const both = await count(`${agencies} and (TravelID eq '00000001' or TravelID eq '00000002')`);
+    expect(both).toBeGreaterThanOrEqual(2);
+    await page.waitForFunction(`document.querySelectorAll('${rows}').length === ${both}`, undefined, { timeout: 30_000 });
+    // removing the token "=1" leaves one travel
+    await page.locator(`${id("TravelList", "filter_TravelID")} .sapMToken .sapMTokenIcon`).first().click();
+    await page.waitForFunction(`document.querySelectorAll('${id("TravelList", "filter_TravelID")} .sapMToken').length === 1`, undefined, { timeout: 30_000 });
+    await page.locator(id("TravelList", "go")).click();
+    const second = await count(`${agencies} and TravelID eq '00000002'`);
+    await page.waitForFunction(`document.querySelectorAll('${rows}').length === ${second}`, undefined, { timeout: 30_000 });
+    expect(await page.locator(id("TravelList", "tableTitle")).textContent()).toBe(`Travels (${second})`);
+    expect(await page.locator(id("TravelList", "adaptFilters")).textContent()).toBe("Adapt Filters (2)");
+    // a wrong condition is refused, the list keeps its filter
+    await page.locator(`${id("TravelList", "filter_CustomerID")}-inner`).fill(">abc");
+    await page.locator(id("TravelList", "go")).click();
+    await page.waitForFunction(`document.querySelector('${id("TravelList", "filter_CustomerID")}').classList.contains('sapMInputBaseErrorState') || !!document.querySelector('${id("TravelList", "filter_CustomerID")}-content.sapMInputBaseContentWrapperError')`, undefined, { timeout: 30_000 });
+    await page.locator(`${id("TravelList", "filter_CustomerID")}-inner`).fill("");
+    await page.locator(id("TravelList", "clearFilters")).click();
+    const all = ((await odata("Travel"))["value"] as unknown[]).length;
+    await page.waitForFunction(`document.querySelectorAll('${rows}').length === ${all}`, undefined, { timeout: 30_000 });
+    // "Adapt Filters": the begin date (a column) becomes a filter, a date range
+    await page.locator(id("TravelList", "adaptFilters")).click();
+    await page.locator(".sapMDialog li", { hasText: "Begin Date" }).first().locator(".sapMCb").click();
+    // the confirmation button of the dialog ("Select")
+    await page.locator(".sapMDialog footer button, .sapMDialog .sapMDialogFooter button").first().click();
+    await page.locator(`${id("TravelList", "filter_BeginDate")}-inner`).waitFor({ timeout: 30_000 });
+    await page.locator(`${id("TravelList", "filter_BeginDate")}-inner`).fill("Jun 1, 2026 - Jul 31, 2026");
+    await page.locator(`${id("TravelList", "filter_BeginDate")}-inner`).press("Enter");
+    await page.locator(id("TravelList", "go")).click();
+    const expected = ((await odata("Travel?$filter=BeginDate ge 2026-06-01 and BeginDate le 2026-07-31"))["value"] as unknown[]).length;
+    await page.waitForFunction(`document.querySelectorAll('${rows}').length === ${expected}`, undefined, { timeout: 30_000 });
+    if (SHOTS !== undefined) await page.screenshot({ path: path.join(SHOTS, "list-report-filters.png") });
+  }, 120_000);
+
+  it("keeps the views (variants) of the user", async () => {
+    const url = `${SERVICE}$variants?page=TravelList`;
+    expect(JSON.parse((await t.app.inject({ method: "GET", url })).body)).toEqual({ items: [] });
+    const views = { defaultKey: "v1", items: [{ key: "v1", title: "Agency 2", content: { filters: { AgencyID: ["=70002"] }, search: "", visible: ["TravelID", "AgencyID"], hidden: ["EndDate"], sort: [] } }] };
+    expect((await t.app.inject({ method: "PUT", url, headers: { ...JSON_HEADERS }, payload: JSON.stringify(views) })).statusCode).toBe(204);
+    expect((await t.app.inject({ method: "PUT", url, headers: { ...JSON_HEADERS }, payload: "{}" })).statusCode).toBe(400);
+    // the default view of the user is applied when the List Report opens
+    try {
+      const page = await open();
+      const rows = `${id("TravelList", "table")} ${ROWS}`;
+      const expected = await count("AgencyID eq '070002'");
+      await page.waitForFunction(`document.querySelectorAll('${rows}').length === ${expected} && [...document.querySelectorAll('${rows}')].every((r) => r.textContent.includes('70002'))`, undefined, { timeout: 30_000 });
+      expect(await page.locator(id("TravelList", "variants")).textContent()).toContain("Agency 2");
+      expect(await page.locator(id("TravelList", "TravelCol_EndDate")).count()).toBe(0);
+    } finally {
+      expect((await t.app.inject({ method: "PUT", url, headers: { ...JSON_HEADERS }, payload: JSON.stringify({ items: [] }) })).statusCode).toBe(204);
+    }
+  }, 120_000);
+
+  it("shows in the List Report an object deleted from its Object Page", async () => {
+    const created = await t.app.inject({
+      method: "POST",
+      url: `${SERVICE}Travel`,
+      headers: { ...JSON_HEADERS },
+      payload: JSON.stringify({ TravelID: "00000077", AgencyID: "070009", CustomerID: "000077", BeginDate: "2027-05-01", EndDate: "2027-05-02", BookingFee: 1, CurrencyCode: "EUR", Description: "To be deleted" }),
+    });
+    expect(created.statusCode).toBe(201);
+    const page = await open();
+    const rows = `${id("TravelList", "table")} ${ROWS}`;
+    await page.locator(rows, { hasText: "70009" }).first().waitFor({ timeout: 30_000 });
+    await page.locator(rows, { hasText: "70009" }).first().click();
+    await page.getByText("To be deleted").first().waitFor({ timeout: 30_000 });
+    await page.locator(id("TravelObject", "deleteObject")).click();
+    await page.locator(".sapMMessageBox button", { hasText: "OK" }).first().click();
+    // back on the List Report: the row is gone
+    await page.waitForFunction(`document.querySelectorAll('${rows}').length > 0 && ![...document.querySelectorAll('${rows}')].some((r) => r.textContent.includes('70009'))`, undefined, { timeout: 30_000 });
+    // the breadcrumb of an Object Page leads back to the List Report
+    await page.locator(rows).first().click();
+    await page.locator(id("TravelObject", "crumbList")).click();
+    await page.locator(id("TravelList", "go")).waitFor({ timeout: 30_000 });
   }, 120_000);
 });

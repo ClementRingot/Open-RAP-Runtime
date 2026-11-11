@@ -17,6 +17,7 @@ import { ODataError } from "./odata/errors.js";
 import { RapWriteHandler } from "./odata/write.js";
 import type { RapRuntime } from "./rap/runtime.js";
 import { registerUi, type UiOptions } from "./ui/plugin.js";
+import { UiVariants, VariantError } from "./ui/variants.js";
 import type { Kysely } from "kysely";
 
 export interface AppOptions {
@@ -87,6 +88,7 @@ export async function createApp(options: AppOptions): Promise<FastifyInstance> {
   const authenticator = new Authenticator(options.auth ?? { mode: "none" });
   const csrf = new CsrfTokens(options.csrfSecret);
   const auth = options.auth;
+  const variants = new UiVariants(() => options.db);
   const sessions = auth?.mode === "oidc" && auth.session !== undefined ? new OidcSessions(authenticator, { ...auth, session: auth.session }) : undefined;
 
   // bodies are read as text: the OData layer parses JSON (decimals as strings) and multipart
@@ -158,6 +160,26 @@ export async function createApp(options: AppOptions): Promise<FastifyInstance> {
       // the operations of the entity sets the user may perform (creation), for the UI (D36)
       const permissions = writes instanceof RapWriteHandler ? await withReader(user, () => writes.permissions(ctx)) : {};
       return send(reply, { status: 200, headers: { "Content-Type": "application/json", "Cache-Control": "no-store", ...extra }, body: JSON.stringify(permissions) });
+    }
+    if (odataRequest.path === "$variants" && (request.method === "GET" || request.method === "PUT")) {
+      // the views of the list reports of the user (filters, columns, sort order)
+      const page = new URLSearchParams(odataRequest.query).get("page") ?? "";
+      const json = { "Content-Type": "application/json", "Cache-Control": "no-store", ...extra };
+      if (page === "" || page.length > 200) {
+        return send(reply, { status: 400, headers: json, body: JSON.stringify({ error: "the page parameter is required" }) });
+      }
+      try {
+        if (request.method === "GET") {
+          return send(reply, { status: 200, headers: json, body: JSON.stringify(await variants.read(user.id, page)) });
+        }
+        await variants.write(user.id, page, odataRequest.body ?? "");
+        return send(reply, { status: 204, headers: extra });
+      } catch (error) {
+        if (error instanceof VariantError) {
+          return send(reply, { status: 400, headers: json, body: JSON.stringify({ error: error.message }) });
+        }
+        throw error;
+      }
     }
     const response = await withReader(user, () => handler.handle(odataRequest, ctx));
     response.headers = { ...response.headers, ...extra };

@@ -79,3 +79,66 @@ describe("UI files", () => {
     ]);
   });
 });
+
+describe("filter conditions of the list report (controller/filters.js)", () => {
+  // the module runs with stubs of sap.ui.define and of the filters of OpenUI5
+  class Filter {
+    public constructor(public readonly spec: unknown, operator?: string, value1?: unknown) {
+      if (typeof spec === "string") this.spec = { path: spec, operator, value1 };
+    }
+  }
+  const FilterOperator = { EQ: "EQ", NE: "NE", GT: "GT", GE: "GE", LT: "LT", LE: "LE", BT: "BT", Contains: "Contains", StartsWith: "StartsWith", EndsWith: "EndsWith" };
+  let filters: {
+    parse(field: object, text: string): { op: string; values: string[] } | null;
+    text(condition: object): string;
+    fieldFilter(field: object, conditions: object[]): Filter | null;
+    dateFilter(field: object, from: string, to: string): Filter | null;
+  } = undefined as never;
+  const source = generateUi(fixture()).find((f) => f.path === "controller/filters.js")?.content ?? "";
+  new Function("sap", source)({ ui: { define: (_deps: string[], factory: (...args: unknown[]) => typeof filters) => (filters = factory(Filter, FilterOperator)) } });
+  const text = { property: "Description", kind: "text" };
+  const digits = { property: "TravelID", kind: "digits", maxLength: 8 };
+  const amount = { property: "TotalPrice", kind: "amount" };
+
+  it("reads the conditions written as in SAP Fiori", () => {
+    expect(filters.parse(text, "Rome")).toEqual({ op: "Contains", values: ["Rome"] });
+    expect(filters.parse(text, "=Rome")).toEqual({ op: "EQ", values: ["Rome"] });
+    expect(filters.parse(text, "Ro*")).toEqual({ op: "StartsWith", values: ["Ro"] });
+    expect(filters.parse(text, "*me")).toEqual({ op: "EndsWith", values: ["me"] });
+    expect(filters.parse(digits, "3")).toEqual({ op: "EQ", values: ["3"] });
+    expect(filters.parse(digits, "2...5")).toEqual({ op: "BT", values: ["2", "5"] });
+    expect(filters.parse(amount, ">=100.5")).toEqual({ op: "GE", values: ["100.5"] });
+    expect(filters.parse(amount, "!=0")).toEqual({ op: "NE", values: ["0"] });
+    expect(filters.parse(amount, "abc")).toBeNull();
+    expect(filters.parse(digits, "123456789")).toBeNull();
+    for (const t of ["=Rome", "*Rome*", "Ro*", "2...5", ">=100.5", "!=0"]) {
+      const field = /\d/.test(t) ? amount : text;
+      expect(filters.text(filters.parse(field, t) as object)).toBe(t);
+    }
+  });
+
+  it("pads the digit sequences and combines the conditions of a field", () => {
+    const single = filters.fieldFilter(digits, [{ op: "EQ", values: ["3"] }]);
+    expect(single?.spec).toMatchObject({ path: "TravelID", operator: "EQ", value1: "00000003" });
+    const combined = filters.fieldFilter(amount, [
+      { op: "GT", values: ["10"] },
+      { op: "LT", values: ["1"] },
+      { op: "NE", values: ["500"] },
+    ]);
+    // included values or'ed, exclusions and'ed
+    expect(combined?.spec).toMatchObject({ and: true });
+    const parts = (combined?.spec as { filters: Filter[] }).filters;
+    expect((parts[0]?.spec as { and: boolean }).and).toBe(false);
+    expect(parts[1]?.spec).toMatchObject({ operator: "NE", value1: "500" });
+  });
+
+  it("filters dates by range, and date-times by whole days", () => {
+    expect(filters.dateFilter({ property: "BeginDate", kind: "date" }, "2026-06-01", "2026-06-30")?.spec).toMatchObject({ operator: "BT", value1: "2026-06-01", value2: "2026-06-30" });
+    expect(filters.dateFilter({ property: "BeginDate", kind: "date" }, "2026-06-01", "")?.spec).toMatchObject({ operator: "EQ", value1: "2026-06-01" });
+    const day = filters.dateFilter({ property: "CreatedAt", kind: "datetime" }, "2026-12-31", "")?.spec as { filters: Filter[] };
+    expect(day.filters.map((f) => f.spec)).toEqual([
+      { path: "CreatedAt", operator: "GE", value1: "2026-12-31T00:00:00Z" },
+      { path: "CreatedAt", operator: "LT", value1: "2027-01-01T00:00:00Z" },
+    ]);
+  });
+});
