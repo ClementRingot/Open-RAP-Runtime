@@ -12,7 +12,7 @@ import type { Cond, CustomQueries } from "./custom.js";
 import type { AccessControls } from "./access.js";
 import { DEPENDENT_ETAG } from "./json.js";
 import type { Key, ServiceRuntime, TypeInfo } from "./service.js";
-import type { ExpandItem, Expr, OrderItem, QueryOptions } from "./uri/ast.js";
+import type { AggregateItem, ApplyStep, ExpandItem, Expr, OrderItem, QueryOptions } from "./uri/ast.js";
 
 export type Row = { [property: string]: CanonicalValue | Row | Row[] | number | undefined };
 
@@ -512,6 +512,92 @@ export class ReadEngine {
       result.count = await this.count(info, options, scope);
     }
     await this.expand(info, result.rows, options.expand);
+    return result;
+  }
+
+  /**
+   * `$apply` (D52): the groups of the dimensions with their aggregates, after the filters of
+   * `$apply` and `$filter` (on the instances), with the access controls; `$orderby` on the
+   * dimensions and the aliases, `$top`, `$skip`, `$count` (number of groups).
+   */
+  public async readAggregated(info: TypeInfo, options: QueryOptions, scope: RawBuilder<unknown>[] = []): Promise<{ rows: Array<Record<string, CanonicalValue | number>>; count?: number; properties: string[]; aliases: string[] }> {
+    if (info.entity.kind === "custom") {
+      throw notImplemented("$apply on a custom entity");
+    }
+    const steps = options.apply ?? [];
+    const alias = "t0";
+    const filters = steps.filter((s): s is Extract<ApplyStep, { kind: "filter" }> => s.kind === "filter").map((s) => this.condition(info, alias, s.filter));
+    const grouping = steps.find((s) => s.kind !== "filter") as Exclude<ApplyStep, { kind: "filter" }> | undefined;
+    const dimensions = grouping?.kind === "groupby" ? grouping.properties : [];
+    const items = grouping === undefined ? [] : grouping.aggregate;
+    for (const d of dimensions) {
+      if (!info.properties.has(d)) {
+        throw badRequest(`$apply: ${info.type.name} has no property ${d}`, d);
+      }
+    }
+    const aliases = items.map((i) => i.alias);
+    if (new Set([...dimensions, ...aliases]).size !== dimensions.length + aliases.length) {
+      throw badRequest("$apply: an alias repeats a property or another alias");
+    }
+    const aggregate = (item: AggregateItem): RawBuilder<unknown> => {
+      if (item.method === "count") {
+        return sql`count(*)`;
+      }
+      const name = item.property ?? "";
+      if (!info.properties.has(name)) {
+        throw badRequest(`$apply: ${info.type.name} has no property ${name}`, name);
+      }
+      const column = sql.ref(`${alias}.${name}`);
+      switch (item.method) {
+        case "sum":
+          return sql`coalesce(sum(${column}), 0)`;
+        case "average":
+          return sql`avg(${column})`;
+        case "countdistinct":
+          return sql`count(DISTINCT ${column})`;
+        default:
+          return sql`${sql.raw(item.method)}(${column})`;
+      }
+    };
+    const columns = [...dimensions.map((d) => sql.ref(`${alias}.${d}`) as RawBuilder<unknown>), ...items.map((i) => sql`${aggregate(i)} AS ${sql.id(i.alias)}`)];
+    if (columns.length === 0) {
+      throw badRequest("$apply: groupby or aggregate is needed");
+    }
+    const where = this.where(info, alias, options, [...scope, ...filters]);
+    const groupBy = dimensions.length === 0 ? sql`` : sql`GROUP BY ${sql.join(dimensions.map((d) => sql.ref(`${alias}.${d}`)))}`;
+    const order = (options.orderby ?? []).map((o) => {
+      const name = o.path.join("/");
+      if (!dimensions.includes(name) && !aliases.includes(name)) {
+        throw badRequest(`$orderby: ${name} is not a property or an alias of $apply`);
+      }
+      return sql`${sql.id(name)} ${sql.raw(o.descending ? "DESC NULLS LAST" : "ASC NULLS FIRST")}`;
+    });
+    for (const d of dimensions) {
+      order.push(sql`${sql.id(d)} ASC`);
+    }
+    const orderBy = order.length === 0 ? sql`` : sql`ORDER BY ${sql.join(order)}`;
+    const inner = sql`SELECT ${sql.join(columns)} FROM ${sql.table(info.view)} AS ${sql.id(alias)} ${where} ${groupBy}`;
+    const limit = Math.min(options.top ?? MAX_PAGE_SIZE, MAX_PAGE_SIZE);
+    const { rows } = await sql<Record<string, unknown>>`SELECT * FROM (${inner}) AS "g" ${orderBy} LIMIT ${limit} OFFSET ${options.skip ?? 0}`.execute(this.db());
+    const result: { rows: Array<Record<string, CanonicalValue | number>>; count?: number; properties: string[]; aliases: string[] } = {
+      rows: rows.map((raw) => {
+        const row: Record<string, CanonicalValue | number> = {};
+        for (const d of dimensions) {
+          row[d] = fromSql(this.service.property(info, d).field.type, raw[d]);
+        }
+        for (const a of aliases) {
+          const value = raw[a];
+          row[a] = value === null || value === undefined ? 0 : Number(value);
+        }
+        return row;
+      }),
+      properties: dimensions,
+      aliases,
+    };
+    if (options.count === true) {
+      const counted = await sql<{ n: string | number }>`SELECT count(*) AS n FROM (${inner}) AS "g"`.execute(this.db());
+      result.count = Number(counted.rows[0]?.n ?? 0);
+    }
     return result;
   }
 

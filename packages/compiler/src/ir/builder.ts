@@ -11,6 +11,7 @@ import {
   getArray,
   type Model,
   type ServiceModel,
+  type UiConfigModel,
   type TableModel,
 } from "@rap-transpiler/model";
 import { parseBdef } from "../bdef/parser.js";
@@ -79,6 +80,19 @@ function addValueHelps(service: ServiceModel, entities: EntityResolver, diagnost
       }
     }
   }
+}
+
+/** The UI settings name entity sets of the service (D53): CFG003 otherwise. */
+function checkUi(ui: UiConfigModel, service: ServiceModel, diagnostics: Diagnostics): UiConfigModel {
+  const at = { file: "rapt/config.json", line: 1 };
+  const sets = new Set(service.entitySets.map((s) => s.name));
+  for (const set of Object.keys(ui.floorplans ?? {})) {
+    if (!sets.has(set)) diagnostics.error("CFG003", `rapt/config.json: ui.floorplans: no entity set ${set} in the service`, at);
+  }
+  for (const card of ui.overview?.cards ?? []) {
+    if (!sets.has(card.entitySet)) diagnostics.error("CFG003", `rapt/config.json: card ${card.title}: no entity set ${card.entitySet} in the service`, at);
+  }
+  return ui;
 }
 
 export function buildModel(project: Project, options: BuildOptions = {}): BuildResult {
@@ -277,6 +291,7 @@ export function buildModel(project: Project, options: BuildOptions = {}): BuildR
     formatVersion: MODEL_FORMAT_VERSION,
     generator: { name: "rap-transpiler", version: COMPILER_VERSION },
     ...(config.mode === "enhanced" ? { mode: config.mode } : {}),
+    ...(config.ui === undefined ? {} : { ui: checkUi(config.ui, service, diagnostics) }),
     service,
     tables: [...tables.values()].sort((a, b) => a.name.localeCompare(b.name)),
     entities: sortedEntities,

@@ -35,14 +35,35 @@ export function indexHtml(layout: UiLayout): string {
 export const STYLE = `.raptFilterBar { column-gap: 1rem; row-gap: 0.5rem; }
 .raptFilterBar .raptFilterItem { margin: 0; }
 .raptFilterBar .raptFilterButtons { margin-left: auto; align-items: flex-end; }
+.raptChartArea { padding: 0 0 1rem 0; }
+.raptChart { width: 100%; box-sizing: border-box; padding: 0.5rem 0; }
+.raptChart svg { display: block; }
+.raptChartLabel { font-family: var(--sapFontFamily); font-size: 11px; fill: var(--sapContent_LabelColor, #556b82); }
+.raptChartGrid { stroke: var(--sapList_BorderColor, #e5e5e5); stroke-width: 1; }
+.raptChartItem { cursor: pointer; opacity: 0.9; }
+.raptChartItem:hover { opacity: 1; }
+.raptChartSelected { stroke: var(--sapContent_FocusColor, #0070f2); stroke-width: 3; opacity: 1; }
+.raptChartHole { fill: var(--sapTile_Background, #fff); }
+.raptChartEmpty { display: flex; align-items: center; justify-content: center; height: 100%; color: var(--sapContent_LabelColor); }
+.raptCards { gap: 1rem; padding-top: 1rem; }
+.raptCards .raptCard { max-width: 100%; }
 `;
 
 export function manifest(layout: UiLayout): string {
   const routes: unknown[] = [];
   const targets: Record<string, unknown> = {};
+  // the start page (D53): an Overview Page, a form to create (form entry), or a list report
+  const startPage = layout.pages.find((p) => p.set === layout.start);
+  if (layout.overview !== undefined) {
+    routes.push({ pattern: "", name: "Overview", target: "Overview" });
+    targets["Overview"] = { name: "Overview", id: "Overview", level: 0 };
+  } else if (startPage?.floorplan === "formEntry") {
+    routes.push({ pattern: "", name: `${startPage.set}FormEntry`, target: `${startPage.set}Object` });
+  }
   for (const page of layout.pages) {
     if (page.list !== undefined) {
-      routes.push({ pattern: page.set === layout.start ? "" : `${page.set}`, name: `${page.set}List`, target: `${page.set}List` });
+      const start = page.set === layout.start && layout.overview === undefined && page.floorplan !== "formEntry";
+      routes.push({ pattern: start ? "" : `${page.set}`, name: `${page.set}List`, target: `${page.set}List` });
       targets[`${page.set}List`] = { name: `${page.set}List`, id: `${page.set}List`, level: 1 };
     }
     if (page.insertable) {
@@ -575,6 +596,41 @@ export const FILTERS = `sap.ui.define([
       return aParts.length === 1 ? aParts[0] : new Filter({ filters: aParts, and: true });
     },
 
+    /**
+     * A filter as an OData $filter expression (the chart of the Analytical List Page and the counts
+     * of the worklist tabs send their own requests). mFields: property → field of the layout.
+     */
+    toOData: function (oFilter, mFields) {
+      if (!oFilter) {
+        return "";
+      }
+      var aInner = oFilter.aFilters || (oFilter.getFilters && oFilter.getFilters());
+      if (aInner && aInner.length) {
+        var bAnd = oFilter.bAnd !== undefined ? oFilter.bAnd : !!(oFilter.isAnd && oFilter.isAnd());
+        return "(" + aInner.map(function (f) { return filters.toOData(f, mFields); }).join(bAnd ? " and " : " or ") + ")";
+      }
+      var sPath = oFilter.sPath || (oFilter.spec && oFilter.spec.path);
+      var sOp = oFilter.sOperator || (oFilter.spec && oFilter.spec.operator);
+      var v1 = oFilter.oValue1 !== undefined ? oFilter.oValue1 : oFilter.spec && oFilter.spec.value1;
+      var v2 = oFilter.oValue2 !== undefined ? oFilter.oValue2 : oFilter.spec && oFilter.spec.value2;
+      var bCaseInsensitive = oFilter.bCaseSensitive === false || (oFilter.spec && oFilter.spec.caseSensitive === false);
+      var oField = (mFields && mFields[sPath]) || { edm: "Edm.String" };
+      var literal = function (v) {
+        if (v === null || v === undefined) { return "null"; }
+        if (oField.edm === "Edm.String") { return "'" + String(v).replace(/'/g, "''") + "'"; }
+        return String(v);
+      };
+      var sLeft = bCaseInsensitive ? "tolower(" + sPath + ")" : sPath;
+      var lit = function (v) { return bCaseInsensitive ? "tolower(" + literal(v) + ")" : literal(v); };
+      switch (sOp) {
+        case "BT": return "(" + sPath + " ge " + literal(v1) + " and " + sPath + " le " + literal(v2) + ")";
+        case "Contains": return "contains(" + sLeft + "," + lit(v1) + ")";
+        case "StartsWith": return "startswith(" + sLeft + "," + lit(v1) + ")";
+        case "EndsWith": return "endswith(" + sLeft + "," + lit(v1) + ")";
+        default: return sPath + " " + String(sOp).toLowerCase() + " " + literal(v1);
+      }
+    },
+
     /** The filter of a date range (Edm.Date: inclusive bounds; Edm.DateTimeOffset: whole days, UTC). */
     dateFilter: function (oField, sFrom, sTo) {
       if (!sFrom) {
@@ -596,6 +652,289 @@ export const FILTERS = `sap.ui.define([
     }
   };
   return filters;
+});
+`;
+
+/**
+ * A chart of the Analytical List Page and of the cards (D53): an SVG drawn by the control itself —
+ * columns, bars, line, pie, donut — from the groups of a `$apply` (OpenUI5 has no chart library:
+ * sap.viz exists in SAPUI5 only). Clicking a column selects its dimension value (event select).
+ */
+export const CHART = `sap.ui.define(["sap/ui/core/Control"], function (Control) {
+  "use strict";
+
+  var COLORS = ["var(--sapChart_OrderedColor_1, #168eff)", "var(--sapChart_OrderedColor_2, #c87b00)", "var(--sapChart_OrderedColor_3, #75980b)", "var(--sapChart_OrderedColor_4, #df1278)", "var(--sapChart_OrderedColor_5, #8b47d7)", "var(--sapChart_OrderedColor_6, #049f9a)"];
+
+  function esc(s) {
+    return String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+  }
+
+  function fmt(n) {
+    var a = Math.abs(n);
+    if (a >= 1e9) { return (n / 1e9).toFixed(1) + "B"; }
+    if (a >= 1e6) { return (n / 1e6).toFixed(1) + "M"; }
+    if (a >= 1e4) { return (n / 1e3).toFixed(1) + "K"; }
+    return Math.round(n * 100) / 100 + "";
+  }
+
+  return Control.extend("rapt.app.controller.Chart", {
+    metadata: {
+      properties: {
+        type: { type: "string", defaultValue: "column" },
+        height: { type: "sap.ui.core.CSSSize", defaultValue: "16rem" },
+        selected: { type: "string", defaultValue: "" },
+        noDataText: { type: "string", defaultValue: "No data" }
+      },
+      events: { select: { parameters: { value: { type: "string" } } } }
+    },
+
+    /** aRows: [{ key, label, values: [number…] }]; aMeasures: [label…]. */
+    setData: function (aRows, aMeasures) {
+      this._aRows = aRows || [];
+      this._aMeasures = aMeasures || [];
+      this.invalidate();
+      return this;
+    },
+
+    getData: function () {
+      return this._aRows || [];
+    },
+
+    renderer: {
+      apiVersion: 2,
+      render: function (rm, oChart) {
+        rm.openStart("div", oChart);
+        rm.class("raptChart");
+        rm.style("height", oChart.getHeight());
+        rm.openEnd();
+        rm.unsafeHtml(oChart._svg());
+        rm.close("div");
+      }
+    },
+
+    _svg: function () {
+      var aRows = this._aRows || [];
+      var aMeasures = this._aMeasures || [];
+      var sType = this.getType();
+      var sSelected = this.getSelected();
+      if (aRows.length === 0) {
+        return "<div class='raptChartEmpty'>" + esc(this.getNoDataText()) + "</div>";
+      }
+      var W = 640, H = 260, L = 56, B = 48, T = 12, R = 12;
+      var aParts = ["<svg viewBox='0 0 " + W + " " + H + "' width='100%' height='100%' preserveAspectRatio='xMidYMid meet' role='img'>"];
+      var legend = aMeasures.length > 1 ? aMeasures.map(function (m, i) {
+        return "<rect x='" + (L + i * 140) + "' y='" + (H - 14) + "' width='10' height='10' fill='" + COLORS[i % COLORS.length] + "'/><text x='" + (L + i * 140 + 14) + "' y='" + (H - 5) + "' class='raptChartLabel'>" + esc(m) + "</text>";
+      }).join("") : "";
+      if (sType === "pie" || sType === "donut") {
+        var total = aRows.reduce(function (t, r) { return t + Math.max(0, r.values[0] || 0); }, 0) || 1;
+        var cx = 150, cy = H / 2, r = 100, a0 = -Math.PI / 2;
+        aRows.forEach(function (row, i) {
+          var v = Math.max(0, row.values[0] || 0);
+          var a1 = a0 + (v / total) * Math.PI * 2;
+          var large = a1 - a0 > Math.PI ? 1 : 0;
+          var x0 = cx + r * Math.cos(a0), y0 = cy + r * Math.sin(a0), x1 = cx + r * Math.cos(a1), y1 = cy + r * Math.sin(a1);
+          var path = aRows.length === 1 ? "M" + (cx - r) + "," + cy + "a" + r + "," + r + " 0 1,0 " + (2 * r) + ",0a" + r + "," + r + " 0 1,0 " + (-2 * r) + ",0" : "M" + cx + "," + cy + "L" + x0 + "," + y0 + "A" + r + "," + r + " 0 " + large + ",1 " + x1 + "," + y1 + "Z";
+          aParts.push("<path d='" + path + "' fill='" + COLORS[i % COLORS.length] + "' data-value='" + esc(row.key) + "' class='raptChartItem" + (sSelected === row.key ? " raptChartSelected" : "") + "'><title>" + esc(row.label) + ": " + esc(fmt(v)) + "</title></path>");
+          aParts.push("<rect x='300' y='" + (20 + i * 22) + "' width='12' height='12' fill='" + COLORS[i % COLORS.length] + "'/><text x='318' y='" + (31 + i * 22) + "' class='raptChartLabel'>" + esc(row.label) + " (" + esc(fmt(v)) + ")</text>");
+          a0 = a1;
+        });
+        if (sType === "donut") {
+          aParts.push("<circle cx='" + cx + "' cy='" + cy + "' r='55' class='raptChartHole'/>");
+        }
+        aParts.push("</svg>");
+        return aParts.join("");
+      }
+      var max = 0, min = 0;
+      aRows.forEach(function (row) {
+        row.values.forEach(function (v) { max = Math.max(max, v || 0); min = Math.min(min, v || 0); });
+      });
+      if (max === min) { max = min + 1; }
+      var plotW = W - L - R, plotH = H - T - B;
+      var horizontal = sType === "bar";
+      var scale = function (v) { return (v - min) / (max - min); };
+      // axis and grid
+      for (var g = 0; g <= 4; g++) {
+        var gv = min + (max - min) * g / 4;
+        if (horizontal) {
+          var gx = L + plotW * g / 4;
+          aParts.push("<line x1='" + gx + "' y1='" + T + "' x2='" + gx + "' y2='" + (T + plotH) + "' class='raptChartGrid'/><text x='" + gx + "' y='" + (T + plotH + 14) + "' text-anchor='middle' class='raptChartLabel'>" + esc(fmt(gv)) + "</text>");
+        } else {
+          var gy = T + plotH - plotH * g / 4;
+          aParts.push("<line x1='" + L + "' y1='" + gy + "' x2='" + (L + plotW) + "' y2='" + gy + "' class='raptChartGrid'/><text x='" + (L - 6) + "' y='" + (gy + 4) + "' text-anchor='end' class='raptChartLabel'>" + esc(fmt(gv)) + "</text>");
+        }
+      }
+      var n = aRows.length, m = Math.max(1, aMeasures.length);
+      var band = (horizontal ? plotH : plotW) / n;
+      if (sType === "line") {
+        for (var k = 0; k < m; k++) {
+          var pts = aRows.map(function (row, i) { return (L + band * (i + 0.5)) + "," + (T + plotH - plotH * scale(row.values[k] || 0)); });
+          aParts.push("<polyline points='" + pts.join(" ") + "' fill='none' stroke='" + COLORS[k % COLORS.length] + "' stroke-width='2'/>");
+          aRows.forEach(function (row, i) {
+            aParts.push("<circle cx='" + (L + band * (i + 0.5)) + "' cy='" + (T + plotH - plotH * scale(row.values[k] || 0)) + "' r='5' fill='" + COLORS[k % COLORS.length] + "' data-value='" + esc(row.key) + "' class='raptChartItem" + (sSelected === row.key ? " raptChartSelected" : "") + "'><title>" + esc(row.label) + ": " + esc(fmt(row.values[k] || 0)) + "</title></circle>");
+          });
+        }
+      } else {
+        var bar = band * 0.7 / m;
+        aRows.forEach(function (row, i) {
+          for (var k = 0; k < m; k++) {
+            var v = row.values[k] || 0;
+            var size = (horizontal ? plotW : plotH) * Math.abs(scale(v) - scale(0));
+            var start = band * i + band * 0.15 + bar * k;
+            var cls = "raptChartItem" + (sSelected === row.key ? " raptChartSelected" : "");
+            var tip = "<title>" + esc(row.label) + (m > 1 ? " – " + esc(aMeasures[k]) : "") + ": " + esc(fmt(v)) + "</title>";
+            if (horizontal) {
+              aParts.push("<rect x='" + (L + plotW * Math.min(scale(v), scale(0))) + "' y='" + (T + start) + "' width='" + size + "' height='" + bar + "' fill='" + COLORS[k % COLORS.length] + "' data-value='" + esc(row.key) + "' class='" + cls + "'>" + tip + "</rect>");
+            } else {
+              aParts.push("<rect x='" + (L + start) + "' y='" + (T + plotH - plotH * Math.max(scale(v), scale(0))) + "' width='" + bar + "' height='" + size + "' fill='" + COLORS[k % COLORS.length] + "' data-value='" + esc(row.key) + "' class='" + cls + "'>" + tip + "</rect>");
+            }
+          }
+        });
+      }
+      // category labels
+      aRows.forEach(function (row, i) {
+        var label = String(row.label).length > 14 ? String(row.label).slice(0, 13) + "…" : String(row.label);
+        if (horizontal) {
+          aParts.push("<text x='" + (L - 6) + "' y='" + (T + band * (i + 0.5) + 4) + "' text-anchor='end' class='raptChartLabel'>" + esc(label) + "</text>");
+        } else {
+          aParts.push("<text x='" + (L + band * (i + 0.5)) + "' y='" + (T + plotH + 16) + "' text-anchor='middle' class='raptChartLabel'>" + esc(label) + "</text>");
+        }
+      });
+      aParts.push(legend);
+      aParts.push("</svg>");
+      return aParts.join("");
+    },
+
+    onclick: function (oEvent) {
+      var oTarget = oEvent.target && oEvent.target.closest ? oEvent.target.closest("[data-value]") : null;
+      if (!oTarget) {
+        return;
+      }
+      var sValue = oTarget.getAttribute("data-value");
+      this.setSelected(this.getSelected() === sValue ? "" : sValue);
+      this.fireSelect({ value: this.getSelected() });
+    }
+  });
+});
+`;
+
+/** The Overview Page (D53): counts of the list cards, data of the chart and KPI cards, navigation. */
+export const OVERVIEW_CONTROLLER = `sap.ui.define([
+  "sap/ui/core/mvc/Controller",
+  "sap/ui/model/json/JSONModel",
+  "sap/ui/core/format/NumberFormat",
+  "rapt/app/controller/support"
+], function (Controller, JSONModel, NumberFormat, support) {
+  "use strict";
+
+  var oNumber = NumberFormat.getFloatInstance({ style: "short", maxFractionDigits: 1 });
+
+  return Controller.extend("rapt.app.controller.Overview", {
+    onInit: function () {
+      this._oOvp = new JSONModel({ counts: {}, kpi: {} });
+      this.getView().setModel(this._oOvp, "ovp");
+      this._bFirst = true;
+      this.getOwnerComponent().getRouter().getRoute("Overview").attachPatternMatched(this._onMatched, this);
+    },
+
+    _cards: function () {
+      return this.getOwnerComponent().getModel("layout").getProperty("/overview/cards") || [];
+    },
+
+    _service: function () {
+      return this.getOwnerComponent().getManifestEntry("/sap.app/dataSources/mainService/uri");
+    },
+
+    _onMatched: function () {
+      var that = this;
+      var bStale = this.getOwnerComponent().takeStale("Overview");
+      this._cards().forEach(function (oCard) {
+        if (oCard.type === "chart") {
+          that._loadChart(oCard);
+        } else if (oCard.type === "kpi") {
+          that._loadKpi(oCard);
+        } else if (bStale && !that._bFirst) {
+          var oControl = that.byId(oCard.id + (oCard.type === "list" ? "_list" : "_table"));
+          if (oControl && oControl.getBinding("items")) {
+            oControl.getBinding("items").refresh();
+          }
+        }
+      });
+      this._bFirst = false;
+    },
+
+    _get: function (oCard, sQuery) {
+      return fetch(this._service() + oCard.set + "?" + sQuery, { credentials: "same-origin", headers: { accept: "application/json" } })
+        .then(function (r) { return r.ok ? r.json() : { value: [] }; });
+    },
+
+    _loadChart: function (oCard) {
+      var oSpec = oCard.chart;
+      var oChart = this.byId(oCard.id + "_chart");
+      var sApply = (oCard.filter ? "filter(" + oCard.filter + ")/" : "") + "groupby((" + oSpec.dimension.property + "),aggregate(" + oSpec.measures.map(function (m) {
+        return m.property + " with " + m.aggregation + " as " + m.property;
+      }).join(",") + "))";
+      this._get(oCard, "$apply=" + encodeURIComponent(sApply) + "&$orderby=" + encodeURIComponent(oSpec.dimension.property) + "&$top=20").then(function (oData) {
+        oChart.setData((oData.value || []).map(function (row) {
+          var v = row[oSpec.dimension.property];
+          return { key: v === null ? "" : String(v), label: v === null || v === "" ? "(empty)" : String(v), values: oSpec.measures.map(function (m) { return Number(row[m.property]) || 0; }) };
+        }), oSpec.measures.map(function (m) { return m.label; }));
+      });
+    },
+
+    /** A KPI: the aggregate of a measure (per currency or unit when it has one), or the count. */
+    _loadKpi: function (oCard) {
+      var oKpi = oCard.kpi;
+      var that = this;
+      var sAggregate = oKpi.aggregation === "count" || !oKpi.property ? "$count as Value" : oKpi.property + " with " + oKpi.aggregation + " as Value";
+      var sApply = (oCard.filter ? "filter(" + oCard.filter + ")/" : "") + (oKpi.unit ? "groupby((" + oKpi.unit + "),aggregate(" + sAggregate + "))" : "aggregate(" + sAggregate + ")");
+      this._get(oCard, "$apply=" + encodeURIComponent(sApply) + (oKpi.unit ? "&$orderby=Value%20desc" : "")).then(function (oData) {
+        var aRows = oData.value || [];
+        var oFirst = aRows[0] || { Value: 0 };
+        that._oOvp.setProperty("/kpi/" + oCard.id, {
+          number: oNumber.format(Number(oFirst.Value) || 0),
+          unit: oKpi.unit ? (oFirst[oKpi.unit] || "") : "",
+          details: oKpi.label + (oKpi.aggregation === "count" ? "" : " (" + oKpi.aggregation + ")"),
+          text: aRows.length > 1 ? aRows.slice(1, 4).map(function (r) { return oNumber.format(Number(r.Value) || 0) + " " + (r[oKpi.unit] || ""); }).join(" · ") : ""
+        });
+      });
+    },
+
+    _card: function (oControl) {
+      var oParent = oControl;
+      while (oParent && !(oParent.data && oParent.data("card"))) {
+        oParent = oParent.getParent();
+      }
+      var sId = oParent ? oParent.data("card") : "";
+      return this._cards().find(function (c) { return c.id === sId; });
+    },
+
+    onCardUpdated: function (oEvent) {
+      var oCard = this._card(oEvent.getSource());
+      var oBinding = oEvent.getSource().getBinding("items");
+      if (oCard && oBinding && oBinding.isLengthFinal()) {
+        this._oOvp.setProperty("/counts/" + oCard.id, oEvent.getParameter("total") + "");
+      }
+    },
+
+    onCardHeader: function (oEvent) {
+      var oCard = this._card(oEvent.getSource());
+      if (oCard && oCard.navigable) {
+        this.getOwnerComponent().getRouter().navTo(oCard.set + "List");
+      }
+    },
+
+    onCardChartSelect: function (oEvent) {
+      this.onCardHeader(oEvent);
+    },
+
+    onCardItem: function (oEvent) {
+      var oCard = this._card(oEvent.getSource());
+      var oContext = oEvent.getSource().getBindingContext();
+      if (oCard && oContext) {
+        this.getOwnerComponent().getRouter().navTo(oCard.set + "Object", { key: support.keyOf(oContext.getPath()) });
+      }
+    }
+  });
 });
 `;
 
@@ -632,7 +971,8 @@ export const LIST_CONTROLLER = `sap.ui.define([
       oPage.list.filterFields.forEach(function (f) {
         oVisible[f.property] = oPage.list.selectionFields.some(function (s) { return s.property === f.property; });
       });
-      this._oLr = new JSONModel({ visible: oVisible, columns: {}, sort: [], active: 0, summary: "Filtered By: None", tableTitle: oPage.typeNamePlural, count: undefined, variant: STANDARD, defaultVariant: STANDARD, modified: false, variants: [{ key: STANDARD, title: oPage.typeNamePlural, author: "", changeable: false, favorite: true }] });
+      this._oLr = new JSONModel({ visible: oVisible, columns: {}, sort: [], active: 0, summary: "Filtered By: None", tableTitle: oPage.typeNamePlural, count: undefined, variant: STANDARD, defaultVariant: STANDARD, modified: false, variants: [{ key: STANDARD, title: oPage.typeNamePlural, author: "", changeable: false, favorite: true }], view: "both", chartSelection: "", tab: "all", tabCounts: {} });
+      this._aFilters = [];
       this.getView().setModel(this._oLr, "lr");
       this._oStandard = this._state();
       // the bindings of other pages do not see the changes of this one: refresh when coming back
@@ -642,6 +982,9 @@ export const LIST_CONTROLLER = `sap.ui.define([
         oRoute.attachPatternMatched(this._onListMatched, this);
       }
       var that = this;
+      // the chart of an Analytical List Page, the counts of the tabs of a worklist (D53)
+      this._loadChart();
+      this._loadTabCounts();
       this._oStore = variants.store(this.getOwnerComponent(), this._sSet + "List");
       this._oStore.load().then(function (oData) {
         var aItems = [that._oLr.getProperty("/variants/0")].concat(oData.items.map(function (v) {
@@ -662,6 +1005,8 @@ export const LIST_CONTROLLER = `sap.ui.define([
 
     _onListMatched: function () {
       if (this.getOwnerComponent().takeStale(this._sSet)) {
+        this._loadChart();
+        this._loadTabCounts();
         this.byId("table").getBinding("items").refresh();
         this.byId("table").removeSelections(true);
         this.getView().getModel("ui").setProperty("/tableSelected", false);
@@ -813,8 +1158,96 @@ export const LIST_CONTROLLER = `sap.ui.define([
         var sSearch = this.byId("search").getValue().trim();
         oBinding.changeParameters({ $search: sSearch === "" ? undefined : sSearch });
       }
-      oBinding.filter(aFilters.length > 0 ? new Filter({ filters: aFilters, and: true }) : []);
+      this._aFilters = aFilters;
+      this._applyTableFilters();
+      this._loadChart();
+      this._loadTabCounts();
       this._summarize();
+    },
+
+    /** The filters of the filter bar, and the value selected in the chart (Analytical List Page). */
+    _applyTableFilters: function () {
+      var aFilters = this._aFilters.slice();
+      var oChart = this._page().charts[0];
+      var sSelection = this._oLr.getProperty("/chartSelection");
+      if (this._page().floorplan === "analyticalListPage" && oChart && sSelection !== "") {
+        aFilters.push(new Filter(oChart.dimension.property, "EQ", sSelection));
+      }
+      this.byId("table").getBinding("items").filter(aFilters.length > 0 ? new Filter({ filters: aFilters, and: true }) : []);
+    },
+
+    _service: function () {
+      return this.getOwnerComponent().getManifestEntry("/sap.app/dataSources/mainService/uri");
+    },
+
+    /** The $filter of the filter bar, for the requests of the chart and of the tab counts. */
+    _odataFilter: function (sExtra) {
+      var sFilter = this._aFilters.length > 0 ? filters.toOData(new Filter({ filters: this._aFilters, and: true }), this._page().fields) : "";
+      return [sFilter, sExtra].filter(Boolean).join(" and ");
+    },
+
+    _searchParameter: function () {
+      var oSearch = this.byId("search");
+      var sSearch = oSearch ? oSearch.getValue().trim() : "";
+      return sSearch === "" ? "" : "&$search=" + encodeURIComponent(sSearch);
+    },
+
+    /** The chart of the Analytical List Page: the groups of its dimension ($apply). */
+    _loadChart: function () {
+      var oPage = this._page();
+      var oSpec = oPage.charts[0];
+      var oChart = this.byId("chart");
+      if (oPage.floorplan !== "analyticalListPage" || !oSpec || !oChart) {
+        return;
+      }
+      var sFilter = this._odataFilter();
+      var sApply = (sFilter ? "filter(" + sFilter + ")/" : "") + "groupby((" + oSpec.dimension.property + "),aggregate(" + oSpec.measures.map(function (m) {
+        return m.property + " with " + m.aggregation + " as " + m.property;
+      }).join(",") + "))";
+      var that = this;
+      fetch(this._service() + this._sSet + "?$apply=" + encodeURIComponent(sApply) + "&$orderby=" + encodeURIComponent(oSpec.dimension.property) + "&$top=50" + this._searchParameter(), { credentials: "same-origin", headers: { accept: "application/json" } })
+        .then(function (r) { return r.ok ? r.json() : { value: [] }; })
+        .then(function (oData) {
+          oChart.setData((oData.value || []).map(function (row) {
+            var v = row[oSpec.dimension.property];
+            return { key: v === null ? "" : String(v), label: v === null || v === "" ? "(empty)" : String(v), values: oSpec.measures.map(function (m) { return Number(row[m.property]) || 0; }) };
+          }), oSpec.measures.map(function (m) { return m.label; }));
+          that._oChartRows = oData.value || [];
+        })
+        .catch(function () { oChart.setData([], []); });
+    },
+
+    onChartSelect: function (oEvent) {
+      this._oLr.setProperty("/chartSelection", oEvent.getParameter("value"));
+      this._applyTableFilters();
+    },
+
+    onViewSwitch: function (oEvent) {
+      this._oLr.setProperty("/view", oEvent.getParameter("item").getKey());
+    },
+
+    /** Worklist: a tab is a selection variant (@UI.selectionVariant), its filter a parameter of the list. */
+    onWorklistTab: function (oEvent) {
+      var sKey = oEvent.getParameter("key");
+      var oVariant = this._page().selectionVariants.find(function (v) { return v.key === sKey; });
+      this._oLr.setProperty("/tab", sKey);
+      this.byId("table").getBinding("items").changeParameters({ $filter: oVariant && oVariant.filter ? oVariant.filter : undefined });
+    },
+
+    _loadTabCounts: function () {
+      var oPage = this._page();
+      if (oPage.floorplan !== "worklist" || oPage.selectionVariants.length === 0) {
+        return;
+      }
+      var that = this;
+      var aTabs = [{ key: "all" }].concat(oPage.selectionVariants);
+      aTabs.forEach(function (oTab) {
+        var sFilter = that._odataFilter(oTab.filter ? "(" + oTab.filter + ")" : "");
+        fetch(that._service() + that._sSet + "/$count" + (sFilter ? "?$filter=" + encodeURIComponent(sFilter) : "?") + that._searchParameter(), { credentials: "same-origin" })
+          .then(function (r) { return r.ok ? r.text() : ""; })
+          .then(function (sCount) { that._oLr.setProperty("/tabCounts/" + oTab.key, sCount.trim()); })
+          .catch(function () { /* no count */ });
+      });
     },
 
     /** "Filtered By: …" in the collapsed header, the count of "Adapt Filters (n)". */
@@ -1169,6 +1602,11 @@ export const OBJECT_CONTROLLER = `sap.ui.define([
       if (oNew) {
         oNew.attachPatternMatched(this._onNewMatched, this);
       }
+      // form entry (D53): the start page creates, again and again
+      var oFormEntry = oRouter.getRoute(this._sSet + "FormEntry");
+      if (oFormEntry) {
+        oFormEntry.attachPatternMatched(this._onFormEntryMatched, this);
+      }
     },
 
     _page: function () {
@@ -1196,12 +1634,26 @@ export const OBJECT_CONTROLLER = `sap.ui.define([
       });
     },
 
-    _onNewMatched: function () {
-      var oContext = this.getOwnerComponent().getTransient();
-      if (!oContext) {
-        this._back();
-        return;
+    _onFormEntryMatched: function () {
+      this._bFormEntry = true;
+      this._newTransient();
+      this._onNewMatched();
+    },
+
+    /** A new instance to create, when none was prepared (form entry, link to …/new). */
+    _newTransient: function () {
+      var oBinding = this.getView().getModel().bindList("/" + this._sSet, undefined, undefined, undefined, { $$updateGroupId: "changes" });
+      this.getOwnerComponent().setTransient(oBinding.create({}));
+    },
+
+    _onNewMatched: function (oEvent) {
+      if (oEvent) {
+        this._bFormEntry = false;
       }
+      if (!this.getOwnerComponent().getTransient()) {
+        this._newTransient();
+      }
+      var oContext = this.getOwnerComponent().getTransient();
       Messaging.removeAllMessages();
       this.getView().unbindElement();
       this.getView().setBindingContext(oContext);
@@ -1299,6 +1751,13 @@ export const OBJECT_CONTROLLER = `sap.ui.define([
         if (bCreate) {
           return oContext.created().then(function () {
             that.getOwnerComponent().setTransient(undefined);
+            if (that._bFormEntry) {
+              // form entry: a new, empty form
+              MessageToast.show("Object created");
+              that._newTransient();
+              that._onNewMatched();
+              return;
+            }
             that._mode(false, false);
             MessageToast.show("Object created");
             that.getOwnerComponent().getRouter().navTo(that._sSet + "Object", { key: support.keyOf(oContext.getPath()) }, true);
@@ -1317,7 +1776,10 @@ export const OBJECT_CONTROLLER = `sap.ui.define([
       this.getView().getModel().resetChanges("changes");
       Messaging.removeAllMessages();
       this._mode(false, false);
-      if (bCreate) {
+      if (bCreate && this._bFormEntry) {
+        this._newTransient();
+        this._onNewMatched();
+      } else if (bCreate) {
         this.getOwnerComponent().setTransient(undefined);
         this._back();
       }

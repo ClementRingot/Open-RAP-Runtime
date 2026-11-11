@@ -57,3 +57,19 @@ describe("mode of the project", () => {
     });
   });
 });
+
+describe("ui settings (D53)", () => {
+  it("reads the floorplans and the overview, and reports what the service lacks", () => {
+    withConfig('{ "mode": "enhanced", "ui": { "floorplans": { "Product": "worklist" }, "overview": { "title": "Shop", "cards": [{ "type": "kpi", "entitySet": "Product", "title": "Products", "aggregation": "count" }] } } }', (dir) => {
+      const { model, diagnostics } = buildModel(loadProject(dir));
+      expect(diagnostics.errors()).toEqual([]);
+      expect(model?.ui).toEqual({ floorplans: { Product: "worklist" }, overview: { title: "Shop", cards: [{ type: "kpi", entitySet: "Product", title: "Products", aggregation: "count" }] } });
+    });
+    withConfig('{ "mode": "enhanced", "ui": { "floorplans": { "Nothing": "worklist", "Product": "galaxy" } } }', (dir) => {
+      expect(codes(dir)).toContainEqual(["CFG003", "error"]);
+    });
+    withConfig('{ "mode": "enhanced", "ui": { "floorplans": { "Nothing": "worklist" }, "overview": { "cards": [{ "type": "kpi", "entitySet": "Product" }] } } }', (dir) => {
+      expect(codes(dir).filter(([c]) => c === "CFG003")).toHaveLength(1);
+    });
+  });
+});

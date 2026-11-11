@@ -4,7 +4,7 @@
  * (sap.uxap.ObjectPageLayout, header actions, forms and child tables).
  */
 
-import type { UiAction, UiField, UiLayout, UiPage, UiSection, UiTable } from "./layout.js";
+import type { UiAction, UiCard, UiField, UiLayout, UiPage, UiSection, UiTable } from "./layout.js";
 
 const esc = (s: string): string => s.replace(/&/g, "&amp;").replace(/"/g, "&quot;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 
@@ -134,9 +134,56 @@ function listReport(page: UiPage): string {
   const search = list.searchable
     ? `<VBox class="raptFilterItem" width="12rem"><Label text="Search" labelFor="search"/><SearchField id="search" width="100%" search=".onSearch"/></VBox>`
     : "";
-  return `<mvc:View controllerName="rapt.app.controller.List" xmlns:mvc="sap.ui.core.mvc" xmlns="sap.m" xmlns:f="sap.f" xmlns:core="sap.ui.core">
+  const worklist = page.floorplan === "worklist";
+  const alp = page.floorplan === "analyticalListPage";
+  const chart = alp ? page.charts[0] : undefined;
+  // worklist: no filter bar; the search in the toolbar, the selection variants as tabs (D53)
+  const header = worklist
+    ? ""
+    : `<f:header>
+      <f:DynamicPageHeader pinnable="true">
+        <FlexBox id="filterBar" wrap="Wrap" alignItems="End" class="raptFilterBar">
+          ${search}
+          ${filters}
+          <HBox id="filterButtons" class="raptFilterItem raptFilterButtons">
+            <Button id="go" text="Go" type="Emphasized" press=".onSearch"/>
+            <Button id="clearFilters" text="Clear" type="Transparent" press=".onClearFilters" class="sapUiTinyMarginBegin"/>
+            <Button id="adaptFilters" text="{= 'Adapt Filters' + (\${lr>/active} > 0 ? ' (' + \${lr>/active} + ')' : '') }" type="Transparent" press=".onAdaptFilters" class="sapUiTinyMarginBegin"/>
+          </HBox>
+        </FlexBox>
+      </f:DynamicPageHeader>
+    </f:header>`;
+  const tabs =
+    worklist && page.selectionVariants.length > 0
+      ? `<IconTabHeader id="worklistTabs" mode="Inline" select=".onWorklistTab" selectedKey="all">
+          <items>
+            <IconTabFilter key="all" text="All" count="{lr>/tabCounts/all}"/>
+            ${page.selectionVariants.map((v) => `<IconTabFilter key="${esc(v.key)}" text="${esc(v.text)}" count="{lr>/tabCounts/${esc(v.key)}}"/>`).join("\n            ")}
+          </items>
+        </IconTabHeader>`
+      : "";
+  // analytical list page: the chart above the table, the views chart / table / both (D53)
+  const chartArea =
+    chart === undefined
+      ? ""
+      : `<VBox id="chartArea" visible="{= \${lr>/view} !== 'table' }" class="raptChartArea">
+          <Toolbar style="Clear"><Title id="chartTitle" text="${esc(chart.title)}" level="H3"/><ToolbarSpacer/><Text id="chartSelection" text="{= \${lr>/chartSelection} ? '${esc(chart.dimension.label)}: ' + \${lr>/chartSelection} : '' }"/></Toolbar>
+          <rapt:Chart id="chart" type="${chart.type}" height="16rem" select=".onChartSelect"/>
+        </VBox>`;
+  const viewSwitch =
+    chart === undefined
+      ? ""
+      : `<SegmentedButton id="viewSwitch" selectedKey="{lr>/view}" selectionChange=".onViewSwitch">
+              <items>
+                <SegmentedButtonItem key="both" icon="sap-icon://chart-table-view" tooltip="Chart and table"/>
+                <SegmentedButtonItem key="chart" icon="sap-icon://vertical-bar-chart" tooltip="Chart"/>
+                <SegmentedButtonItem key="table" icon="sap-icon://table-view" tooltip="Table"/>
+              </items>
+            </SegmentedButton>`;
+  const toolbarSearch = worklist && list.searchable ? `<SearchField id="search" width="14rem" search=".onSearch"/>` : "";
+  return `<mvc:View controllerName="rapt.app.controller.List" xmlns:mvc="sap.ui.core.mvc" xmlns="sap.m" xmlns:f="sap.f" xmlns:core="sap.ui.core" xmlns:rapt="rapt.app.controller">
   <f:DynamicPage id="page" toggleHeaderOnTitleClick="true" headerPinned="false">
-    <f:customData><core:CustomData key="set" value="${esc(page.set)}"/></f:customData>
+    <f:customData><core:CustomData key="set" value="${esc(page.set)}"/><core:CustomData key="floorplan" value="${page.floorplan}"/></f:customData>
     <f:title>
       <f:DynamicPageTitle>
         <f:heading>
@@ -150,30 +197,23 @@ function listReport(page: UiPage): string {
         <f:snappedContent><Text id="filterSummary" text="{lr>/summary}"/></f:snappedContent>
       </f:DynamicPageTitle>
     </f:title>
-    <f:header>
-      <f:DynamicPageHeader pinnable="true">
-        <FlexBox id="filterBar" wrap="Wrap" alignItems="End" class="raptFilterBar">
-          ${search}
-          ${filters}
-          <HBox id="filterButtons" class="raptFilterItem raptFilterButtons">
-            <Button id="go" text="Go" type="Emphasized" press=".onSearch"/>
-            <Button id="clearFilters" text="Clear" type="Transparent" press=".onClearFilters" class="sapUiTinyMarginBegin"/>
-            <Button id="adaptFilters" text="{= 'Adapt Filters' + (\${lr>/active} > 0 ? ' (' + \${lr>/active} + ')' : '') }" type="Transparent" press=".onAdaptFilters" class="sapUiTinyMarginBegin"/>
-          </HBox>
-        </FlexBox>
-      </f:DynamicPageHeader>
-    </f:header>
+    ${header}
     <f:content>
-      <Table id="table" growing="true" growingThreshold="25" growingScrollToLoad="true" mode="SingleSelectLeft" selectionChange=".onSelectionChange" updateFinished=".onUpdateFinished" sticky="ColumnHeaders,HeaderToolbar"
+      <VBox id="content" renderType="Bare" height="100%">
+      ${tabs}
+      ${chartArea}
+      <Table id="table" visible="{= \${lr>/view} !== 'chart' }" growing="true" growingThreshold="25" growingScrollToLoad="true" mode="SingleSelectLeft" selectionChange=".onSelectionChange" updateFinished=".onUpdateFinished" sticky="ColumnHeaders,HeaderToolbar"
         items="{path: '/${esc(page.set)}', parameters: {${esc(parameters.join(", "))}}}">
         <headerToolbar>
           <OverflowToolbar>
             <Title id="tableTitle" text="{lr>/tableTitle}" level="H3"><customData><core:CustomData key="plural" value="${esc(page.typeNamePlural)}"/></customData></Title>
             <ToolbarSpacer/>
+            ${toolbarSearch}
             ${table.insertable ? `<Button id="create" text="Create" type="Transparent" press=".onCreate" visible="${esc(`{= %{ui>/permissions/${page.set}/create} !== false }`)}"/>` : ""}
             ${table.deletable ? `<Button id="delete" text="Delete" type="Transparent" press=".onDelete" enabled="{ui>/tableSelected}"/>` : ""}
             ${table.actions.map((a) => actionButton(a, "table", "list")).join("\n            ")}
             <Button id="tableSettings" icon="sap-icon://action-settings" tooltip="Table settings" type="Transparent" press=".onTableSettings"/>
+            ${viewSwitch}
           </OverflowToolbar>
         </headerToolbar>
         <columns>
@@ -187,6 +227,60 @@ function listReport(page: UiPage): string {
           </ColumnListItem>
         </items>
       </Table>
+      </VBox>
+    </f:content>
+  </f:DynamicPage>
+</mvc:View>
+`;
+}
+
+/** A card of the Overview Page (D53): list, table, chart or KPI. */
+function cardXml(card: UiCard): string {
+  const params = [`$count: true`, ...(card.filter === undefined ? [] : [`$filter: '${card.filter.replace(/'/g, "\\'")}'`]), ...(card.orderby === undefined ? [] : [`$orderby: '${card.orderby}'`])];
+  const items = `{path: '/${card.set}', parameters: {${params.join(", ")}}}`;
+  const header =
+    card.type === "kpi"
+      ? `<card:NumericHeader id="${card.id}_header" title="${esc(card.title)}" subtitle="${esc(card.subtitle ?? "")}" number="{ovp>/kpi/${card.id}/number}" unitOfMeasurement="{ovp>/kpi/${card.id}/unit}" details="{ovp>/kpi/${card.id}/details}" press=".onCardHeader"/>`
+      : `<card:Header id="${card.id}_header" title="${esc(card.title)}" subtitle="${esc(card.subtitle ?? "")}" statusText="{ovp>/counts/${card.id}}" press=".onCardHeader"/>`;
+  const [first, second, third] = card.fields;
+  let content = "";
+  if (card.type === "list") {
+    content = `<List id="${card.id}_list" growing="false" growingThreshold="${card.top}" showNoData="true" items="${esc(items)}" updateFinished=".onCardUpdated" showSeparators="Inner">
+            <items><StandardListItem type="Navigation" press=".onCardItem" title="{${first?.property ?? ""}}"${second === undefined ? "" : ` description="{${second.property}}"`}${third === undefined ? "" : ` info="{${third.property}}"`}/></items>
+          </List>`;
+  } else if (card.type === "table") {
+    content = `<Table id="${card.id}_table" growing="false" growingThreshold="${card.top}" items="${esc(items)}" updateFinished=".onCardUpdated">
+            <columns>${card.fields.map((f) => `<Column${f.kind === "amount" || f.kind === "decimal" || f.kind === "integer" ? ' hAlign="End"' : ""}><Text text="${esc(f.label)}"/></Column>`).join("")}</columns>
+            <items><ColumnListItem type="Navigation" press=".onCardItem"><cells>${card.fields.map(display).join("")}</cells></ColumnListItem></items>
+          </Table>`;
+  } else if (card.type === "chart") {
+    content = `<rapt:Chart id="${card.id}_chart" type="${card.chart?.type ?? "column"}" height="14rem" select=".onCardChartSelect"/>`;
+  } else {
+    content = `<VBox id="${card.id}_kpi" class="sapUiSmallMargin"><Text text="{ovp>/kpi/${card.id}/text}"/></VBox>`;
+  }
+  return `<f:Card id="${card.id}" width="${card.type === "table" || card.type === "chart" ? "36rem" : "22rem"}" class="raptCard">
+        <f:customData><core:CustomData key="card" value="${card.id}"/></f:customData>
+        <f:header>${header}</f:header>
+        <f:content>
+          ${content}
+        </f:content>
+      </f:Card>`;
+}
+
+/** The Overview Page (D53): the cards of rapt/config.json in a grid. */
+function overviewPage(layout: UiLayout): string {
+  const overview = layout.overview as NonNullable<UiLayout["overview"]>;
+  return `<mvc:View controllerName="rapt.app.controller.Overview" xmlns:mvc="sap.ui.core.mvc" xmlns="sap.m" xmlns:f="sap.f" xmlns:card="sap.f.cards" xmlns:core="sap.ui.core" xmlns:rapt="rapt.app.controller">
+  <f:DynamicPage id="page" toggleHeaderOnTitleClick="false" class="raptOverview">
+    <f:title>
+      <f:DynamicPageTitle>
+        <f:heading><Title id="overviewTitle" text="${esc(overview.title)}" level="H2"/></f:heading>
+      </f:DynamicPageTitle>
+    </f:title>
+    <f:content>
+      <FlexBox id="cards" wrap="Wrap" alignItems="Start" class="raptCards">
+      ${overview.cards.map(cardXml).join("\n      ")}
+      </FlexBox>
     </f:content>
   </f:DynamicPage>
 </mvc:View>
@@ -314,6 +408,9 @@ function objectPage(page: UiPage, layout: UiLayout): string {
 
 export function views(layout: UiLayout): Array<{ path: string; content: string }> {
   const files: Array<{ path: string; content: string }> = [];
+  if (layout.overview !== undefined) {
+    files.push({ path: "view/Overview.view.xml", content: overviewPage(layout) });
+  }
   for (const page of layout.pages) {
     if (page.list !== undefined) {
       files.push({ path: `view/${page.set}List.view.xml`, content: listReport(page) });

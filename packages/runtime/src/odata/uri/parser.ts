@@ -6,7 +6,7 @@
 import { createToken, EmbeddedActionsParser, Lexer, type IToken, type TokenType } from "chevrotain";
 import type { UrlLiteral } from "../../values.js";
 import { badRequest, ODataError } from "../errors.js";
-import type { ExpandItem, Expr, KeyPredicate, OrderItem, QueryOptions, Segment } from "./ast.js";
+import type { AggregateItem, ApplyStep, ExpandItem, Expr, KeyPredicate, OrderItem, QueryOptions, Segment } from "./ast.js";
 
 const WhiteSpace = createToken({ name: "WhiteSpace", pattern: /\s+/, group: Lexer.SKIPPED });
 const StringLiteral = createToken({ name: "StringLiteral", pattern: /'(?:[^']|'')*'/ });
@@ -448,6 +448,106 @@ export const parseKeyPredicate = (text: string): KeyPredicate => run(text, "key 
 export const parseParameters = (text: string): Array<{ name: string; value: Expr }> => run(text, "function parameters", (p) => p.parameters());
 
 // ---------------------------------------------------------------------------------------------
+// $apply (D52): filter(…), groupby((…),aggregate(…)), aggregate(…), separated by /
+
+/** Splits `text` at `separator` outside parentheses and string literals. */
+function splitTopLevel(text: string, separator: string): string[] {
+  const parts: string[] = [];
+  let depth = 0;
+  let quoted = false;
+  let start = 0;
+  for (let i = 0; i < text.length; i++) {
+    const c = text[i];
+    if (c === "'") {
+      if (quoted && text[i + 1] === "'") {
+        i++;
+        continue;
+      }
+      quoted = !quoted;
+    } else if (!quoted && c === "(") {
+      depth++;
+    } else if (!quoted && c === ")") {
+      depth--;
+    } else if (!quoted && depth === 0 && c === separator) {
+      parts.push(text.slice(start, i).trim());
+      start = i + 1;
+    }
+  }
+  parts.push(text.slice(start).trim());
+  return parts.filter((p) => p !== "");
+}
+
+/** `name(arguments)`: the name and the text between the outer parentheses. */
+function callOf(text: string): { name: string; inner: string } {
+  const match = /^([A-Za-z]+)\s*\(([\s\S]*)\)$/.exec(text.trim());
+  if (match === null) {
+    throw badRequest(`$apply: cannot read ${text}`);
+  }
+  return { name: (match[1] ?? "").toLowerCase(), inner: match[2] ?? "" };
+}
+
+const IDENTIFIER = /^[A-Za-z_][A-Za-z0-9_]*$/;
+
+function aggregates(text: string): AggregateItem[] {
+  return splitTopLevel(text, ",").map((item) => {
+    const count = /^\$count\s+as\s+([A-Za-z_][A-Za-z0-9_]*)$/i.exec(item);
+    if (count !== null) {
+      return { method: "count" as const, alias: count[1] ?? "" };
+    }
+    const match = /^([A-Za-z_][A-Za-z0-9_]*)\s+with\s+(sum|min|max|average|countdistinct)\s+as\s+([A-Za-z_][A-Za-z0-9_]*)$/i.exec(item);
+    if (match === null) {
+      throw badRequest(`$apply: the aggregate ${item} is not "Property with sum|min|max|average|countdistinct as Alias" or "$count as Alias"`);
+    }
+    return { property: match[1] ?? "", method: (match[2] ?? "sum").toLowerCase() as AggregateItem["method"], alias: match[3] ?? "" };
+  });
+}
+
+export function parseApply(text: string): ApplyStep[] {
+  const steps: ApplyStep[] = [];
+  for (const part of splitTopLevel(text, "/")) {
+    const { name, inner } = callOf(part);
+    switch (name) {
+      case "filter":
+        steps.push({ kind: "filter", filter: parseFilter(inner) });
+        break;
+      case "aggregate":
+        steps.push({ kind: "aggregate", aggregate: aggregates(inner) });
+        break;
+      case "groupby": {
+        const [group, rest, extra] = splitTopLevel(inner, ",");
+        if (group === undefined || !group.startsWith("(") || !group.endsWith(")") || extra !== undefined) {
+          throw badRequest("$apply: groupby((Property,…)) or groupby((Property,…),aggregate(…))");
+        }
+        const properties = splitTopLevel(group.slice(1, -1), ",");
+        if (properties.length === 0 || properties.some((p) => !IDENTIFIER.test(p))) {
+          throw badRequest(`$apply: groupby needs properties, not ${group}`);
+        }
+        const aggregate = rest === undefined ? [] : (() => {
+          const call = callOf(rest);
+          if (call.name !== "aggregate") {
+            throw badRequest(`$apply: only aggregate(…) may follow the properties of groupby, not ${rest}`);
+          }
+          return aggregates(call.inner);
+        })();
+        steps.push({ kind: "groupby", properties, aggregate });
+        break;
+      }
+      default:
+        throw notImplementedApply(name);
+    }
+  }
+  const grouping = steps.filter((s) => s.kind !== "filter");
+  if (grouping.length > 1 || steps.findIndex((s) => s.kind !== "filter") < steps.length - grouping.length) {
+    throw notImplementedApply("transformations after groupby or aggregate");
+  }
+  return steps;
+}
+
+function notImplementedApply(what: string): ODataError {
+  return new ODataError(501, "NOT_IMPLEMENTED", `$apply: ${what} is not supported (filter, groupby, aggregate are)`);
+}
+
+// ---------------------------------------------------------------------------------------------
 // query string and resource path
 
 /** Splits a query string without turning `+` into a space (OData URLs percent-encode it). */
@@ -527,7 +627,8 @@ export function parseQueryOptions(query: Map<string, string>): QueryOptions {
         }
         break;
       case "$apply":
-        throw badRequest("$apply is not supported");
+        options.apply = parseApply(value);
+        break;
       default:
         throw badRequest(`${name} is not supported`);
     }

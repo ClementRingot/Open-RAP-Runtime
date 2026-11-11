@@ -1,9 +1,10 @@
 import { XMLValidator } from "fast-xml-parser";
 import { describe, expect, it } from "vitest";
-import { buildUiLayout, generateUi } from "../src/gen/ui/index.js";
+import { buildUiLayout, generateUi, type UiLayout } from "../src/gen/ui/index.js";
+import type { Model } from "@rap-transpiler/model";
 import { loadProject } from "../src/input/project.js";
 import { buildModel } from "../src/ir/builder.js";
-import { FIXTURE_DIR } from "./helpers.js";
+import { FIXTURE_DIR, fixtureVariant } from "./helpers.js";
 
 function fixture() {
   const { model } = buildModel(loadProject(FIXTURE_DIR));
@@ -140,5 +141,41 @@ describe("filter conditions of the list report (controller/filters.js)", () => {
       { path: "CreatedAt", operator: "GE", value1: "2026-12-31T00:00:00Z" },
       { path: "CreatedAt", operator: "LT", value1: "2027-01-01T00:00:00Z" },
     ]);
+  });
+});
+
+describe("floorplans (D53)", () => {
+  const variant = (ddlx: (c: string) => string, ui: Model["ui"]): UiLayout => {
+    const { dir, cleanup } = fixtureVariant({ "zrt_c_travel.ddlx.asddlxs": ddlx });
+    try {
+      const { model } = buildModel(loadProject(dir));
+      return buildUiLayout({ ...(model as Model), ...(ui === undefined ? {} : { ui }) });
+    } finally {
+      cleanup();
+    }
+  };
+  const annotations = (c: string): string =>
+    c.replace(
+      "@UI.presentationVariant:",
+      "@UI.chart: [ { qualifier: 'ByCurrency', chartType: #DONUT, dimensions: [ 'CurrencyCode' ], measures: [ 'TotalPrice' ] } ]\n@UI.selectionVariant: [ { qualifier: 'open', text: 'Open', filter: 'OverallStatus EQ ''O'' AND TotalPrice GT 100' } ]\n@UI.presentationVariant:",
+    );
+
+  it("reads the charts and the selection variants", () => {
+    const travel = variant(annotations, { floorplans: { Travel: "analyticalListPage" } }).pages.find((p) => p.set === "Travel");
+    expect(travel?.floorplan).toBe("analyticalListPage");
+    expect(travel?.charts).toEqual([{ qualifier: "ByCurrency", title: "Total Price", type: "donut", dimension: { property: "CurrencyCode", label: "Currency", kind: "text" }, measures: [{ property: "TotalPrice", label: "Total Price", aggregation: "sum" }] }]);
+    expect(travel?.selectionVariants).toEqual([{ key: "open", text: "Open", filter: "OverallStatus eq 'O' and TotalPrice gt 100" }]);
+  });
+
+  it("routes the start page to the overview or to the form", () => {
+    const overviewModel = { ...fixture(), ui: { overview: { title: "Home", cards: [{ type: "list" as const, entitySet: "Travel", title: "Travels" }] } } };
+    const routes = (model: Model): Array<[string, string]> =>
+      (JSON.parse(generateUi(model).find((f) => f.path === "manifest.json")?.content ?? "{}") as { "sap.ui5": { routing: { routes: Array<{ pattern: string; name: string }> } } })["sap.ui5"].routing.routes.map((r) => [r.pattern, r.name]);
+    expect(routes(overviewModel).slice(0, 2)).toEqual([["", "Overview"], ["Travel", "TravelList"]]);
+    expect(generateUi(overviewModel).map((f) => f.path)).toContain("view/Overview.view.xml");
+    expect(routes({ ...fixture(), ui: { floorplans: { Travel: "formEntry" } } }).slice(0, 2)).toEqual([["", "TravelFormEntry"], ["Travel", "TravelList"]]);
+    for (const view of generateUi(overviewModel).filter((f) => f.path.endsWith(".xml"))) {
+      expect(XMLValidator.validate(view.content), view.path).toBe(true);
+    }
   });
 });

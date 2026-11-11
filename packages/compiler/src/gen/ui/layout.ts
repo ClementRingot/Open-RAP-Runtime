@@ -94,8 +94,48 @@ export type UiSection =
   | { id: string; label: string; kind: "table"; table: UiTable }
   | { id: string; label: string; kind: "collection"; sections: UiSection[] };
 
+/** A chart (`@UI.chart`, D53): one dimension, measures with their aggregation (`@Aggregation.default`). */
+export interface UiChart {
+  qualifier?: string;
+  title: string;
+  type: "column" | "bar" | "line" | "pie" | "donut";
+  dimension: { property: string; label: string; kind: FieldKind };
+  measures: Array<{ property: string; label: string; aggregation: "sum" | "min" | "max" | "average" }>;
+}
+
+/** A selection variant (`@UI.selectionVariant`): the tabs of a worklist (D53). */
+export interface UiSelectionVariant {
+  key: string;
+  text: string;
+  /** OData $filter. */
+  filter?: string;
+}
+
+/** A card of the Overview Page (D53). */
+export interface UiCard {
+  id: string;
+  type: "list" | "table" | "chart" | "kpi";
+  set: string;
+  title: string;
+  subtitle?: string;
+  filter?: string;
+  orderby?: string;
+  top: number;
+  /** list, table: the first columns of the line item; the title field first. */
+  fields: UiField[];
+  chart?: UiChart;
+  kpi?: { property?: string; label: string; aggregation: "sum" | "min" | "max" | "average" | "count"; unit?: string };
+  /** The list report of the set opens from the header of the card. */
+  navigable: boolean;
+}
+
 export interface UiPage {
   set: string;
+  /** The floorplan of the start page of a root entity set (D53). */
+  floorplan: "listReport" | "worklist" | "analyticalListPage" | "formEntry";
+  /** The charts of the entity (`@UI.chart`), for the Analytical List Page and the cards. */
+  charts: UiChart[];
+  selectionVariants: UiSelectionVariant[];
   entityType: string;
   typeName: string;
   typeNamePlural: string;
@@ -130,6 +170,8 @@ export interface UiLayout {
   /** Entity set of the start page (list report). */
   start: string;
   pages: UiPage[];
+  /** An Overview Page as start page (D53). */
+  overview?: { title: string; cards: UiCard[] };
 }
 
 const isObject = (v: AnnotationValue | undefined): v is AnnotationObject => typeof v === "object" && v !== null && !Array.isArray(v);
@@ -183,16 +225,22 @@ class LayoutBuilder {
   }
 
   public build(): UiLayout {
-    const pages = this.service.entitySets.filter((s) => s.valueHelp !== true).map((set) => this.page(set.name)).filter((p): p is UiPage => p !== undefined);
+    const pages = this.service.entitySets.filter((s) => s.valueHelp !== true || this.model.ui?.overview?.cards.some((c) => c.entitySet === s.name) === true).map((set) => this.page(set.name)).filter((p): p is UiPage => p !== undefined);
     const start = pages.find((p) => p.list !== undefined)?.set ?? pages[0]?.set ?? "";
     const root = pages.find((p) => p.set === start);
-    return {
+    const layout: UiLayout = {
       title: root?.typeNamePlural ?? this.model.service.name,
       servicePath: this.model.service.path,
       namespace: this.service.namespace,
       start,
       pages,
     };
+    const overview = this.model.ui?.overview;
+    if (overview !== undefined) {
+      layout.title = overview.title;
+      layout.overview = { title: overview.title, cards: overview.cards.map((c, i) => this.card(c, i, pages)).filter((c): c is UiCard => c !== undefined) };
+    }
+    return layout;
   }
 
   private typeOf(set: string): { type: ODataEntityType; entity: EntityModel } | undefined {
@@ -346,6 +394,9 @@ class LayoutBuilder {
       updatableDynamic: type.entityControl?.updatable === true,
       deletableDynamic: type.entityControl?.deletable === true,
       fields: Object.fromEntries(type.properties.map((p) => [p.name, this.field(type, entity, p.name) as UiField])),
+      floorplan: this.model.ui?.floorplans?.[set] ?? "listReport",
+      charts: this.charts(type, entity),
+      selectionVariants: this.selectionVariants(entity),
     };
     const title = isObject(header) ? value(header["title"]) : undefined;
     const description = isObject(header) ? value(header["description"]) : undefined;
@@ -370,6 +421,89 @@ class LayoutBuilder {
       }
     }
     return page;
+  }
+
+  /** `@UI.chart`: the first dimension and the measures, aggregated as `@Aggregation.default` says (sum). */
+  private charts(type: ODataEntityType, entity: EntityModel): UiChart[] {
+    const result: UiChart[] = [];
+    for (const raw of getArray(entity.annotations, "UI.chart") ?? []) {
+      if (!isObject(raw)) continue;
+      const list = (v: AnnotationValue | undefined): string[] => (Array.isArray(v) ? v.map(str).filter((x): x is string => x !== undefined) : str(v) === undefined ? [] : [str(v) as string]);
+      const dimension = list(raw["dimensions"])[0];
+      const dimensionField = dimension === undefined ? undefined : this.field(type, entity, dimension);
+      if (dimensionField === undefined) continue;
+      const measures = list(raw["measures"])
+        .map((m) => this.field(type, entity, m))
+        .filter((f): f is UiField => f !== undefined)
+        .map((f) => {
+          const declared = str(getAnnotation(entity.fields.find((x) => x.name === f.property)?.annotations, "Aggregation.default"))?.replace(/^#/, "").toLowerCase();
+          const aggregation = declared === "min" || declared === "max" || declared === "average" || declared === "avg" ? (declared === "avg" ? "average" : declared) : "sum";
+          return { property: f.property, label: f.label, aggregation: aggregation as UiChart["measures"][number]["aggregation"] };
+        });
+      if (measures.length === 0) continue;
+      const kind = str(raw["charttype"])?.replace(/^#/, "").toLowerCase() ?? "column";
+      const chart: UiChart = {
+        title: str(raw["title"]) ?? measures.map((m) => m.label).join(", "),
+        type: kind === "bar" || kind === "line" || kind === "pie" || kind === "donut" ? kind : "column",
+        dimension: { property: dimensionField.property, label: dimensionField.label, kind: dimensionField.kind },
+        measures,
+      };
+      const qualifier = str(raw["qualifier"]);
+      if (qualifier !== undefined) chart.qualifier = qualifier;
+      result.push(chart);
+    }
+    return result;
+  }
+
+  /** `@UI.selectionVariant`: `filter: 'Status EQ ''O'' AND …'` becomes an OData $filter. */
+  private selectionVariants(entity: EntityModel): UiSelectionVariant[] {
+    return (getArray(entity.annotations, "UI.selectionVariant") ?? []).filter(isObject).map((raw, i) => {
+      const key = (str(raw["qualifier"]) ?? `variant${i}`).replace(/[^A-Za-z0-9_]/g, "_");
+      const variant: UiSelectionVariant = { key, text: str(raw["text"]) ?? key };
+      const filter = str(raw["filter"]);
+      if (filter !== undefined) {
+        variant.filter = filter.replace(/\s+(EQ|NE|GT|GE|LT|LE|AND|OR)\s+/gi, (_m, op: string) => ` ${op.toLowerCase()} `);
+      }
+      return variant;
+    });
+  }
+
+  private card(card: NonNullable<NonNullable<Model["ui"]>["overview"]>["cards"][number], index: number, pages: UiPage[]): UiCard | undefined {
+    const typed = this.typeOf(card.entitySet);
+    if (typed === undefined) return undefined;
+    const { type, entity } = typed;
+    const page = pages.find((p) => p.set === card.entitySet);
+    const lineItem = this.dataFields(type, entity, "UI.lineItem").fields;
+    const title = page?.title === undefined ? undefined : this.field(type, entity, page.title);
+    const fields = [...(title === undefined ? [] : [title]), ...lineItem.filter((f) => f.property !== title?.property)].slice(0, card.type === "table" ? 4 : 3);
+    const result: UiCard = {
+      id: `card${index}`,
+      type: card.type,
+      set: card.entitySet,
+      title: card.title,
+      top: card.top ?? 5,
+      fields: fields.length > 0 ? fields : type.keys.map((k) => this.field(type, entity, k)).filter((f): f is UiField => f !== undefined),
+      navigable: page?.list !== undefined,
+    };
+    if (card.subtitle !== undefined) result.subtitle = card.subtitle;
+    if (card.filter !== undefined) result.filter = card.filter;
+    if (card.orderby !== undefined) result.orderby = card.orderby;
+    if (card.type === "chart") {
+      const charts = this.charts(type, entity);
+      const chart = charts.find((c) => c.qualifier === card.chart) ?? (card.chart === undefined ? charts[0] : undefined);
+      if (chart === undefined) return undefined;
+      result.chart = chart;
+    }
+    if (card.type === "kpi") {
+      const measure = card.measure === undefined ? undefined : this.field(type, entity, card.measure);
+      result.kpi = {
+        label: measure?.label ?? "Count",
+        aggregation: card.aggregation ?? (measure === undefined ? "count" : "sum"),
+        ...(measure === undefined ? {} : { property: measure.property }),
+        ...(measure?.unit === undefined ? {} : { unit: measure.unit }),
+      };
+    }
+    return result;
   }
 
   private sections(type: ODataEntityType, entity: EntityModel): UiSection[] {

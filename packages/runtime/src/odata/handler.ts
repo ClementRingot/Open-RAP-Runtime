@@ -11,6 +11,7 @@ import { etagOf, JsonWriter, stringify } from "./json.js";
 import type { ReadEngine } from "./read.js";
 import type { Key, ServiceRuntime, TypeInfo } from "./service.js";
 import type { QueryOptions, Segment } from "./uri/ast.js";
+import { toJson, type CanonicalValue } from "../values.js";
 import { parseQueryOptions, parseQueryString, parseResourcePath } from "./uri/parser.js";
 
 export interface ODataRequest {
@@ -248,6 +249,29 @@ export class ODataHandler {
       const body = { "@odata.context": this.json.contextUrl(info, target.options, true), ...this.json.entity(info, row, target.options, ctx) };
       const etag = etagOf(info, row);
       return jsonResponse(200, body, ctx.ieee754, etag === undefined ? {} : { ETag: etag });
+    }
+    if (target.options.apply !== undefined) {
+      // data aggregation (D52): groups, not entities
+      if (single) {
+        throw badRequest("$apply applies to collections");
+      }
+      const aggregated = await this.read.readAggregated(info, target.options, scope);
+      const groups = aggregated.rows.map((row) => {
+        const item: Record<string, unknown> = {};
+        for (const name of aggregated.properties) {
+          item[name] = toJson(this.service.property(info, name).property.edm, (row[name] ?? null) as CanonicalValue, ctx.ieee754);
+        }
+        for (const name of aggregated.aliases) {
+          item[name] = row[name] ?? 0;
+        }
+        return item;
+      });
+      const body: Record<string, unknown> = { "@odata.context": `$metadata#${info.set.name}(${[...aggregated.properties, ...aggregated.aliases].join(",")})` };
+      if (aggregated.count !== undefined) {
+        body["@odata.count"] = aggregated.count;
+      }
+      body["value"] = groups;
+      return jsonResponse(200, body, ctx.ieee754);
     }
     const result = await this.read.readCollection(info, target.options, scope);
     await this.writes?.enrich?.(info, result.rows, target.options, ctx);

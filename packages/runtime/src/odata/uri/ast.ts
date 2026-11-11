@@ -30,7 +30,22 @@ export interface QueryOptions {
   skip?: number;
   count?: boolean;
   search?: string;
+  /** `$apply` (data aggregation, D52): filter, then one groupby or aggregate. */
+  apply?: ApplyStep[];
 }
+
+/** An aggregate of `$apply`: `Price with sum as Total`, `$count as Count`. */
+export interface AggregateItem {
+  /** Property aggregated; undefined for `$count`. */
+  property?: string;
+  method: "sum" | "min" | "max" | "average" | "countdistinct" | "count";
+  alias: string;
+}
+
+export type ApplyStep =
+  | { kind: "filter"; filter: Expr }
+  | { kind: "groupby"; properties: string[]; aggregate: AggregateItem[] }
+  | { kind: "aggregate"; aggregate: AggregateItem[] };
 
 /** `(value)` or `(Name=value,…)`. */
 export type KeyPredicate = { kind: "single"; value: Expr } | { kind: "named"; values: Array<{ name: string; value: Expr }> };

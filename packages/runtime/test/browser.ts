@@ -20,6 +20,7 @@ export interface Locator {
 }
 export interface Page {
   goto(url: string): Promise<unknown>;
+  goBack(): Promise<unknown>;
   locator(selector: string, options?: { hasText?: string }): Locator;
   getByText(text: string, options?: { exact?: boolean }): Locator;
   waitForFunction(fn: string, arg?: unknown, options?: { timeout?: number }): Promise<unknown>;

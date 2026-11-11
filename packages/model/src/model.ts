@@ -24,8 +24,40 @@ export interface SourceRef {
  */
 export type ProjectMode = "standard" | "enhanced";
 
+/** Floorplan of the UI of a root entity set (D53). */
+export type Floorplan = "listReport" | "worklist" | "analyticalListPage" | "formEntry";
+
+/** A card of the Overview Page (D53). */
+export interface OverviewCardModel {
+  type: "list" | "table" | "chart" | "kpi";
+  entitySet: string;
+  title: string;
+  subtitle?: string;
+  /** OData $filter of the card. */
+  filter?: string;
+  /** OData $orderby (list, table). */
+  orderby?: string;
+  /** Rows shown (list, table; default 5). */
+  top?: number;
+  /** Qualifier of the `@UI.chart` of the entity (chart). */
+  chart?: string;
+  /** Measure and aggregation (kpi). */
+  measure?: string;
+  aggregation?: "sum" | "min" | "max" | "average" | "count";
+}
+
+/** The UI settings of rapt/config.json (D53). */
+export interface UiConfigModel {
+  /** Floorplan per root entity set (default: listReport). */
+  floorplans?: Record<string, Floorplan>;
+  /** An Overview Page as start page. */
+  overview?: { title: string; cards: OverviewCardModel[] };
+}
+
 export interface Model {
   formatVersion: typeof MODEL_FORMAT_VERSION;
+  /** UI settings of rapt/config.json (D53). */
+  ui?: UiConfigModel;
   /** Absent: standard (rapt/config.json, D45). */
   mode?: ProjectMode;
   generator: { name: string; version: string };
