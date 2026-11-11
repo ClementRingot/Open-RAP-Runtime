@@ -25,6 +25,7 @@ etag master LocalLastChangedAt
   determination calculateTotalPrice on modify { create; field BookingFee, CurrencyCode; }
 
   validation validateDates on save { create; field BeginDate, EndDate; }
+  validation validateMandatory on save { create; field TravelID, AgencyID, CustomerID, CurrencyCode; }
 
   mapping for zrt_travel corresponding
   {
@@ -61,7 +62,9 @@ etag master LocalLastChangedAt
   field ( readonly ) TravelUUID, LocalLastChangedAt;
   field ( mandatory ) BookingID, CarrierID, ConnectionID, FlightDate;
 
-  determination calculateTotalPrice on modify { create; field FlightPrice, CurrencyCode; }
+  determination calculateTotalPrice on modify { create; delete; field FlightPrice, CurrencyCode; }
+
+  validation validateMandatory on save { create; field BookingID, CarrierID, ConnectionID, FlightDate; }
 
   mapping for zrt_booking corresponding
   {

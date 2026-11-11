@@ -2418,6 +2418,35 @@
                   "keys": "keys"
                 }
               }
+            },
+            {
+              "name": "validateMandatory",
+              "triggers": {
+                "create": true,
+                "update": false,
+                "delete": false,
+                "fields": [
+                  "TravelID",
+                  "AgencyID",
+                  "CustomerID",
+                  "CurrencyCode"
+                ]
+              },
+              "src": {
+                "file": "src/zrt_r_travel.bdef.asbdef",
+                "line": 28,
+                "column": 3
+              },
+              "handler": {
+                "classKey": "CLAS-ZBP_RT_R_TRAVEL-LHC_TRAVEL",
+                "className": "LHC_TRAVEL",
+                "method": "validatemandatory",
+                "params": {
+                  "failed": "failed",
+                  "reported": "reported",
+                  "keys": "keys"
+                }
+              }
             }
           ],
           "actions": [
@@ -2679,7 +2708,7 @@
               "triggers": {
                 "create": true,
                 "update": false,
-                "delete": false,
+                "delete": true,
                 "fields": [
                   "FlightPrice",
                   "CurrencyCode"
@@ -2687,7 +2716,7 @@
               },
               "src": {
                 "file": "src/zrt_r_travel.bdef.asbdef",
-                "line": 64,
+                "line": 65,
                 "column": 3
               },
               "handler": {
@@ -2702,14 +2731,44 @@
               }
             }
           ],
-          "validations": [],
+          "validations": [
+            {
+              "name": "validateMandatory",
+              "triggers": {
+                "create": true,
+                "update": false,
+                "delete": false,
+                "fields": [
+                  "BookingID",
+                  "CarrierID",
+                  "ConnectionID",
+                  "FlightDate"
+                ]
+              },
+              "src": {
+                "file": "src/zrt_r_travel.bdef.asbdef",
+                "line": 67,
+                "column": 3
+              },
+              "handler": {
+                "classKey": "CLAS-ZBP_RT_R_TRAVEL-LHC_BOOKING",
+                "className": "LHC_BOOKING",
+                "method": "validatemandatory",
+                "params": {
+                  "failed": "failed",
+                  "reported": "reported",
+                  "keys": "keys"
+                }
+              }
+            }
+          ],
           "actions": [],
           "sideEffects": [],
           "useEtag": false,
           "precheckHandlers": {},
           "src": {
             "file": "src/zrt_r_travel.bdef.asbdef",
-            "line": 50,
+            "line": 51,
             "column": 1
           },
           "persistentTable": "zrt_booking",

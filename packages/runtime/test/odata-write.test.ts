@@ -103,6 +103,23 @@ describe("OData writes on the managed runtime", () => {
     expect((await send("POST", "Booking", { BookingID: "0005" })).status).toBe(405);
   });
 
+  it("recalculates the travel when a booking is deleted (determination on delete)", async () => {
+    expect((await send("DELETE", `Booking(${B1})`, undefined, { "if-match": "*" })).status).toBe(204);
+    // 20.00 + 750.25 (B2) + 0.00 (B3): B1 is no longer counted
+    expect((await get(`Travel(${T1})`)).body["TotalPrice"]).toBe("770.25");
+  });
+
+  it("rejects mandatory fields left empty (validations, mandatory has no runtime check of its own)", async () => {
+    const travelResponse = await send("POST", "Travel", { ...travel, TravelID: "", AgencyID: "" });
+    expect(travelResponse.status).toBe(400);
+    expect(JSON.stringify(travelResponse.body)).toContain("Travel ID is required");
+    expect(JSON.stringify(travelResponse.body)).toContain("Agency ID is required");
+    const bookingResponse = await send("POST", `Travel(${T1})/_Booking`, { FlightPrice: "10.00", CurrencyCode: "EUR" });
+    expect(bookingResponse.status).toBe(400);
+    expect(JSON.stringify(bookingResponse.body)).toContain("Airline is required");
+    expect((await get(`Travel(${T1})`)).body["TotalPrice"]).toBe("1520.50");
+  });
+
   it("deep inserts the bookings of a new travel", async () => {
     const response = await send("POST", "Travel?$expand=_Booking", {
       ...travel,

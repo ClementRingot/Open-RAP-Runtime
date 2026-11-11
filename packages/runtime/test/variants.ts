@@ -94,11 +94,11 @@ const INSTANCE_FEATURES: [string, string] = [
 ];
 
 const BOOKING: [string, string] = [
-  `    METHODS calculateTotalPrice FOR DETERMINE ON MODIFY
-      IMPORTING keys FOR Booking~calculateTotalPrice.
+  `    METHODS validateMandatory FOR VALIDATE ON SAVE
+      IMPORTING keys FOR Booking~validateMandatory.
 ENDCLASS.`,
-  `    METHODS calculateTotalPrice FOR DETERMINE ON MODIFY
-      IMPORTING keys FOR Booking~calculateTotalPrice.
+  `    METHODS validateMandatory FOR VALIDATE ON SAVE
+      IMPORTING keys FOR Booking~validateMandatory.
 
     METHODS recalcOnDelete FOR DETERMINE ON MODIFY
       IMPORTING keys FOR Booking~recalcOnDelete.
@@ -136,7 +136,7 @@ export function featuresVariant(): Record<string, string | ((content: string) =>
         ["  factory action copyTravel [1];", "  factory action ( features : global ) copyTravel [1];\n  action listBookings result [0..*] entity ZRT_R_Booking;\n  static function mostExpensive result [1] $self;"],
         ["  determination setStatusOpen on modify { create; }", "  determination setStatusOpen on modify { create; }\n  determination markChanged on modify { update; }"],
         ["  validation validateDates on save { create; field BeginDate, EndDate; }", "  validation validateDates on save { create; field BeginDate, EndDate; }\n\n  side effects\n  {\n    field BookingFee affects field TotalPrice;\n  }"],
-        ["  determination calculateTotalPrice on modify { create; field FlightPrice, CurrencyCode; }", "  determination calculateTotalPrice on modify { create; field FlightPrice, CurrencyCode; }\n  determination recalcOnDelete on modify { delete; }"],
+        ["  determination calculateTotalPrice on modify { create; delete; field FlightPrice, CurrencyCode; }", "  determination calculateTotalPrice on modify { create; delete; field FlightPrice, CurrencyCode; }\n  determination recalcOnDelete on modify { delete; }"],
       ]),
     "zrt_c_travel.bdef.asbdef": (c) => edit(c, [["  use action copyTravel;", "  use action copyTravel;\n  use action listBookings;\n  use function mostExpensive;"]]),
     [ABP]: (c) => {
