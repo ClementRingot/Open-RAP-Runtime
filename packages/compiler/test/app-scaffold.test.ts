@@ -51,6 +51,9 @@ describe("destinations of the generated application", () => {
     const files = generateScaffold(model!, new Diagnostics());
     expect(files.find((f) => f.path === ".env.example")?.content).not.toContain("DESTINATION_");
     expect(files.find((f) => f.path === "README.md")?.content).not.toContain("## Remote APIs");
+    // deployment (D50): Cloud Foundry manifest with its PostgreSQL service, and the README section
+    expect(files.find((f) => f.path === "manifest.yml")?.content).toContain("health-check-http-endpoint: /health");
+    expect(files.find((f) => f.path === "README.md")?.content).toContain("## Deploy");
   });
 });
 

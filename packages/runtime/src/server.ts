@@ -18,6 +18,7 @@ import type { FastifyInstance } from "fastify";
 import { PGliteDialect, sql } from "kysely";
 import type { LaunchpadModel, McpToolsModel, Model } from "@rap-transpiler/model";
 import { registerDevLaunchpad } from "./launchpad/dev.js";
+import { platformEnvironment } from "./platform.js";
 import { createApp } from "./app.js";
 import { authFromEnvironment } from "./auth/environment.js";
 import { Authorizations, rolesFromJson } from "./auth/authorizations.js";
@@ -46,7 +47,7 @@ export interface RunningServer {
 async function databaseFromEnvironment(env: Record<string, string | undefined>): Promise<Database> {
   const url = env["DATABASE_URL"];
   if (url !== undefined && url !== "") {
-    return createPostgresDatabase(url);
+    return createPostgresDatabase(url, env["DATABASE_CA"] === undefined ? {} : { ca: env["DATABASE_CA"] });
   }
   const dir = env["PGLITE_DIR"];
   if (dir !== undefined && dir !== "") {
@@ -61,7 +62,8 @@ async function databaseFromEnvironment(env: Record<string, string | undefined>):
 }
 
 export async function start(options: StartOptions): Promise<RunningServer> {
-  const env = options.env ?? process.env;
+  // on Cloud Foundry: the route and the bound PostgreSQL service (D50)
+  const env = platformEnvironment(options.env ?? process.env);
   const dir = path.resolve(options.dir);
   const port = Number(env["PORT"] ?? 8080);
   const host = env["HOST"] ?? "0.0.0.0";

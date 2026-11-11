@@ -28,9 +28,11 @@ export const PGLITE_PARSERS: Record<number, (value: string) => unknown> = {
   [INT8]: asString,
 };
 
-export function createPostgresDatabase(connectionString: string, options: { max?: number } = {}): Database {
+export function createPostgresDatabase(connectionString: string, options: { max?: number; ca?: string } = {}): Database {
   const pool = new pg.Pool({
     connectionString,
+    // the certificate of the database server (DATABASE_CA, a bound service on Cloud Foundry, D50)
+    ...(options.ca === undefined || options.ca === "" ? {} : { ssl: { ca: options.ca, rejectUnauthorized: true } }),
     max: options.max ?? 10,
     options: "-c TimeZone=UTC",
     types: {

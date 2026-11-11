@@ -5,6 +5,7 @@
  * built by `rapt build` (one PostgreSQL each) and, in the `oidc` profile, Keycloak.
  */
 
+import { CFIGNORE, cloudFoundryManifest, deploySection } from "../deploy.js";
 import { readFileSync } from "node:fs";
 import path from "node:path";
 import { appUrlVariable, type LaunchpadModel } from "@rap-transpiler/model";
@@ -208,6 +209,10 @@ and \`/#<intent>\` open the application of an intent.
 |---|---|---|---|---|
 ${tiles.map(({ group, tile }) => `| ${group} | ${tile.title} | ${tile.intent === undefined ? "" : `\`${tile.intent}\``} | ${tile.roles.length === 0 ? "every user" : tile.roles.map((r) => `\`${r}\``).join(", ")} | ${tile.count === undefined ? "" : `\`${tile.count}\``} |`).join("\n")}
 
+${deploySection(name, "launchpad")}
+On Cloud Foundry, each application is pushed on its own route; give their routes to the
+launchpad with \`cf set-env ${name} APP_<ID>_URL https://…\`.
+
 ## Content
 
 | Path | Content |
@@ -276,6 +281,8 @@ export function generateLaunchpad(file: string, options: LaunchpadOptions = {}):
     ...generateLaunchpadUi(model).map((f) => ({ path: `ui/${f.path}`, content: f.content })),
     { path: "Dockerfile", content: DOCKERFILE },
     { path: ".dockerignore", content: DOCKERIGNORE },
+    { path: "manifest.yml", content: cloudFoundryManifest(name, { database: false, memory: "256M" }) },
+    { path: ".cfignore", content: CFIGNORE },
     { path: "docker-compose.yml", content: compose(name, model, apps, options.outDir === undefined ? undefined : path.resolve(options.outDir)) },
     { path: "keycloak/rapt-realm.json", content: `${JSON.stringify(realm, null, 2)}\n` },
     { path: ".env.example", content: envExample(model) },

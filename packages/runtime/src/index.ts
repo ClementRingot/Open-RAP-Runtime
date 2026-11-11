@@ -19,3 +19,4 @@ export { RapRuntime } from "./rap/runtime.js";
 export { OidcSessions, signSession } from "./auth/session.js";
 export { createLaunchpad, launchpadView, startLaunchpad, type LaunchpadOptions, type LaunchpadView, type RunningLaunchpad, type StartLaunchpadOptions } from "./launchpad/server.js";
 export { rewriteLocation } from "./launchpad/proxy.js";
+export { boundPostgres, platformEnvironment } from "./platform.js";

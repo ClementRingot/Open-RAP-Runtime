@@ -4,6 +4,7 @@
  * runtime embedded in `vendor/` (no private registry needed).
  */
 
+import { CFIGNORE, cloudFoundryManifest, deploySection } from "../deploy.js";
 import { readFileSync } from "node:fs";
 import path from "node:path";
 import { authorizationClaims, destinationKeys, type Model } from "@rap-transpiler/model";
@@ -280,7 +281,7 @@ AUTH_MODE=oidc docker compose --profile oidc up --build
 \`\`\`
 
 The variables are listed in \`.env.example\`.
-${authorizationsSection(model)}${destinations.length === 0 ? "" : destinationsSection(destinations)}
+${authorizationsSection(model)}${destinations.length === 0 ? "" : destinationsSection(destinations)}${deploySection(name, "application")}
 ## Content
 
 | Folder | Content |
@@ -329,6 +330,8 @@ export function generateScaffold(model: Model, diagnostics: Diagnostics, options
     { path: "server.mjs", content: SERVER },
     { path: "Dockerfile", content: DOCKERFILE },
     { path: ".dockerignore", content: DOCKERIGNORE },
+    { path: "manifest.yml", content: cloudFoundryManifest(name, { database: true }) },
+    { path: ".cfignore", content: CFIGNORE },
     { path: "docker-compose.yml", content: compose(name) },
     { path: "keycloak/rapt-realm.json", content: `${JSON.stringify(realm(model), null, 2)}\n` },
     { path: ".env.example", content: `${ENV_EXAMPLE}${destinationLines(options.destinations ?? [])}${model.services?.mail === true ? MAIL_LINES : ""}` },

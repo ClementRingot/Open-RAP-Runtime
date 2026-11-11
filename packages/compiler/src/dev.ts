@@ -26,6 +26,8 @@ export interface DevOptions extends Omit<GenerateOptions, "scaffold" | "transpil
   outDir?: string;
   /** Port of the application (default: PORT of the environment, else 8080). */
   port?: number;
+  /** Interface the server listens on (default: HOST of the environment, else 127.0.0.1; 0.0.0.0: the network). */
+  host?: string;
   /** Environment of the application (default: process.env). */
   env?: Record<string, string | undefined>;
   /** Output of the session (default: stdout and stderr). */
@@ -130,7 +132,7 @@ export class DevSession {
     }
     let result: Awaited<ReturnType<typeof generateApplication>>;
     try {
-      const { outDir: _out, port: _port, env: _env, out: _o, err: _e, events: _ev, ...generate } = this.options;
+      const { outDir: _out, port: _port, host: _host, env: _env, out: _o, err: _e, events: _ev, ...generate } = this.options;
       result = await generateApplication(loadProject(this.root), { ...generate, scaffold: false });
     } catch (e) {
       this.emit({ type: "error", message: (e as Error).message });
@@ -315,7 +317,7 @@ export class DevSession {
     const env: Record<string, string | undefined> = {
       ...this.env,
       PORT: String(this.port),
-      HOST: this.env["HOST"] ?? "127.0.0.1",
+      HOST: this.options.host ?? this.env["HOST"] ?? "127.0.0.1",
       LOG_LEVEL: this.env["LOG_LEVEL"] ?? "warn",
       AUTH_MODE: this.env["AUTH_MODE"] ?? "none",
       // seed data of rapt/seed.json, rapt/seed.sql at the first start (D42)

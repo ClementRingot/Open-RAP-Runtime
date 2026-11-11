@@ -14,6 +14,7 @@
  * `APP_<ID>_URL` for the internal URL of each application.
  */
 
+import { platformEnvironment } from "../platform.js";
 import { readFileSync } from "node:fs";
 import path from "node:path";
 import Fastify, { type FastifyInstance, type FastifyReply, type FastifyRequest, type FastifyServerOptions } from "fastify";
@@ -200,7 +201,7 @@ export interface RunningLaunchpad {
 
 /** Start-up of a generated launchpad (`node server.mjs`), configured by the environment. */
 export async function startLaunchpad(options: StartLaunchpadOptions): Promise<RunningLaunchpad> {
-  const env = options.env ?? process.env;
+  const env = platformEnvironment(options.env ?? process.env);
   const dir = path.resolve(options.dir);
   const port = Number(env["PORT"] ?? 8090);
   const host = env["HOST"] ?? "0.0.0.0";

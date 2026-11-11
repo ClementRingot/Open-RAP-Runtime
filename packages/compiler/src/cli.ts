@@ -40,6 +40,7 @@ Options:
   --runtime <dir>    @rap-transpiler/runtime package to embed in the application (default: next to rapt)
   --out <path>       output file (rapt ir) or folder (rapt build, rapt launchpad, rapt dev: <src>/.rapt/dev)
   --port <n>         port of the application (rapt dev, default: PORT, else 8080)
+  --host <address>   interface of rapt dev (default 127.0.0.1; 0.0.0.0 to open it to the network)
   --json             machine-readable output (rapt check, rapt build: one JSON object;
                      rapt dev: one JSON event per line)
   --prefix <Z…>      prefix of the object names (rapt new, default Z): ZRT → zrt_travel, ZRT_R_Travel…
@@ -79,6 +80,7 @@ export async function main(argv: string[]): Promise<number> {
         out: { type: "string" },
         runtime: { type: "string" },
         port: { type: "string" },
+        host: { type: "string" },
         json: { type: "boolean" },
         prefix: { type: "string" },
         description: { type: "string" },
@@ -154,7 +156,7 @@ export async function main(argv: string[]): Promise<number> {
   if (typeof parsed.values["runtime"] === "string") options.runtimeDir = parsed.values["runtime"];
 
   if (command === "dev") {
-    return dev(source, options, parsed.values["out"], parsed.values["port"], parsed.values["json"] === true);
+    return dev(source, options, parsed.values["out"], parsed.values["port"], parsed.values["json"] === true, parsed.values["host"]);
   }
   const json = parsed.values["json"] === true;
   const project = loadProject(source);
@@ -306,8 +308,9 @@ function writeJson(command: string, root: string, diagnostics: Diagnostics, ok: 
 }
 
 /** rapt dev: runs until SIGINT or SIGTERM. */
-async function dev(source: string, generate: GenerateOptions, out: unknown, port: unknown, json: boolean): Promise<number> {
+async function dev(source: string, generate: GenerateOptions, out: unknown, port: unknown, json: boolean, host: unknown): Promise<number> {
   const options: DevOptions = { ...generate };
+  if (typeof host === "string") options.host = host;
   if (json) options.events = (event) => process.stdout.write(`${JSON.stringify(event)}\n`);
   if (typeof out === "string") options.outDir = out;
   if (typeof port === "string") {
