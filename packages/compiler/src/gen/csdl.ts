@@ -12,6 +12,7 @@ import {
   fieldControlTypeName,
   findEntity,
   getAnnotation,
+  valueHelpOf,
   getArray,
   OPERATION_CONTROL,
   operationControlTypeName,
@@ -262,6 +263,29 @@ class CsdlBuilder {
       if (field.currencyCode !== undefined) children.push(annotation("Measures.ISOCurrency", { Path: field.currencyCode }));
       if (field.unitOfMeasure !== undefined) children.push(annotation("Measures.Unit", { Path: field.unitOfMeasure }));
       if (getAnnotation(a, "UI.hidden") === true) children.push(annotation("UI.Hidden"));
+      const help = valueHelpOf(this.model, field);
+      if (help !== undefined) {
+        children.push(
+          annotation(
+            "Common.ValueList",
+            {},
+            record(
+              "Common.ValueListType",
+              pv("Label", { String: help.label }),
+              pv("CollectionPath", { String: help.set }),
+              pv("SearchSupported", { Bool: this.service.entitySets.find((s) => s.name === help.set)?.searchable === true }),
+              pv(
+                "Parameters",
+                {},
+                collection(
+                  record("Common.ValueListParameterInOut", pv("LocalDataProperty", { PropertyPath: property.name }), pv("ValueListProperty", { String: help.element })),
+                  ...help.columns.slice(1).map((c) => record("Common.ValueListParameterDisplayOnly", pv("ValueListProperty", { String: c.property }))),
+                ),
+              ),
+            ),
+          ),
+        );
+      }
       const text = getArray(a, "ObjectModel.text.element")?.map(str).find((t) => t !== undefined);
       if (text !== undefined) {
         const arrangement = str(getAnnotation(a, "UI.textArrangement"));

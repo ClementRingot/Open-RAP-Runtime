@@ -119,6 +119,11 @@ export interface EntitySetModel {
   name: string;
   /** Exposed CDS entity (usually a projection view). */
   entity: string;
+  /**
+   * Exposed implicitly as the value help of an element (`@Consumption.valueHelpDefinition`), as
+   * RAP does: read-only, without its own pages in the UI.
+   */
+  valueHelp?: true;
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -127,6 +132,8 @@ export interface EntitySetModel {
 export interface TableModel {
   /** Table name, lower case. */
   name: string;
+  /** Table of a standard view (I_Currency…, D44): reference data delivered with the application. */
+  standard?: true;
   description?: string;
   columns: ColumnModel[];
   src?: SourceRef;

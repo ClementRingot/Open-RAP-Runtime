@@ -7,14 +7,17 @@ import {
   sqlName,
   type BehaviorModel,
   type EntityModel,
+  getAnnotation,
+  getArray,
   type Model,
+  type ServiceModel,
   type TableModel,
 } from "@rap-transpiler/model";
 import { parseBdef } from "../bdef/parser.js";
 import type { BdefAst } from "../bdef/ast.js";
 import { readMsagXml } from "../ddic/xml.js";
 import { Diagnostics } from "../diagnostics.js";
-import { filesOfType, type Project, type SourceFile } from "../input/project.js";
+import { filesOfType, STANDARD_FOLDER, type Project, type SourceFile } from "../input/project.js";
 import { COMPILER_VERSION } from "../version.js";
 import { buildBehavior } from "./behaviors.js";
 import { Dictionary } from "./dictionary.js";
@@ -30,6 +33,48 @@ export type BuildOptions = ServiceOptions;
 export interface BuildResult {
   model?: Model;
   diagnostics: Diagnostics;
+}
+
+/**
+ * The entities of the value helps of the exposed entities (`@Consumption.valueHelpDefinition`)
+ * are exposed implicitly, read-only, as RAP does: the value help reads them from the service.
+ */
+function addValueHelps(service: ServiceModel, entities: EntityResolver, diagnostics: Diagnostics): void {
+  const names = new Set(service.entitySets.map((s) => s.name.toUpperCase()));
+  const exposedEntities = new Set(service.entitySets.map((s) => s.entity.toUpperCase()));
+  for (const set of [...service.entitySets]) {
+    const entity = entities.resolve(set.entity);
+    for (const field of entity?.fields ?? []) {
+      for (const definition of getArray(field.annotations, "Consumption.valueHelpDefinition") ?? []) {
+        const target = typeof definition === "object" && definition !== null && !Array.isArray(definition) ? definition["entity"] : undefined;
+        const name = typeof target === "object" && target !== null && !Array.isArray(target) ? target["name"] : undefined;
+        if (typeof name !== "string" || exposedEntities.has(name.toUpperCase())) {
+          continue;
+        }
+        const resolved = entities.resolve(name);
+        if (resolved === undefined) {
+          diagnostics.warning("CDS018", `${entity?.name ?? set.entity}.${field.name}: value help entity ${name} not found, the value help is omitted`, field.src);
+          continue;
+        }
+        if (names.has(resolved.name.toUpperCase())) {
+          continue;
+        }
+        service.entitySets.push({ name: resolved.name, entity: resolved.name, valueHelp: true });
+        names.add(resolved.name.toUpperCase());
+        exposedEntities.add(resolved.name.toUpperCase());
+        // its text entity (`_Text` to an entity of data category #TEXT): the descriptions of the values
+        for (const association of resolved.associations) {
+          const text = entities.resolve(association.target);
+          if (text === undefined || getAnnotation(text.annotations, "ObjectModel.dataCategory") !== "#TEXT" || names.has(text.name.toUpperCase())) {
+            continue;
+          }
+          service.entitySets.push({ name: text.name, entity: text.name, valueHelp: true });
+          names.add(text.name.toUpperCase());
+          exposedEntities.add(text.name.toUpperCase());
+        }
+      }
+    }
+  }
 }
 
 export function buildModel(project: Project, options: BuildOptions = {}): BuildResult {
@@ -50,6 +95,7 @@ export function buildModel(project: Project, options: BuildOptions = {}): BuildR
   // ----------------------------------------------------------------- entities, from the service
   const required = new Map<string, EntityModel>();
   const queue: string[] = [];
+  addValueHelps(service, entities, diagnostics);
   const exposed = new Set(service.entitySets.map((s) => s.entity.toUpperCase()));
   for (const set of service.entitySets) {
     const expose = selection.ast.exposes.find((e) => same(e.entity, set.entity));
@@ -89,7 +135,7 @@ export function buildModel(project: Project, options: BuildOptions = {}): BuildR
   }
   for (const entity of required.values()) {
     for (const association of entity.associations) {
-      if (association.kind === "association" && !exposed.has(association.target.toUpperCase())) {
+      if (association.kind === "association" && !exposed.has(association.target.toUpperCase()) && association.src?.file.startsWith(STANDARD_FOLDER) !== true) {
         diagnostics.info("SRVD006", `${entity.name}.${association.name}: target ${association.target} is not exposed, the navigation is omitted`, association.src);
       }
     }

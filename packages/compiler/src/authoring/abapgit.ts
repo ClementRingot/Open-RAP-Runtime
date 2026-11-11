@@ -236,7 +236,7 @@ export function generateAbapGitFiles(dir: string, options: AbapGitOptions = {}):
   const hadDotAbapGit = existsSync(dotAbapGit);
   const existing = hadDotAbapGit ? readFileSync(dotAbapGit, "utf8") : DEFAULT_DOT_ABAPGIT;
   let project: Project = loadProject(root);
-  const hasTableSources = project.files.some((f) => f.generatedFrom === "astabl");
+  const hasTableSources = project.files.some((f) => f.generatedFrom === "astabl" && f.standard !== true);
   write(".abapgit.xml", hasTableSources ? ignoreTableSources(existing) : existing);
   if (!hadDotAbapGit && options.check !== true) {
     project = loadProject(root);
@@ -254,6 +254,9 @@ export function generateAbapGitFiles(dir: string, options: AbapGitOptions = {}):
   // objects: type:name → files
   const objects = new Map<string, SourceFile[]>();
   for (const file of project.files) {
+    if (file.standard === true) {
+      continue; // a standard object of SAP (D44), not a file of the project
+    }
     const key = `${file.type}:${file.name}`;
     objects.set(key, [...(objects.get(key) ?? []), file]);
   }

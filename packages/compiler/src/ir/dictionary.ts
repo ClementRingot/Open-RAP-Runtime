@@ -169,6 +169,9 @@ export class Dictionary {
       sink.warning("DDIC004", `${xml.name}: table class ${xml.tableClass} handled as a transparent table`, { file: file.path, line: 1 });
     }
     const table: TableModel = { name: sqlName(xml.name), columns, src: { file: file.path, line: 1, column: 1 } };
+    if (file.standard === true) {
+      table.standard = true;
+    }
     if (xml.description !== undefined) {
       table.description = xml.description;
     }

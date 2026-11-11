@@ -3,6 +3,7 @@
 import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
 import path from "node:path";
 import { parseTableSource, tableSourceToXml } from "../ddic/table-source.js";
+import { standardObjectsFor } from "../standard/index.js";
 
 export interface SourceFile {
   /** Path relative to the project root, with forward slashes (used in diagnostics). */
@@ -24,7 +25,15 @@ export interface SourceFile {
   generatedFrom?: "astabl";
   /** Lines of the fields in the source, for the diagnostics of a generated file. */
   fieldLines?: Record<string, number>;
+  /**
+   * A standard object of SAP (I_Currency…) added because the sources name it (D44): not a file of
+   * the project, never written by `rapt abapgit`.
+   */
+  standard?: true;
 }
+
+/** Folder of the standard objects in the paths of the diagnostics. */
+export const STANDARD_FOLDER = "<standard>";
 
 /** Problems found while reading the project (sources of tables). */
 export interface ProjectIssue {
@@ -102,7 +111,28 @@ export function loadProject(dir: string): Project {
     });
   }
   const issues: ProjectIssue[] = [];
-  return { root, sourceRoot, files: withTableSources(files, issues), issues };
+  return { root, sourceRoot, files: withTableSources(withStandardObjects(root, files), issues), issues };
+}
+
+/** The standard views of SAP the sources name (I_Currency…) and their tables (D44). */
+function withStandardObjects(root: string, files: SourceFile[]): SourceFile[] {
+  const standard = standardObjectsFor(files);
+  return [
+    ...files,
+    ...standard.map((object): SourceFile => {
+      const match = ABAPGIT_FILE.exec(object.fileName);
+      return {
+        path: `${STANDARD_FOLDER}/${object.fileName}`,
+        absolute: path.join(root, STANDARD_FOLDER, object.fileName),
+        name: object.name,
+        type: object.type,
+        extension: (match?.[3] ?? "").toLowerCase(),
+        fileName: object.fileName,
+        content: object.content,
+        standard: true,
+      };
+    }),
+  ];
 }
 
 /**

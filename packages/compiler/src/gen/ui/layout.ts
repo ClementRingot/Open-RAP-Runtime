@@ -12,6 +12,7 @@ import {
   getAnnotation,
   getArray,
   isUuid,
+  valueHelpOf,
   same,
   type AnnotationObject,
   type AnnotationValue,
@@ -21,6 +22,7 @@ import {
   type ODataEntityType,
   type ODataOperation,
   type ODataService,
+  type ValueHelp,
 } from "@rap-transpiler/model";
 
 export type FieldKind = "text" | "digits" | "integer" | "decimal" | "amount" | "boolean" | "date" | "time" | "datetime" | "uuid";
@@ -46,16 +48,8 @@ export interface UiField {
   valueHelp?: UiValueHelp;
 }
 
-/** A value help: the entity set listing the values, its key element and its other columns. */
-export interface UiValueHelp {
-  /** Entity set of the value help in the service (exposed automatically, like RAP). */
-  set: string;
-  /** Element of the value help entity giving the value of the field. */
-  element: string;
-  label: string;
-  /** Columns of the value help dialog (the element first). */
-  columns: Array<{ property: string; label: string }>;
-}
+/** A value help: the entity set listing the values, its element and its columns (D44). */
+export type UiValueHelp = ValueHelp;
 
 export interface UiParameter {
   name: string;
@@ -189,7 +183,7 @@ class LayoutBuilder {
   }
 
   public build(): UiLayout {
-    const pages = this.service.entitySets.map((set) => this.page(set.name)).filter((p): p is UiPage => p !== undefined);
+    const pages = this.service.entitySets.filter((s) => s.valueHelp !== true).map((set) => this.page(set.name)).filter((p): p is UiPage => p !== undefined);
     const start = pages.find((p) => p.list !== undefined)?.set ?? pages[0]?.set ?? "";
     const root = pages.find((p) => p.set === start);
     return {
@@ -227,6 +221,8 @@ class LayoutBuilder {
       dynamic: property.dynamic,
     };
     if (property.edm.maxLength !== undefined) result.maxLength = property.edm.maxLength;
+    const help = valueHelpOf(this.model, field);
+    if (help !== undefined) result.valueHelp = help;
     if (unit !== undefined && type.properties.some((p) => p.name === unit)) result.unit = unit;
     const level = importance?.replace(/^#/, "").toLowerCase();
     if (level === "high" || level === "medium" || level === "low") result.importance = level === "high" ? "High" : level === "medium" ? "Medium" : "Low";

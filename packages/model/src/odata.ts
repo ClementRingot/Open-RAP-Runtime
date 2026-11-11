@@ -82,6 +82,8 @@ export interface ODataEntitySet {
   searchable: boolean;
   /** Search fields (@Search.defaultSearchElement). */
   searchFields: string[];
+  /** Exposed implicitly as a value help (D44). */
+  valueHelp?: true;
 }
 
 export interface ODataParameter {
@@ -398,6 +400,7 @@ export function buildODataService(model: Model): ODataService {
       deletable: publicOperation(behavior, "delete"),
       searchable: getBoolean(entity.annotations, "Search.searchable") === true,
       searchFields: entity.fields.filter((f) => getBoolean(f.annotations, "Search.defaultSearchElement") === true).map((f) => f.name),
+      ...(set.valueHelp === true ? { valueHelp: true as const } : {}),
     });
   }
   for (const entity of complexTypes.values()) {

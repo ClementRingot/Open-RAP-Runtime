@@ -18,7 +18,7 @@ export async function applySeed(db: Database, model: Model, dir: string): Promis
   if (!existsSync(jsonFile) && !existsSync(sqlFile)) {
     return undefined;
   }
-  for (const table of model.tables) {
+  for (const table of model.tables.filter((t) => t.standard !== true)) {
     const row = await db.selectFrom(table.name).select(sql<number>`1`.as("one")).limit(1).executeTakeFirst();
     if (row !== undefined) {
       return undefined; // not the first start

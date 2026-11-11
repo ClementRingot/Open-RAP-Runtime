@@ -17,6 +17,7 @@ import {
   type Model,
   type TableModel,
 } from "@rap-transpiler/model";
+import { standardRows } from "../standard/index.js";
 
 export function quoteIdentifier(name: string): string {
   return `"${name.replace(/"/g, '""')}"`;
@@ -410,8 +411,31 @@ export function generateSql(model: Model): SqlOutput {
   const drop = views.length === 0 ? "" : `DROP VIEW IF EXISTS ${[...views].reverse().map((v) => quoteIdentifier(v.sqlView ?? "")).join(", ")} CASCADE;\n`;
   const viewStatements = views.map((v) => createView(model, v));
   const abapSql = abapSqlSchema(model, views);
-  const schema = [header, "-- tables", ...tables, "-- compositions", ...foreignKeys(model), ...[frameworkTables(model)].filter((t) => t !== ""), "-- CDS views", drop, ...viewStatements, "-- ABAP SQL of the behavior pools (values in ABAP form)", ...abapSql].join("\n");
+  const schema = [header, "-- tables", ...tables, ...standardData(model), "-- compositions", ...foreignKeys(model), ...[frameworkTables(model)].filter((t) => t !== ""), "-- CDS views", drop, ...viewStatements, "-- ABAP SQL of the behavior pools (values in ABAP form)", ...abapSql].join("\n");
   return { schema, tables: model.tables.map((t) => t.name), views: views.map((v) => v.sqlView ?? "") };
+}
+
+/**
+ * The reference data of the standard views (I_Currency…, D44), as SAP delivers it: inserted when
+ * missing, never changed (rows added or changed by the application stay).
+ */
+function standardData(model: Model): string[] {
+  const statements: string[] = [];
+  for (const table of model.tables.filter((t) => t.standard === true)) {
+    const data = standardRows(table.name);
+    if (data.length === 0) {
+      continue;
+    }
+    const columns = Object.keys(data[0] ?? {});
+    const keys = table.columns.filter((c) => c.key && !c.client).map((c) => quoteIdentifier(c.name));
+    const value = (v: string | number): string => (typeof v === "number" ? String(v) : `'${v.replace(/'/g, "''")}'`);
+    statements.push(
+      `-- reference data of ${table.name} (standard views, D44)\nINSERT INTO ${quoteIdentifier(table.name)} (${columns.map(quoteIdentifier).join(", ")}) VALUES\n${data
+        .map((row) => `  (${columns.map((c) => value(row[c] ?? "")).join(", ")})`)
+        .join(",\n")}\nON CONFLICT (${keys.join(", ")}) DO NOTHING;`,
+    );
+  }
+  return statements;
 }
 
 /**

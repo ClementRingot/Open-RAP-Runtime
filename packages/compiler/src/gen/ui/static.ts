@@ -341,8 +341,48 @@ export const SUPPORT = `sap.ui.define([
       });
     },
 
+    /** The descriptions of the values of a value help (text entity), by value: { EUR: "Euro" }. */
+    valueHelpTexts: function (oView, oHelp) {
+      if (!oHelp.text) {
+        return Promise.resolve({});
+      }
+      var sService = oView.getModel().getServiceUrl();
+      var sLanguage = (navigator.language || "en").slice(0, 2).toUpperCase();
+      var sKey = { EN: "E", DE: "D", FR: "F", ES: "S", IT: "I", PT: "P", NL: "N", JA: "J", ZH: "1", RU: "R", PL: "L" }[sLanguage] || "E";
+      var oText = oHelp.text;
+      var sFilter = oText.language ? "&$filter=" + encodeURIComponent(oText.language + " eq '" + sKey + "' or " + oText.language + " eq 'E'") : "";
+      return fetch(sService + oText.set + "?$select=" + [oText.key, oText.element].concat(oText.language ? [oText.language] : []).join(",") + sFilter, {
+        credentials: "same-origin",
+        headers: { accept: "application/json" }
+      }).then(function (oResponse) {
+        return oResponse.ok ? oResponse.json() : { value: [] };
+      }).then(function (oData) {
+        var mTexts = {};
+        (oData.value || []).forEach(function (oRow) {
+          var sValue = String(oRow[oText.key]);
+          if (mTexts[sValue] === undefined || (oText.language && oRow[oText.language] === sKey)) {
+            mTexts[sValue] = oRow[oText.element];
+          }
+        });
+        return mTexts;
+      }).catch(function () {
+        return {};
+      });
+    },
+
     /** Opens the value help of a field; resolves the chosen values (none when cancelled). */
     valueHelp: function (oView, oHelp, bMulti) {
+      return support.valueHelpTexts(oView, oHelp).then(function (mTexts) {
+        return support._valueHelpDialog(oView, oHelp, bMulti, mTexts);
+      });
+    },
+
+    _valueHelpDialog: function (oView, oHelp, bMulti, mTexts) {
+      var bTexts = Object.keys(mTexts).length > 0;
+      var aColumns = oHelp.columns.slice();
+      if (bTexts) {
+        aColumns.splice(1, 0, { property: oHelp.element, label: oHelp.text.label, string: false, text: true });
+      }
       return new Promise(function (resolve) {
         var bDone = false;
         var done = function (aValues) {
@@ -356,18 +396,22 @@ export const SUPPORT = `sap.ui.define([
           multiSelect: bMulti,
           growing: true,
           growingThreshold: 50,
-          columns: oHelp.columns.map(function (c) {
+          columns: aColumns.map(function (c) {
             return new Column({ header: new Text({ text: c.label }) });
           }),
           search: function (oEvent) {
             var sValue = (oEvent.getParameter("value") || "").trim();
-            var aText = oHelp.columns.filter(function (c) { return c.string; });
-            oEvent.getSource().getBinding("items").filter(sValue === "" || aText.length === 0 ? [] : new Filter({
-              filters: aText.map(function (c) {
-                return new Filter({ path: c.property, operator: "Contains", value1: sValue, caseSensitive: false });
-              }),
-              and: false
-            }));
+            var aFilters = oHelp.columns.filter(function (c) { return c.string; }).map(function (c) {
+              return new Filter({ path: c.property, operator: "Contains", value1: sValue, caseSensitive: false });
+            });
+            // values whose description matches
+            var sLower = sValue.toLowerCase();
+            Object.keys(mTexts).filter(function (k) {
+              return String(mTexts[k]).toLowerCase().indexOf(sLower) >= 0;
+            }).slice(0, 30).forEach(function (k) {
+              aFilters.push(new Filter(oHelp.element, "EQ", k));
+            });
+            oEvent.getSource().getBinding("items").filter(sValue === "" || aFilters.length === 0 ? [] : new Filter({ filters: aFilters, and: false }));
           },
           confirm: function (oEvent) {
             done((oEvent.getParameter("selectedItems") || []).map(function (oItem) {
@@ -386,8 +430,10 @@ export const SUPPORT = `sap.ui.define([
           path: "/" + oHelp.set,
           parameters: { $count: true },
           template: new ColumnListItem({
-            cells: oHelp.columns.map(function (c) {
-              return new Text({ text: "{" + c.property + "}" });
+            cells: aColumns.map(function (c) {
+              return c.text
+                ? new Text({ text: { path: c.property, formatter: function (v) { return mTexts[v] || ""; } } })
+                : new Text({ text: "{" + c.property + "}" });
             })
           })
         });
