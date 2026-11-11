@@ -1,5 +1,5 @@
 /**
- * CDS simple types and CDS enumerated types (D55): the TDL sources `name.drty.asdrty`.
+ * CDS simple types and CDS enumerated types (D55): the TDL sources `name.drty.acds`.
  *
  *   @EndUserText.label: 'Travel name'
  *   define type zrt_name : abap.char(40);

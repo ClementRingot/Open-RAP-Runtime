@@ -5,7 +5,8 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
-import { ddlSourceType } from "../src/authoring/abapgit.js";
+import { ddlSourceType, generateAbapGitFiles } from "../src/authoring/abapgit.js";
+import { generateObject } from "../src/authoring/generate.js";
 import { parseCdsTypeSource } from "../src/ddic/cds-types.js";
 import { replaceEnumConstants } from "../src/gen/abap/enums.js";
 import { generateCsdl } from "../src/gen/csdl.js";
@@ -122,13 +123,13 @@ describe("table entities and CDS types", () => {
   });
 
   it("check the enumerated types", () => {
-    expect(codes({ "zrt_priority.drty.asdrty": (c) => c.replace("MEDIUM = 5;", "MEDIUM = initial;") })).toContain("TYPE003");
-    expect(codes({ "zrt_priority.drty.asdrty": (c) => c.replace("MEDIUM = 5;", "MEDIUM = 300;") })).toContain("TYPE003");
-    expect(codes({ "zrt_priority.drty.asdrty": (c) => c.replace("MEDIUM = 5;", "MEDIUM = 9;") })).toContain("TYPE003");
-    expect(codes({ "zrt_order_status.drty.asdrty": (c) => c.replace("abap.char(1)", "abap.string") })).toContain("TYPE003");
-    expect(codes({ "zrt_order_status.drty.asdrty": (c) => c.replace("OPEN = 'O'", "OPEN = 'OK'") })).toContain("TYPE003");
-    expect(codes({ "zrt_order_name.drty.asdrty": (c) => c.replace("abap.char(40)", "zrt_unknown") })).toContain("TYPE002");
-    expect(codes({ "zrt_order_name.drty.asdrty": (c) => c.replace("ZRT_ORDER_NAME", "ZRT_OTHER") })).toContain("TYPE001");
+    expect(codes({ "zrt_priority.drty.acds": (c) => c.replace("MEDIUM = 5;", "MEDIUM = initial;") })).toContain("TYPE003");
+    expect(codes({ "zrt_priority.drty.acds": (c) => c.replace("MEDIUM = 5;", "MEDIUM = 300;") })).toContain("TYPE003");
+    expect(codes({ "zrt_priority.drty.acds": (c) => c.replace("MEDIUM = 5;", "MEDIUM = 9;") })).toContain("TYPE003");
+    expect(codes({ "zrt_order_status.drty.acds": (c) => c.replace("abap.char(1)", "abap.string") })).toContain("TYPE003");
+    expect(codes({ "zrt_order_status.drty.acds": (c) => c.replace("OPEN = 'O'", "OPEN = 'OK'") })).toContain("TYPE003");
+    expect(codes({ "zrt_order_name.drty.acds": (c) => c.replace("abap.char(40)", "zrt_unknown") })).toContain("TYPE002");
+    expect(codes({ "zrt_order_name.drty.acds": (c) => c.replace("ZRT_ORDER_NAME", "ZRT_OTHER") })).toContain("TYPE001");
   });
 
   it("check the table entities", () => {
@@ -136,6 +137,19 @@ describe("table entities and CDS types", () => {
     expect(codes({ "zrt_order.ddls.asddls": (c) => c.replace("key OrderId  : abap.numc(8);", "key OrderId  : abap.numc(8) null;") })).toContain("CDS020");
     expect(codes({ "zrt_order.ddls.asddls": (c) => c.replace("      Name     : zrt_order_name;", "  key Name     : zrt_order_name;").replace("  key OrderId  : abap.numc(8);", "      Status2  : abap.char(1);\n  key OrderId  : abap.numc(8);") })).toContain("CDS020");
     expect(codes({ "zrt_order.ddls.asddls": (c) => c.replace("Currency : abap.cuky;", "Currency : zrt_no_type;") })).toContain("CDS014");
+  });
+
+  it("get the AFF metadata of abapGit (.drty.json) from rapt abapgit and rapt generate", () => {
+    const v = variant({});
+    try {
+      rmSync(path.join(v.dir, "src", "zrt_priority.drty.json"));
+      expect(generateAbapGitFiles(v.dir).written).toEqual(["src/zrt_priority.drty.json"]);
+      expect(JSON.parse(readFileSync(path.join(v.dir, "src", "zrt_priority.drty.json"), "utf8"))).toEqual({ formatVersion: "1", header: { description: "Priority", originalLanguage: "en" } });
+      expect(generateObject(v.dir, "enum", "ZRT_COLOR").written).toEqual(["src/zrt_color.drty.acds", "src/zrt_color.drty.json"]);
+      expect(buildModel(loadProject(v.dir)).diagnostics.items.filter((d) => d.severity === "error")).toEqual([]);
+    } finally {
+      v.cleanup();
+    }
   });
 
   it("are written as DDLS of source type T by rapt abapgit", () => {

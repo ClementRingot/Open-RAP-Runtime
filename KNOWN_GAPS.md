@@ -77,7 +77,6 @@ Versions de référence : `@abaplint/core` 2.120.98, `@abaplint/transpiler` 2.14
 | Table entities (D55) : `@ClientHandling.type` | Lu, sans effet : pas de colonne mandant (D9). |
 | Table entities : colonnes `null` | La colonne PostgreSQL garde sa valeur par défaut (valeur initiale ABAP) comme les autres ; `null` n'est un état distinct que pour les types sans valeur initiale. |
 | Table entities : `SOURCE_TYPE` du XML abapGit écrit par `rapt abapgit` | `T`, déduit de la documentation : à vérifier à la première importation ; ADT réécrit le XML à l'activation. |
-| Types CDS (D55) : XML abapGit des objets DRTY | Non écrit par `rapt abapgit` : créer le type dans ADT, ou reprendre le XML d'un objet exporté. |
 | Types énumérés : `CAST( x AS enum )`, constante `Type.#CONST` dans une vue, `CONV string( enum )` (nom de la constante) dans le behavior pool, `cl_abap_enumdescr` | Non gérés : les expressions CDS sont refusées (CDS002) ; dans le behavior pool, une valeur énumérée est sa valeur de base. |
 | Types énumérés dans le behavior pool : constante dans un modèle de chaîne (`|{ type-const }|`) | Non remplacée : le transpiler signale le nom inconnu (ABP004) ; passer par une variable. |
 | Types énumérés exposés en OData | Refusés en mode `standard` comme sur SAP (CDS021) ; `EnumType` en mode `enhanced` seulement. |

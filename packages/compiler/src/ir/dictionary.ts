@@ -53,7 +53,7 @@ export class Dictionary {
         this.domains.set(xml.name.toUpperCase(), { xml, file });
       }
     }
-    for (const file of filesOfType(project, "DRTY").filter((f) => f.extension === "asdrty")) {
+    for (const file of filesOfType(project, "DRTY").filter((f) => f.extension === "acds" || f.extension === "asdrty")) {
       const parsed = parseCdsTypeSource(file.content);
       for (const issue of parsed.issues) {
         diagnostics.add(issue.severity, issue.code, issue.message, { file: file.path, line: issue.line, column: issue.column });

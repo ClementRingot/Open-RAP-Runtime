@@ -18,7 +18,6 @@ dans [FEATURES.md](FEATURES.md), les écarts assumés dans [KNOWN_GAPS.md](../KN
 
 - Expressions CDS : `CAST` vers un type CDS ou un type énuméré, constantes `Type.#CONST` dans les
   vues.
-- XML abapGit des objets DRTY écrit par `rapt abapgit`.
 
 ## Autres pistes
 

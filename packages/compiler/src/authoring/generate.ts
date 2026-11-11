@@ -25,8 +25,8 @@ export const OBJECT_KINDS = {
   abstract: "CDS abstract entity, e.g. an action parameter (.ddls.asddls)",
   custom: "CDS custom entity and its query class (.ddls.asddls, .clas.abap)",
   tableentity: "CDS table entity: a table and its entity, the persistence of a BO (.ddls.asddls)",
-  type: "CDS simple type (.drty.asdrty)",
-  enum: "CDS enumerated type (.drty.asdrty)",
+  type: "CDS simple type (.drty.acds)",
+  enum: "CDS enumerated type (.drty.acds)",
   metadata: "metadata extension (UI annotations) of an entity (.ddlx.asddlxs)",
   access: "access control (DCL) of an entity (.dcls.asdcls)",
   behavior: "behavior definition of a root view or projection (.bdef.asbdef)",
@@ -545,10 +545,10 @@ export function generateObject(dir: string, kind: string, name: string, options:
       files.push([`${lower}.ddls.asddls`, tableEntitySource(name, options.root === true, description)]);
       break;
     case "type":
-      files.push([`${lower}.drty.asdrty`, simpleTypeSource(name, description)]);
+      files.push([`${lower}.drty.acds`, simpleTypeSource(name, description)]);
       break;
     case "enum":
-      files.push([`${lower}.drty.asdrty`, enumTypeSource(name, description)]);
+      files.push([`${lower}.drty.acds`, enumTypeSource(name, description)]);
       break;
     case "custom": {
       const query = options.for ?? `zcl_${lower.replace(/^[zy]_?/, "")}_query`.slice(0, 30);

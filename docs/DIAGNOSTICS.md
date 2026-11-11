@@ -36,7 +36,7 @@ Le code de retour est 1 dès qu'il y a une erreur (ou un avertissement avec
 | CDS019 | erreur | Nom de table entity de plus de 25 caractères (D55) |
 | CDS020 | erreur | Élément de table entity : clé `null`, clé après un élément non clé, `abap.string` ou `abap.rawstring` sans `null` (D55) |
 | CDS021 | erreur | Élément de type énuméré CDS dans une entité exposée : SAP n'expose pas les types énumérés dans les services OData RAP. En mode `enhanced`, type énumération OData (D55) |
-| TYPE001 | erreur | Source d'un type CDS (`.drty.asdrty`) illisible, ou nom différent de celui du fichier (D55) |
+| TYPE001 | erreur | Source d'un type CDS (`.drty.acds`) illisible, ou nom différent de celui du fichier (D55) |
 | TYPE002 | erreur | Type CDS fondé sur un type inconnu (D55) |
 | TYPE003 | erreur | Type énuméré CDS incorrect : type de base (`abap.int1`, `int2`, `int4`, `char(1..8)`, `numc(1..8)`), pas exactement une constante `initial`, valeur hors du type de base, constantes ou valeurs en double (D55) |
 | DDIC001 | erreur | Élément de données inconnu |

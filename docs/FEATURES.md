@@ -179,7 +179,7 @@ ajoutent ce que la fixture n'utilise pas : numérotation, feature control global
 | Vues standards `I_Currency`, `I_UnitOfMeasure`, `I_Country`, `I_Language` et leurs textes | ✅ | Ajoutées quand une source les nomme, avec leurs données de référence (D44). |
 | Value helps (`@Consumption.valueHelpDefinition`) | ✅ | Entité et vue de textes exposées implicitement en lecture seule, `Common.ValueList` (D44). |
 | Table entities (`define [root] table entity`) | ✅ | Table et view entity ; persistance implicite d'un BO managed ; `null`, clés, associations, compositions (D55). |
-| Types simples CDS (`define type x : abap.char(40);`) | ✅ | Objets DRTY (`.drty.asdrty`) : type et libellé des éléments (D55). |
+| Types simples CDS (`define type x : abap.char(40);`) | ✅ | Objets DRTY (`.drty.acds`) : type et libellé des éléments (D55). |
 | Types énumérés CDS (`define type x : abap.char(1) enum { … }`) | ✅ | Valeurs de base en base ; constantes utilisables dans le behavior pool. Exposition OData : refusée en mode `standard` comme sur SAP (CDS021), `EnumType` en mode `enhanced` (D55). |
 | Vues standards `I_Region`, `I_CalendarDate`, `I_TimeZone`, `I_BusinessUserBasic`, `I_ExchangeRate` | ✅ | Calendrier généré, utilisateurs de l'IdP enregistrés à la connexion, taux de change à maintenir (D44). |
 | Expressions CDS (CASE, CAST, calculs, littéraux) | ❌ | Prévu après le MVP. |

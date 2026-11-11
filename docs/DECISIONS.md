@@ -1067,7 +1067,7 @@ et la conséquence. Les numéros D1 à D13 correspondent aux points 1 à 13 du �
   DRTY) : types simples et types énumérés (`enum`). SAP n'expose pas les types énumérés dans les
   services OData RAP (« Development Constraints » de RAP).
 - **Décision** :
-  - **Types CDS** (`<nom>.drty.asdrty`, lus par rap-transpiler : abaplint connaît l'objet sans
+  - **Types CDS** (`<nom>.drty.acds`, lus par rap-transpiler : abaplint connaît l'objet sans
     l'analyser) : un type simple vaut son type de base (type intégré, élément de données ou autre
     type CDS), avec son libellé ; un type énuméré a un type de base (`abap.int1`, `int2`, `int4`,
     `char(1..8)`, `numc(1..8)`), exactement une constante `initial`, des constantes et des
@@ -1088,8 +1088,10 @@ et la conséquence. Les numéros D1 à D13 correspondent aux points 1 à 13 du �
     `$filter` accepte `Status eq 'OPEN'`, `Ns.Type'OPEN'` et la valeur entière ; une valeur hors
     du type est refusée (400). L'UI affiche les libellés et propose une liste de choix (OpenUI5 ne
     sait pas écrire les littéraux d'énumération : le filtre passe par `$filter`).
-  - `rapt generate tableentity|type|enum`, DDLS de type `T` pour `rapt abapgit` ; le XML des
-    objets DRTY s'écrit dans ADT.
+  - `rapt generate tableentity|type|enum`, DDLS de type `T` pour `rapt abapgit`. Un type CDS est
+    un objet au format AFF d'abapGit (dépôt SAP/abap-file-formats) : la source `<nom>.drty.acds`
+    et ses métadonnées `<nom>.drty.json` (`formatVersion`, description, langue), écrites par
+    `rapt abapgit` (`.drty.asdrty` reste lu).
 - **Pourquoi** : la table entity est un BO complet en deux fichiers ; les types énumérés donnent
   des valeurs nommées à l'API sans changer le stockage. Le mode `standard` reste activable sur SAP,
   l'exposition en énumération est une extension (D45).

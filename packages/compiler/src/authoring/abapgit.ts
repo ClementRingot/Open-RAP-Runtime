@@ -53,6 +53,11 @@ const DEFAULT_DOT_ABAPGIT = `<?xml version="1.0" encoding="utf-8"?>
 
 const truncate = (text: string): string => (text.length > DESCRIPTION_LIMIT ? text.slice(0, DESCRIPTION_LIMIT) : text);
 
+/** The AFF metadata of a CDS type (DRTY): `<name>.drty.json`, format of SAP/abap-file-formats. */
+export function drtyJson(description: string): string {
+  return `${JSON.stringify({ formatVersion: "1", header: { description: truncate(description), originalLanguage: "en" } }, null, 2)}\n`;
+}
+
 /** `@EndUserText.label: '…'` before the definition. */
 export function cdsLabel(source: string): string | undefined {
   const header = source.split(/\bdefine\b|\bannotate\b|\bextend\b/i)[0] ?? source;
@@ -273,6 +278,15 @@ export function generateAbapGitFiles(dir: string, options: AbapGitOptions = {}):
     }
     const main = files[0];
     if (main === undefined) {
+      continue;
+    }
+    if (type === "DRTY") {
+      // a CDS type is an ABAP file format object (AFF): <name>.drty.acds and <name>.drty.json (D55)
+      if (!files.some((f) => f.extension === "json")) {
+        const source = files.find((f) => f.extension === "acds" || f.extension === "asdrty");
+        const baseName = main.fileName.split(".")[0] ?? name.toLowerCase();
+        write(relative(path.join(path.dirname(main.absolute), `${baseName}.drty.json`)), drtyJson(cdsLabel(source?.content ?? "") ?? name));
+      }
       continue;
     }
     const xml = objectXml(type, name, files);

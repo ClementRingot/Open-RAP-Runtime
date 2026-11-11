@@ -153,7 +153,7 @@ define root table entity ZRT_ORDER
 }
 ```
 
-Les types CDS sont des sources `<nom>.drty.asdrty` :
+Les types CDS sont des sources `<nom>.drty.acds` (format AFF d'abapGit, métadonnées `<nom>.drty.json` écrites par `rapt abapgit`) :
 
 ```cds
 @EndUserText.label: 'Order status'
