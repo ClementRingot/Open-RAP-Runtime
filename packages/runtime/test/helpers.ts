@@ -334,3 +334,23 @@ export function testLaunchpad(appDir: string, appUrl: string): { config: Launchp
   writeFiles(path.join(work, "ui"), generateLaunchpadUi(resolution.model));
   return { config: resolution.model, uiDir: path.join(work, "ui") };
 }
+
+/** The Travel fixture as a draft BO (D54): `with draft`, draft tables, draft actions. */
+export const DRAFT_CHANGES: Record<string, (content: string) => string> = {
+  "zrt_r_travel.bdef.asbdef": (c) =>
+    edit(c, [
+      ["strict ( 2 );", "strict ( 2 );\nwith draft;"],
+      ["persistent table zrt_travel", "persistent table zrt_travel\ndraft table zrt_d_travel"],
+      ["etag master LocalLastChangedAt\n{\n  create;", "etag master LocalLastChangedAt\ntotal etag LastChangedAt\n{\n  create;"],
+      ["  association _Booking { create; }", "  association _Booking { create; with draft; }\n\n  draft action Edit;\n  draft action Activate optimized;\n  draft action Discard;\n  draft action Resume;\n  draft determine action Prepare { validation validateDates; validation validateMandatory; }"],
+      ["persistent table zrt_booking", "persistent table zrt_booking\ndraft table zrt_d_booking"],
+      ["  association _Travel;\n\n  field ( numbering", "  association _Travel { with draft; }\n\n  field ( numbering"],
+    ]),
+  "zrt_c_travel.bdef.asbdef": (c) =>
+    edit(c, [
+      ["strict ( 2 );", "strict ( 2 );\nuse draft;"],
+      ["  use action copyTravel;", "  use action copyTravel;\n\n  use action Edit;\n  use action Activate;\n  use action Discard;\n  use action Resume;\n  use action Prepare;"],
+      ["  use association _Booking { create; }", "  use association _Booking { create; with draft; }"],
+      ["  use association _Travel;", "  use association _Travel { with draft; }"],
+    ]),
+};

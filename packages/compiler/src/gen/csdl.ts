@@ -613,6 +613,19 @@ class CsdlBuilder {
       // etag dependent by: the ETag property of the master, through the to-one navigations
       children.push(annotation("Core.OptimisticConcurrency", {}, collection(propertyPath([...type.etagPath.navigations, type.etagPath.property].join("/")))));
     }
+    // draft (D54): the root and the nodes of a draft BO, with the actions of the draft
+    if (set.draft?.root === true) {
+      const action = (name: string): string => `${this.service.namespace}.${name}`;
+      children.push(
+        annotation(
+          "Common.DraftRoot",
+          {},
+          record("Common.DraftRootType", pv("ActivationAction", { String: action("Activate") }), pv("EditAction", { String: action("Edit") }), pv("PreparationAction", { String: action("Prepare") }), pv("DiscardAction", { String: action("Discard") }), pv("ResumeAction", { String: action("Resume") })),
+        ),
+      );
+    } else if (set.draft !== undefined) {
+      children.push(annotation("Common.DraftNode", {}, record("Common.DraftNodeType", pv("PreparationAction", { String: `${this.service.namespace}.Prepare` }))));
+    }
     this.annotations(`${SCHEMA_ALIAS}.${CONTAINER_NAME}/${set.name}`, children);
   }
 

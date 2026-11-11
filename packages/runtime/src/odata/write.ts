@@ -33,11 +33,12 @@ import { badRequest, methodNotAllowed, notFound, ODataError, type ODataMessage, 
 import { ChangesetFailure, errorResponse, jsonResponse, sapMessagesHeader, toPart, type HandlerContext, type ODataRequest, type ODataResponse, type Target, type WriteHandler } from "./handler.js";
 import { etagOf, etagValue, JsonWriter } from "./json.js";
 import type { ReadEngine } from "./read.js";
+import { DraftRuntime } from "./draft.js";
 import type { Key, ServiceRuntime, TypeInfo } from "./service.js";
 import type { QueryOptions } from "./uri/ast.js";
 
 /** An entity set and the managed entity behind it. */
-interface SetInfo {
+export interface SetInfo {
   info: TypeInfo;
   bo: BoEntity;
   /** OData property → base field. */
@@ -88,7 +89,7 @@ interface ChangesetState {
 }
 
 /** What a request did, to be rendered once the LUW is committed. */
-interface Outcome {
+export interface Outcome {
   status: number;
   /** The entity to return (read after the commit). */
   entity?: { set: SetInfo; key: Key };
@@ -103,15 +104,18 @@ interface Outcome {
 }
 
 export class RapWriteHandler implements WriteHandler {
-  private readonly sets = new Map<string, SetInfo>();
+  public readonly sets = new Map<string, SetInfo>();
   private readonly json: JsonWriter;
   private servicePath = "/";
 
+  /** The drafts of the draft BOs (D54). */
+  private readonly drafts: DraftRuntime | undefined;
+
   public constructor(
-    private readonly service: ServiceRuntime,
+    public readonly service: ServiceRuntime,
     private readonly read: ReadEngine,
     private readonly db: Kysely<unknown>,
-    private readonly rap: RapRuntime,
+    public readonly rap: RapRuntime,
   ) {
     this.json = new JsonWriter(service, read);
     const model = service.model;
@@ -130,13 +134,14 @@ export class RapWriteHandler implements WriteHandler {
       }
       this.sets.set(info.set.name, { info, bo, toBase, toProperty });
     }
+    this.drafts = [...this.sets.values()].some((s) => s.info.set.draft !== undefined) ? new DraftRuntime(this) : undefined;
   }
 
   public setServicePath(path: string): void {
     this.servicePath = path;
   }
 
-  private setInfo(info: TypeInfo): SetInfo {
+  public setInfo(info: TypeInfo): SetInfo {
     const set = this.sets.get(info.set.name);
     if (set === undefined) {
       throw methodNotAllowed(`${info.set.name} is read-only`);
@@ -149,23 +154,27 @@ export class RapWriteHandler implements WriteHandler {
     return [...this.sets.values()].find((s) => same(s.bo.entity.name, entity));
   }
 
-  private baseKey(set: SetInfo, key: Key): Row {
+  public baseKey(set: SetInfo, key: Key): Row {
     const row: Row = {};
     for (const [property, value] of Object.entries(key)) {
+      if (set.info.properties.get(property)?.field.draft === true) {
+        continue; // IsActiveEntity (D54): not a field of the business object
+      }
       row[set.toBase.get(property) ?? property] = value;
     }
     return row;
   }
 
-  private projectedKey(set: SetInfo, key: Row): Key {
+  public projectedKey(set: SetInfo, key: Row): Key {
     const result: Key = {};
     for (const name of set.info.type.keys) {
-      result[name] = key[set.toBase.get(name) ?? name] ?? null;
+      // IsActiveEntity (D54): an instance of the business object is active, unless the key says so
+      result[name] = set.info.properties.get(name)?.field.draft === true ? (key[name] ?? true) : (key[set.toBase.get(name) ?? name] ?? null);
     }
     return result;
   }
 
-  private path(set: SetInfo, key: Key): string {
+  public path(set: SetInfo, key: Key): string {
     return `${set.info.set.name}${this.service.keyPredicate(set.info, key)}`;
   }
 
@@ -263,6 +272,11 @@ export class RapWriteHandler implements WriteHandler {
     const last = segments[segments.length - 1];
     const minimal = /return=minimal/i.test(request.headers["prefer"] ?? "");
     const outcome = (status: number): Outcome => ({ status, messages: [], options, minimal });
+    // drafts and the actions of the draft (D54); active instances go on below
+    const draft = this.drafts === undefined ? undefined : await this.drafts.route(tx, request, target, ctx, minimal);
+    if (draft !== undefined) {
+      return draft;
+    }
     const resolved = await this.resolve(tx, segments);
 
     if (last?.kind === "operation") {
@@ -342,7 +356,7 @@ export class RapWriteHandler implements WriteHandler {
   }
 
   /** Determinations on modify at the end of a request (D21). */
-  private async determine(tx: Transaction, previous: Responses): Promise<void> {
+  public async determine(tx: Transaction, previous: Responses): Promise<void> {
     const responses = await tx.determineOnModify();
     previous.reported.push(...responses.reported);
     if (responses.hasFailed) {
@@ -405,7 +419,7 @@ export class RapWriteHandler implements WriteHandler {
   }
 
   /** Properties of a request body → base values and the fields given. */
-  private values(set: SetInfo, body: Record<string, unknown>, replace: boolean): { values: Row; fields: Set<string>; navigations: Map<string, unknown> } {
+  public values(set: SetInfo, body: Record<string, unknown>, replace: boolean): { values: Row; fields: Set<string>; navigations: Map<string, unknown> } {
     const values: Row = {};
     const fields = new Set<string>();
     const navigations = new Map<string, unknown>();
@@ -417,6 +431,9 @@ export class RapWriteHandler implements WriteHandler {
         continue; // instance feature control sent back by clients
       }
       const property = set.info.properties.get(name);
+      if (property?.field.draft === true) {
+        continue; // IsActiveEntity, HasDraftEntity… sent back by clients (D54)
+      }
       if (property === undefined) {
         if (set.info.navigations.has(name)) {
           navigations.set(name, value);
@@ -486,7 +503,7 @@ export class RapWriteHandler implements WriteHandler {
     }
   }
 
-  private associationOf(set: SetInfo, navigation: string): NonNullable<ReturnType<RapRuntime["bo"]["association"]>> {
+  public associationOf(set: SetInfo, navigation: string): NonNullable<ReturnType<RapRuntime["bo"]["association"]>> {
     const projected = set.info.entity.associations.find((a) => a.name === navigation);
     const association = this.rap.bo.association(set.bo, projected?.baseAssociation ?? navigation);
     if (association === undefined) {
@@ -665,14 +682,14 @@ export class RapWriteHandler implements WriteHandler {
   // -------------------------------------------------------------------------------------------
   // responses
 
-  private failIf(responses: Responses, set: SetInfo, key: Key | undefined): void {
+  public failIf(responses: Responses, set: SetInfo, key: Key | undefined): void {
     if (responses.hasFailed) {
       throw this.error(responses, key === undefined ? undefined : { set, key: this.baseKey(set, key) });
     }
   }
 
   /** Messages of the RAP responses, with their OData targets. */
-  private messages(reported: ReportedEntry[], resource: { set: SetInfo; key: Row } | undefined, severities = new Set(["S", "I", "W", " "])): ODataMessage[] {
+  public messages(reported: ReportedEntry[], resource: { set: SetInfo; key: Row } | undefined, severities = new Set(["S", "I", "W", " "])): ODataMessage[] {
     return reported
       .filter((r) => severities.has(r.message.severity))
       .map((r) => {
@@ -704,7 +721,7 @@ export class RapWriteHandler implements WriteHandler {
   }
 
   /** The OData error of failed RAP responses. */
-  private error(responses: Responses, resource: { set: SetInfo; key: Row } | undefined): ODataError {
+  public error(responses: Responses, resource: { set: SetInfo; key: Row } | undefined): ODataError {
     const failed = responses.failed[0] as FailedEntry;
     const errors = this.messages(responses.reported, resource, new Set(["E"]));
     const others = this.messages(responses.reported, resource);
@@ -799,9 +816,10 @@ export class RapWriteHandler implements WriteHandler {
   // -------------------------------------------------------------------------------------------
   // feature control of the rows read
 
-  public async enrich(info: TypeInfo, rows: Array<Record<string, unknown>>, options: QueryOptions, ctx: HandlerContext): Promise<void> {
+  public async enrich(info: TypeInfo, rowsRead: Array<Record<string, unknown>>, options: QueryOptions, ctx: HandlerContext): Promise<void> {
     const set = this.sets.get(info.set.name);
     const type = info.type;
+    let rows = rowsRead;
     if (set === undefined || rows.length === 0) {
       return;
     }
@@ -810,6 +828,17 @@ export class RapWriteHandler implements WriteHandler {
     const wantOperations = type.operationControl.length > 0 && selected(OPERATION_CONTROL);
     const wantFields = type.fieldControl.length > 0 && selected(FIELD_CONTROL);
     if (!wantEntity && !wantOperations && !wantFields) {
+      return;
+    }
+    // drafts (D54): edited by their user, actions after the activation
+    const drafts = rows.filter((row) => row["IsActiveEntity"] === false);
+    for (const row of drafts) {
+      if (wantEntity) row[ENTITY_CONTROL] = { Updatable: true, Deletable: true };
+      if (wantOperations) row[OPERATION_CONTROL] = Object.fromEntries(type.operationControl.map((name) => [name, info.navigations.has(name)]));
+      if (wantFields) row[FIELD_CONTROL] = Object.fromEntries(type.fieldControl.map((p) => [p, type.properties.find((x) => x.name === p)?.mandatory === true ? 7 : 3]));
+    }
+    rows = rows.filter((row) => row["IsActiveEntity"] !== false);
+    if (rows.length === 0) {
       return;
     }
     const keys = rows.map((row) => this.baseKey(set, Object.fromEntries(type.keys.map((k) => [k, (row[k] ?? null) as CanonicalValue]))));

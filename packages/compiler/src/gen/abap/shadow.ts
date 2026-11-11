@@ -148,7 +148,7 @@ export function shadowEntity(entity: EntityModel): ShadowFile {
   return shadowTable({
     name: entity.name.toLowerCase(),
     description: `CDS entity ${entity.name}`,
-    columns: entity.fields.map((f) => ({ name: f.name.toLowerCase(), type: f.type, key: f.key, notNull: false, client: false })),
+    columns: entity.fields.filter((f) => f.draft !== true).map((f) => ({ name: f.name.toLowerCase(), type: f.type, key: f.key, notNull: false, client: false })),
     ...(entity.kind === "abstract" ? { structure: true } : {}),
   });
 }

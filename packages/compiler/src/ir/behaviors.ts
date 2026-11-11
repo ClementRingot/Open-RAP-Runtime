@@ -32,6 +32,9 @@ const FIELD_CHARACTERISTICS: Record<string, FieldCharacteristic> = {
   suppress: "suppress",
 };
 
+/** The actions of a draft BO, provided by the runtime (D54). */
+export const DRAFT_ACTIONS = new Set(["edit", "activate", "discard", "resume", "prepare"]);
+
 export interface BehaviorContext {
   diagnostics: Diagnostics;
   dictionary: Dictionary;
@@ -77,14 +80,14 @@ export function buildBehavior(name: string, ast: BdefAst, file: SourceFile, ctx:
         behavior.strict = header.version;
         break;
       case "withDraft":
-        diagnostics.error("BDEF002", "draft (with draft) is out of scope", at(header.loc));
+        behavior.draft = true;
         break;
       case "privilegedMode":
         behavior.privilegedMode = true;
         break;
       case "use":
         if (header.what.includes("draft")) {
-          diagnostics.error("BDEF002", "draft (use draft) is out of scope", at(header.loc));
+          behavior.draft = true;
         } else {
           diagnostics.warning("BDEF003", `use ${header.what} is ignored`, at(header.loc));
         }
@@ -218,10 +221,10 @@ function buildEntityBehavior(
         break;
       }
       case "totalEtag":
-        diagnostics.warning("BDEF003", "total etag is only used by draft BOs and is ignored", at(option.loc));
+        // the ETag of the draft: the change time of the draft, kept by the runtime (D54)
         break;
       case "draftTable":
-        diagnostics.error("BDEF002", "draft (draft table) is out of scope", at(option.loc));
+        model.draftTable = option.table.text.toLowerCase();
         break;
       case "earlyNumbering":
         model.earlyNumbering = true;
@@ -374,9 +377,6 @@ function buildItem(
       if (name === undefined) {
         return;
       }
-      if (item.withDraft) {
-        diagnostics.error("BDEF002", "draft (with draft) is out of scope", at(item.loc));
-      }
       const createFeatures = item.create === undefined ? { precheck: false } : features(item.create.options, at, ctx, `association ${name} create`);
       const association: BehaviorAssociationModel = {
         name,
@@ -497,6 +497,9 @@ function buildItem(
       return;
     }
     case "useAction": {
+      if (DRAFT_ACTIONS.has(item.name.text.toLowerCase())) {
+        return; // use action Edit, Activate… of a draft BO: the actions of the draft (D54)
+      }
       model.actions.push({ name: item.name.text, kind: item.actionKind, static: false, factory: false, internal: false, precheck: false, use: true, src: at(item.loc) });
       if (item.alias !== undefined) {
         diagnostics.warning("BDEF003", `use ${item.actionKind} ${item.name.text} as ${item.alias.text}: the alias is ignored`, at(item.loc));
@@ -537,7 +540,10 @@ function buildItem(
     }
     case "unsupported":
       if (item.what === "draft") {
-        diagnostics.error("BDEF002", `draft is out of scope: ${item.text}`, at(item.loc));
+        // draft action Edit, Activate, Discard, Resume; draft determine action Prepare (D54)
+        if (!/^draft\s+(determine\s+)?action\s+(Edit|Activate|Discard|Resume|Prepare)\b/i.test(item.text)) {
+          diagnostics.warning("BDEF003", `draft statement ignored: ${item.text}`, at(item.loc));
+        }
       } else {
         diagnostics.warning("BDEF003", `${item.what} is not supported yet and is ignored: ${item.text}`, at(item.loc));
       }

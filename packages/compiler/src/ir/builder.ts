@@ -7,8 +7,11 @@ import {
   sqlName,
   type BehaviorModel,
   type EntityModel,
+  baseEntityOf,
+  findEntity,
   getAnnotation,
   getArray,
+  type FieldModel,
   type Model,
   type ServiceModel,
   type UiConfigModel,
@@ -301,12 +304,85 @@ export function buildModel(project: Project, options: BuildOptions = {}): BuildR
     ...(numberRanges === undefined ? {} : { numberRanges }),
     ...(services === undefined ? {} : { services }),
   };
+  applyDraft(model, diagnostics);
   // access controls (DCL) of the exposed entities (D35)
   const accessControls = loadAccessControls(project, model, authorizations, diagnostics);
   if (accessControls.length > 0) {
     model.accessControls = accessControls;
   }
   return diagnostics.hasErrors() ? { diagnostics, model } : { diagnostics, model };
+}
+
+/** The entity of the administrative data of the drafts (D54), a table of the runtime. */
+export const DRAFT_ADMIN_ENTITY = "DraftAdministrativeData";
+export const DRAFT_ADMIN_TABLE = "rapt_draft_admin";
+
+/**
+ * Draft (D54): each exposed entity of a draft BO gets the key IsActiveEntity, HasActiveEntity,
+ * HasDraftEntity and DraftUUID (to DraftAdministrativeData), its compositions join on
+ * IsActiveEntity too, and it is read from a view of its active instances and its drafts.
+ */
+function applyDraft(model: Model, diagnostics: Diagnostics): void {
+  const drafted = new Map<string, { table: string; root: boolean }>();
+  for (const behavior of model.behaviors.filter((b) => b.implementationType === "managed" && b.draft === true)) {
+    for (const entity of behavior.entities) {
+      if (entity.draftTable === undefined) {
+        diagnostics.error("BDEF028", `${entity.entity}: a draft BO needs a draft table for each entity (draft table <name>)`, entity.src);
+        continue;
+      }
+      if (entity.persistentTable === undefined) {
+        diagnostics.error("BDEF028", `${entity.entity}: draft needs a persistent table (not an unmanaged save)`, entity.src);
+        continue;
+      }
+      drafted.set(entity.entity.toUpperCase(), { table: entity.draftTable, root: entity.root });
+    }
+  }
+  if (drafted.size === 0) {
+    return;
+  }
+  const exposed = model.service.entitySets.map((set) => findEntity(model, set.entity)).filter((e): e is EntityModel => e !== undefined);
+  const isDrafted = (entity: EntityModel): boolean => drafted.has(baseEntityOf(model, entity).name.toUpperCase());
+  const bool: FieldModel["type"] = { kind: "bool" };
+  for (const entity of exposed.filter(isDrafted)) {
+    const base = baseEntityOf(model, entity);
+    const info = drafted.get(base.name.toUpperCase()) as { table: string; root: boolean };
+    const hidden = { ui: { hidden: true } };
+    entity.fields.push(
+      { name: "IsActiveEntity", type: bool, key: true, annotations: { endusertext: { label: "Is Active" }, ...hidden }, draft: true },
+      { name: "HasActiveEntity", type: bool, key: false, annotations: { endusertext: { label: "Has Active" }, ...hidden }, draft: true },
+      { name: "HasDraftEntity", type: bool, key: false, annotations: { endusertext: { label: "Has Draft" }, ...hidden }, draft: true },
+      { name: "DraftUUID", type: { kind: "raw", length: 16 }, key: false, annotations: { endusertext: { label: "Draft" }, ...hidden }, draft: true },
+    );
+    for (const association of entity.associations) {
+      const target = exposed.find((e) => same(e.name, association.target));
+      if ((association.kind === "composition" || association.kind === "toParent") && target !== undefined && isDrafted(target)) {
+        association.on.push({ source: "IsActiveEntity", target: "IsActiveEntity" });
+      }
+    }
+    entity.associations.push({ name: DRAFT_ADMIN_ENTITY, target: DRAFT_ADMIN_ENTITY, kind: "association", cardinality: { min: 0, max: 1 }, on: [{ source: "DraftUUID", target: "DraftUUID" }] });
+    entity.draft = { view: `${entity.sqlView ?? sqlName(entity.name)}_all`.slice(0, 63), table: info.table, base: base.name, root: info.root };
+  }
+  const text = (length: number): FieldModel["type"] => ({ kind: "char", length });
+  const stamp: FieldModel["type"] = { kind: "timestampl" };
+  const label = (l: string): FieldModel["annotations"] => ({ endusertext: { label: l } });
+  model.entities.push({
+    name: DRAFT_ADMIN_ENTITY,
+    kind: "view",
+    root: false,
+    sqlView: DRAFT_ADMIN_TABLE,
+    fields: [
+      { name: "DraftUUID", type: { kind: "raw", length: 16 }, key: true, annotations: label("Draft") },
+      { name: "CreationDateTime", type: stamp, key: false, annotations: label("Draft Created On") },
+      { name: "CreatedByUser", type: text(12), key: false, annotations: label("Draft Created By") },
+      { name: "LastChangeDateTime", type: stamp, key: false, annotations: label("Draft Last Changed On") },
+      { name: "LastChangedByUser", type: text(12), key: false, annotations: label("Draft Last Changed By") },
+      { name: "InProcessByUser", type: text(12), key: false, annotations: label("Draft In Process By") },
+    ],
+    associations: [],
+    annotations: label("Draft Administrative Data"),
+    draft: { admin: true },
+  });
+  model.service.entitySets.push({ name: DRAFT_ADMIN_ENTITY, entity: DRAFT_ADMIN_ENTITY, draftAdministrativeData: true });
 }
 
 /** The ON pairs of projection associations name the target fields as the target projection does. */

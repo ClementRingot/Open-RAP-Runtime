@@ -70,6 +70,8 @@ export class Responses {
 
 /** The mode of an EML statement or of an OData request. */
 export interface AccessMode {
+  /** Activation of a draft (D54): the keys of the draft are kept, managed numbering included. */
+  keepKeys?: boolean;
   /** IN LOCAL MODE: no authorization and feature control checks, read-only fields writable. */
   local: boolean;
   /** PRIVILEGED: no authorization checks. */

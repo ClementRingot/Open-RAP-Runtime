@@ -570,9 +570,17 @@ export class Transaction {
       if (early !== undefined) {
         Object.assign(row, early);
       }
+      if (mode.keepKeys === true) {
+        for (const key of bo.keys) {
+          if (request.values[key.name] !== undefined && request.values[key.name] !== null) {
+            row[key.name] = request.values[key.name] ?? null;
+            changed.add(key.name);
+          }
+        }
+      }
       for (const field of bo.fields) {
         const characteristics = this.bo.characteristics(bo, field.name);
-        if (characteristics.includes("numberingManaged") && (isInitial(field.type, row[field.name]) || !mode.local)) {
+        if (characteristics.includes("numberingManaged") && (isInitial(field.type, row[field.name]) || (!mode.local && mode.keepKeys !== true))) {
           row[field.name] = randomUUID();
           changed.add(field.name);
         }

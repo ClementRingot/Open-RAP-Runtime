@@ -8,12 +8,14 @@
 import {
   ABAP_SQL_SCHEMA,
   baseEntityOf,
+  baseFieldOf,
   findEntityBehavior,
   isUuid,
   same,
   type AbapType,
   type ColumnModel,
   type EntityModel,
+  type FieldModel,
   type Model,
   type TableModel,
 } from "@rap-transpiler/model";
@@ -185,7 +187,7 @@ function foreignKeys(model: Model): string[] {
 function orderedViews(model: Model): EntityModel[] {
   const result: EntityModel[] = [];
   const visit = (entity: EntityModel, stack: Set<string>): void => {
-    if (result.includes(entity) || stack.has(entity.name) || entity.sqlView === undefined) {
+    if (result.includes(entity) || stack.has(entity.name) || entity.sqlView === undefined || (entity.draft !== undefined && "admin" in entity.draft)) {
       return;
     }
     stack.add(entity.name);
@@ -205,7 +207,7 @@ function createView(model: Model, entity: EntityModel): string {
   const source = entity.source ?? "";
   const sourceEntity = model.entities.find((e) => same(e.name, source));
   const from = sourceEntity?.sqlView ?? source.toLowerCase();
-  const columns = entity.fields.map((field) => {
+  const columns = entity.fields.filter((field) => field.draft !== true).map((field) => {
     const expression = sourceEntity === undefined ? field.column ?? field.name.toLowerCase() : field.baseField ?? field.name;
     return `  ${quoteIdentifier(expression)} AS ${quoteIdentifier(field.name)}`;
   });
@@ -387,7 +389,7 @@ function abapSqlSchema(model: Model, views: EntityModel[]): string[] {
     if (tables.has(entity.name.toLowerCase())) {
       continue;
     }
-    const columns = entity.fields.map((f) => ({ expression: quoteIdentifier(f.name), type: f.type, name: f.name }));
+    const columns = entity.fields.filter((f) => f.draft !== true).map((f) => ({ expression: quoteIdentifier(f.name), type: f.type, name: f.name }));
     statements.push(abapSqlViewStatement(entity.name, columns, entity.sqlView ?? ""));
   }
   return statements;
@@ -411,8 +413,73 @@ export function generateSql(model: Model): SqlOutput {
   const drop = views.length === 0 ? "" : `DROP VIEW IF EXISTS ${[...views].reverse().map((v) => quoteIdentifier(v.sqlView ?? "")).join(", ")} CASCADE;\n`;
   const viewStatements = views.map((v) => createView(model, v));
   const abapSql = abapSqlSchema(model, views);
-  const schema = [header, "-- tables", ...tables, ...standardData(model), "-- compositions", ...foreignKeys(model), ...[frameworkTables(model)].filter((t) => t !== ""), "-- CDS views", drop, ...viewStatements, "-- ABAP SQL of the behavior pools (values in ABAP form)", ...abapSql].join("\n");
+  const schema = [header, "-- tables", ...tables, ...standardData(model), "-- compositions", ...foreignKeys(model), ...[frameworkTables(model)].filter((t) => t !== ""), ...draftTables(model), "-- CDS views", drop, ...viewStatements, ...draftViews(model), "-- ABAP SQL of the behavior pools (values in ABAP form)", ...abapSql].join("\n");
   return { schema, tables: model.tables.map((t) => t.name), views: views.map((v) => v.sqlView ?? "") };
+}
+
+/**
+ * Draft (D54): one table per entity of a draft BO (its elements, named as in the base view, and the
+ * draft columns), and the administrative data of the drafts.
+ */
+function draftTables(model: Model): string[] {
+  const statements: string[] = [];
+  const done = new Set<string>();
+  for (const behavior of model.behaviors.filter((b) => b.implementationType === "managed" && b.draft === true)) {
+    for (const entityBehavior of behavior.entities) {
+      const entity = model.entities.find((e) => same(e.name, entityBehavior.entity));
+      if (entity === undefined || entityBehavior.draftTable === undefined || done.has(entityBehavior.draftTable)) {
+        continue;
+      }
+      done.add(entityBehavior.draftTable);
+      const lines = entity.fields
+        .filter((f) => f.draft !== true)
+        .map((f) => `  ${columnDefinition({ name: f.name, type: f.type, key: f.key, notNull: f.key, client: false })}`);
+      lines.push('  "DraftUUID" uuid NOT NULL', '  "HasActiveEntity" boolean NOT NULL DEFAULT false', '  "DraftEntityCreationDateTime" timestamptz(6) NOT NULL DEFAULT now()', '  "DraftEntityLastChangeDateTime" timestamptz(6) NOT NULL DEFAULT now()');
+      lines.push(`  PRIMARY KEY (${entity.fields.filter((f) => f.key && f.draft !== true).map((f) => quoteIdentifier(f.name)).join(", ")})`);
+      statements.push(`CREATE TABLE IF NOT EXISTS ${quoteIdentifier(entityBehavior.draftTable)} (\n${lines.join(",\n")}\n);\nCREATE INDEX IF NOT EXISTS ${quoteIdentifier(`${entityBehavior.draftTable}_draft_idx`)} ON ${quoteIdentifier(entityBehavior.draftTable)} ("DraftUUID");\n`);
+    }
+  }
+  if (statements.length > 0) {
+    statements.unshift("-- drafts (D54)");
+    statements.push(`CREATE TABLE IF NOT EXISTS "rapt_draft_admin" (
+  "DraftUUID" uuid PRIMARY KEY,
+  "CreationDateTime" timestamptz(6) NOT NULL DEFAULT now(),
+  "CreatedByUser" varchar(12) NOT NULL DEFAULT '',
+  "LastChangeDateTime" timestamptz(6) NOT NULL DEFAULT now(),
+  "LastChangedByUser" varchar(12) NOT NULL DEFAULT '',
+  "InProcessByUser" varchar(12) NOT NULL DEFAULT '',
+  "RootEntity" text NOT NULL DEFAULT ''
+);
+`);
+  }
+  return statements;
+}
+
+/**
+ * Draft (D54): the view an exposed entity of a draft BO is read from, its active instances
+ * (IsActiveEntity true, HasDraftEntity when a draft exists) and its drafts (IsActiveEntity false).
+ */
+function draftViews(model: Model): string[] {
+  const statements: string[] = [];
+  for (const entity of model.entities) {
+    const draft = entity.draft;
+    if (draft === undefined || "admin" in draft) {
+      continue;
+    }
+    const fields = entity.fields.filter((f) => f.draft !== true);
+    const baseName = (f: FieldModel): string => baseFieldOf(model, entity, f)?.name ?? f.name;
+    const keys = fields.filter((f) => f.key);
+    const exists = keys.map((k) => `d.${quoteIdentifier(baseName(k))} = a.${quoteIdentifier(k.name)}`).join(" AND ");
+    statements.push(`CREATE VIEW ${quoteIdentifier(draft.view)} AS
+SELECT ${fields.map((f) => `a.${quoteIdentifier(f.name)}`).join(", ")}, TRUE AS "IsActiveEntity", FALSE AS "HasActiveEntity",
+  EXISTS (SELECT 1 FROM ${quoteIdentifier(draft.table)} d WHERE ${exists}) AS "HasDraftEntity", NULL::uuid AS "DraftUUID"
+FROM ${quoteIdentifier(entity.sqlView ?? "")} a
+UNION ALL
+SELECT ${fields.map((f) => `d.${quoteIdentifier(baseName(f))} AS ${quoteIdentifier(f.name)}`).join(", ")}, FALSE, d."HasActiveEntity", FALSE, d."DraftUUID"
+FROM ${quoteIdentifier(draft.table)} d;
+`);
+  }
+  return statements.length === 0 ? [] : ["-- active instances and drafts of the exposed entities (D54)", ...statements];
 }
 
 /**

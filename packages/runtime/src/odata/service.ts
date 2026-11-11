@@ -56,7 +56,8 @@ export class ServiceRuntime {
         type,
         set,
         entity,
-        view: entity.sqlView ?? "",
+        // draft (D54): the view of the active instances and the drafts
+        view: entity.draft !== undefined && !("admin" in entity.draft) ? entity.draft.view : (entity.sqlView ?? ""),
         properties,
         navigations: new Map(type.navigations.map((n) => [n.name, n])),
       };

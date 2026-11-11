@@ -225,7 +225,7 @@ class LayoutBuilder {
   }
 
   public build(): UiLayout {
-    const pages = this.service.entitySets.filter((s) => s.valueHelp !== true || this.model.ui?.overview?.cards.some((c) => c.entitySet === s.name) === true).map((set) => this.page(set.name)).filter((p): p is UiPage => p !== undefined);
+    const pages = this.service.entitySets.filter((s) => s.draftAdministrativeData !== true).filter((s) => s.valueHelp !== true || this.model.ui?.overview?.cards.some((c) => c.entitySet === s.name) === true).map((set) => this.page(set.name)).filter((p): p is UiPage => p !== undefined);
     const start = pages.find((p) => p.list !== undefined)?.set ?? pages[0]?.set ?? "";
     const root = pages.find((p) => p.set === start);
     const layout: UiLayout = {

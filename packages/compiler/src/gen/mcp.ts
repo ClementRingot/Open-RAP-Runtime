@@ -132,7 +132,7 @@ class ToolBuilder {
   public build(): void {
     for (const set of this.service.entitySets) {
       const type = this.service.entityTypes.find((t) => t.name === set.entityType);
-      if (type === undefined) continue;
+      if (type === undefined || set.draftAdministrativeData === true) continue;
       const { singular, plural } = this.names(type, set.name);
       const help = set.valueHelp === true ? " (value help)" : "";
       const filterable = type.properties.filter((p) => !p.name.startsWith("__")).map((p) => p.name).join(", ");

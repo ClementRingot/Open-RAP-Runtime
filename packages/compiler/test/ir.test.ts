@@ -126,9 +126,9 @@ describe("IR diagnostics", () => {
     expect(items.map((d) => `${d.severity} ${d.code} ${d.message}`)).toEqual(["error ABP002 no handler method FOR NUMBERING for Travel\\_Booking"]);
   });
 
-  it("rejects draft", () => {
+  it("needs a draft table for each entity of a draft BO (D54)", () => {
     const items = diagnosticsOf({ [bdef]: (c) => c.replace("strict ( 2 );", "strict ( 2 );\nwith draft;") });
-    expect(items).toContainEqual(expect.objectContaining({ code: "BDEF002", message: "draft (with draft) is out of scope", line: 3 }));
+    expect(items.map((d) => d.code)).toEqual(["BDEF028", "BDEF028"]);
   });
 
   it("checks the mapping against the CDS view and the table", () => {

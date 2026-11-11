@@ -84,6 +84,10 @@ export interface ODataEntitySet {
   searchFields: string[];
   /** Exposed implicitly as a value help (D44). */
   valueHelp?: true;
+  /** An entity set of a draft BO (D54). */
+  draft?: { root: boolean };
+  /** DraftAdministrativeData (D54). */
+  draftAdministrativeData?: true;
 }
 
 export interface ODataParameter {
@@ -107,6 +111,8 @@ export interface ODataOperation {
   factory: boolean;
   /** features : instance or global (instance actions) → Core.OperationAvailable through __OperationControl. */
   dynamic: boolean;
+  /** Edit, Activate, Prepare, Resume, Discard of a draft root (D54): run by the runtime. */
+  draft?: true;
 }
 
 export interface ODataComplexType {
@@ -271,7 +277,7 @@ export function buildODataService(model: Model): ODataService {
         edm,
         nullable: field.key ? false : isNullableType(edm),
         key: field.key,
-        computed: characteristics.includes("readonly") || characteristics.includes("numberingManaged"),
+        computed: field.draft === true || characteristics.includes("readonly") || characteristics.includes("numberingManaged"),
         immutable: characteristics.includes("readonlyUpdate"),
         mandatory: characteristics.includes("mandatory") || characteristics.includes("mandatoryCreate"),
         dynamic: characteristics.includes("featuresInstance"),
@@ -390,6 +396,31 @@ export function buildODataService(model: Model): ODataService {
       }
       service.operations.push(operation);
     }
+    // draft (D54): the actions of the draft of a root entity
+    const draft = entity.draft !== undefined && !("admin" in entity.draft) ? entity.draft : undefined;
+    if (draft?.root === true) {
+      const self = { type: typeName, entityType: true, collection: false, nullable: false };
+      const draftOperation = (name: string, returnType: ODataOperation["returnType"], parameters: ODataParameter[] = []): ODataOperation => ({
+        name,
+        kind: "action",
+        boundType: typeName,
+        collectionBound: false,
+        parameters,
+        behaviorEntity: behavior.baseEntity.name,
+        action: name,
+        factory: false,
+        dynamic: false,
+        draft: true,
+        ...(returnType === undefined ? {} : { returnType }),
+      });
+      service.operations.push(
+        draftOperation("Edit", self, [{ name: "PreserveChanges", edm: { type: "Edm.Boolean" }, nullable: true }]),
+        draftOperation("Activate", self),
+        draftOperation("Prepare", self),
+        draftOperation("Resume", self),
+        draftOperation("Discard", undefined),
+      );
+    }
     service.entityTypes.push(entityType);
     service.entitySets.push({
       name: set.name,
@@ -400,6 +431,8 @@ export function buildODataService(model: Model): ODataService {
       deletable: publicOperation(behavior, "delete"),
       searchable: getBoolean(entity.annotations, "Search.searchable") === true,
       searchFields: entity.fields.filter((f) => getBoolean(f.annotations, "Search.defaultSearchElement") === true).map((f) => f.name),
+      ...(draft === undefined ? {} : { draft: { root: draft.root } }),
+      ...(set.draftAdministrativeData === true ? { draftAdministrativeData: true as const } : {}),
       ...(set.valueHelp === true ? { valueHelp: true as const } : {}),
     });
   }

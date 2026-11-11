@@ -9,7 +9,7 @@ import type { Database } from "../db/database.js";
 import { fromSql, literalToCanonical, toSql, type CanonicalValue, type UrlLiteral } from "../values.js";
 import { badRequest, notImplemented, ODataError } from "./errors.js";
 import type { Cond, CustomQueries } from "./custom.js";
-import type { AccessControls } from "./access.js";
+import { currentReader, type AccessControls } from "./access.js";
 import { DEPENDENT_ETAG } from "./json.js";
 import type { Key, ServiceRuntime, TypeInfo } from "./service.js";
 import type { AggregateItem, ApplyStep, ExpandItem, Expr, OrderItem, QueryOptions } from "./uri/ast.js";
@@ -368,6 +368,11 @@ export class ReadEngine {
 
   private where(info: TypeInfo, alias: string, options: QueryOptions, extra: RawBuilder<unknown>[]): RawBuilder<unknown> {
     const conditions = [...extra];
+    // drafts (D54): the active instances, and the drafts in process by the user
+    if (info.entity.draft !== undefined && !("admin" in info.entity.draft)) {
+      const user = currentReader()?.abapName ?? "";
+      conditions.push(sql`(${sql.ref(`${alias}.IsActiveEntity`)} OR EXISTS (SELECT 1 FROM "rapt_draft_admin" "dra" WHERE "dra"."DraftUUID" = ${sql.ref(`${alias}.DraftUUID`)} AND "dra"."InProcessByUser" = ${user}))`);
+    }
     const access = this.accessCondition(info, alias);
     if (access !== undefined) {
       conditions.push(access);

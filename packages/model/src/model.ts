@@ -164,6 +164,8 @@ export interface EntitySetModel {
    * RAP does: read-only, without its own pages in the UI.
    */
   valueHelp?: true;
+  /** The entity set DraftAdministrativeData of a draft service (D54): read-only, no UI page. */
+  draftAdministrativeData?: true;
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -211,6 +213,8 @@ export interface FieldModel {
   /** Projections: the element of the projected entity. */
   baseField?: string;
   semantics?: AdminSemantics;
+  /** Draft (D54): IsActiveEntity, HasActiveEntity, HasDraftEntity, DraftUUID — no column of the base. */
+  draft?: true;
   /** Name of the currency code element (`@Semantics.amount.currencyCode`). */
   currencyCode?: string;
   /** Name of the unit element (`@Semantics.quantity.unitOfMeasure`). */
@@ -251,6 +255,12 @@ export interface EntityModel {
   sqlView?: string;
   /** Custom entities: the class of `@ObjectModel.query.implementedBy`, upper case. */
   queryClass?: string;
+  /**
+   * Draft (D54). On an exposed entity of a draft BO: the SQL view of its active instances and drafts
+   * (`IsActiveEntity`), the draft table, the base entity. `admin`: the synthetic entity
+   * DraftAdministrativeData.
+   */
+  draft?: { view: string; table: string; base: string; root: boolean } | { admin: true };
   fields: FieldModel[];
   associations: AssociationModel[];
   annotations: Annotations;
@@ -272,6 +282,8 @@ export interface BehaviorModel {
   privilegedMode: boolean;
   /** `managed with additional save` / `managed with unmanaged save` of the header. */
   saving?: SavingModel;
+  /** `with draft` (D54). */
+  draft?: boolean;
   /** The saver class of the behavior pool (`lsc_…`), for additional and unmanaged save. */
   saver?: SaverModel;
   entities: EntityBehaviorModel[];
@@ -435,6 +447,8 @@ export interface EntityBehaviorModel {
   sideEffects: SideEffectModel[];
   /** Projection BDEF: `use etag`. */
   useEtag: boolean;
+  /** Draft (D54): the table of the drafts of the entity (`draft table`). */
+  draftTable?: string;
   /** Handlers of the authorization and feature control methods. */
   globalAuthorizationHandler?: HandlerRef;
   instanceAuthorizationHandler?: HandlerRef;
