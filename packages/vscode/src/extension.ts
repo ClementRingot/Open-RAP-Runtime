@@ -4,6 +4,7 @@
  * and `rapt dev`; the extension compiles nothing itself.
  */
 
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import * as vscode from "vscode";
 import {
@@ -15,7 +16,10 @@ import {
   runJson,
   summary,
   validEntityName,
+  GENERATE_KINDS,
+  projectObjects,
   type AbapGitResult,
+  type GenerateResult,
   type Cli,
   type DevEvent,
   type NewResult,
@@ -234,6 +238,91 @@ async function newBo(uri?: vscode.Uri): Promise<void> {
   }
 }
 
+/** "Nouvel objet RAP…": rapt generate, with the object to derive from picked in a list (D46). */
+async function generate(root: string): Promise<void> {
+  const title = "RAP : nouvel objet";
+  const picked = await vscode.window.showQuickPick(
+    GENERATE_KINDS.map((k) => ({ label: k.label, description: k.kind, option: k })),
+    { title, placeHolder: "Type d'objet", ignoreFocusOut: true },
+  );
+  if (picked === undefined) {
+    return;
+  }
+  const kind = picked.option;
+  const args = ["generate", root, kind.kind];
+  let source: string | undefined;
+  if (kind.source !== undefined) {
+    const files = await vscode.workspace.findFiles(new vscode.RelativePattern(root, "**/*.{astabl,xml,asddls,asbdef,srvdsrv}"), "{**/node_modules/**,**/.rapt/**}");
+    const candidates = projectObjects(files.map((f) => f.fsPath))[kind.source.of];
+    source = await vscode.window.showQuickPick(candidates, { title, placeHolder: kind.source.prompt, ignoreFocusOut: true });
+    if (source === undefined) {
+      return;
+    }
+  }
+  const name = await vscode.window.showInputBox({
+    title,
+    prompt: `Nom de l'objet (${kind.label})`,
+    value: source !== undefined && kind.name !== undefined ? kind.name(source) : "",
+    ignoreFocusOut: true,
+    validateInput: (value) => (/^[A-Za-z][A-Za-z0-9_]*$/.test(value) ? undefined : "Lettres, chiffres et _, en commençant par une lettre"),
+  });
+  if (name === undefined) {
+    return;
+  }
+  args.push(name);
+  if (source !== undefined && kind.source !== undefined) {
+    args.push(kind.source.option, source);
+  }
+  if (kind.kind === "view") {
+    const root = await vscode.window.showQuickPick(["Vue racine (root view entity)", "Vue enfant"], { title, ignoreFocusOut: true });
+    if (root === undefined) {
+      return;
+    }
+    if (root.startsWith("Vue racine")) {
+      args.push("--root");
+    }
+  }
+  try {
+    const result = await runJson<GenerateResult>(cli(), args, root);
+    if (!result.ok) {
+      void vscode.window.showErrorMessage(`RAP : ${result.error ?? "création impossible"}`);
+      return;
+    }
+    output.appendLine(`rapt generate ${kind.kind} ${name}: ${result.written.join(", ")}`);
+    const main = result.written.find((f) => !f.endsWith(".xml") && f !== ".abapgit.xml") ?? result.written[0];
+    if (main !== undefined) {
+      await vscode.window.showTextDocument(vscode.Uri.file(path.join(root, main)));
+    }
+  } catch (e) {
+    cliFailed(e as Error);
+  }
+}
+
+/** "Choisir le mode du projet": standard (as on SAP) or enhanced, in rapt/config.json (D45). */
+async function setMode(root: string): Promise<void> {
+  const file = path.join(root, "rapt", "config.json");
+  let current: Record<string, unknown> = {};
+  try {
+    current = existsSync(file) ? (JSON.parse(readFileSync(file, "utf8")) as Record<string, unknown>) : {};
+  } catch {
+    current = {};
+  }
+  const picked = await vscode.window.showQuickPick(
+    [
+      { label: "standard", description: "Comme sur SAP : ce qui ne s'active pas sur SAP est refusé", picked: current["mode"] !== "enhanced" },
+      { label: "enhanced", description: "Extensions rap-transpiler : managed + unmanaged save sur entité custom, champs obligatoires contrôlés", picked: current["mode"] === "enhanced" },
+    ],
+    { title: "RAP : mode du projet", placeHolder: `Mode actuel : ${current["mode"] === "enhanced" ? "enhanced" : "standard"}`, ignoreFocusOut: true },
+  );
+  if (picked === undefined) {
+    return;
+  }
+  mkdirSync(path.dirname(file), { recursive: true });
+  writeFileSync(file, `${JSON.stringify({ ...current, mode: picked.label }, null, 2)}\n`);
+  void vscode.window.showInformationMessage(`RAP : mode ${picked.label} (rapt/config.json)`);
+  await check(root, true);
+}
+
 async function abapGit(root: string): Promise<void> {
   try {
     const result = await runJson<AbapGitResult>(cli(), ["abapgit", root], root);
@@ -373,6 +462,8 @@ export function activate(context: vscode.ExtensionContext): void {
     vscode.commands.registerCommand("rapt.showLog", () => output.show()),
     vscode.commands.registerCommand("rapt.newBo", newBo),
     vscode.commands.registerCommand("rapt.abapgit", withProject(abapGit)),
+    vscode.commands.registerCommand("rapt.generate", withProject(generate)),
+    vscode.commands.registerCommand("rapt.setMode", withProject(setMode)),
     // check on save, unless rapt dev already rebuilds this project
     vscode.workspace.onDidSaveTextDocument((document) => {
       if (document.uri.scheme !== "file" || config().get<boolean>("checkOnSave") === false) {

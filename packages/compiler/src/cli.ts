@@ -4,6 +4,7 @@
 import { writeFileSync } from "node:fs";
 import path from "node:path";
 import { generateAbapGitFiles, type AbapGitResult } from "./authoring/abapgit.js";
+import { generateObject, OBJECT_KINDS } from "./authoring/generate.js";
 import { newBusinessObject } from "./authoring/new.js";
 import { generateApplication, writeFiles, type GenerateOptions } from "./build.js";
 import { parseArgs } from "node:util";
@@ -24,6 +25,8 @@ Usage:
   rapt dev   <src> [--port <n>] [--out <dir>]    build, run with an embedded database, rebuild on change
   rapt new   <src> <Entity> [--prefix Z…]        write the sources of a new business object (and their XML)
   rapt abapgit <src> [--check]                   write the abapGit XML files the sources lack
+  rapt generate <src> <kind> <name> [--from X]   write one new object (table, view, projection, behavior,
+                                                 pool, metadata, access, service, binding…; no kind: the list)
 
 Options:
   --service <name>   service definition to build (required when the sources have several)
@@ -38,6 +41,11 @@ Options:
                      rapt dev: one JSON event per line)
   --prefix <Z…>      prefix of the object names (rapt new, default Z): ZRT → zrt_travel, ZRT_R_Travel…
   --description <t>  description of the business object (rapt new)
+  --from <name>      rapt generate: the object the new one derives from (view ← table, projection ← view,
+                     behavior/metadata/access ← entity)
+  --for <name>       rapt generate: the BDEF of a pool, the service definition of a binding
+  --expose <A,B>     rapt generate service: the exposed entities
+  --root             rapt generate view: a root view entity
   --check            report the missing XML files without writing them, exit code 1 if any (rapt abapgit)
   --warnings-as-errors
   -h, --help
@@ -72,6 +80,10 @@ export async function main(argv: string[]): Promise<number> {
         prefix: { type: "string" },
         description: { type: "string" },
         check: { type: "boolean" },
+        from: { type: "string" },
+        for: { type: "string" },
+        expose: { type: "string" },
+        root: { type: "boolean" },
         "warnings-as-errors": { type: "boolean" },
         help: { type: "boolean", short: "h" },
       },
@@ -91,6 +103,9 @@ export async function main(argv: string[]): Promise<number> {
   }
   if (command === "new") {
     return newCommand(source, parsed.positionals[2], parsed.values, parsed.values["json"] === true);
+  }
+  if (command === "generate") {
+    return generateCommand(source, parsed.positionals[2], parsed.positionals[3], parsed.values, parsed.values["json"] === true);
   }
   if (command === "abapgit") {
     return abapGitCommand(source, parsed.values["check"] === true, parsed.values["json"] === true);
@@ -208,6 +223,36 @@ function abapGitCommand(source: string, check: boolean, json: boolean): number {
   }
   process.stdout.write(result.written.length === 0 ? "abapGit files up to date\n" : `${result.written.length} file(s) ${check ? "to write (run rapt abapgit)" : "written"}\n`);
   return failed ? 1 : 0;
+}
+
+function generateCommand(source: string, kind: string | undefined, name: string | undefined, values: Record<string, unknown>, json: boolean): number {
+  if (kind === undefined || name === undefined) {
+    process.stderr.write(`rapt generate needs a kind and a name, e.g. rapt generate . behavior ZR_Travel\n\nKinds:\n${Object.entries(OBJECT_KINDS)
+      .map(([k, d]) => `  ${k.padEnd(11)}${d}`)
+      .join("\n")}\n`);
+    return 2;
+  }
+  const str = (key: string): string | undefined => (typeof values[key] === "string" ? (values[key] as string) : undefined);
+  const expose = str("expose");
+  const result = generateObject(source, kind, name, {
+    ...(str("from") === undefined ? {} : { from: str("from") as string }),
+    ...(str("for") === undefined ? {} : { for: str("for") as string }),
+    ...(expose === undefined ? {} : { expose: expose.split(",").map((e) => e.trim()).filter((e) => e !== "") }),
+    ...(values["root"] === true ? { root: true } : {}),
+    ...(str("description") === undefined ? {} : { description: str("description") as string }),
+  });
+  if (json) {
+    process.stdout.write(`${JSON.stringify({ command: "generate", ok: result.error === undefined, root: path.resolve(source), kind, name, ...result })}\n`);
+    return result.error === undefined ? 0 : 1;
+  }
+  if (result.error !== undefined) {
+    process.stderr.write(`${result.error}\n`);
+    return 1;
+  }
+  for (const file of result.written) {
+    process.stdout.write(`written: ${file}\n`);
+  }
+  return 0;
 }
 
 function newCommand(source: string, entity: string | undefined, values: Record<string, unknown>, json: boolean): number {

@@ -3,7 +3,7 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { afterEach, describe, expect, it } from "vitest";
-import { DevProcess, diagnosticPath, findProjectRoot, LineSplitter, parseDevEvent, position, resolveCli, runJson, summary, type DevEvent } from "../src/rapt.js";
+import { DevProcess, GENERATE_KINDS, projectObjects, diagnosticPath, findProjectRoot, LineSplitter, parseDevEvent, position, resolveCli, runJson, summary, type DevEvent } from "../src/rapt.js";
 
 const REPO = fileURLToPath(new URL("../../../", import.meta.url));
 const FIXTURE = path.join(REPO, "fixtures", "travel");
@@ -82,5 +82,21 @@ describe("rapt from the extension", () => {
     await dev.stop();
     expect(dev.running).toBe(false);
     await expect(fetch(`http://localhost:${port}/ui/index.html`)).rejects.toThrow();
+  });
+});
+
+describe("rapt generate in VS Code", () => {
+  it("lists the objects of the project by kind", () => {
+    const objects = projectObjects(["/p/src/zrt_travel.tabl.astabl", "/p/src/zrt_travel.tabl.xml", "/p/src/zrt_r_travel.ddls.asddls", "/p/src/zrt_r_travel.ddls.xml", "/p/src/zrt_r_travel.bdef.asbdef", "/p/src/zrt_ui_travel.srvd.srvdsrv", "/p/src/readme.md"]);
+    expect(objects).toEqual({ table: ["zrt_travel"], entity: ["ZRT_R_TRAVEL"], bdef: ["ZRT_R_TRAVEL"], srvd: ["ZRT_UI_TRAVEL"] });
+  });
+
+  it("proposes the names RAP uses", () => {
+    const name = (kind: string, source: string): string | undefined => GENERATE_KINDS.find((k) => k.kind === kind)?.name?.(source);
+    expect(name("view", "zrt_travel")).toBe("ZR_Travel");
+    expect(name("projection", "ZRT_R_TRAVEL")).toBe("ZRT_C_TRAVEL");
+    expect(name("pool", "ZRT_R_TRAVEL")).toBe("ZBP_RT_R_TRAVEL");
+    expect(name("binding", "ZRT_UI_TRAVEL")).toBe("ZRT_UI_TRAVEL_O4");
+    expect(name("service", "ZRT_C_TRAVEL")).toBe("ZUI_TRAVEL");
   });
 });

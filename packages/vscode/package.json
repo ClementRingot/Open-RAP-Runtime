@@ -135,6 +135,22 @@
         "title": "Générer les fichiers abapGit",
         "category": "RAP",
         "icon": "$(repo)"
+      },
+      {
+        "command": "rapt.generate",
+        "title": "Nouvel objet RAP… (table, vue, BDEF, behavior pool, service…)",
+        "category": "RAP",
+        "icon": "$(new-file)"
+      },
+      {
+        "command": "rapt.setMode",
+        "title": "Choisir le mode du projet (standard / enhanced)",
+        "category": "RAP"
+      },
+      {
+        "command": "rapt.mcp",
+        "title": "Générer le serveur MCP du service",
+        "category": "RAP"
       }
     ],
     "menus": {
@@ -173,6 +189,11 @@
           "command": "rapt.abapgit",
           "when": "resourceFilename == .abapgit.xml || explorerResourceIsFolder",
           "group": "rapt@4"
+        },
+        {
+          "command": "rapt.generate",
+          "when": "resourceFilename == .abapgit.xml || explorerResourceIsFolder",
+          "group": "rapt@0"
         }
       ],
       "editor/title": [

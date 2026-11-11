@@ -55,6 +55,70 @@ export interface AbapGitResult {
   issues: { severity: Severity; code: string; message: string; file: string; line: number; column: number }[];
 }
 
+/** Result of `rapt generate --json`. */
+export interface GenerateResult {
+  command: "generate";
+  ok: boolean;
+  root: string;
+  written: string[];
+  error?: string;
+}
+
+/** What each kind of `rapt generate` starts from, and how the new object is named by default. */
+export interface GenerateKind {
+  kind: string;
+  label: string;
+  /** The object the new one derives from (asked in a list), and the option that passes it. */
+  source?: { of: "table" | "entity" | "bdef" | "srvd"; option: "--from" | "--for"; prompt: string };
+  /** Default name from the source object. */
+  name?: (source: string) => string;
+}
+
+const swapLayer = (entity: string, layer: string): string => (/^[ZY][A-Z0-9]*_[A-Z]_/i.test(entity) ? entity.replace(/^([ZY][A-Z0-9]*_)[A-Z]_/i, `$1${layer}_`) : entity);
+
+export const GENERATE_KINDS: GenerateKind[] = [
+  { kind: "table", label: "Table de base de données" },
+  {
+    kind: "view",
+    label: "Vue CDS (view entity) depuis une table",
+    source: { of: "table", option: "--from", prompt: "Table source" },
+    name: (table) => `ZR_${table.replace(/^[zy][a-z0-9]*?_/i, "").replace(/(^|_)([a-z])/g, (_m, _s: string, c: string) => c.toUpperCase())}`,
+  },
+  { kind: "projection", label: "Projection CDS depuis une vue", source: { of: "entity", option: "--from", prompt: "Vue projetée" }, name: (entity) => swapLayer(entity, "C") },
+  { kind: "metadata", label: "Metadata extension (annotations UI)", source: { of: "entity", option: "--from", prompt: "Entité annotée" }, name: (entity) => entity },
+  { kind: "behavior", label: "Behavior definition (BDEF)", source: { of: "entity", option: "--from", prompt: "Entité racine (vue ou projection)" }, name: (entity) => entity },
+  {
+    kind: "pool",
+    label: "Behavior pool (classe d'implémentation)",
+    source: { of: "bdef", option: "--for", prompt: "Behavior definition" },
+    name: (bdef) => `ZBP_${bdef.toUpperCase().replace(/^[ZY]_?/, "")}`.slice(0, 30),
+  },
+  { kind: "access", label: "Access control (DCL)", source: { of: "entity", option: "--from", prompt: "Entité protégée" }, name: (entity) => entity },
+  { kind: "abstract", label: "Entité abstraite (paramètre d'action)" },
+  { kind: "custom", label: "Entité custom et sa classe de requête" },
+  { kind: "service", label: "Définition de service", source: { of: "entity", option: "--from", prompt: "Entité exposée" }, name: (entity) => `ZUI_${entity.toUpperCase().replace(/^[ZY][A-Z0-9]*?_[A-Z]_/, "")}` },
+  { kind: "binding", label: "Service binding OData V4", source: { of: "srvd", option: "--for", prompt: "Définition de service" }, name: (srvd) => `${srvd.toUpperCase()}_O4` },
+  { kind: "class", label: "Classe ABAP" },
+  { kind: "interface", label: "Interface ABAP" },
+];
+
+/** The objects of a project by kind, from the file names of its sources. */
+export function projectObjects(fileNames: string[]): Record<"table" | "entity" | "bdef" | "srvd", string[]> {
+  const result = { table: new Set<string>(), entity: new Set<string>(), bdef: new Set<string>(), srvd: new Set<string>() };
+  for (const file of fileNames) {
+    const base = file.split(/[\\/]/).pop() ?? file;
+    const match = /^([^.]+)\.(tabl|ddls|bdef|srvd)\.(astabl|xml|asddls|asbdef|srvdsrv)$/i.exec(base);
+    if (match === null) continue;
+    const name = (match[1] ?? "").replace(/#/g, "/");
+    const type = (match[2] ?? "").toLowerCase();
+    if (type === "tabl") result.table.add(name.toLowerCase());
+    else if (type === "ddls" && match[3]?.toLowerCase() === "asddls") result.entity.add(name.toUpperCase());
+    else if (type === "bdef" && match[3]?.toLowerCase() === "asbdef") result.bdef.add(name.toUpperCase());
+    else if (type === "srvd" && match[3]?.toLowerCase() === "srvdsrv") result.srvd.add(name.toUpperCase());
+  }
+  return { table: [...result.table].sort(), entity: [...result.entity].sort(), bdef: [...result.bdef].sort(), srvd: [...result.srvd].sort() };
+}
+
 /** The entity name of `rapt new`: letters and digits, starting with a letter. */
 export function validEntityName(name: string): boolean {
   return /^[A-Za-z][A-Za-z0-9]*$/.test(name);
