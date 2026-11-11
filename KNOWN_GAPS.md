@@ -110,3 +110,20 @@ Versions de référence : `@abaplint/core` 2.120.98, `@abaplint/transpiler` 2.14
 | Session partagée : même `SESSION_SECRET` pour le launchpad et ses applications, pas de révocation avant l'expiration | Assumé : une même confiance, comme les sessions (D28). |
 | Applications derrière le launchpad en `AUTH_MODE=none` : leur utilisateur de développement, indépendant de celui du launchpad | Développement seulement. |
 | Ressources OpenUI5 servies par chaque application (`/apps/<id>/resources/`) | Assumé : pas de cache commun aux applications. |
+
+## Utilitaires d'ABAP Cloud (D40)
+
+| Écart | Statut |
+|---|---|
+| Fuseau horaire de l'utilisateur | UTC : `xco_cp_time=>time_zone->user` et `->utc` donnent les mêmes valeurs, `systemtstmp_*` ne convertit pas. |
+| Numérotation et journal applicatif | Écrits dans la LUW de la requête : annulés si elle échoue (sur SAP, un numéro tiré est consommé). `use_2nd_db_connection` est ignoré. |
+| Intervalle de numérotation non configuré | Créé à la première demande, de 1 à 99999999999999999999 (sur SAP : `cx_nr_object_not_found`). Numérotation externe et intervalles alphanumériques non pris en charge. |
+| `/ui2/cl_json` | Pas de `generate` (données dynamiques), ni `assoc_arrays`, ni `conversion_exits`, ni `type_descr` ; les références d'objets sont écrites `null`. Un JSON invalide laisse les données inchangées. |
+| `xco_cp_json` | `from_abap` écrit les `abap_bool` en `"X"`/`""` ; les noms des membres sont rapprochés sans tenir compte de la casse ni des `_` à la lecture. |
+| `cl_abap_regex`, `cl_abap_matcher` | Moteur d'expressions régulières de JavaScript : les constructions propres à PCRE (quantificateurs possessifs, `\K`, récursion…) ne sont pas prises en charge (`cx_sy_regex`, ou un autre sens) ; la syntaxe POSIX est approchée (classes `[:alpha:]`…, `\<`, `\>`). `FIND … REGEX objet` avec un objet `cl_abap_regex` n'est pas pris en charge. |
+| RTTS | `describe_by_name` lève `cx_sy_rtti_type_not_released` ; pas de création de types (`cl_abap_structdescr=>create`, `CREATE DATA … TYPE HANDLE`), pas d'attributs ni de méthodes dans `cl_abap_classdescr`. `absolute_name` vient du nom qualifié du transpiler. |
+| `cl_abap_random*` | Générateur de Park-Miller (non cryptographique) : les suites diffèrent de celles de SAP pour une même graine. Pas de `cl_abap_random_packed*` ni `decfloat16`. |
+| `cl_abap_char_utilities=>minchar` | Absent (caractère nul). |
+| Traitement en arrière-plan (D41) | Les opérations restent en mémoire jusqu'à leur exécution : un processus pas encore exécuté quand l'application s'arrête ne l'est jamais (il reste `NEW`). Pas de reprise ni de nouvel essai d'un processus `ERRONEOUS`, pas de file par nom (`set_name` sert au suivi), pas de vérification de la phase transactionnelle d'appel (sur SAP, `save_for_execution` d'une opération contrôlée se fait en phase de sauvegarde). `if_bgmc_process_monitor` : états `NEW`, `SUCCESSFUL`, `ERRONEOUS` (noms propres à rap-transpiler). Un seul `COMMIT ENTITIES` par opération. |
+| E-mail (D41) | Envoyé après la validation de la LUW, sans nouvel essai ; `send( )` rend toujours l'état `W` (en attente). Pas de modèles d'e-mail (`cl_bcs_mail_message=>create_instance_by_template`), ni de signature, ni de chiffrement. |
+

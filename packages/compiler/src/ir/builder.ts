@@ -21,6 +21,7 @@ import { Dictionary } from "./dictionary.js";
 import { EntityResolver } from "./entities.js";
 import { loadAccessControls } from "./access-controls.js";
 import { checkAuthorityChecks, loadAuthorizations } from "./authorizations.js";
+import { loadNumberRanges, usedServices } from "./number-ranges.js";
 import { abaplintRegistry, attachHandlers, syntaxCheck } from "./handlers.js";
 import { selectService, type ServiceOptions } from "./service.js";
 
@@ -146,6 +147,8 @@ export function buildModel(project: Project, options: BuildOptions = {}): BuildR
 
   // ------------------------------------------------------- authorization objects and roles (D34)
   const authorizations = loadAuthorizations(project, diagnostics);
+  const numberRanges = loadNumberRanges(project, diagnostics);
+  const services = usedServices(project);
 
   // --------------------------------------------------------------------- behavior pools (ABAP)
   const pools = behaviors.flatMap((b) => [b.implementationClass, ...b.entities.map((e) => e.implementationClass)]).filter((c): c is string => c !== undefined);
@@ -215,6 +218,8 @@ export function buildModel(project: Project, options: BuildOptions = {}): BuildR
     behaviors: behaviors.sort((a, b) => a.name.localeCompare(b.name)),
     messageClasses,
     ...(authorizations === undefined ? {} : { authorizations }),
+    ...(numberRanges === undefined ? {} : { numberRanges }),
+    ...(services === undefined ? {} : { services }),
   };
   // access controls (DCL) of the exposed entities (D35)
   const accessControls = loadAccessControls(project, model, authorizations, diagnostics);

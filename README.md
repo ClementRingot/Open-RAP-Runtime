@@ -56,6 +56,22 @@ est 8080 (`--port`). Les variables de l'application s'appliquent (`AUTH_MODE`, `
 `DATABASE_URL` pour un PostgreSQL…) ; par défaut, `AUTH_MODE=none` et écoute sur 127.0.0.1
 ([D38](docs/DECISIONS.md)).
 
+### Extension VS Code
+
+[packages/vscode](packages/vscode) ajoute à VS Code les diagnostics de `rapt check` dans l'onglet
+Problèmes à chaque enregistrement, les commandes *RAP : Lancer rapt dev*, *Vérifier le BO* et
+*Générer l'application*, et l'état de `rapt dev` dans la barre d'état. Elle appelle la CLI avec
+`--json` (une sortie JSON pour `check` et `build`, un événement JSON par ligne pour `dev`) et ne
+compile rien elle-même ([D39](docs/DECISIONS.md)).
+
+Le `.vsix` est autonome : il contient rapt, OpenUI5 et PGlite, et lance rapt avec le Node.js
+de VS Code (1.101 ou plus). Rien d'autre à installer. La CI le publie en artefact
+(`rap-transpiler-vscode`) ; pour le construire :
+
+```sh
+cd packages/vscode && pnpm run package && code --install-extension rap-transpiler-vscode.vsix
+```
+
 ## Lancer l'application générée
 
 ```sh
@@ -69,6 +85,13 @@ npm install && DATABASE_URL=postgres://user:password@localhost:5432/app npm star
 Connexion OIDC (Keycloak fourni dans le profil `oidc` de docker-compose, utilisateur `alice`) :
 `AUTH_MODE=oidc docker compose --profile oidc up --build`. Les variables sont décrites dans le
 `README.md` et le `.env.example` de l'application générée.
+
+Le behavior pool peut utiliser les classes utilitaires d'ABAP Cloud : `/ui2/cl_json` et
+`xco_cp_json`, `cl_web_http_utility`, `cl_abap_conv_codepage`, `cl_numberrange_runtime`
+(intervalles dans `rapt/number-ranges.json`), `cl_abap_tstmp` et `xco_cp_time`, journal
+applicatif `cl_bali_*`, hachage, aléatoire, expressions régulières, RTTS, traitement en
+arrière-plan `cl_bgmc_process_factory` et e-mail `cl_bcs_mail_message` (envoyé par
+`MAIL_SMTP_URL`) ([guide](docs/UTILITAIRES.md), [D40, D41](docs/DECISIONS.md)).
 
 Le behavior pool peut appeler des API distantes avec le client HTTP d'ABAP Cloud et le client
 proxy OData d'un service consumption model (SCM, SCM2) ; chaque destination se configure par
@@ -126,5 +149,6 @@ handlers, EML abaissé vers la classe noyau `ZRAP_EML` (décision D2). Les diagn
 packages/model/      types de l'IR (model.json), conventions de nommage partagées
 packages/compiler/   CLI rapt, parsers, construction de l'IR, générateurs
 packages/runtime/    runtime des applications générées (OData V4, RAP managed)
+packages/vscode/     extension VS Code (appelle la CLI rapt)
 fixtures/travel/     BO de référence Travel / Booking (format abapGit)
 ```

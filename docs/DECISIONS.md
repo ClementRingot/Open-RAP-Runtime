@@ -659,3 +659,124 @@ et la conséquence. Les numéros D1 à D13 correspondent aux points 1 à 13 du �
 - **Tests** : `compiler/test/dev.test.ts` couvre la construction, le behavior pool exécuté, la
   conservation des données, la construction en erreur, la réinitialisation sur changement de
   schéma et la surveillance d'un fichier remplacé par un renommage.
+
+## D39 — Sortie JSON de la CLI et extension VS Code
+
+- **Contexte** : tout doit pouvoir se faire en ligne de commande, ou visuellement dans VS Code.
+  Deux implémentations du compilateur divergeraient.
+- **Décision** : la CLI reste le seul moteur ; l'extension VS Code ([packages/vscode](../packages/vscode))
+  l'appelle et affiche ses résultats.
+  - **`--json`** : `rapt check` et `rapt build` écrivent un objet JSON (`command`, `ok`, `root`,
+    `counts`, `diagnostics` avec, en plus de `file`, le chemin absolu `path`) ; `rapt build`
+    ajoute `out` et `files`. `rapt dev` écrit un événement JSON par ligne (`building`,
+    `changed`, `diagnostics`, `ready`, `failed`, `database-reset`, `server-failed`,
+    `server-stopped`, `error`, `log` pour les journaux du serveur). Le texte de `rapt dev` est
+    dérivé des mêmes événements (`formatDevEvent`).
+  - **Extension** : diagnostics dans l'onglet Problèmes (à chaque enregistrement, ou par
+    `rapt dev` quand il tourne sur le projet), commandes *Vérifier le BO*, *Générer
+    l'application*, *Lancer / Arrêter rapt dev*, *Ouvrir l'application*, état dans la barre
+    d'état, menus de l'explorateur et de la barre de titre. Un projet est le dossier de
+    `.abapgit.xml` (à défaut, le parent de `src`).
+  - **Extension autonome** : le `.vsix` (~31 Mo, ~9 100 fichiers) contient `rapt/` : les paquets
+    du dépôt (`pnpm pack`) installés par npm, à plat, avec leurs dépendances de production et ce
+    que `rapt dev` sert (OpenUI5, `less-openui5`, PGlite, aux versions du runtime), sans cartes
+    de sources, types, documentation, tests des paquets, design time OpenUI5 ni extensions
+    PGlite (`scripts/stage-rapt.mjs`). Un téléchargement au premier lancement aurait allégé le
+    `.vsix`, mais demandé l'accès au registre npm (souvent filtré en entreprise) et du code de
+    cache ; le `.vsix` passe par VS Code, hors ligne une fois installé, et rapt y a toujours la
+    version de l'extension.
+  - **Node.js de VS Code** : rapt tourne sur l'exécutable de VS Code avec
+    `ELECTRON_RUN_AS_NODE=1` (Node.js 22 depuis VS Code 1.101, version minimale de
+    l'extension) ; le serveur de `rapt dev` hérite de la variable. Vérifié avec Electron 37 :
+    `check`, `dev`, PGlite, behavior pool, arrêt du serveur quand `rapt dev` est tué.
+  - **`rapt dev` installé à plat** : le `node_modules` lié dans `.rapt/dev` est le premier
+    dossier, du runtime vers la racine, qui contient `@abaplint/runtime` (celui du runtime dans
+    le dépôt pnpm, celui de `rapt/` dans l'extension).
+  - **CLI trouvée** : réglage `rapt.cliPath`, sinon le rapt intégré, sinon un clone
+    rap-transpiler ou un `node_modules` de l'espace de travail, sinon `rapt` du PATH ; Node.js
+    par `rapt.nodePath`, sinon celui de VS Code.
+  - **CI** : le job `test` construit le `.vsix`, vérifie la fixture avec le rapt intégré et
+    publie le `.vsix` en artefact (`rap-transpiler-vscode`).
+  - **Arrêt de `rapt dev`** : SIGINT. Sous Windows, où ce signal termine le processus, le
+    serveur s'arrête quand son canal IPC avec `rapt dev` se ferme (D38).
+  - **Construction** : sources ESM vérifiées par `tsc`, livrées en un fichier CommonJS par
+    esbuild (`dist/extension.cjs`, `vscode` externe), sans dépendance à l'exécution ; `.vsix`
+    par `vsce package`.
+- **Tests** : `vscode/test/rapt.test.ts` couvre la recherche du projet et de la CLI, la lecture
+  des lignes JSON, `rapt check --json` et `rapt dev --json` lancés réellement.
+  `compiler/test/cli.test.ts` et `dev.test.ts` couvrent la sortie JSON et les événements.
+  L'interface de l'extension (commandes, barre d'état) n'est pas testée dans VS Code.
+
+## D40 — Classes utilitaires d'ABAP Cloud dans le behavior pool
+
+- **Contexte** : après le client HTTP (D31), les behavior pools ont besoin des autres classes
+  libérées d'usage courant : JSON pour les API, encodages, numérotation, dates, journal
+  applicatif, hachage, aléatoire, expressions régulières, RTTS. Sans elles, du code ABAP Cloud
+  ordinaire ne passe pas la vérification.
+- **Décision** : une implémentation clean-room en ABAP de ces classes
+  (`gen/abap/framework-utils.ts`), écrite à partir des signatures publiques documentées par SAP,
+  avec des méthodes du noyau `ZRAP_EML` pour ce que l'ABAP ne peut pas faire seul
+  (`runtime/src/abap/utils.ts`). Guide : [UTILITAIRES.md](UTILITAIRES.md).
+  - **Fermeture** : seuls les objets nommés par les sources du projet, puis ceux qu'ils nomment,
+    sont donnés au transpiler. Un projet qui n'en utilise aucun garde la même construction et le
+    même temps de vérification ; un objet du projet de même nom l'emporte.
+  - **Le noyau** : JSON (analyseur qui garde les nombres tels qu'écrits, parcours des données
+    de `@abaplint/runtime` par type, noms des membres selon le mode), pages de codes, base64,
+    gzip (zlib), hachage et HMAC (crypto), graine aléatoire, expressions régulières (RegExp avec
+    `d` pour les sous-correspondances, mode étendu et classes POSIX traduits), calendrier et
+    horodatages en dixièmes de microseconde (BigInt), description d'une donnée pour les RTTS.
+    Les RTTS se construisent en ABAP, un niveau à la fois : `ASSIGN COMPONENT` pour les
+    structures, `CREATE DATA … LIKE LINE OF` pour les tables.
+  - **Numérotation** : intervalles de `rapt/number-ranges.json` (diagnostic NR001), insérés par
+    `db/schema.sql` sans toucher au numéro courant ; table `rapt_number_range`, écrite dans la LUW
+    (les LUW sont sérialisées : pas de conflit). Un intervalle non configuré commence à 1, pour
+    développer sans configuration.
+  - **Journal applicatif** : tables `rapt_application_log` et `rapt_application_log_item`, dans la
+    LUW ; lecture par filtre.
+  - **Tables** : générées seulement quand le code utilise `cl_numberrange_runtime` ou
+    `cl_bali_*` (`model.services`), pour ne pas changer le schéma des autres applications.
+  - **Types globaux** : `string_table`, `xstring_table`, `match_result(_tab)`,
+    `submatch_result(_tab)` comme objets DDIC (TABL, TTYP), et un type-pool `ABAP`
+    (`abap_compdescr_tab`, `abap_component_tab`…), que l'analyse d'abaplint résout.
+  - **Constructeurs de classe** : ils s'exécutent au chargement des modules, avant le noyau ;
+    ceux des utilitaires n'appellent donc pas `ZRAP_EML` (`cl_abap_char_utilities` écrit ses
+    caractères de contrôle en littéraux).
+- **Tests** : `runtime/test/utilities.test.ts` exécute un auto-test écrit en ABAP dans un behavior
+  pool (`test/utilities/selftest.abap` : plus de soixante-dix vérifications sur toutes les classes,
+  dont les valeurs de référence de SHA-256, MD5 et HMAC), tire des numéros jusqu'à épuisement d'un
+  intervalle et écrit puis relit un journal. `compiler/test/utilities.test.ts` couvre la
+  fermeture, la vérification de toutes les classes et `rapt/number-ranges.json`.
+
+## D41 — Traitement en arrière-plan (bgPF) et e-mail
+
+- **Contexte** : `cl_bgmc_process_factory` et `cl_bcs_mail_message` sont d'usage courant dans les
+  BO RAP (travail différé après la sauvegarde, notifications). Les deux s'appuient sur la LUW : le
+  processus ne démarre et le mail ne part qu'après le `COMMIT WORK`.
+- **Décision** : le runtime garde, pour chaque LUW, le travail à faire après sa validation
+  (`LuwContext.afterCommit`). Une LUW annulée l'oublie ; une LUW validée le démarre après la
+  réponse (`setImmediate`), chaque élément dans une LUW à lui, sérialisée avec les autres.
+  - **bgPF** : `save_for_execution` écrit le processus (`rapt_background_process`, `NEW`) dans la
+    LUW et garde la référence de l'opération ABAP. L'exécution appelle `execute` dans une LUW
+    marquée « arrière-plan » : contrôlée (`if_bgmc_op_single`), l'EML est sauvegardé à la fin et
+    l'ABAP SQL écrit après `cl_abap_tx=>save( )` ; non contrôlée, l'ABAP SQL écrit toujours,
+    `COMMIT ENTITIES` lance la séquence de sauvegarde (une fois) et `ROLLBACK ENTITIES` annule la
+    LUW. Hors arrière-plan, `COMMIT ENTITIES` reste refusé dans un behavior pool. L'état final
+    (`SUCCESSFUL`, `ERRONEOUS` avec le texte de l'exception) est écrit dans une LUW séparée, pour
+    survivre à l'annulation de celle de l'opération.
+  - **Pourquoi en mémoire** : SAP sérialise l'objet opération pour l'exécuter plus tard, ailleurs.
+    Sérialiser un objet du runtime d'abaplint (références, objets imbriqués) demanderait un
+    mécanisme général ; l'application étant un seul processus, la référence suffit. Limite : un
+    processus non exécuté à l'arrêt n'est pas repris.
+  - **E-mail** : `send( )` compose le message MIME avec nodemailer (MIT-0), le garde dans
+    `rapt_mail` (`WAITING`), puis l'envoie après la validation par le serveur de `MAIL_SMTP_URL`
+    (`SENT` / `ERROR`). Sans serveur, le mail reste dans la table (`STORED`) avec son message
+    complet : le développement n'a besoin d'aucun serveur. `MAIL_FROM` donne l'expéditeur par
+    défaut ; les deux variables sont dans le `.env.example` des applications qui envoient des
+    mails.
+  - **Tables** : générées seulement si le code utilise `cl_bgmc_process_factory` ou
+    `cl_bcs_mail_message` (`model.services`, D40).
+- **Tests** : `runtime/test/background.test.ts` : une action lance trois processus (contrôlé avec
+  EML, non contrôlé avec `COMMIT ENTITIES`, en échec) et vérifie leurs états et leurs effets ; une
+  autre envoie un mail (HTML, copie, pièces jointes texte et binaire), gardé sans serveur, envoyé
+  à un serveur SMTP de test avec `MAIL_SMTP_URL`, et rien n'est envoyé quand la LUW est annulée.
+

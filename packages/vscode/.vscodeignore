@@ -1,0 +1,9 @@
+src/**
+test/**
+scripts/**
+tsconfig*.json
+dist/**/*.map
+node_modules/**
+*.vsix
+.gitignore
+.rapt-packs/**

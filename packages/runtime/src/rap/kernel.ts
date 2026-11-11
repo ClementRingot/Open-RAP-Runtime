@@ -9,6 +9,9 @@ import { same, type ActionModel } from "@rap-transpiler/model";
 import { setSubrc } from "../abap/bridge.js";
 import { installHttp } from "../abap/http.js";
 import { installODataClient } from "../abap/odata-client.js";
+import { installUtilities } from "../abap/utils.js";
+import { installBackground } from "../abap/background.js";
+import { installMail } from "../abap/mail.js";
 import { abapGlobal, abapString, appendRow, component, rowsOf, type AbapData } from "../abap/convert.js";
 import { isInitial } from "../values.js";
 import { entityOfTable, type BoEntity } from "./bo.js";
@@ -260,12 +263,7 @@ export function installKernel(runtime: RapRuntime): void {
     }
   };
 
-  const forbidden = async (): Promise<never> => {
-    throw new RapRuntimeError("COMMIT ENTITIES and ROLLBACK ENTITIES are not allowed in a behavior implementation");
-  };
-  kernel.commit = forbidden;
-  kernel.commit_response = forbidden;
-  kernel.rollback = forbidden;
+  // COMMIT ENTITIES and ROLLBACK ENTITIES: only in a background operation (installBackground)
 
   kernel.message_text = async (input: Input): Promise<AbapData> => {
     const vars = ["v1", "v2", "v3", "v4"].map((v) => abapString(input?.[v]));
@@ -283,6 +281,11 @@ export function installKernel(runtime: RapRuntime): void {
   // consumption of remote APIs: HTTP client and OData client proxy (D31)
   installHttp(kernel);
   installODataClient(kernel);
+  // utilities of ABAP Cloud: JSON, encodings, number ranges, application log, RTTS… (D40)
+  installUtilities(kernel, { db: () => runtime.context().tx.db, user: () => runtime.context().user.abapName });
+  // background processing (bgPF) and e-mails, after the commit of the LUW (D41)
+  installBackground(kernel, runtime);
+  installMail(kernel, runtime);
 
   // AUTHORITY-CHECK: the transpiler calls the kernel class KERNEL_AUTHORITY_CHECK (D34)
   abap.Classes["KERNEL_AUTHORITY_CHECK"] = {

@@ -1,0 +1,159 @@
+{
+  "name": "rap-transpiler-vscode",
+  "displayName": "RAP Transpiler",
+  "description": "Vérifier, générer et lancer un business object RAP sans système SAP : rap-transpiler, OpenUI5 et PGlite sont intégrés, rien d'autre à installer.",
+  "version": "0.1.0",
+  "publisher": "clementringot",
+  "private": true,
+  "license": "MIT",
+  "type": "module",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/ClementRingot/rap-transpiler"
+  },
+  "engines": {
+    "vscode": "^1.101.0"
+  },
+  "categories": [
+    "Programming Languages",
+    "Linters",
+    "Other"
+  ],
+  "keywords": [
+    "abap",
+    "rap",
+    "cds",
+    "odata",
+    "abapgit"
+  ],
+  "main": "./dist/extension.cjs",
+  "activationEvents": [
+    "workspaceContains:**/.abapgit.xml"
+  ],
+  "contributes": {
+    "commands": [
+      {
+        "command": "rapt.check",
+        "title": "Vérifier le BO",
+        "category": "RAP",
+        "icon": "$(check)"
+      },
+      {
+        "command": "rapt.build",
+        "title": "Générer l'application",
+        "category": "RAP",
+        "icon": "$(package)"
+      },
+      {
+        "command": "rapt.devStart",
+        "title": "Lancer rapt dev",
+        "category": "RAP",
+        "icon": "$(play)"
+      },
+      {
+        "command": "rapt.devStop",
+        "title": "Arrêter rapt dev",
+        "category": "RAP",
+        "icon": "$(debug-stop)"
+      },
+      {
+        "command": "rapt.openUi",
+        "title": "Ouvrir l'application",
+        "category": "RAP",
+        "icon": "$(globe)"
+      },
+      {
+        "command": "rapt.showLog",
+        "title": "Afficher le journal",
+        "category": "RAP"
+      }
+    ],
+    "menus": {
+      "commandPalette": [
+        {
+          "command": "rapt.devStop",
+          "when": "rapt.devRunning"
+        },
+        {
+          "command": "rapt.openUi",
+          "when": "rapt.devRunning"
+        }
+      ],
+      "explorer/context": [
+        {
+          "command": "rapt.check",
+          "when": "resourceFilename == .abapgit.xml || explorerResourceIsFolder",
+          "group": "rapt@1"
+        },
+        {
+          "command": "rapt.devStart",
+          "when": "resourceFilename == .abapgit.xml || explorerResourceIsFolder",
+          "group": "rapt@2"
+        },
+        {
+          "command": "rapt.build",
+          "when": "resourceFilename == .abapgit.xml || explorerResourceIsFolder",
+          "group": "rapt@3"
+        }
+      ],
+      "editor/title": [
+        {
+          "command": "rapt.devStart",
+          "when": "!rapt.devRunning && resourceExtname =~ /^\\.(asbdef|asddls|asddlxs|asdcls|srvdsrv|abap|xml)$/",
+          "group": "navigation@90"
+        },
+        {
+          "command": "rapt.openUi",
+          "when": "rapt.devRunning",
+          "group": "navigation@90"
+        },
+        {
+          "command": "rapt.devStop",
+          "when": "rapt.devRunning",
+          "group": "navigation@91"
+        }
+      ]
+    },
+    "configuration": {
+      "title": "RAP Transpiler",
+      "properties": {
+        "rapt.cliPath": {
+          "type": "string",
+          "default": "",
+          "markdownDescription": "Chemin du `cli.js` de rapt, ou du dossier d'un clone rap-transpiler. Vide : la version de rapt intégrée à l'extension."
+        },
+        "rapt.nodePath": {
+          "type": "string",
+          "default": "",
+          "markdownDescription": "Exécutable Node.js (22 ou plus) qui lance rapt. Vide : le Node.js intégré à VS Code."
+        },
+        "rapt.checkOnSave": {
+          "type": "boolean",
+          "default": true,
+          "description": "Vérifier le projet à chaque enregistrement (sauf quand rapt dev tourne déjà sur ce projet)."
+        },
+        "rapt.dev.port": {
+          "type": "number",
+          "default": 8080,
+          "description": "Port de l'application lancée par rapt dev."
+        },
+        "rapt.dev.openUi": {
+          "type": "boolean",
+          "default": true,
+          "description": "Ouvrir l'application dans le navigateur au premier démarrage de rapt dev."
+        }
+      }
+    }
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json --noEmit && esbuild src/extension.ts --bundle --platform=node --target=node20 --format=cjs --external:vscode --sourcemap --outfile=dist/extension.cjs",
+    "package": "pnpm run build && node scripts/stage-rapt.mjs && vsce package --no-dependencies --out rap-transpiler-vscode.vsix",
+    "stage": "node scripts/stage-rapt.mjs"
+  },
+  "devDependencies": {
+    "@types/node": "22.20.5",
+    "@types/vscode": "1.101.0",
+    "@vscode/vsce": "3.9.2",
+    "esbuild": "0.28.2"
+  }
+}

@@ -6,7 +6,7 @@ import path from "node:path";
 import { generateApplication, writeFiles, type GenerateOptions } from "./build.js";
 import { parseArgs } from "node:util";
 import { DevSession, type DevOptions } from "./dev.js";
-import { formatDiagnostic, type Diagnostics } from "./diagnostics.js";
+import { countDiagnostics, formatDiagnostic, type Diagnostics } from "./diagnostics.js";
 import { generateLaunchpad } from "./gen/launchpad/index.js";
 import { loadProject } from "./input/project.js";
 import { buildModel, type BuildOptions } from "./ir/builder.js";
@@ -28,6 +28,8 @@ Options:
   --runtime <dir>    @rap-transpiler/runtime package to embed in the application (default: next to rapt)
   --out <path>       output file (rapt ir) or folder (rapt build, rapt launchpad, rapt dev: <src>/.rapt/dev)
   --port <n>         port of the application (rapt dev, default: PORT, else 8080)
+  --json             machine-readable output (rapt check, rapt build: one JSON object;
+                     rapt dev: one JSON event per line)
   --warnings-as-errors
   -h, --help
 `;
@@ -56,6 +58,7 @@ export async function main(argv: string[]): Promise<number> {
         out: { type: "string" },
         runtime: { type: "string" },
         port: { type: "string" },
+        json: { type: "boolean" },
         "warnings-as-errors": { type: "boolean" },
         help: { type: "boolean", short: "h" },
       },
@@ -96,8 +99,9 @@ export async function main(argv: string[]): Promise<number> {
   if (typeof parsed.values["runtime"] === "string") options.runtimeDir = parsed.values["runtime"];
 
   if (command === "dev") {
-    return dev(source, options, parsed.values["out"], parsed.values["port"]);
+    return dev(source, options, parsed.values["out"], parsed.values["port"], parsed.values["json"] === true);
   }
+  const json = parsed.values["json"] === true;
   const project = loadProject(source);
   if (command === "build") {
     const out = parsed.values["out"];
@@ -106,12 +110,18 @@ export async function main(argv: string[]): Promise<number> {
       return 2;
     }
     const result = await generateApplication(project, options);
-    report(result.diagnostics);
     const buildFailed = result.files.length === 0 || (parsed.values["warnings-as-errors"] === true && result.diagnostics.items.some((d) => d.severity === "warning"));
+    if (!buildFailed) {
+      writeFiles(out, result.files);
+    }
+    if (json) {
+      writeJson("build", project.root, result.diagnostics, !buildFailed, buildFailed ? {} : { out: path.resolve(out), files: result.files.length });
+      return buildFailed ? 1 : 0;
+    }
+    report(result.diagnostics);
     if (buildFailed) {
       return 1;
     }
-    writeFiles(out, result.files);
     process.stdout.write(`${result.files.length} files written to ${path.resolve(out)}\n`);
     return 0;
   }
@@ -121,6 +131,10 @@ export async function main(argv: string[]): Promise<number> {
 
   switch (command) {
     case "check": {
+      if (json) {
+        writeJson("check", project.root, diagnostics, !failed);
+        return failed ? 1 : 0;
+      }
       report(diagnostics);
       const counts = { error: 0, warning: 0, info: 0 };
       for (const d of diagnostics.items) {
@@ -148,9 +162,16 @@ export async function main(argv: string[]): Promise<number> {
   }
 }
 
+/** `rapt check --json`, `rapt build --json`: diagnostics with absolute paths, for tools. */
+function writeJson(command: string, root: string, diagnostics: Diagnostics, ok: boolean, extra: Record<string, unknown> = {}): void {
+  const sorted = diagnostics.sorted().map((d) => (d.file === undefined ? d : { ...d, path: path.join(root, ...d.file.split("/")) }));
+  process.stdout.write(`${JSON.stringify({ command, ok, root, ...extra, counts: countDiagnostics(sorted), diagnostics: sorted })}\n`);
+}
+
 /** rapt dev: runs until SIGINT or SIGTERM. */
-async function dev(source: string, generate: GenerateOptions, out: unknown, port: unknown): Promise<number> {
+async function dev(source: string, generate: GenerateOptions, out: unknown, port: unknown, json: boolean): Promise<number> {
   const options: DevOptions = { ...generate };
+  if (json) options.events = (event) => process.stdout.write(`${JSON.stringify(event)}\n`);
   if (typeof out === "string") options.outDir = out;
   if (typeof port === "string") {
     const value = Number(port);

@@ -35,6 +35,7 @@ Aucune dépendance externe.
 | `pg` | 8.23.1 | MIT | Pilote PostgreSQL | 2026-11-09 |
 | `chevrotain` | 13.2.0 | Apache-2.0 | Grammaire des URL OData (`$filter`, `$orderby`, `$select`, `$expand`) | 2026-11-09 |
 | `jose` | 6.2.16 | MIT | Vérification des JWT et JWKS (OIDC) | 2026-11-09 |
+| `nodemailer` | 10.5.0 | MIT-0 | Composition MIME et envoi SMTP des mails de `cl_bcs_mail_message` (D41) | 2026-11-11 |
 | `@abaplint/runtime` | 2.14.24 | MIT | Exécution du JavaScript transpilé de l'ABP (types et instructions ABAP) | 2026-11-09 |
 | `fast-xml-parser` | 5.12.0 | MIT | Lecture du `$metadata` des services OData distants (client proxy, D31) | 2026-11-10 |
 
@@ -91,3 +92,16 @@ copyleft limité aux fichiers de la bibliothèque elle-même, sans effet sur not
 | Image `node:22-alpine` | Node.js : MIT ; Alpine : paquets libres | Base de l'image Docker de l'application générée |
 | Image `postgres:16-alpine` | PostgreSQL License | Base de données du docker-compose généré |
 | Image `quay.io/keycloak/keycloak:26.0` | Apache-2.0 | Fournisseur OIDC du profil `oidc` du docker-compose (non embarqué dans l'image de l'application) |
+
+### Extension VS Code (`packages/vscode`)
+
+Le `.vsix` redistribue le compilateur, le runtime et leurs dépendances de production, ainsi
+qu'OpenUI5, `less-openui5` et PGlite pour `rapt dev` (D39) : toutes sous les licences listées
+ci-dessus (MIT, Apache-2.0…), avec leurs fichiers de licence dans `rapt/node_modules`. Outils de
+construction seulement, non redistribués :
+
+| Composant | Version | Licence | Usage |
+|---|---|---|---|
+| `esbuild` | 0.28.2 | MIT | Fichier unique CommonJS de l'extension |
+| `@vscode/vsce` | 3.9.2 | MIT | Construction du `.vsix` |
+| `@types/vscode` | 1.101.0 | MIT | Types de l'API VS Code |

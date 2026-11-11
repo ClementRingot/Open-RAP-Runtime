@@ -172,6 +172,14 @@ function realm(model: Model): Record<string, unknown> {
   });
 }
 
+/** The mails of cl_bcs_mail_message (D41): without MAIL_SMTP_URL they stay in the table rapt_mail. */
+const MAIL_LINES = `
+# Mails of the behavior pool (cl_bcs_mail_message): SMTP server, e.g. smtp://user:password@smtp.example.com:587
+# or smtps://…:465; without it, the mails stay in the table rapt_mail. MAIL_FROM: default sender.
+MAIL_SMTP_URL=
+MAIL_FROM=
+`;
+
 const ENV_EXAMPLE = `# Configuration of the generated application (all optional except the database).
 PORT=8080
 PUBLIC_URL=http://localhost:8080/
@@ -321,7 +329,7 @@ export function generateScaffold(model: Model, diagnostics: Diagnostics, options
     { path: ".dockerignore", content: DOCKERIGNORE },
     { path: "docker-compose.yml", content: compose(name) },
     { path: "keycloak/rapt-realm.json", content: `${JSON.stringify(realm(model), null, 2)}\n` },
-    { path: ".env.example", content: `${ENV_EXAMPLE}${destinationLines(options.destinations ?? [])}` },
+    { path: ".env.example", content: `${ENV_EXAMPLE}${destinationLines(options.destinations ?? [])}${model.services?.mail === true ? MAIL_LINES : ""}` },
     { path: "README.md", content: readme(model, name, options.destinations ?? []) },
     ...vendorPackage(modelDir, "rap-transpiler-model", {}),
     ...vendorPackage(runtimeDir, "rap-transpiler-runtime", { "@rap-transpiler/model": "file:../rap-transpiler-model" }),

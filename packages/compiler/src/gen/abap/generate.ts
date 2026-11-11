@@ -14,6 +14,7 @@ import type { Project, SourceFile } from "../../input/project.js";
 import { abaplintRegistry } from "../../ir/handlers.js";
 import { generateDerivedTypes } from "./derived-types.js";
 import { FRAMEWORK_SOURCES } from "./framework.js";
+import { frameworkClosure, frameworkObjectName } from "./framework-utils.js";
 import { BdefCatalog, findModelProviders, findSaverClasses, poolBdefOf, rewriteAbapFile } from "./rewrite.js";
 import { frameworkDictionary, shadowEntity, shadowTable } from "./shadow.js";
 
@@ -127,6 +128,13 @@ export function abapSources(project: Project, model: Model, diagnostics: Diagnos
     }
     for (const xml of project.files.filter((f) => f.type === type && f.name === name && f.extension === "xml")) {
       sources.push({ fileName: xml.fileName, content: xml.content, original: xml.path });
+    }
+  }
+  // the utilities of ABAP Cloud the project uses (D40), unless it has objects of the same name
+  for (const util of frameworkClosure(sources.filter((s) => s.original !== undefined))) {
+    const type = (util.fileName.split(".")[1] ?? "").toUpperCase();
+    if (!projectObjects.has(`${type}:${frameworkObjectName(util.fileName).toUpperCase()}`)) {
+      sources.push({ fileName: util.fileName, content: util.source });
     }
   }
   return sources;

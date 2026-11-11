@@ -75,3 +75,12 @@ export function formatDiagnostic(d: Diagnostic): string {
   const position = d.file === undefined ? "" : `${d.file}${d.line === undefined ? "" : `:${d.line}`}${d.column === undefined ? "" : `:${d.column}`}: `;
   return `${position}${d.severity} ${d.code} ${d.message}`;
 }
+
+/** Number of diagnostics by severity. */
+export function countDiagnostics(diagnostics: readonly Diagnostic[]): Record<Severity, number> {
+  const counts = { error: 0, warning: 0, info: 0 };
+  for (const d of diagnostics) {
+    counts[d.severity]++;
+  }
+  return counts;
+}
