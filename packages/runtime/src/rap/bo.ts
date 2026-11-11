@@ -91,9 +91,9 @@ export class BoModel {
         if (persistent !== undefined && saving !== "unmanaged") {
           table = persistent;
           columns = columnsOf(persistent);
-        } else if (saving === "unmanaged" && entity.sqlView !== undefined) {
-          // no persistent table: the instances are read through the CDS view
-          table = { name: entity.sqlView, columns: entity.fields.map((f) => ({ name: f.name, type: f.type, key: f.key, notNull: false, client: false })) };
+        } else if (saving === "unmanaged" && (entity.sqlView !== undefined || entity.kind === "custom")) {
+          // no persistent table: the instances are read through the CDS view, or the query class of a custom entity (D43)
+          table = { name: entity.sqlView ?? "", columns: entity.fields.map((f) => ({ name: f.name, type: f.type, key: f.key, notNull: false, client: false })) };
           columns = new Map(entity.fields.map((f) => [f.name, f.name]));
         } else {
           return;

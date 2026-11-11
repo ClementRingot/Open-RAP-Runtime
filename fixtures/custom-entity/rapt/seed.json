@@ -1,0 +1,8 @@
+{
+  "zproduct_api": [
+    { "product_id": "P1", "name": "Laptop", "price": "999.00", "currency": "EUR" },
+    { "product_id": "P2", "name": "Phone", "price": "599.00", "currency": "EUR" },
+    { "product_id": "P3", "name": "Tablet", "price": "399.00", "currency": "USD" },
+    { "product_id": "P4", "name": "Monitor", "price": "249.00", "currency": "EUR" }
+  ]
+}

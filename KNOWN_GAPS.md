@@ -21,6 +21,7 @@ Versions de référence : `@abaplint/core` 2.120.98, `@abaplint/transpiler` 2.14
 | abaplint ne type pas la déclaration en ligne du résultat d'un `SELECT` avec un littéral, un agrégat autre que `COUNT(*)` ou une expression (type `void` « SELECT_todo »). | La méthode transpilée échoue dès son appel. | La passe de réécriture déclare le test d'existence (`@abap_true` : `abap_boolean`) et `MAX`/`MIN` d'une seule source (type de la colonne) ; diagnostic ABP009 pour les autres formes (D26). | Contourné |
 | Le transpiler lit un hôte à composant (`@ls-comp`) comme une soustraction (`ls - comp`) quand le `SELECT` utilise des champs préfixés par un alias (`t~col`). | SQL invalide ou ambigu à l'exécution. | La passe de réécriture l'écrit `@( ls-comp )` (expression hôte équivalente) dans ces `SELECT`. | Contourné |
 | `SELECT … ENDSELECT` lit des lignes entières de la table puis les affecte à la cible. | Avec une liste de champs, cible élémentaire en échec, structure plus courte remplie par position. | Diagnostic ABP007 : `SELECT *`, ou `INTO TABLE` puis `LOOP AT`. | — |
+| Une valeur `int8` (`get_offset( )`, `get_page_size( )` de la pagination d'une requête) dans `LOOP AT … FROM`/`TO` | Le runtime mélange BigInt et nombres : l'exception « Cannot mix BigInt » | `CONV i( … )` avant le `LOOP`, comme dans la fixture `custom-entity`. | — |
 | `OPEN CURSOR … ORDER BY` : le transpiler écrit deux fois `ORDER BY` ; `FETCH NEXT CURSOR … INTO TABLE @DATA(…)` le fait échouer (« InlineDeclarations »). | — | Le doublon est retiré à la traduction SQL ; déclarer la cible du `FETCH`. Les curseurs ne font de toute façon pas partie d'ABAP Cloud (refusés par la vérification). | — |
 
 ## Behavior pool (ABAP)
@@ -65,7 +66,10 @@ Versions de référence : `@abaplint/core` 2.120.98, `@abaplint/transpiler` 2.14
 | Expressions dans la liste de sélection (CAST, CASE, calculs, littéraux) | Diagnostic CDS002 |
 | Chemins d'association dans la liste de sélection (`_Agency.Name`) | Diagnostic CDS002 |
 | Jointures, clause WHERE | Diagnostic CDS002 (WHERE ignoré avec avertissement) |
-| Vues avec paramètres, unions, hiérarchies, entités custom | Diagnostic CDS002 |
+| Vues avec paramètres, unions, hiérarchies | Diagnostic CDS002 |
+| Entités custom (D43) : paramètres, agrégation (`get_aggregation`), `$expand` imbriqué ; DCL non appliqué (la classe de requête filtre elle-même) | Non gérés |
+| Entités custom : un `$filter` hors plages (OU entre éléments, fonctions autres que `contains`/`startswith`/`endswith`, comparaison entre éléments) | `get_as_ranges` lève `cx_rap_query_filter_no_range`, comme dans SAP ; `get_as_sql_string` reste disponible. Les fonctions et expressions non traduisibles : 501. |
+| BO managed avec unmanaged save sur une entité custom (D43) | Propre à rap-transpiler (avertissement BDEF027) ; pas de verrou en base : les LUW de l'application sont sérialisées, l'API cible garde ses propres contrôles. |
 | Contrôle d'accès DCL : EML et ABAP SQL du behavior pool | Non filtrés (comme `WITH PRIVILEGED ACCESS`) ; seules les lectures OData le sont (D35). Comme dans RAP, les modifications passent par l'autorisation d'instance, pas par le DCL. |
 | Contrôle d'accès DCL : autres aspects (`bypass when`, aspects définis par l'utilisateur), chemins de plusieurs associations, `$filter` sur une navigation | Une condition non évaluée n'accorde aucune ligne (DCL002) ; la sous-requête d'un `$filter` sur `_Travel/…` lit la cible sans son DCL. |
 | `@AccessControl.authorizationCheck` | Informatif : un rôle s'applique s'il existe, quelle que soit la valeur. |

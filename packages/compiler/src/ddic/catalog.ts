@@ -203,10 +203,13 @@ export function parseBuiltInType(text: string): AbapType | undefined {
   const type: AbapType = { kind };
   if (match[2] !== undefined) {
     type.length = Number.parseInt(match[2], 10);
-  } else if (kind === "dats") {
-    type.length = 8;
-  } else if (kind === "tims") {
-    type.length = 6;
+  } else {
+    // the fixed lengths of the dictionary types written without one (abap.cuky, abap.lang…)
+    const fixed: Partial<Record<AbapType["kind"], number>> = { dats: 8, tims: 6, cuky: 5, unit: 3, lang: 1, clnt: 3 };
+    const length = fixed[kind];
+    if (length !== undefined) {
+      type.length = length;
+    }
   }
   if (match[3] !== undefined) {
     type.decimals = Number.parseInt(match[3], 10);

@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<abapGit version="v1.0.0" serializer="LCL_OBJECT_BDEF" serializer_version="v1.0.0">
+ <asx:abap xmlns:asx="http://www.sap.com/abapxml" version="1.0">
+  <asx:values>
+   <BDEF>
+    <NAME>ZCE_PRODUCT</NAME>
+    <TYPE>BDEF/BDO</TYPE>
+    <DESCRIPTION>Behavior of ZCE_PRODUCT</DESCRIPTION>
+    <DESCRIPTION_TEXT_LIMIT>60</DESCRIPTION_TEXT_LIMIT>
+    <LANGUAGE>EN</LANGUAGE>
+   </BDEF>
+  </asx:values>
+ </asx:abap>
+</abapGit>

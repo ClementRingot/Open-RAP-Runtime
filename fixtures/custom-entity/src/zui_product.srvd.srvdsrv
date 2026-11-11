@@ -1,0 +1,5 @@
+@EndUserText.label: 'Products (custom entities)'
+define service ZUI_PRODUCT {
+  expose ZCE_Product as Product;
+  expose ZCE_Review  as Review;
+}

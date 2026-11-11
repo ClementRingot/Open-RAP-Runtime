@@ -183,36 +183,43 @@ class AdapterContext {
       return entity;
     }
 
-    // abstract and custom entities: `[key] name : type;`
-    entity.elements = this.typedElements(tree);
+    // abstract and custom entities: `[key] name : type;`, `_Assoc : association … ;`
+    const typed = this.typedElements(tree);
+    entity.elements = typed.elements;
+    entity.associations = typed.associations;
     return entity;
   }
 
   private associations(parent: abaplint.Nodes.ExpressionNode): CdsAssociationAst[] {
     const result: CdsAssociationAst[] = [];
     for (const child of parent.getChildren()) {
-      if (!isExpression(child)) {
-        continue;
+      const association = isExpression(child) ? this.association(child) : undefined;
+      if (association !== undefined) {
+        result.push(association);
       }
-      const isComposition = child.get() instanceof E.CDSComposition;
-      if (!isComposition && !(child.get() instanceof E.CDSAssociation)) {
-        continue;
-      }
-      const tokens = child.getChildren().filter(isToken).map((t) => tokenText(t).toUpperCase());
-      const relation = child.findDirectExpression(E.CDSRelation);
-      const target = relation?.getFirstToken().getStr() ?? "";
-      const alias = relation?.findDirectExpression(E.CDSAs)?.findDirectExpression(E.CDSName)?.concatTokens() ?? target;
-      const kind: CdsAssociationAst["kind"] = isComposition ? "composition" : tokens.includes("PARENT") ? "toParent" : "association";
-      result.push({
-        kind,
-        target,
-        alias,
-        cardinality: this.cardinality(child, kind),
-        on: this.onCondition(child.findDirectExpression(E.CDSCondition)),
-        loc: this.loc(child),
-      });
     }
     return result;
+  }
+
+  /** An association or composition node; `name` for those of custom and abstract entities (`_X : association …`). */
+  private association(child: abaplint.Nodes.ExpressionNode, name?: string): CdsAssociationAst | undefined {
+    const isComposition = child.get() instanceof E.CDSComposition;
+    if (!isComposition && !(child.get() instanceof E.CDSAssociation)) {
+      return undefined;
+    }
+    const tokens = child.getChildren().filter(isToken).map((t) => tokenText(t).toUpperCase());
+    const relation = child.findDirectExpression(E.CDSRelation);
+    const target = relation?.getFirstToken().getStr() ?? "";
+    const alias = name ?? relation?.findDirectExpression(E.CDSAs)?.findDirectExpression(E.CDSName)?.concatTokens() ?? target;
+    const kind: CdsAssociationAst["kind"] = isComposition ? "composition" : tokens.includes("PARENT") ? "toParent" : "association";
+    return {
+      kind,
+      target,
+      alias,
+      cardinality: this.cardinality(child, kind),
+      on: this.onCondition(child.findDirectExpression(E.CDSCondition)),
+      loc: this.loc(child),
+    };
   }
 
   private cardinality(node: abaplint.Nodes.ExpressionNode, kind: CdsAssociationAst["kind"]): { min: number; max: number | "*" } {
@@ -287,8 +294,9 @@ class AdapterContext {
   }
 
   /** Elements of abstract/custom entities: `[key] name : type;`. */
-  private typedElements(tree: abaplint.Nodes.ExpressionNode): CdsElementAst[] {
+  private typedElements(tree: abaplint.Nodes.ExpressionNode): { elements: CdsElementAst[]; associations: CdsAssociationAst[] } {
     const result: CdsElementAst[] = [];
+    const associations: CdsAssociationAst[] = [];
     let pendingAnnotations: abaplint.Nodes.ExpressionNode[] = [];
     let key = false;
     let name: abaplint.Nodes.ExpressionNode | undefined;
@@ -323,11 +331,19 @@ class AdapterContext {
         pendingAnnotations = [];
         key = false;
         name = undefined;
+      } else if ((statement instanceof E.CDSAssociation || statement instanceof E.CDSComposition) && name !== undefined) {
+        const association = this.association(child, name.concatTokens());
+        if (association !== undefined) {
+          associations.push({ ...association, loc: this.loc(name) });
+        }
+        pendingAnnotations = [];
+        key = false;
+        name = undefined;
       } else if (statement instanceof E.CDSElement) {
         result.push(this.element(child));
       }
     }
-    return result;
+    return { elements: result, associations };
   }
 
   public metadataExtension(tree: abaplint.Nodes.ExpressionNode): CdsMetadataExtensionAst {

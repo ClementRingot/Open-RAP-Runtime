@@ -7,7 +7,8 @@ import { sql, type RawBuilder } from "kysely";
 import type { AbapType, EdmType, FieldModel } from "@rap-transpiler/model";
 import type { Database } from "../db/database.js";
 import { fromSql, literalToCanonical, toSql, type CanonicalValue, type UrlLiteral } from "../values.js";
-import { badRequest, notImplemented } from "./errors.js";
+import { badRequest, notImplemented, ODataError } from "./errors.js";
+import type { Cond, CustomQueries } from "./custom.js";
 import type { AccessControls } from "./access.js";
 import { DEPENDENT_ETAG } from "./json.js";
 import type { Key, ServiceRuntime, TypeInfo } from "./service.js";
@@ -30,12 +31,105 @@ function escapeLike(value: string): string {
 }
 
 export class ReadEngine {
+  /** The query classes of the custom entities (D43), when the application has a RAP runtime. */
+  public queries?: CustomQueries;
+  /** Scopes on custom entities: the SQL placeholder stands for a condition given to the query class. */
+  private readonly customScopes = new WeakMap<RawBuilder<unknown>, Cond>();
+
   public constructor(
     private readonly service: ServiceRuntime,
     private readonly db: () => Database,
     /** The access controls (DCL) of the entities, for the user of the request (D35). */
     private readonly access?: AccessControls,
   ) {}
+
+  // -------------------------------------------------------------------------------------------
+  // custom entities (D43)
+
+  private customScope(cond: Cond): RawBuilder<unknown> {
+    const placeholder = sql`TRUE`;
+    this.customScopes.set(placeholder, cond);
+    return placeholder;
+  }
+
+  private customQueries(): CustomQueries {
+    if (this.queries === undefined) {
+      throw new ODataError(500, "NO_QUERY_RUNTIME", "custom entities are read by their query class: the application has no ABAP runtime");
+    }
+    return this.queries;
+  }
+
+  /** Equalities on properties, as a condition on the elements of the custom entity. */
+  private equalities(info: TypeInfo, properties: string[], values: CanonicalValue[]): Cond {
+    const items: Cond[] = properties.map((p, i) => ({ kind: "cmp", name: this.service.property(info, p).field.name, op: "eq", value: values[i] ?? null }));
+    return items.length === 1 ? (items[0] as Cond) : { kind: "and", items };
+  }
+
+
+  private scopeConditions(scope: RawBuilder<unknown>[]): Cond[] {
+    return scope.map((s) => {
+      const cond = this.customScopes.get(s);
+      if (cond === undefined) {
+        throw notImplemented("A condition in SQL on a custom entity");
+      }
+      return cond;
+    });
+  }
+
+  private async customCollection(info: TypeInfo, options: QueryOptions, scope: RawBuilder<unknown>[], withCount: boolean): Promise<ReadResult> {
+    const needed = this.neededForExpand(info, options.expand);
+    const properties = this.selectedProperties(info, options, needed);
+    const scoped = this.scopeConditions(scope);
+    const filter = options.filter === undefined ? undefined : this.customQueries().condition(info, options.filter);
+    const top = Math.min(options.top ?? MAX_PAGE_SIZE, MAX_PAGE_SIZE);
+    const result = await this.customQueries().select(info, {
+      ...(filter === undefined ? {} : { filter }),
+      scope: scoped,
+      ...(options.orderby === undefined ? {} : { orderby: options.orderby }),
+      ...(options.search === undefined ? {} : { search: options.search }),
+      top,
+      skip: options.skip ?? 0,
+      count: withCount,
+      data: true,
+      properties,
+    });
+    const rows = result.rows;
+    const read: ReadResult = { rows };
+    if (withCount && result.total !== undefined) {
+      read.count = result.total;
+    }
+    await this.expand(info, rows, options.expand);
+    return read;
+  }
+
+  private async customExpand(rows: Row[], target: TypeInfo, navigation: { name: string; collection: boolean; on: Array<{ source: string; target: string }> }, item: ExpandItem, properties: string[], needed: string[]): Promise<void> {
+    const targetFields = navigation.on.map((p) => p.target);
+    const tuples = rows.map((r) => navigation.on.map((p) => r[p.source] as CanonicalValue));
+    const distinct = [...new Map(tuples.map((t) => [JSON.stringify(t), t])).values()].filter((t) => t.every((v) => v !== null));
+    let matches: Row[] = [];
+    if (distinct.length > 0) {
+      const scope: Cond = distinct.length === 1 ? this.equalities(target, targetFields, distinct[0] ?? []) : { kind: "or", items: distinct.map((t) => this.equalities(target, targetFields, t)) };
+      const filter = item.options.filter === undefined ? undefined : this.customQueries().condition(target, item.options.filter);
+      const result = await this.customQueries().select(target, {
+        ...(filter === undefined ? {} : { filter }),
+        scope: [scope],
+        ...(item.options.orderby === undefined ? {} : { orderby: item.options.orderby }),
+        count: false,
+        data: true,
+        properties,
+      });
+      matches = result.rows;
+    }
+    for (const row of rows) {
+      const all = matches.filter((m) => navigation.on.every((p) => m[p.target] === row[p.source]));
+      const skip = item.options.skip ?? 0;
+      const mine = all.slice(skip, item.options.top === undefined ? undefined : skip + item.options.top);
+      row[navigation.name] = navigation.collection ? mine.map((m) => strip(m, properties, needed)) : mine[0] === undefined ? null : strip(mine[0], properties, needed);
+      if (navigation.collection && item.options.count === true) {
+        row[`${navigation.name}@odata.count`] = all.length;
+      }
+    }
+  }
 
   // -------------------------------------------------------------------------------------------
   // expressions
@@ -391,6 +485,9 @@ export class ReadEngine {
   }
 
   private keyCondition(info: TypeInfo, alias: string, key: Key): RawBuilder<unknown>[] {
+    if (info.entity.kind === "custom") {
+      return [this.customScope(this.equalities(info, info.type.keys, info.type.keys.map((k) => key[k] ?? null)))];
+    }
     return info.type.keys.map((k) => {
       const { field } = this.service.property(info, k);
       return sql`${sql.ref(`${alias}.${k}`)} = ${toSql(field.type, key[k] ?? null)}`;
@@ -399,6 +496,9 @@ export class ReadEngine {
 
   /** Reads a collection of an entity set, optionally restricted to the targets of a navigation. */
   public async readCollection(info: TypeInfo, options: QueryOptions, scope: RawBuilder<unknown>[] = [], withCount = options.count === true): Promise<ReadResult> {
+    if (info.entity.kind === "custom") {
+      return this.customCollection(info, options, scope, withCount);
+    }
     const alias = "t0";
     const needed = this.neededForExpand(info, options.expand);
     const properties = this.selectedProperties(info, options, needed);
@@ -416,6 +516,12 @@ export class ReadEngine {
   }
 
   public async count(info: TypeInfo, options: QueryOptions, scope: RawBuilder<unknown>[] = []): Promise<number> {
+    if (info.entity.kind === "custom") {
+      const scoped = this.scopeConditions(scope);
+      const filter = options.filter === undefined ? undefined : this.customQueries().condition(info, options.filter);
+      const result = await this.customQueries().select(info, { ...(filter === undefined ? {} : { filter }), scope: scoped, ...(options.search === undefined ? {} : { search: options.search }), count: true, data: false, properties: [] });
+      return result.total ?? 0;
+    }
     const alias = "t0";
     const where = this.where(info, alias, { ...(options.filter === undefined ? {} : { filter: options.filter }), ...(options.search === undefined ? {} : { search: options.search }) }, scope);
     const { rows } = await sql<{ n: string | number }>`SELECT count(*) AS n FROM ${sql.table(info.view)} AS ${sql.id(alias)} ${where}`.execute(this.db());
@@ -433,6 +539,9 @@ export class ReadEngine {
     const parent = await this.readOne(source, key, { select: nav.on.map((p) => [p.source]) });
     if (parent === undefined) {
       return undefined;
+    }
+    if (target.entity.kind === "custom") {
+      return { target, scope: [this.customScope(this.equalities(target, nav.on.map((p) => p.target), nav.on.map((p) => parent[p.source] as CanonicalValue)))], collection: nav.collection };
     }
     const scope = nav.on.map((p) => {
       const { field } = this.service.property(target, p.target);
@@ -477,6 +586,10 @@ export class ReadEngine {
       const targetFields = navigation.on.map((p) => p.target);
       const needed = [...targetFields];
       const properties = this.selectedProperties(target, item.options, needed);
+      if (target.entity.kind === "custom") {
+        await this.customExpand(rows, target, navigation, item, properties, needed);
+        continue;
+      }
       const tuples = rows.map((r) => navigation.on.map((p) => r[p.source] as CanonicalValue));
       const distinct = [...new Map(tuples.map((t) => [JSON.stringify(t), t])).values()].filter((t) => t.every((v) => v !== null));
       const attach = (matches: Row[]): void => {

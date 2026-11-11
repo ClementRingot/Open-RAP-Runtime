@@ -1,0 +1,16 @@
+managed with unmanaged save implementation in class zbp_ce_product unique;
+strict ( 2 );
+
+define behavior for ZCE_Product alias Product
+lock master
+authorization master ( global )
+{
+  create;
+  update;
+  delete;
+
+  field ( mandatory : create, readonly : update ) ProductID;
+  field ( mandatory ) Name, Currency;
+
+  validation validatePrice on save { create; field Price; }
+}

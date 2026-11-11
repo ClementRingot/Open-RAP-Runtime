@@ -189,7 +189,8 @@ export interface AssociationModel {
   src?: SourceRef;
 }
 
-export type EntityKind = "view" | "projection" | "abstract";
+/** `custom`: custom entity read by its query class (unmanaged query, D43). */
+export type EntityKind = "view" | "projection" | "abstract" | "custom";
 
 export interface EntityModel {
   /** CDS entity name as written: ZR_Travel. */
@@ -199,8 +200,10 @@ export interface EntityModel {
   /** View entities: the source table (lower case). Projections: the projected entity. */
   source?: string;
   providerContract?: string;
-  /** Name of the generated SQL view (lower case); abstract entities have none. */
+  /** Name of the generated SQL view (lower case); abstract and custom entities have none. */
   sqlView?: string;
+  /** Custom entities: the class of `@ObjectModel.query.implementedBy`, upper case. */
+  queryClass?: string;
   fields: FieldModel[];
   associations: AssociationModel[];
   annotations: Annotations;

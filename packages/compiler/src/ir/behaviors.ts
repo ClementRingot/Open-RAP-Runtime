@@ -253,10 +253,17 @@ function buildEntityBehavior(
   }
 
   if (!isProjection) {
-    if (entity.kind !== "view") {
-      diagnostics.error("BDEF013", `${entity.name}: a managed BDEF must be defined on a view entity, not a ${entity.kind}`, at(ast.entity.loc));
-    }
     const unmanagedSave = (model.saving ?? behavior.saving)?.kind === "unmanaged";
+    if (entity.kind === "custom" && unmanagedSave) {
+      // rap-transpiler only (D43): instances read by the query class, written by save_modified
+      diagnostics.warning(
+        "BDEF027",
+        `${entity.name}: a managed BO with unmanaged save on a custom entity runs with rap-transpiler only; it cannot be activated on SAP (unmanaged BO there)`,
+        at(ast.entity.loc),
+      );
+    } else if (entity.kind !== "view") {
+      diagnostics.error("BDEF013", `${entity.name}: a managed BDEF must be defined on a view entity, not a ${entity.kind}${entity.kind === "custom" ? " (except with unmanaged save, D43)" : ""}`, at(ast.entity.loc));
+    }
     if (model.persistentTable === undefined && !unmanagedSave) {
       diagnostics.error("BDEF014", `${entity.name}: a managed entity needs a persistent table (or with unmanaged save)`, at(ast.loc));
     }
