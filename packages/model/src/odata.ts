@@ -4,7 +4,7 @@
  */
 
 import { edmTypeOf, type AbapType, type EdmEnum, type EdmType } from "./abap-types.js";
-import { getBoolean } from "./annotations.js";
+import { getAnnotation, getBoolean } from "./annotations.js";
 import { baseEntityOf, entitySetOfEntity, findEntity, findEntityBehavior, same } from "./lookup.js";
 import type { ActionModel, EntityBehaviorModel, EntityModel, FieldCharacteristic, FieldModel, Model } from "./model.js";
 
@@ -306,6 +306,10 @@ export function buildODataService(model: Model): ODataService {
     for (const field of entity.fields) {
       const characteristics = characteristicsOf(model, entity, field);
       if (characteristics.includes("suppress")) {
+        continue;
+      }
+      // @Consumption.hidden: not exposed (D57), unless a key or an element of an association
+      if (getAnnotation(field.annotations, "Consumption.hidden") === true && !field.key && !entity.associations.some((a) => a.on.some((p) => same(p.source, field.name)))) {
         continue;
       }
       const edm = edmTypeOfField(model, field.type);

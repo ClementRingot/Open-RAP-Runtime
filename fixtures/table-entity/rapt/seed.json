@@ -5,8 +5,8 @@
     { "category": "US", "description": "US purchases", "defaultcurrency": "USD" }
   ],
   "zrt_order": [
-    { "orderid": "00000001", "name": "Laptops for the team", "status": "O", "priority": 9, "amount": "4500.00", "currency": "EUR" },
-    { "orderid": "00000002", "name": "Office chairs", "status": "D", "priority": 5, "amount": "1200.00", "currency": "EUR" },
-    { "orderid": "00000003", "name": "Coffee machine", "status": "", "priority": 0, "amount": "300.00", "currency": "USD" }
+    { "orderid": "00000001", "name": "Laptops for the team", "status": "O", "priority": 9, "amount": "4500.00", "currency": "EUR", "email": "ana@example.com", "progress": 40, "criticality": 2 },
+    { "orderid": "00000002", "name": "Office chairs", "status": "D", "priority": 5, "amount": "1200.00", "currency": "EUR", "email": "ben@example.com", "progress": 100, "criticality": 3 },
+    { "orderid": "00000003", "name": "Coffee machine", "status": "", "priority": 0, "amount": "300.00", "currency": "USD", "progress": 0, "criticality": 1 }
   ]
 }

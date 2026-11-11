@@ -46,37 +46,69 @@ function enumItems(field: UiField, empty: boolean): string {
   return `${empty ? `<core:Item key="" text=""/>` : ""}${(field.options ?? []).map((o) => `<core:Item key="${esc(o.key)}" text="${esc(o.text)}"/>`).join("")}`;
 }
 
-/** A display control (list report cells). */
-function display(field: UiField): string {
+/** The state of a criticality (0 neutral, 1 negative, 2 critical, 3 positive), as an expression (D57). */
+function criticalityState(field: UiField): string {
+  const c = `%{${field.criticality ?? ""}}`;
+  return esc(`{= ${c} === 1 ? 'Error' : ${c} === 2 ? 'Warning' : ${c} === 3 ? 'Success' : 'None' }`);
+}
+
+/** The value with its text (`@ObjectModel.text.element`, `@UI.textArrangement`, D57). */
+function valueText(field: UiField): string {
+  if (field.kind === "enum") {
+    return enumText(field);
+  }
+  const text = field.text;
+  if (text === undefined || text.arrangement === "TextSeparate") {
+    return `{${field.property}}`;
+  }
+  const v = `\${${field.property}}`;
+  const t = `\${${text.property}}`;
+  switch (text.arrangement) {
+    case "TextOnly":
+      return esc(`{= ${t} ? ${t} : ${v} }`);
+    case "TextLast":
+      return esc(`{= ${t} ? ${v} + ' (' + ${t} + ')' : ${v} }`);
+    default:
+      return esc(`{= ${t} ? ${t} + ' (' + ${v} + ')' : ${v} }`);
+  }
+}
+
+/**
+ * A display control: numbers, check boxes, links (e-mail, phone, URL), statuses with their
+ * criticality, texts. `extra`: attributes (id, visibility).
+ */
+function displayControl(field: UiField, extra: string): string {
+  const state = field.criticality === undefined ? "" : ` state="${criticalityState(field)}"`;
   switch (field.kind) {
-    case "enum":
-      return `<Text text="${enumText(field)}"/>`;
     case "amount":
     case "decimal":
     case "integer":
-      return `<ObjectNumber number="{${field.property}}"${field.unit === undefined ? "" : ` unit="{${field.unit}}"`} emphasized="false"/>`;
+      return `<ObjectNumber${extra} number="{${field.property}}"${field.unit === undefined ? "" : ` unit="{${field.unit}}"`} emphasized="false"${state}/>`;
     case "boolean":
-      return `<CheckBox selected="{${field.property}}" editable="false"/>`;
+      return `<CheckBox${extra} selected="{${field.property}}" editable="false"/>`;
     default:
-      return `<Text text="{${field.property}}"/>`;
+      break;
   }
+  if (field.link !== undefined) {
+    const href =
+      field.link.kind === "url" ? `{${field.link.url ?? field.property}}` : esc(`{= ${field.link.kind === "email" ? "'mailto:'" : "'tel:'"} + \${${field.property}} }`);
+    return `<Link${extra} text="${valueText(field)}" href="${href}"${field.link.kind === "url" ? ' target="_blank"' : ""}/>`;
+  }
+  if (field.criticality !== undefined) {
+    return `<ObjectStatus${extra} text="${valueText(field)}"${state}/>`;
+  }
+  return `<Text${extra} text="${valueText(field)}"${field.multiLine === true ? ' renderWhitespace="true"' : ""}/>`;
+}
+
+/** A display control (list report cells). */
+function display(field: UiField): string {
+  return displayControl(field, "");
 }
 
 /** The value as text (display mode of a form or a child table). */
 function text(field: UiField, id?: string): string {
   const idAttribute = id === undefined ? "" : ` id="${esc(id)}"`;
-  switch (field.kind) {
-    case "enum":
-      return `<Text${idAttribute} text="${enumText(field)}" visible="${esc("{= !${ui>/editMode} }")}"/>`;
-    case "boolean":
-      return `<CheckBox${idAttribute} selected="{${field.property}}" editable="false" visible="${esc("{= !${ui>/editMode} }")}"/>`;
-    case "amount":
-    case "decimal":
-    case "integer":
-      return `<ObjectNumber${idAttribute} number="{${field.property}}"${field.unit === undefined ? "" : ` unit="{${field.unit}}"`} emphasized="false" visible="${esc("{= !${ui>/editMode} }")}"/>`;
-    default:
-      return `<Text${idAttribute} text="{${field.property}}" visible="${esc("{= !${ui>/editMode} }")}"/>`;
-  }
+  return displayControl(field, `${idAttribute} visible="${esc("{= !${ui>/editMode} }")}"`);
 }
 
 /** Text in display mode, input in edit mode. */
@@ -91,6 +123,9 @@ function displayOrInput(field: UiField, id: string | undefined): string {
 function input(field: UiField, id: string | undefined): string {
   const common = `${id === undefined ? "" : `id="${esc(id)}" `}editable="${editable(field)}" visible="{ui>/editMode}"`;
   const required = field.mandatory ? ` required="{ui>/editMode}"` : "";
+  if (field.multiLine === true && field.kind === "text" && field.valueHelp === undefined) {
+    return `<TextArea ${common}${required} value="{${field.property}}" rows="4" width="100%" growing="true"/>`;
+  }
   switch (field.kind) {
     case "enum":
       return `<Select ${common}${required} forceSelection="false" width="100%" selectedKey="${enumValue(field)}">${enumItems(field, false)}</Select>`;
@@ -153,7 +188,7 @@ function filterControl(f: UiField): string {
     case "enum":
       return `<Select id="${controlId}" width="100%" change=".onFilterChange">${enumItems(f, true)}</Select>`;
     default:
-      return `<MultiInput id="${controlId}" width="100%" submit=".onFilterSubmit" tokenUpdate=".onFilterChange" showValueHelp="${f.valueHelp === undefined ? "false" : "true"}" valueHelpRequest=".onFilterValueHelp" placeholder="${esc(placeholderOf(f))}"><customData><core:CustomData key="property" value="${esc(f.property)}"/></customData></MultiInput>`;
+      return `<MultiInput id="${controlId}" width="100%"${f.filter?.single === true ? ' maxTokens="1"' : ""} submit=".onFilterSubmit" tokenUpdate=".onFilterChange" showValueHelp="${f.valueHelp === undefined ? "false" : "true"}" valueHelpRequest=".onFilterValueHelp" placeholder="${esc(placeholderOf(f))}"><customData><core:CustomData key="property" value="${esc(f.property)}"/></customData></MultiInput>`;
   }
 }
 
@@ -168,7 +203,7 @@ function listReport(page: UiPage): string {
   // draft (D54): the active instances and the new drafts; an edited instance shows its marker
   const parameters = [`$count: true`, ...(table.orderby === undefined ? [] : [`$orderby: '${table.orderby}'`]), ...(page.draft === undefined ? [] : [`$filter: 'IsActiveEntity eq true or HasActiveEntity eq false'`])];
   const filters = list.filterFields
-    .map((f) => `<VBox id="filterItem_${idOf(f.property)}" class="raptFilterItem" width="12rem" visible="{= %{lr>/visible/${f.property}} === true }"><Label text="${esc(f.label)}" labelFor="filter_${idOf(f.property)}"/>${filterControl(f)}</VBox>`)
+    .map((f) => `<VBox id="filterItem_${idOf(f.property)}" class="raptFilterItem" width="12rem" visible="{= %{lr>/visible/${f.property}} === true }"><Label text="${esc(f.label)}" labelFor="filter_${idOf(f.property)}"${f.filter?.mandatory === true ? ' required="true"' : ""}/>${filterControl(f)}</VBox>`)
     .join("\n          ");
   const search = list.searchable
     ? `<VBox class="raptFilterItem" width="12rem"><Label text="Search" labelFor="search"/><SearchField id="search" width="100%" search=".onSearch"/></VBox>`
@@ -407,6 +442,36 @@ function tablesOf(section: UiSection): UiTable[] {
   return section.kind === "table" ? [section.table] : section.kind === "collection" ? section.sections.flatMap(tablesOf) : [];
 }
 
+/** The header facets of the object page: data points and field groups (D57). */
+function headerContent(page: UiPage): string {
+  const facets = page.headerFacets ?? [];
+  if (facets.length === 0) {
+    return "";
+  }
+  const blocks = facets.map((facet) => {
+    const title = facet.title === "" ? "" : `<Title text="${esc(facet.title)}" level="H5" class="sapUiTinyMarginBottom"/>`;
+    if (facet.kind === "fields") {
+      const rows = facet.fields.map((f) => `<HBox alignItems="Center"><Label text="${esc(f.label)}:" class="sapUiTinyMarginEnd"/>${display(f)}</HBox>`).join("");
+      return `<VBox id="header_${idOf(facet.id)}" class="sapUiLargeMarginEnd sapUiSmallMarginBottom">${title}${rows}</VBox>`;
+    }
+    const f = facet.field;
+    const state = f.criticality === undefined ? "" : ` state="${criticalityState(f)}"`;
+    let control: string;
+    if (facet.visualization === "rating") {
+      control = `<RatingIndicator value="{${f.property}}" maxValue="${facet.target ?? 5}" editable="false" iconSize="1.25rem"/>`;
+    } else if (facet.visualization === "progress") {
+      const target = facet.target ?? 100;
+      control = `<ProgressIndicator width="12rem" percentValue="${esc(`{= Math.min(100, Math.max(0, %{${f.property}} * 100 / ${target})) }`)}" displayValue="${esc(`{= %{${f.property}} + ' / ${target}' }`)}"${state}/>`;
+    } else if (f.kind === "amount" || f.kind === "decimal" || f.kind === "integer") {
+      control = `<ObjectNumber number="{${f.property}}"${f.unit === undefined ? "" : ` unit="{${f.unit}}"`} emphasized="true" class="sapMObjectNumberLarge"${state}/>`;
+    } else {
+      control = `<ObjectStatus text="${valueText(f)}"${state} class="sapMObjectStatusLarge"/>`;
+    }
+    return `<VBox id="header_${idOf(facet.id)}" class="sapUiLargeMarginEnd sapUiSmallMarginBottom">${title}${control}</VBox>`;
+  });
+  return `<uxap:headerContent><FlexBox wrap="Wrap" alignItems="Start">${blocks.join("")}</FlexBox></uxap:headerContent>`;
+}
+
 function objectPage(page: UiPage, layout: UiLayout): string {
   const title = page.title === undefined ? `<Title text="${esc(page.typeName)}" wrapping="true"/>` : `<Title text="{${page.title}}" wrapping="true"/>`;
   const edit = page.updatable
@@ -431,6 +496,7 @@ function objectPage(page: UiPage, layout: UiLayout): string {
         </uxap:actions>
       </uxap:ObjectPageDynamicHeaderTitle>
     </uxap:headerTitle>
+    ${headerContent(page)}
     <uxap:sections>
     ${page.sections.map(section).join("\n    ")}
     </uxap:sections>

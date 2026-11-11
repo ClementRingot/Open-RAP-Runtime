@@ -77,6 +77,10 @@ describe("table entities and CDS types", () => {
       ["Amount", "amount"],
       ["Currency", "currency"],
       ["Note", "note"],
+      ["Email", "email"],
+      ["Progress", "progress"],
+      ["Criticality", "criticality"],
+      ["InternalRef", "internalref"],
     ]);
     // simple type: its base type and its label
     expect(order?.fields.find((f) => f.name === "Name")).toMatchObject({ type: { kind: "char", length: 40, dataElement: "ZRT_ORDER_NAME" }, annotations: { endusertext: { label: "Order name" } } });
@@ -90,6 +94,10 @@ describe("table entities and CDS types", () => {
       ["amount", false, true],
       ["currency", false, true],
       ["note", false, false],
+      ["email", false, true],
+      ["progress", false, true],
+      ["criticality", false, true],
+      ["internalref", false, true],
     ]);
     expect(model?.behaviors.find((b) => b.name === "ZRT_ORDER")?.entities[0]?.persistentTable).toBe("zrt_order");
     expect(model?.enumTypes).toEqual([
@@ -134,6 +142,19 @@ describe("table entities and CDS types", () => {
     const currency = /<Annotations Target="SAP__self.OrdersType\/Currency">[\s\S]*?<\/Annotations>/.exec(csdl)?.[0] ?? "";
     expect(currency).toContain('<Annotation Term="Common.ValueListForValidation" String=""/>');
     expect(model?.service.entitySets.map((s) => s.name)).toEqual(expect.arrayContaining(["ZRT_ORDER_CAT", "I_Currency"]));
+  });
+
+  it("expose the annotations of the UI: data points, header facets, texts, links, filters (D57)", () => {
+    const { model } = buildModel(loadProject(FIXTURE));
+    const csdl = generateCsdl(model as NonNullable<typeof model>);
+    expect(csdl).toMatch(/<Annotation Term="UI.DataPoint" Qualifier="Progress">\s*<Record Type="UI.DataPointType">\s*<PropertyValue Property="Value" Path="Progress"\/>\s*<PropertyValue Property="Title" String="Delivery"\/>\s*<PropertyValue Property="TargetValue" Decimal="100"\/>\s*<PropertyValue Property="Criticality" Path="Criticality"\/>\s*<PropertyValue Property="Visualization" EnumMember="UI.VisualizationType\/Progress"\/>/);
+    expect(csdl).toMatch(/<Annotation Term="UI.HeaderFacets">[\s\S]*?AnnotationPath="@UI.DataPoint#Progress"[\s\S]*?AnnotationPath="@UI.FieldGroup#Buyer"/);
+    expect(csdl).toContain('<Annotation Term="Communication.IsEmailAddress"/>');
+    expect(csdl).toContain('<Annotation Term="UI.MultiLineText"/>');
+    expect(csdl).toContain('<Annotation Term="Common.FilterDefaultValue" String="EUR"/>');
+    expect(csdl).toMatch(/<Annotation Term="Common.Text" Path="Name">\s*<Annotation Term="UI.TextArrangement" EnumMember="UI.TextArrangementType\/TextFirst"\/>/);
+    // @Consumption.hidden: not exposed
+    expect(csdl).not.toContain("InternalRef");
   });
 
   it("check the enumerated types", () => {

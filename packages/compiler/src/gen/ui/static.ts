@@ -1058,6 +1058,18 @@ export const LIST_CONTROLLER = `sap.ui.define([
       this._aFilters = [];
       this.getView().setModel(this._oLr, "lr");
       this._oStandard = this._state();
+      // the default values of the filters (@Consumption.filter.defaultValue, D57)
+      var bDefaults = false;
+      oPage.list.filterFields.forEach(function (f) {
+        if (f.filter && f.filter.defaultValue !== undefined) {
+          bDefaults = true;
+          this._oStandard.filters[f.property] = f.kind === "boolean" || f.kind === "enum" ? f.filter.defaultValue : ["=" + f.filter.defaultValue];
+          if (this._oStandard.visible.indexOf(f.property) < 0) {
+            this._oStandard.visible.push(f.property);
+          }
+        }
+      }, this);
+      this._bFilterDefaults = bDefaults;
       // the bindings of other pages do not see the changes of this one: refresh when coming back
       var oRouter = this.getOwnerComponent().getRouter();
       var oRoute = oRouter.getRoute(this._sSet + "List");
@@ -1076,7 +1088,7 @@ export const LIST_CONTROLLER = `sap.ui.define([
         that._oLr.setProperty("/variants", aItems);
         var sDefault = aItems.some(function (v) { return v.key === oData.defaultKey; }) ? oData.defaultKey : STANDARD;
         that._oLr.setProperty("/defaultVariant", sDefault);
-        if (sDefault !== STANDARD) {
+        if (sDefault !== STANDARD || that._bFilterDefaults) {
           that._selectVariant(sDefault);
         }
       });
@@ -1217,6 +1229,15 @@ export const LIST_CONTROLLER = `sap.ui.define([
           return;
         }
         var oFilter = null;
+        // a mandatory filter (@Consumption.filter.mandatory, D57)
+        if (oField.filter && oField.filter.mandatory) {
+          var bEmpty = oControl.getTokens ? oControl.getTokens().length === 0 && oControl.getValue() === "" : oControl.getSelectedKey ? oControl.getSelectedKey() === "" : !oControl.getDateValue();
+          oControl.setValueState(bEmpty ? "Error" : "None");
+          if (bEmpty) {
+            oControl.setValueStateText("Fill in this filter");
+            bValid = false;
+          }
+        }
         if (oField.kind === "date" || oField.kind === "datetime") {
           var oFrom = oControl.getDateValue();
           var oTo = oControl.getSecondDateValue();

@@ -1117,3 +1117,29 @@ et la conséquence. Les numéros D1 à D13 correspondent aux points 1 à 13 du �
 - **Tests** : `compiler/test/table-entity.test.ts` (CSDL), `runtime/test/table-entity.test.ts`
   (liste déroulante qui remplit la devise, validation, dans le navigateur),
   `runtime/test/standard-views.test.ts`.
+
+## D57 — Annotations d'affichage : criticité, textes, en-tête, liens, filtres
+
+- **Contexte** : l'UI générée suivait les annotations de structure (`lineItem`, `identification`,
+  `facet`…) mais pas celles d'affichage courantes des BO RAP ; la table complète est dans
+  [ANNOTATIONS.md](ANNOTATIONS.md).
+- **Décision** :
+  - `criticality` (line item, identification, data point) : `ObjectStatus` ou `ObjectNumber`
+    coloré (1 négatif, 2 critique, 3 positif) ;
+  - `@ObjectModel.text.element` + `@UI.textArrangement` : « Texte (ID) » (défaut, comme Fiori
+    Elements), « ID (Texte) », texte seul, séparé ;
+  - `@UI.dataPoint` (`UI.DataPoint`, qualifié par son `qualifier` ou le nom de l'élément) et
+    `@UI.facet` purpose `#HEADER` (`#DATAPOINT_REFERENCE`, `#FIELDGROUP_REFERENCE`) : en-tête de
+    l'Object Page, barre de progression (`#PROGRESS`, `targetValue`), notation (`#RATING`), nombre ;
+  - `@UI.multiLineText` : zone de texte ; `@Semantics.email.address`, `@Semantics.telephone.type` :
+    liens `mailto:` / `tel:` (vocabulaire `Communication`) ; line item `#WITH_URL` : lien ;
+  - `@Consumption.filter.defaultValue` (filtre initial, appliqué par la variante standard),
+    `mandatory` (filtre obligatoire, `FilterRestrictions`), `selectionType` /
+    `multipleSelections` (une valeur) ;
+  - `@Consumption.hidden` : élément non exposé, sauf une clé ou l'élément d'une association.
+  - Correctif : `@UI.facet: […]` puis `@UI: { … }` sur le même élément gardent les deux (la
+    seconde annotation remplaçait la première).
+- **Pourquoi** : ce sont les annotations que les exemples SAP (RAP100, Flight) utilisent sur
+  chaque BO ; elles changent ce que voit l'utilisateur sans changer le BO.
+- **Tests** : `compiler/test/table-entity.test.ts` (CSDL), `runtime/test/table-entity.test.ts`
+  (navigateur), fixture `fixtures/table-entity`.

@@ -233,8 +233,9 @@ traitement en arrière-plan (`cl_bgmc_process_factory`) et e-mail (`cl_bcs_mail_
 
 Le List Report et l'Object Page suivent les annotations `@UI` : `headerInfo`, `lineItem` (colonnes
 et actions de table), `selectionField`, `identification` (champs et actions d'en-tête),
-`fieldGroup`, `facet` (sections, tables des compositions), `presentationVariant` (tri),
-`hidden`.
+`fieldGroup`, `facet` (sections, tables des compositions, en-tête), `dataPoint`, `presentationVariant`
+(tri), `hidden`, `multiLineText`, `textArrangement`, la criticité, `@Consumption.filter`. La liste
+complète, annotation par annotation : [ANNOTATIONS.md](ANNOTATIONS.md).
 
 - **Filtres** : conditions comme SAP Fiori, plusieurs par champ :
 

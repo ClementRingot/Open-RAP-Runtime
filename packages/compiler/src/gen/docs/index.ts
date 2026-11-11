@@ -21,7 +21,7 @@ export interface DocPage {
 }
 
 /** The order of the pages; the others follow, by name. */
-const ORDER = ["README.md", "GUIDE.md", "FEATURES.md", "DIAGNOSTICS.md", "DEPLOIEMENT.md", "MCP.md", "UTILITAIRES.md", "API_DISTANTES.md", "KNOWN_GAPS.md", "AGENTS.md", "DECISIONS.md"];
+const ORDER = ["README.md", "GUIDE.md", "FEATURES.md", "ANNOTATIONS.md", "DIAGNOSTICS.md", "DEPLOIEMENT.md", "MCP.md", "UTILITAIRES.md", "API_DISTANTES.md", "KNOWN_GAPS.md", "AGENTS.md", "DECISIONS.md"];
 
 /** The folder of the documentation: copied next to the compiled compiler, or that of the repository. */
 export function documentationDir(): string | undefined {

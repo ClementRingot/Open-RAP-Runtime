@@ -82,7 +82,16 @@ export function setAnnotation(annotations: Annotations, path: string, value: Ann
       current = created;
     }
   }
-  current[segments[segments.length - 1] as string] = value;
+  const last = segments[segments.length - 1] as string;
+  const existing = current[last];
+  if (isObject(existing) && isObject(value)) {
+    // `@UI.facet: …` then `@UI: { lineItem: … }` on the same element: both are kept
+    for (const [key, inner] of Object.entries(value)) {
+      setAnnotation(existing, key, inner);
+    }
+    return;
+  }
+  current[last] = value;
 }
 
 /**

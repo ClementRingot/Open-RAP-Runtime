@@ -51,7 +51,22 @@ export interface UiField {
   valueHelp?: UiValueHelp;
   /** Enumeration type (enhanced mode, D55): the members, in the order of the CDS type. */
   options?: UiOption[];
+  /** `criticality` of the line item, identification or data point: the property giving 0 to 3 (D57). */
+  criticality?: string;
+  /** `@ObjectModel.text.element` and `@UI.textArrangement` (D57). */
+  text?: { property: string; arrangement: "TextFirst" | "TextLast" | "TextOnly" | "TextSeparate" };
+  /** `@UI.multiLineText` (D57). */
+  multiLine?: boolean;
+  /** `@Semantics.email.address`, `@Semantics.telephone.type`, line item `#WITH_URL` (D57). */
+  link?: { kind: "email" | "phone" | "url"; url?: string };
+  /** `@Consumption.filter`: default value, mandatory filter, a single value (D57). */
+  filter?: { defaultValue?: string; mandatory?: boolean; single?: boolean };
 }
+
+/** A header facet of the object page (`@UI.facet` purpose #HEADER, D57). */
+export type UiHeaderFacet =
+  | { kind: "dataPoint"; id: string; title: string; field: UiField; visualization?: "progress" | "rating"; target?: number }
+  | { kind: "fields"; id: string; title: string; fields: UiField[] };
 
 /** A value help: the entity set listing the values, its element and its columns (D44). */
 export type UiValueHelp = ValueHelp;
@@ -176,6 +191,8 @@ export interface UiPage {
   deletableDynamic: boolean;
   /** Fields of the object page, by property (editability in edit mode). */
   fields: Record<string, UiField>;
+  /** Header facets: data points and field groups (D57). */
+  headerFacets?: UiHeaderFacet[];
 }
 
 export interface UiLayout {
@@ -266,7 +283,7 @@ class LayoutBuilder {
     return type === undefined || entity === undefined ? undefined : { type, entity };
   }
 
-  private field(type: ODataEntityType, entity: EntityModel, name: string, label?: string, importance?: string): UiField | undefined {
+  private field(type: ODataEntityType, entity: EntityModel, name: string, label?: string, importance?: string, entry?: AnnotationObject): UiField | undefined {
     const property = type.properties.find((p) => p.name === name);
     const field = entity.fields.find((f) => f.name === name);
     if (property === undefined || field === undefined) {
@@ -290,8 +307,80 @@ class LayoutBuilder {
     const help = valueHelpOf(this.model, field);
     if (help !== undefined) result.valueHelp = help;
     if (unit !== undefined && type.properties.some((p) => p.name === unit)) result.unit = unit;
+    this.decorate(result, type, field.annotations, entry);
     const level = importance?.replace(/^#/, "").toLowerCase();
     if (level === "high" || level === "medium" || level === "low") result.importance = level === "high" ? "High" : level === "medium" ? "Medium" : "Low";
+    return result;
+  }
+
+  /** Criticality, text, multi-line, links and filter settings of a field (D57). */
+  private decorate(result: UiField, type: ODataEntityType, annotations: EntityModel["annotations"], entry?: AnnotationObject): void {
+    const has = (property: string | undefined): property is string => property !== undefined && type.properties.some((p) => p.name === property);
+    const dataPoint = getAnnotation(annotations, "UI.dataPoint");
+    const criticality = str(entry?.["criticality"]) ?? (isObject(dataPoint) ? str(dataPoint["criticality"]) : undefined);
+    if (has(criticality)) result.criticality = criticality;
+    const textElement = getAnnotation(annotations, "ObjectModel.text.element");
+    const textProperty = Array.isArray(textElement) ? str(textElement[0]) : str(textElement);
+    if (has(textProperty) && textProperty !== result.property) {
+      const arrangement = str(getAnnotation(annotations, "UI.textArrangement"))?.replace(/^#/, "").toUpperCase();
+      result.text = {
+        property: textProperty,
+        arrangement: arrangement === "TEXT_LAST" ? "TextLast" : arrangement === "TEXT_ONLY" ? "TextOnly" : arrangement === "TEXT_SEPARATE" ? "TextSeparate" : "TextFirst",
+      };
+    }
+    if (getAnnotation(annotations, "UI.multiLineText") === true) result.multiLine = true;
+    const url = str(entry?.["url"]);
+    if (str(entry?.["type"]) === "#WITH_URL" && has(url)) {
+      result.link = { kind: "url", url };
+    } else if (getAnnotation(annotations, "Semantics.email.address") === true) {
+      result.link = { kind: "email" };
+    } else if (getAnnotation(annotations, "Semantics.telephone.type") !== undefined) {
+      result.link = { kind: "phone" };
+    }
+    const filter: NonNullable<UiField["filter"]> = {};
+    const defaultValue = getAnnotation(annotations, "Consumption.filter.defaultValue");
+    if (typeof defaultValue === "string" || typeof defaultValue === "number") filter.defaultValue = String(defaultValue);
+    if (getAnnotation(annotations, "Consumption.filter.mandatory") === true) filter.mandatory = true;
+    if (getAnnotation(annotations, "Consumption.filter.selectionType") === "#SINGLE" || getAnnotation(annotations, "Consumption.filter.multipleSelections") === false) filter.single = true;
+    if (Object.keys(filter).length > 0) result.filter = filter;
+  }
+
+  /** Header facets of the object page: `@UI.facet` purpose #HEADER, data points and field groups (D57). */
+  private headerFacets(type: ODataEntityType, entity: EntityModel): UiHeaderFacet[] {
+    const facets = entity.fields.flatMap((f) => (getArray(f.annotations, "UI.facet") ?? []).filter(isObject));
+    const header = facets
+      .filter((f) => str(f["purpose"]) === "#HEADER" && f["hidden"] !== true)
+      .sort((a, b) => (typeof a["position"] === "number" ? a["position"] : 1e9) - (typeof b["position"] === "number" ? b["position"] : 1e9));
+    const result: UiHeaderFacet[] = [];
+    header.forEach((facet, index) => {
+      const id = str(facet["id"]) ?? `header${index}`;
+      const kind = str(facet["type"]);
+      const qualifier = str(facet["targetqualifier"]);
+      if (kind === "#DATAPOINT_REFERENCE") {
+        // the data point of the element whose qualifier (or name) is the target qualifier
+        const element = entity.fields.find((f) => {
+          const point = getAnnotation(f.annotations, "UI.dataPoint");
+          return isObject(point) && (str(point["qualifier"]) ?? f.name) === qualifier;
+        });
+        const point = element === undefined ? undefined : getAnnotation(element.annotations, "UI.dataPoint");
+        const field = element === undefined ? undefined : this.field(type, entity, element.name);
+        if (field === undefined || !isObject(point)) return;
+        const visualization = str(point["visualization"])?.replace(/^#/, "").toLowerCase();
+        const target = point["targetvalue"];
+        result.push({
+          kind: "dataPoint",
+          id,
+          title: str(facet["label"]) ?? str(point["title"]) ?? field.label,
+          field,
+          ...(visualization === "progress" || visualization === "rating" ? { visualization } : {}),
+          ...(typeof target === "number" ? { target } : {}),
+        });
+      } else if (kind === "#FIELDGROUP_REFERENCE" || kind === "#IDENTIFICATION_REFERENCE") {
+        const path = kind === "#FIELDGROUP_REFERENCE" ? "UI.fieldGroup" : "UI.identification";
+        const fields = this.dataFields(type, entity, path, qualifier).fields;
+        if (fields.length > 0) result.push({ kind: "fields", id, title: str(facet["label"]) ?? "", fields });
+      }
+    });
     return result;
   }
 
@@ -345,10 +434,10 @@ class LayoutBuilder {
         }
         continue;
       }
-      if (kind !== "#STANDARD" && kind !== "#WITH_URL") {
+      if (kind !== "#STANDARD" && kind !== "#WITH_URL" && kind !== "#AS_DATAPOINT") {
         continue;
       }
-      const uiField = this.field(type, entity, field, str(entry["label"]), str(entry["importance"]));
+      const uiField = this.field(type, entity, field, str(entry["label"]), str(entry["importance"]), entry);
       if (uiField !== undefined && !fields.some((f) => f.property === uiField.property)) {
         fields.push(uiField);
       }
@@ -425,6 +514,8 @@ class LayoutBuilder {
     const description = isObject(header) ? value(header["description"]) : undefined;
     if (title !== undefined) page.title = title;
     if (description !== undefined) page.description = description;
+    const headerFacets = this.headerFacets(type, entity);
+    if (headerFacets.length > 0) page.headerFacets = headerFacets;
     if (entity.root) {
       const table = this.table(set);
       if (table !== undefined) {

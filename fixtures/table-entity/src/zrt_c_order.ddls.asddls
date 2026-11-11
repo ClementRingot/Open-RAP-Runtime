@@ -5,6 +5,8 @@ define root view entity ZRT_C_ORDER
   provider contract transactional_query
   as projection on ZRT_ORDER
 {
+      @ObjectModel.text.element: [ 'Name' ]
+      @UI.textArrangement: #TEXT_FIRST
   key OrderId,
       Name,
       Status,
@@ -16,5 +18,11 @@ define root view entity ZRT_C_ORDER
       Amount,
       @Consumption.valueHelpDefinition: [{ entity: { name: 'I_Currency', element: 'Currency' }, useForValidation: true }]
       Currency,
-      Note
+      Note,
+      @Semantics.email.address: true
+      Email,
+      Progress,
+      Criticality,
+      @Consumption.hidden: true
+      InternalRef
 }

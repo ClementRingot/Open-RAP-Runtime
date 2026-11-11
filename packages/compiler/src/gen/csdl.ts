@@ -36,6 +36,7 @@ const VOCABULARIES = [
   { uri: "https://oasis-tcs.github.io/odata-vocabularies/vocabularies/Org.OData.Measures.V1.xml", namespace: "Org.OData.Measures.V1", alias: "Measures" },
   { uri: "https://sap.github.io/odata-vocabularies/vocabularies/Common.xml", namespace: "com.sap.vocabularies.Common.v1", alias: "Common" },
   { uri: "https://sap.github.io/odata-vocabularies/vocabularies/UI.xml", namespace: "com.sap.vocabularies.UI.v1", alias: "UI" },
+  { uri: "https://sap.github.io/odata-vocabularies/vocabularies/Communication.xml", namespace: "com.sap.vocabularies.Communication.v1", alias: "Communication" },
 ];
 
 const isObject = (v: AnnotationValue | undefined): v is AnnotationObject => typeof v === "object" && v !== null && !Array.isArray(v);
@@ -266,6 +267,12 @@ class CsdlBuilder {
       const quickInfo = str(getAnnotation(a, "EndUserText.quickInfo"));
       if (quickInfo !== undefined) children.push(annotation("Common.QuickInfo", { String: quickInfo }));
       if (property.computed) children.push(annotation("Core.Computed"));
+      // D57: multi-line texts, e-mail addresses and phone numbers, default filter values
+      if (getAnnotation(a, "UI.multiLineText") === true) children.push(annotation("UI.MultiLineText"));
+      if (getAnnotation(a, "Semantics.email.address") === true) children.push(annotation("Communication.IsEmailAddress"));
+      if (getAnnotation(a, "Semantics.telephone.type") !== undefined) children.push(annotation("Communication.IsPhoneNumber"));
+      const filterDefault = getAnnotation(a, "Consumption.filter.defaultValue");
+      if (typeof filterDefault === "string" || typeof filterDefault === "number") children.push(annotation("Common.FilterDefaultValue", { String: String(filterDefault) }));
       if (property.immutable) children.push(annotation("Core.Immutable"));
       if (property.dynamic) {
         children.push(annotation("Common.FieldControl", { Path: `${FIELD_CONTROL}/${property.name}` }));
@@ -329,6 +336,35 @@ class CsdlBuilder {
     }
   }
 
+  /** `@UI.dataPoint` of the elements: UI.DataPoint, qualified by its qualifier or the element name (D57). */
+  private dataPoints(entity: EntityModel): XmlElement[] {
+    const result: XmlElement[] = [];
+    for (const field of entity.fields) {
+      const point = getAnnotation(field.annotations, "UI.dataPoint");
+      if (!isObject(point)) continue;
+      const title = str(point["title"]) ?? str(getAnnotation(field.annotations, "EndUserText.label"));
+      const criticality = str(point["criticality"]);
+      const target = point["targetvalue"];
+      const visualization = str(point["visualization"]);
+      result.push(
+        annotation(
+          "UI.DataPoint",
+          { Qualifier: str(point["qualifier"]) ?? field.name },
+          record(
+            "UI.DataPointType",
+            pv("Value", { Path: field.name }),
+            title === undefined ? undefined : pv("Title", { String: title }),
+            str(point["description"]) === undefined ? undefined : pv("Description", { String: str(point["description"]) }),
+            typeof target === "number" ? pv("TargetValue", { Decimal: target }) : undefined,
+            criticality === undefined ? undefined : pv("Criticality", { Path: criticality }),
+            visualization === undefined ? undefined : pv("Visualization", { EnumMember: `UI.VisualizationType/${enumName(visualization)}` }),
+          ),
+        ),
+      );
+    }
+    return result;
+  }
+
   private dataFields(entity: EntityModel, path: string): XmlElement[] {
     const result: XmlElement[] = [];
     for (const { field, entry } of entriesOf(entity, path)) {
@@ -358,6 +394,12 @@ class CsdlBuilder {
       }
       const criticality = str(entry["criticality"]);
       const url = str(entry["url"]);
+      if (kind === "#AS_DATAPOINT") {
+        const point = getAnnotation(entity.fields.find((f) => f.name === field)?.annotations, "UI.dataPoint");
+        const qualifier = isObject(point) ? (str(point["qualifier"]) ?? field) : field;
+        result.push(record("UI.DataFieldForAnnotation", pv("Target", { AnnotationPath: `@UI.DataPoint#${qualifier}` }), label === undefined ? undefined : pv("Label", { String: label }), importanceAnnotation, hidden));
+        continue;
+      }
       result.push(
         record(
           kind === "#WITH_URL" && url !== undefined ? "UI.DataFieldWithUrl" : "UI.DataField",
@@ -422,6 +464,7 @@ class CsdlBuilder {
       );
     }
     children.push(...this.facets(entity));
+    children.push(...this.dataPoints(entity));
     const variant = getArray(a, "UI.presentationVariant")?.find(isObject);
     if (variant !== undefined) {
       const sortOrder = (getArray(variant, "sortOrder") ?? []).filter(isObject);
@@ -581,6 +624,36 @@ class CsdlBuilder {
     return { properties, entities };
   }
 
+  /** `@Consumption.filter.mandatory` and `selectionType` / `multipleSelections` (D57). */
+  private filterRestrictions(type: ODataEntityType): XmlElement | undefined {
+    const entity = findEntity(this.model, type.entity);
+    if (entity === undefined) return undefined;
+    const exposed = entity.fields.filter((f) => type.properties.some((p) => p.name === f.name));
+    const required = exposed.filter((f) => getAnnotation(f.annotations, "Consumption.filter.mandatory") === true).map((f) => f.name);
+    const expressions = exposed.flatMap((f) => {
+      const selection = str(getAnnotation(f.annotations, "Consumption.filter.selectionType"))?.replace(/^#/, "").toUpperCase();
+      const single = getAnnotation(f.annotations, "Consumption.filter.multipleSelections") === false;
+      const allowed = selection === "SINGLE" || (single && selection === undefined) ? "SingleValue" : selection === "INTERVAL" ? (single ? "SingleRange" : "MultiRange") : selection === "RANGE" && single ? "SingleRange" : undefined;
+      return allowed === undefined ? [] : [{ property: f.name, allowed }];
+    });
+    if (required.length === 0 && expressions.length === 0) return undefined;
+    return annotation(
+      "Capabilities.FilterRestrictions",
+      {},
+      record(
+        "Capabilities.FilterRestrictionsType",
+        required.length === 0 ? undefined : pv("RequiredProperties", {}, collection(...required.map(propertyPath))),
+        expressions.length === 0
+          ? undefined
+          : pv(
+              "FilterExpressionRestrictions",
+              {},
+              collection(...expressions.map((e) => record("Capabilities.FilterExpressionRestrictionType", pv("Property", { PropertyPath: e.property }), pv("AllowedExpressions", { String: e.allowed })))),
+            ),
+      ),
+    );
+  }
+
   private setAnnotations(type: ODataEntityType): void {
     const set = this.service.entitySets.find((s) => s.entityType === type.name);
     if (set === undefined) {
@@ -605,6 +678,7 @@ class CsdlBuilder {
         ),
       ),
       annotation("Capabilities.SearchRestrictions", {}, record("Capabilities.SearchRestrictionsType", pv("Searchable", { Bool: set.searchable }))),
+      this.filterRestrictions(type),
     ];
     const navigations = type.navigations.filter((n) => n.collection);
     if (navigations.length > 0) {

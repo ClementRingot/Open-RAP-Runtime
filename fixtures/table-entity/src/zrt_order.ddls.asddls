@@ -15,4 +15,12 @@ define root table entity ZRT_ORDER
       Currency : abap.cuky;
       @EndUserText.label: 'Note'
       Note     : abap.string null;
+      @EndUserText.label: 'Buyer e-mail'
+      Email    : abap.char(80);
+      @EndUserText.label: 'Delivery progress'
+      Progress : abap.int4;
+      @EndUserText.label: 'Criticality'
+      Criticality : abap.int1;
+      @EndUserText.label: 'Internal reference'
+      InternalRef : abap.char(10);
 }

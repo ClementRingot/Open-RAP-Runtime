@@ -89,6 +89,7 @@ rapt dev mon-projet                         # http://localhost:8080/ — recharg
 |---|---|
 | [Guide](docs/GUIDE.md) | Tout ce que fait rap-transpiler et comment s'en servir (humains et agents IA) |
 | [Fonctionnalités](docs/FEATURES.md) | Couverture RAP, fonctionnalité par fonctionnalité |
+| [Annotations](docs/ANNOTATIONS.md) | Chaque annotation CDS : ce qu'en font le `$metadata` et l'UI |
 | [Diagnostics](docs/DIAGNOSTICS.md) | Les codes de `rapt check` |
 | [Serveur MCP](docs/MCP.md) | Le service pour les agents IA |
 | [Déploiement](docs/DEPLOIEMENT.md) | Docker, SAP BTP Cloud Foundry, HTTPS |

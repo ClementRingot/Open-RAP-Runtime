@@ -2,12 +2,15 @@
 @UI.headerInfo: { typeName: 'Order', typeNamePlural: 'Orders', title: { value: 'Name' } }
 annotate entity ZRT_C_ORDER with
 {
-  @UI.facet: [ { id: 'Order', purpose: #STANDARD, type: #IDENTIFICATION_REFERENCE, label: 'Order', position: 10 } ]
+  @UI.facet: [ { id: 'Order', purpose: #STANDARD, type: #IDENTIFICATION_REFERENCE, label: 'Order', position: 10 },
+               { id: 'Progress', purpose: #HEADER, type: #DATAPOINT_REFERENCE, targetQualifier: 'Progress', position: 10 },
+               { id: 'Buyer', purpose: #HEADER, type: #FIELDGROUP_REFERENCE, targetQualifier: 'Buyer', label: 'Buyer', position: 20 } ]
   @UI: { lineItem: [ { position: 10 } ], identification: [ { position: 10 } ], selectionField: [ { position: 10 } ] }
   OrderId;
   @UI: { lineItem: [ { position: 20 } ], identification: [ { position: 20 } ] }
   Name;
-  @UI: { lineItem: [ { position: 30 }, { type: #FOR_ACTION, dataAction: 'complete', label: 'Complete' } ], identification: [ { position: 30 } ], selectionField: [ { position: 20 } ] }
+  @UI: { lineItem: [ { position: 30, criticality: 'Criticality' }, { type: #FOR_ACTION, dataAction: 'complete', label: 'Complete' } ],
+         identification: [ { position: 30, criticality: 'Criticality' } ], selectionField: [ { position: 20 } ] }
   Status;
   @UI: { lineItem: [ { position: 40 } ], identification: [ { position: 40 } ] }
   Priority;
@@ -15,6 +18,17 @@ annotate entity ZRT_C_ORDER with
   Category;
   @UI: { lineItem: [ { position: 50 } ], identification: [ { position: 50 } ] }
   Amount;
+  @UI: { selectionField: [ { position: 30 } ], identification: [ { position: 55 } ] }
+  @Consumption.filter.defaultValue: 'EUR'
+  Currency;
   @UI.identification: [ { position: 60 } ]
+  @UI.multiLineText: true
   Note;
+  @UI.fieldGroup: [ { qualifier: 'Buyer', position: 10 } ]
+  Email;
+  @UI.dataPoint: { title: 'Delivery', targetValue: 100, visualization: #PROGRESS, criticality: 'Criticality' }
+  @UI.identification: [ { position: 70 } ]
+  Progress;
+  @UI.hidden: true
+  Criticality;
 }
