@@ -6,6 +6,7 @@ import path from "node:path";
 import { generateApplication, writeFiles, type GenerateOptions } from "./build.js";
 import { parseArgs } from "node:util";
 import { formatDiagnostic, type Diagnostics } from "./diagnostics.js";
+import { generateLaunchpad } from "./gen/launchpad/index.js";
 import { loadProject } from "./input/project.js";
 import { buildModel, type BuildOptions } from "./ir/builder.js";
 import { COMPILER_VERSION } from "./version.js";
@@ -16,13 +17,14 @@ Usage:
   rapt check <src> [--service <SRVD>]           report the diagnostics of the sources
   rapt ir    <src> [--service <SRVD>] [--out f] print (or write) the intermediate representation
   rapt build <src> --out <dir> [--service <SRVD>] generate the application into <dir>
+  rapt launchpad <launchpad.json> --out <dir>    generate the launchpad of applications into <dir>
 
 Options:
   --service <name>   service definition to build (required when the sources have several)
   --binding <name>   service binding name (default: the SRVB of the service, else <SRVD>_O4)
   --path <path>      service root path (default: /sap/opu/odata4/sap/<binding>/srvd/sap/<srvd>/0001/)
   --runtime <dir>    @rap-transpiler/runtime package to embed in the application (default: next to rapt)
-  --out <path>       output file (rapt ir) or folder (rapt build)
+  --out <path>       output file (rapt ir) or folder (rapt build, rapt launchpad)
   --warnings-as-errors
   -h, --help
 `;
@@ -66,6 +68,22 @@ export async function main(argv: string[]): Promise<number> {
   if (source === undefined) {
     process.stderr.write(`missing <src>\n\n${USAGE}`);
     return 2;
+  }
+  if (command === "launchpad") {
+    const out = parsed.values["out"];
+    if (typeof out !== "string") {
+      process.stderr.write(`rapt launchpad needs --out <dir>\n\n${USAGE}`);
+      return 2;
+    }
+    const runtimeDir = parsed.values["runtime"];
+    const result = generateLaunchpad(source, { outDir: out, ...(typeof runtimeDir === "string" ? { runtimeDir } : {}) });
+    report(result.diagnostics);
+    if (result.files.length === 0 || (parsed.values["warnings-as-errors"] === true && result.diagnostics.items.some((d) => d.severity === "warning"))) {
+      return 1;
+    }
+    writeFiles(out, result.files);
+    process.stdout.write(`${result.files.length} files written to ${path.resolve(out)}\n`);
+    return 0;
   }
   const options: GenerateOptions = {};
   if (typeof parsed.values["service"] === "string") options.service = parsed.values["service"];

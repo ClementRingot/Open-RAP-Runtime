@@ -98,3 +98,15 @@ Versions de référence : `@abaplint/core` 2.120.98, `@abaplint/transpiler` 2.14
 | Verrous entre plusieurs instances de l'application | Verrous de ligne PostgreSQL (`NOWAIT`), testés contre une autre transaction (`rap-locks.test.ts`) ; pas de test de charge. |
 | TypeScript 7.0.2 compile `new (x as T).Y()` sans parenthèses | Forme évitée dans le code (D29). |
 
+## Launchpad (D37)
+
+| Écart | Statut |
+|---|---|
+| Navigation entre applications depuis une application (CrossApplicationNavigation, liens d'intent dans une Object Page) | Non prévu : les intents s'ouvrent depuis le launchpad (`/#…`, `/go/…`). |
+| Paramètres d'intent transmis en query string, que l'UI générée n'exploite pas (pas d'ouverture directe d'une instance) | Écart. |
+| Application chargée en pleine page, pas dans un conteneur du shell | Assumé : une application par page ; la barre shell est affichée par l'application. |
+| Personnalisation (groupes et tuiles de l'utilisateur), spaces et pages, notifications, recherche d'entreprise | Non prévu. |
+| Compteurs des tuiles lus au chargement seulement | Écart : pas d'intervalle de rafraîchissement. |
+| Session partagée : même `SESSION_SECRET` pour le launchpad et ses applications, pas de révocation avant l'expiration | Assumé : une même confiance, comme les sessions (D28). |
+| Applications derrière le launchpad en `AUTH_MODE=none` : leur utilisateur de développement, indépendant de celui du launchpad | Développement seulement. |
+| Ressources OpenUI5 servies par chaque application (`/apps/<id>/resources/`) | Assumé : pas de cache commun aux applications. |

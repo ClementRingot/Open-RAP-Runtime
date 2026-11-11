@@ -164,6 +164,11 @@ describe.skipIf(APP === "" || KEYCLOAK === "")("OIDC with a real Keycloak", () =
     expect(logout.status).toBe(302);
     const target = logout.headers.get("location") ?? "";
     expect(target.startsWith(`${REALM}/protocol/openid-connect/logout`), target).toBe(true);
+    // with the ID token of the login as hint, Keycloak ends its session without a confirmation page
+    expect(new URL(target).searchParams.get("id_token_hint")).toBeTruthy();
+    const ended = await browser.get(target);
+    expect(ended.status, await ended.clone().text()).toBe(302);
+    expect(ended.headers.get("location")).toBe(`${APP}/`);
     // the session cookie is gone: the UI asks for a login again
     const again = await browser.get(`${APP}/ui/index.html`);
     expect(again.status).toBe(302);

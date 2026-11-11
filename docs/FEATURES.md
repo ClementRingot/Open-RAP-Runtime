@@ -205,6 +205,21 @@ ajoutent ce que la fixture n'utilise pas : numérotation, feature control global
 | Boutons selon les autorisations de l'utilisateur | ✅ | Create masqué sans autorisation globale de création (`$permissions`) ; Edit, Delete, actions et création d'enfants désactivés par instance (`__EntityControl`, `__OperationControl`, D36). Test `ui-authorizations.test.ts`. |
 | Aide à la saisie (value help), variantes, personnalisation de table | ❌ | Prévu après le MVP. |
 
+## Launchpad (D37)
+
+| Fonctionnalité | Statut | Note |
+|---|---|---|
+| Groupes et tuiles (`launchpad.json`) : titre, sous-titre, pied, icône | ✅ | `sap.m.GenericTile` ; `rapt launchpad` contrôle le contenu (LPD001 à LPD007). |
+| Tuiles affectées à des rôles de l'IdP (business catalog d'un business role) | ✅ | Filtrées par le serveur ; sans rôle, visibles par tous. |
+| Tuiles dynamiques : `$count` d'un entity set, filtre `$filter` | ✅ | Avec les contrôles d'accès de l'utilisateur (DCL) ; lus au chargement. |
+| Navigation par intent (`/#Objet-action`, `/go/Objet-action?…`) | ✅ | Paramètres transmis à l'application en query string. |
+| Barre shell : accueil, recherche des tuiles, utilisateur, déconnexion | ✅ | `sap.f.ShellBar`, aussi au-dessus des applications ouvertes depuis le launchpad. |
+| Une seule origine : UI des applications sous `/apps/<id>/`, services à leurs chemins | ✅ | Redirections réécrites ; 502 si une application ne répond pas. |
+| Connexion unique : session OIDC du launchpad lue par les applications | ✅ | Autorisations, DCL, CSRF et rôle obligatoire de chaque application conservés ; testé (`launchpad.test.ts`). |
+| Tuiles externes (URL) | ✅ | Ouvertes dans un nouvel onglet. |
+| Docker : launchpad, applications et leurs bases, Keycloak (profil `oidc`) | ✅ | `docker-compose.yml` généré. |
+| Personnalisation, spaces et pages, notifications, navigation entre applications depuis une application | ❌ | Voir KNOWN_GAPS. |
+
 ## Application générée et exploitation
 
 | Fonctionnalité | Statut | Note |
@@ -215,7 +230,7 @@ ajoutent ce que la fixture n'utilise pas : numérotation, feature control global
 | PGlite embarqué (`PGLITE_DIR`) pour le développement | ✅ | Test e2e : démarrage, données conservées après un redémarrage (D33). |
 | Dockerfile multi-étapes, `docker-compose.yml` (app + PostgreSQL) | ✅ | Image construite et `docker compose up` vérifié (service OData, actions, UI) ; job CI `docker`. |
 | Profil Keycloak (realm importé : client `rapt-app`, utilisateur `alice`) | ✅ | `keycloak.test.ts` contre un vrai Keycloak : formulaire de connexion, PKCE, session, CSRF, déconnexion, jetons porteurs (JWKS) ; en CI avec le profil `oidc` du docker-compose généré (D33). |
-| OIDC : jetons porteurs (JWKS), sessions navigateur (code + PKCE), CSRF, déconnexion | ✅ | |
+| OIDC : jetons porteurs (JWKS), sessions navigateur (code + PKCE), CSRF, déconnexion | ✅ | Déconnexion avec `id_token_hint` : pas de page de confirmation chez le fournisseur (D37). |
 | Rôle obligatoire (`OIDC_REQUIRED_ROLE`) | ✅ | Rôles Keycloak (`realm_access.roles`) ou revendication configurable. |
 | Bundle UI5 optimisé (`ui5 build`) | ❌ | Ressources servies depuis les sources npm (D27). |
 

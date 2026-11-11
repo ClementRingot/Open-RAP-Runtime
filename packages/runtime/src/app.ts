@@ -94,7 +94,14 @@ export async function createApp(options: AppOptions): Promise<FastifyInstance> {
   app.addHook("onRequest", async (request, reply) => {
     if (sessions !== undefined && (request.url === "/" || request.url.startsWith("/ui")) && request.headers.authorization === undefined) {
       // the UI needs a session: log in first
-      if (sessions.user(request) === undefined) {
+      let user: User | undefined;
+      try {
+        user = sessions.user(request);
+      } catch (error) {
+        // a session without the role the application requires (opened by a launchpad, D37)
+        return reply.status(error instanceof AuthenticationError ? error.status : 401).type("text/plain").send((error as Error).message);
+      }
+      if (user === undefined) {
         return reply.redirect(sessions.loginUrl(request.url === "/" ? "/ui/index.html" : request.url));
       }
       return;

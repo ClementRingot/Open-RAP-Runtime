@@ -24,7 +24,7 @@ export function indexHtml(layout: UiLayout): string {
   <style>html, body { height: 100%; margin: 0; }</style>
 </head>
 <body class="sapUiBody" id="content">
-  <div data-sap-ui-component data-name="rapt.app" data-id="container" data-settings='{"id": "rapt"}' style="height: 100%"></div>
+  <div data-sap-ui-component data-name="rapt.app" data-id="container" data-height="100%" data-settings='{"id": "rapt"}' style="height: 100%"></div>
 </body>
 </html>
 `;
@@ -78,9 +78,70 @@ export function manifest(layout: UiLayout): string {
   )}\n`;
 }
 
-export const APP_VIEW = `<mvc:View xmlns:mvc="sap.ui.core.mvc" xmlns="sap.m" displayBlock="true">
-  <App id="app"/>
+/**
+ * The root view: the pages of the application in an App; above them the shell bar of the
+ * launchpad (D37) when the application is served behind one (home, user, logout).
+ */
+export const APP_VIEW = `<mvc:View controllerName="rapt.app.controller.App" xmlns:mvc="sap.ui.core.mvc" xmlns="sap.m" xmlns:f="sap.f" displayBlock="true" height="100%">
+  <Page id="shell" showHeader="{= !!\${ui>/shell} }" enableScrolling="false">
+    <customHeader>
+      <f:ShellBar id="shellBar" title="{ui>/shell/title}" secondTitle="{ui>/shell/launchpad}" homeIcon="{ui>/shell/logo}" homeIconTooltip="Home" homeIconPressed=".onHome" avatarPressed=".onAvatarPressed">
+        <f:profile>
+          <Avatar id="avatar" initials="{ui>/shell/user/initials}" tooltip="{ui>/shell/user/name}"/>
+        </f:profile>
+      </f:ShellBar>
+    </customHeader>
+    <content>
+      <App id="app"/>
+    </content>
+  </Page>
 </mvc:View>
+`;
+
+export const APP_CONTROLLER = `sap.ui.define([
+  "sap/ui/core/mvc/Controller",
+  "sap/m/ResponsivePopover",
+  "sap/m/VBox",
+  "sap/m/Text",
+  "sap/m/Button"
+], function (Controller, ResponsivePopover, VBox, Text, Button) {
+  "use strict";
+
+  /** The shell bar of the launchpad the application is served behind (D37). */
+  return Controller.extend("rapt.app.controller.App", {
+    onHome: function () {
+      window.location.assign(this.getView().getModel("ui").getProperty("/shell/home") || "/");
+    },
+
+    onAvatarPressed: function (oEvent) {
+      if (!this._oUserMenu) {
+        var oShell = this.getView().getModel("ui").getProperty("/shell");
+        var aItems = [];
+        if (oShell.user.id !== oShell.user.name) {
+          aItems.push(new Text({ text: oShell.user.id }));
+        }
+        if (!oShell.logout) {
+          aItems.push(new Text({ text: "Development user (no login)" }));
+        }
+        this._oUserMenu = new ResponsivePopover(this.createId("userMenu"), { title: oShell.user.name, placement: "Bottom", contentMinWidth: "12rem" });
+        if (aItems.length > 0) {
+          this._oUserMenu.addContent(new VBox({ items: aItems }).addStyleClass("sapUiSmallMargin"));
+        }
+        if (oShell.logout) {
+          this._oUserMenu.setBeginButton(new Button(this.createId("logout"), {
+            text: "Sign Out",
+            icon: "sap-icon://log",
+            press: function () {
+              window.location.assign(oShell.logout);
+            }
+          }));
+        }
+        this.getView().addDependent(this._oUserMenu);
+      }
+      this._oUserMenu.openBy(oEvent.getParameter("avatar"));
+    }
+  });
+});
 `;
 
 export const COMPONENT = `sap.ui.define([
@@ -104,6 +165,16 @@ export const COMPONENT = `sap.ui.define([
         .then(function (oResponse) { return oResponse.ok ? oResponse.json() : {}; })
         .then(function (oPermissions) { oUi.setProperty("/permissions", oPermissions); })
         .catch(function () { /* the permissions stay unknown: every button is shown */ });
+      // behind a launchpad (D37): its shell bar above the pages; standalone, the request fails
+      var sTitle = this.getManifestEntry("/sap.app/title");
+      fetch("/launchpad/config", { credentials: "same-origin", headers: { accept: "application/json" } })
+        .then(function (oResponse) { return oResponse.ok ? oResponse.json() : undefined; })
+        .then(function (oLaunchpad) {
+          if (oLaunchpad && oLaunchpad.user) {
+            oUi.setProperty("/shell", { title: sTitle, launchpad: oLaunchpad.title, home: oLaunchpad.home || "/", logo: oLaunchpad.logo || "", user: oLaunchpad.user, logout: oLaunchpad.logout || "" });
+          }
+        })
+        .catch(function () { /* not behind a launchpad */ });
       this.getRouter().initialize();
     },
 

@@ -578,3 +578,53 @@ et la conséquence. Les numéros D1 à D13 correspondent aux points 1 à 13 du �
 - **Tests** : `rap-authorizations.test.ts` (contrôles par profil, `$permissions`, création de
   réservations), `ui-authorizations.test.ts` (navigateur : un viewer ne voit pas Create, Edit,
   Delete et l'action sont désactivés).
+
+## D37 — Launchpad des applications (OpenUI5)
+
+- **Décision** : `rapt launchpad <launchpad.json> --out <dossier>` génère un launchpad,
+  l'équivalent du SAP Fiori launchpad construit avec OpenUI5. Le shell de SAP (`sap.ushell`)
+  n'existe que dans SAPUI5, sous licence SAP, et la règle du projet l'exclut. Le launchpad est
+  fait de `sap.f.ShellBar` (accueil, recherche des tuiles, menu utilisateur avec déconnexion) et
+  de groupes de `sap.m.GenericTile`. Une tuile dynamique (`NumericContent`) affiche le `$count`
+  d'un entity set, avec un filtre éventuel. La navigation se fait par intent (`/#Travel-manage`,
+  `/go/Travel-manage?…`).
+- **Contenu** : `launchpad.json` est versionné avec les sources, comme le contenu du launchpad
+  (catalogues, groupes, tuiles, target mappings). Il liste les applications (dossier généré par
+  `rapt build`, URL interne) et les groupes de tuiles. Une tuile est affectée à des rôles de
+  l'IdP, l'équivalent du business catalog d'un business role ; sans rôle, tout utilisateur la
+  voit. Le compilateur résout les chemins de service et contrôle les entity sets des compteurs,
+  les intents et les rôles (`LPD001` à `LPD007`) ; il reprend les rôles et les claims des
+  applications pour le realm et la session.
+- **Architecture, une seule origine** : le serveur front-end de SAP sert le launchpad, les
+  applications et leurs services sous un même domaine. Ici, le serveur du launchpad monte l'UI de
+  chaque application sous `/apps/<id>/` et relaie ses services à leurs propres chemins
+  (`/sap/opu/odata4/…`, uniques par service) ; les redirections des applications sont réécrites
+  sous leur point de montage. Le navigateur ne voit qu'une origine : pas de CORS, l'UI lit les
+  compteurs directement, les cookies sont partagés.
+- **Connexion unique** : le launchpad ouvre la session OIDC (code + PKCE). Les applications
+  derrière lui ont le même `SESSION_SECRET` (et le client et `PUBLIC_URL` du launchpad) et lisent
+  cette session : utilisateur, rôles, claims lus par leurs autorisations. Chaque application garde
+  ses autorisations (D34), ses contrôles d'accès (D35) et son rôle obligatoire, désormais vérifié
+  à chaque requête : une session ouverte par le launchpad pour un utilisateur sans ce rôle reçoit
+  un 403. Les jetons porteurs des clients d'API sont relayés tels quels.
+- **Déconnexion** : l'ID token de la connexion est gardé dans un cookie HttpOnly séparé
+  (`rapt_idt`) et passé en `id_token_hint` au point de fin de session. Le fournisseur termine
+  alors sa session sans page de confirmation, même avec un jeton expiré, comme le prévoit OIDC
+  RP-Initiated Logout (vérifié avec Keycloak). Cela vaut aussi pour une application seule.
+- **Pourquoi pas le jeton relayé (BFF)** : relayer le jeton d'accès de l'utilisateur aurait
+  demandé de conserver les jetons côté serveur et de les rafraîchir (5 minutes par défaut chez
+  Keycloak). La session signée partagée reste sans état, comme celle des applications (D28).
+- **Dans les applications** : l'UI générée, servie derrière un launchpad (`/launchpad/config`
+  répond), affiche la barre shell du launchpad au-dessus de ses pages (accueil, utilisateur,
+  déconnexion). Seule, elle est inchangée. Chaque application reste déployable seule.
+- **Exploitation** : le dossier généré contient `server.mjs`, un Dockerfile et un
+  `docker-compose.yml` : le launchpad, chaque application construite depuis son dossier avec sa
+  base PostgreSQL, et Keycloak dans le profil `oidc` (client `rapt-launchpad`). S'y ajoutent
+  `.env.example` (`APP_<ID>_URL`) et un README.
+- **Tests** : `runtime/test/launchpad.test.ts` couvre les tuiles par rôle et la connexion contre
+  un fournisseur OIDC de test, puis la lecture de la session par l'application. Il vérifie aussi,
+  à travers la passerelle, le DCL, les autorisations, le CSRF et les jetons porteurs, ainsi que
+  les intents, la réécriture des redirections, le 502 et le rôle obligatoire.
+  `runtime/test/launchpad-ui.test.ts` teste dans le navigateur les tuiles d'un viewer, le
+  compteur, la recherche, l'application ouverte avec la barre shell, le retour et l'intent.
+  `compiler/test/launchpad.test.ts` couvre les diagnostics, les fichiers générés et la CLI.

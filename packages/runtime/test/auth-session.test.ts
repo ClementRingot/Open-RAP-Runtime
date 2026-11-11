@@ -74,6 +74,9 @@ const cookieOf = (setCookie: string | string[] | undefined, name: string): strin
   return undefined;
 };
 
+/** The cookie of the ID token of the last login (the hint of the logout). */
+let idTokenCookie: string | undefined;
+
 async function login(): Promise<string> {
   const start = await t.app.inject({ method: "GET", url: "/auth/login?returnTo=%2Fui%2Findex.html" });
   expect(start.statusCode).toBe(302);
@@ -86,6 +89,7 @@ async function login(): Promise<string> {
   const done = await t.app.inject({ method: "GET", url: `${callback.pathname}${callback.search}`, headers: { cookie: state } });
   expect(done.statusCode).toBe(302);
   expect(done.headers.location).toBe("/ui/index.html");
+  idTokenCookie = cookieOf(done.headers["set-cookie"], "rapt_idt");
   return cookieOf(done.headers["set-cookie"], "rapt_session") as string;
 }
 
@@ -137,5 +141,15 @@ describe("OIDC browser sessions", () => {
     expect(response.statusCode).toBe(302);
     expect(String(response.headers.location)).toBe(`${issuer}/logout?client_id=rapt-app&post_logout_redirect_uri=http%3A%2F%2Fapp.example%2F`);
     expect(cookieOf(response.headers["set-cookie"], "rapt_session")).toBe("rapt_session=");
+  });
+
+  it("gives the ID token of the login as the hint of the logout: no confirmation at the provider", async () => {
+    const session = await login();
+    expect(idTokenCookie).toMatch(/^rapt_idt=[\w-]+\.[\w-]+\.[\w-]+$/);
+    const response = await t.app.inject({ method: "GET", url: "/auth/logout", headers: { cookie: `${session}; ${idTokenCookie}` } });
+    const target = new URL(String(response.headers.location));
+    expect(target.searchParams.get("id_token_hint")).toBe(idTokenCookie?.slice("rapt_idt=".length));
+    expect(target.searchParams.get("post_logout_redirect_uri")).toBe("http://app.example/");
+    expect(cookieOf(response.headers["set-cookie"], "rapt_idt")).toBe("rapt_idt=");
   });
 });

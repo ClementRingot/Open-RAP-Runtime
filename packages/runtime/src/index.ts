@@ -15,4 +15,6 @@ export { parseExpand, parseFilter, parseOrderby, parseSelect } from "./odata/uri
 export * from "./values.js";
 export { start, type RunningServer, type StartOptions } from "./server.js";
 export { RapRuntime } from "./rap/runtime.js";
-export { OidcSessions } from "./auth/session.js";
+export { OidcSessions, signSession } from "./auth/session.js";
+export { createLaunchpad, launchpadView, startLaunchpad, type LaunchpadOptions, type LaunchpadView, type RunningLaunchpad, type StartLaunchpadOptions } from "./launchpad/server.js";
+export { rewriteLocation } from "./launchpad/proxy.js";

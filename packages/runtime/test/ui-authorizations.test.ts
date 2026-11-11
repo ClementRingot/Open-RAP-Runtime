@@ -45,6 +45,8 @@ describe.skipIf(browserType === undefined)("authorizations in the generated UI",
     await page.goto(`${base}/`);
     await page.locator(ROWS).first().waitFor({ timeout: 60_000 });
     // the agencies 07…: every travel of the fixture
+    // the rows may come in several renderings: wait for all of them
+    await page.waitForFunction(`document.querySelectorAll('${ROWS}').length >= 3`, undefined, { timeout: 30_000 });
     expect(await page.locator(ROWS).count()).toBe(3);
     await page.waitForFunction(`!document.querySelector('${id("TravelList", "create")}') || document.querySelector('${id("TravelList", "create")}').offsetParent === null`, undefined, { timeout: 30_000 });
 

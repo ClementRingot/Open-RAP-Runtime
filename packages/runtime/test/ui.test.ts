@@ -51,6 +51,8 @@ async function open(): Promise<Page> {
 describe.skipIf(browserType === undefined)("generated UI (OpenUI5)", () => {
   it("shows the List Report with the line items, sorted by the presentation variant", async () => {
     const page = await open();
+    // the rows may come in several renderings: wait for all of them
+    await page.waitForFunction(`document.querySelectorAll('${ROWS}').length >= 3`, undefined, { timeout: 30_000 });
     expect(await page.locator(ROWS).count()).toBe(3);
     // TravelID desc: the first row is the third travel
     expect(await page.locator(ROWS).first().textContent()).toContain("Jan 5, 2027");

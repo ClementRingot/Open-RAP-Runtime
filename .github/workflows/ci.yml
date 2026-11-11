@@ -90,3 +90,33 @@ jobs:
         if: always()
         working-directory: out/travel
         run: AUTH_MODE=oidc docker compose --profile oidc down -v
+      # the launchpad (D37) with the application behind it: one origin, the service at its path
+      - name: rapt launchpad
+        run: |
+          cat > out/launchpad.json <<'JSON'
+          {
+            "title": "Travel Agency",
+            "apps": [{ "id": "travel", "build": "travel", "url": "http://localhost:8080/" }],
+            "groups": [{ "title": "Travels", "tiles": [{ "title": "Manage Travels", "app": "travel", "intent": "Travel-manage", "count": "Travel" }] }]
+          }
+          JSON
+          node packages/compiler/dist/cli.js launchpad out/launchpad.json --out out/launchpad --warnings-as-errors
+      - name: docker compose up (launchpad)
+        working-directory: out/launchpad
+        run: docker compose up -d --build --wait --wait-timeout 240
+      - name: Launchpad checks
+        run: |
+          L=http://localhost:8090
+          S=$L/sap/opu/odata4/sap/zrt_ui_travel_o4/srvd/sap/zrt_ui_travel/0001
+          curl -fsS $L/health
+          curl -fsS $L/launchpad/config | grep -q '"Manage Travels"'
+          curl -fsS -X POST "$S/Travel" -H "content-type: application/json" \
+            -d '{"TravelID":"00000001","AgencyID":"070001","CustomerID":"000001","BeginDate":"2027-05-01","EndDate":"2027-05-08","BookingFee":"40.00","CurrencyCode":"EUR"}'
+          test "$(curl -fsS "$S/Travel/\$count")" = "1"
+          curl -fsS -o /dev/null $L/ui/index.html
+          curl -fsS $L/apps/travel/ui/index.html | grep -q 'data-name="rapt.app"'
+          test "$(curl -sS -o /dev/null -w '%{redirect_url}' $L/go/Travel-manage)" = "$L/apps/travel/ui/index.html"
+      - name: docker compose down (launchpad)
+        if: always()
+        working-directory: out/launchpad
+        run: docker compose down -v

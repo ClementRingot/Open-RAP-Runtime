@@ -15,6 +15,8 @@ import type { User } from "./user.js";
 
 export const SESSION_COOKIE = "rapt_session";
 const STATE_COOKIE = "rapt_oidc";
+/** The ID token of the login, kept for the logout (`id_token_hint`: no confirmation page at the provider). */
+const ID_TOKEN_COOKIE = "rapt_idt";
 
 interface ProviderMetadata {
   authorization_endpoint: string;
@@ -65,6 +67,31 @@ class Signer {
       return undefined;
     }
   }
+}
+
+function signedSession(signer: Signer, user: User, maxAge: number): string {
+  const session: SessionPayload = {
+    user: {
+      id: user.id,
+      abapName: user.abapName,
+      roles: user.roles,
+      authenticatedBy: "session",
+      ...(user.name === undefined ? {} : { name: user.name }),
+      ...(user.email === undefined ? {} : { email: user.email }),
+      ...(user.attributes === undefined ? {} : { attributes: user.attributes }),
+    },
+    sid: b64(randomBytes(16)),
+    exp: Math.floor(Date.now() / 1000) + maxAge,
+  };
+  return signer.sign(session);
+}
+
+/**
+ * The value of a session cookie for a user, signed with the secret of the sessions: what the
+ * login callback sets. For the tests, and the tools that open a session for a known user.
+ */
+export function signSession(user: User, secret: string, maxAge = 8 * 3600): string {
+  return signedSession(new Signer(secret), user, maxAge);
 }
 
 export function parseCookies(header: string | undefined): Record<string, string> {
@@ -119,10 +146,21 @@ export class OidcSessions {
     return new URL("auth/callback", this.options.session.baseUrl.endsWith("/") ? this.options.session.baseUrl : `${this.options.session.baseUrl}/`).href;
   }
 
-  /** The user of a session cookie; undefined without a valid session. */
+  /**
+   * The user of a session cookie; undefined without a valid session. The session may have been
+   * opened by another application sharing the secret (a launchpad, D37): the role required by
+   * this one is checked at each request (AuthenticationError 403 without it).
+   */
   public user(request: FastifyRequest): User | undefined {
     const session = this.signer.verify<SessionPayload>(parseCookies(request.headers.cookie)[SESSION_COOKIE]);
-    return session === undefined ? undefined : { ...session.user, authenticatedBy: "session", session: session.sid };
+    if (session === undefined) {
+      return undefined;
+    }
+    const required = this.options.requiredRole;
+    if (required !== undefined && !session.user.roles.includes(required)) {
+      throw new AuthenticationError(`the role ${required} is required`, 403);
+    }
+    return { ...session.user, authenticatedBy: "session", session: session.sid };
   }
 
   /** `/auth/login?returnTo=…` for the current page. */
@@ -133,9 +171,14 @@ export class OidcSessions {
   public register(app: FastifyInstance): void {
     app.get("/auth/login", async (request, reply) => this.login(request, reply));
     app.get("/auth/callback", async (request, reply) => this.callback(request, reply));
-    app.get("/auth/logout", async (_request, reply) => this.logout(reply));
+    app.get("/auth/logout", async (request, reply) => this.logout(request, reply));
     app.get("/auth/me", async (request, reply) => {
-      const user = this.user(request);
+      let user: User | undefined;
+      try {
+        user = this.user(request);
+      } catch (error) {
+        return reply.status(error instanceof AuthenticationError ? error.status : 401).send({ authenticated: true, error: (error as Error).message });
+      }
       return user === undefined ? reply.status(401).send({ authenticated: false }) : { authenticated: true, id: user.id, name: user.name, roles: user.roles };
     });
   }
@@ -212,25 +255,13 @@ export class OidcSessions {
     } catch (error) {
       return reply.status(error instanceof AuthenticationError ? error.status : 401).type("text/plain").send(`Login failed: ${(error as Error).message}`);
     }
-    const session: SessionPayload = {
-      user: {
-        id: user.id,
-        abapName: user.abapName,
-        roles: user.roles,
-        authenticatedBy: "session",
-        ...(user.name === undefined ? {} : { name: user.name }),
-        ...(user.email === undefined ? {} : { email: user.email }),
-        ...(user.attributes === undefined ? {} : { attributes: user.attributes }),
-      },
-      sid: b64(randomBytes(16)),
-      exp: Math.floor(Date.now() / 1000) + this.maxAge,
-    };
-    reply.header("Set-Cookie", [this.cookie(SESSION_COOKIE, this.signer.sign(session), this.maxAge), this.cookie(STATE_COOKIE, "", 0)]);
+    reply.header("Set-Cookie", [this.cookie(SESSION_COOKIE, signedSession(this.signer, user, this.maxAge), this.maxAge), this.cookie(STATE_COOKIE, "", 0), this.cookie(ID_TOKEN_COOKIE, tokens.id_token, this.maxAge)]);
     return reply.redirect(pending.returnTo);
   }
 
-  private async logout(reply: FastifyReply): Promise<FastifyReply> {
-    reply.header("Set-Cookie", this.cookie(SESSION_COOKIE, "", 0));
+  private async logout(request: FastifyRequest, reply: FastifyReply): Promise<FastifyReply> {
+    const idToken = parseCookies(request.headers.cookie)[ID_TOKEN_COOKIE];
+    reply.header("Set-Cookie", [this.cookie(SESSION_COOKIE, "", 0), this.cookie(ID_TOKEN_COOKIE, "", 0)]);
     let target = "/";
     try {
       const metadata = await this.metadata();
@@ -238,6 +269,10 @@ export class OidcSessions {
         const url = new URL(metadata.end_session_endpoint);
         url.searchParams.set("client_id", this.options.session.clientId);
         url.searchParams.set("post_logout_redirect_uri", this.options.session.baseUrl);
+        // the provider ends its session without asking (OIDC RP-Initiated Logout, even with an expired ID token)
+        if (idToken !== undefined && /^[\w-]+\.[\w-]+\.[\w-]+$/.test(idToken)) {
+          url.searchParams.set("id_token_hint", idToken);
+        }
         target = url.href;
       }
     } catch {

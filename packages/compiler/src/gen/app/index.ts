@@ -4,12 +4,12 @@
  * runtime embedded in `vendor/` (no private registry needed).
  */
 
-import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
-import { createRequire } from "node:module";
+import { readFileSync } from "node:fs";
 import path from "node:path";
-import { fileURLToPath } from "node:url";
-import { authorizationClaims, destinationKeys, shortHash, type Model } from "@rap-transpiler/model";
+import { authorizationClaims, destinationKeys, type Model } from "@rap-transpiler/model";
 import type { Diagnostics } from "../../diagnostics.js";
+import { keycloakRealm } from "../keycloak.js";
+import { packageDir, vendorPackage, type PackageJson } from "../vendor.js";
 
 export interface ScaffoldOptions {
   /** Folder of the @rap-transpiler/runtime package (default: next to the compiler). */
@@ -63,74 +63,6 @@ function destinationLines(destinations: string[]): string {
     lines.push(`DESTINATION_${key}_URL=`, `# DESTINATION_${key}_USER=`, `# DESTINATION_${key}_PASSWORD=`, `# DESTINATION_${key}_TOKEN=`, `# DESTINATION_${key}_HEADERS={"APIKey":"..."}`);
   }
   return `${lines.join("\n")}\n`;
-}
-
-interface PackageJson {
-  name: string;
-  version: string;
-  license?: string;
-  type?: string;
-  main?: string;
-  types?: string;
-  exports?: unknown;
-  engines?: Record<string, string>;
-  dependencies?: Record<string, string>;
-  devDependencies?: Record<string, string>;
-}
-
-/** The folder of a package of this repository: installed next to the compiler, or in the monorepo. */
-function packageDir(name: string, folder: string, given?: string): string | undefined {
-  const candidates: string[] = [];
-  if (given !== undefined) {
-    candidates.push(path.resolve(given));
-  }
-  try {
-    let dir = path.dirname(createRequire(import.meta.url).resolve(name));
-    while (!existsSync(path.join(dir, "package.json")) && path.dirname(dir) !== dir) {
-      dir = path.dirname(dir);
-    }
-    candidates.push(dir);
-  } catch {
-    // not installed: the monorepo layout
-  }
-  candidates.push(fileURLToPath(new URL(`../../../../${folder}/`, import.meta.url)));
-  return candidates.find((dir) => existsSync(path.join(dir, "package.json")) && existsSync(path.join(dir, "dist")));
-}
-
-function filesBelow(root: string, dir = root): string[] {
-  const result: string[] = [];
-  for (const entry of readdirSync(dir)) {
-    const full = path.join(dir, entry);
-    if (statSync(full).isDirectory()) {
-      result.push(...filesBelow(root, full));
-    } else if (!entry.endsWith(".tsbuildinfo")) {
-      result.push(path.relative(root, full).split(path.sep).join("/"));
-    }
-  }
-  return result;
-}
-
-/** A package of the repository, as files of `vendor/<folder>/`: its dist and a production package.json. */
-function vendorPackage(dir: string, folder: string, rename: Record<string, string>): Array<{ path: string; content: string }> {
-  const manifest = JSON.parse(readFileSync(path.join(dir, "package.json"), "utf8")) as PackageJson;
-  const dependencies: Record<string, string> = {};
-  for (const [name, version] of Object.entries(manifest.dependencies ?? {})) {
-    dependencies[name] = rename[name] ?? version;
-  }
-  const dist = filesBelow(path.join(dir, "dist")).map((file) => ({ path: `vendor/${folder}/dist/${file}`, content: readFileSync(path.join(dir, "dist", file), "utf8") }));
-  // a version that changes with the content: npm install updates the copy after a new rapt build
-  const version = `${manifest.version}-rapt.${shortHash(dist.map((f) => `${f.path}\n${f.content}`).join("\n"))}`;
-  const vendored: PackageJson = { name: manifest.name, version, license: manifest.license ?? "MIT", type: manifest.type ?? "module", dependencies };
-  if (manifest.main !== undefined) vendored.main = manifest.main;
-  if (manifest.types !== undefined) vendored.types = manifest.types;
-  if (manifest.exports !== undefined) vendored.exports = manifest.exports;
-  if (manifest.engines !== undefined) vendored.engines = manifest.engines;
-  const files = [{ path: `vendor/${folder}/package.json`, content: `${JSON.stringify(vendored, null, 2)}\n` }, ...dist];
-  const license = [path.join(dir, "LICENSE"), path.join(dir, "..", "..", "LICENSE")].find((f) => existsSync(f));
-  if (license !== undefined) {
-    files.push({ path: `vendor/${folder}/LICENSE`, content: readFileSync(license, "utf8") });
-  }
-  return files;
 }
 
 const SERVER = `#!/usr/bin/env node
@@ -228,94 +160,16 @@ volumes:
 `;
 }
 
-/** The default attributes of the Keycloak user profile (declarative user profile, Keycloak 24+). */
-const PROFILE_ATTRIBUTES = [
-  { name: "username", displayName: "${username}", validations: { length: { min: 3, max: 255 }, "username-prohibited-characters": {}, "up-username-not-idn-homograph": {} }, permissions: { view: ["admin", "user"], edit: ["admin", "user"] }, multivalued: false },
-  { name: "email", displayName: "${email}", validations: { email: {}, length: { max: 255 } }, required: { roles: ["user"] }, permissions: { view: ["admin", "user"], edit: ["admin", "user"] }, multivalued: false },
-  { name: "firstName", displayName: "${firstName}", validations: { length: { max: 255 }, "person-name-prohibited-characters": {} }, required: { roles: ["user"] }, permissions: { view: ["admin", "user"], edit: ["admin", "user"] }, multivalued: false },
-  { name: "lastName", displayName: "${lastName}", validations: { length: { max: 255 }, "person-name-prohibited-characters": {} }, required: { roles: ["user"] }, permissions: { view: ["admin", "user"], edit: ["admin", "user"] }, multivalued: false },
-];
-
-/**
- * The realm of the Keycloak of docker-compose: the client of the application, the roles of
- * rapt/authorizations.json (D34) given to alice, and for each claim the roles read (`{claim:x}`)
- * a user attribute (declared in the user profile, set by the administrator) mapped into the tokens.
- */
+/** The realm of the Keycloak of docker-compose: the client rapt-app and the roles of the application. */
 function realm(model: Model): Record<string, unknown> {
-  const roles = model.authorizations?.roles ?? [];
-  const claims = authorizationClaims(model.authorizations);
-  const attribute = (claim: string): string => claim.replace(/[^A-Za-z0-9_-]/g, "_");
-  const result: Record<string, unknown> = {
-    realm: "rapt",
-    enabled: true,
-    roles: { realm: [{ name: "rapt_user", description: "User of the generated application" }, ...roles.map((r) => ({ name: r.name, ...(r.description === undefined ? {} : { description: r.description }) }))] },
-    clients: [
-      {
-        clientId: "rapt-app",
-        name: "Application generated by rap-transpiler",
-        enabled: true,
-        protocol: "openid-connect",
-        publicClient: false,
-        secret: "rapt-app-secret",
-        standardFlowEnabled: true,
-        directAccessGrantsEnabled: false,
-        redirectUris: ["http://localhost:8080/auth/callback"],
-        webOrigins: ["http://localhost:8080"],
-        attributes: { "pkce.code.challenge.method": "S256", "post.logout.redirect.uris": "http://localhost:8080/*" },
-        ...(claims.length === 0
-          ? {}
-          : {
-              protocolMappers: claims.map((claim) => ({
-                name: claim,
-                protocol: "openid-connect",
-                protocolMapper: "oidc-usermodel-attribute-mapper",
-                consentRequired: false,
-                config: {
-                  "user.attribute": attribute(claim),
-                  "claim.name": claim,
-                  "jsonType.label": "String",
-                  multivalued: "true",
-                  "id.token.claim": "true",
-                  "access.token.claim": "true",
-                  "userinfo.token.claim": "true",
-                  "introspection.token.claim": "true",
-                },
-              })),
-            }),
-      },
-    ],
-    users: [
-      {
-        username: "alice",
-        enabled: true,
-        firstName: "Alice",
-        lastName: "Example",
-        email: "alice@example.org",
-        emailVerified: true,
-        credentials: [{ type: "password", value: "alice", temporary: false }],
-        realmRoles: ["rapt_user", ...roles.map((r) => r.name)],
-      },
-    ],
-  };
-  if (claims.length > 0) {
-    result["components"] = {
-      "org.keycloak.userprofile.UserProfileProvider": [
-        {
-          providerId: "declarative-user-profile",
-          subComponents: {},
-          config: {
-            "kc.user.profile.config": [
-              JSON.stringify({
-                attributes: [...PROFILE_ATTRIBUTES, ...claims.map((claim) => ({ name: attribute(claim), displayName: claim, permissions: { view: ["admin"], edit: ["admin"] }, multivalued: true }))],
-                groups: [{ name: "user-metadata", displayHeader: "User metadata", displayDescription: "Attributes, which refer to user metadata" }],
-              }),
-            ],
-          },
-        },
-      ],
-    };
-  }
-  return result;
+  return keycloakRealm({
+    clientId: "rapt-app",
+    clientName: "Application generated by rap-transpiler",
+    secret: "rapt-app-secret",
+    url: "http://localhost:8080",
+    roles: model.authorizations?.roles ?? [],
+    claims: authorizationClaims(model.authorizations),
+  });
 }
 
 const ENV_EXAMPLE = `# Configuration of the generated application (all optional except the database).

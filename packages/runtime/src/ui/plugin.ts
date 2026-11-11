@@ -22,6 +22,10 @@ const TYPES: Record<string, string> = {
   ".xml": "application/xml; charset=utf-8",
   ".properties": "text/plain; charset=utf-8",
   ".css": "text/css; charset=utf-8",
+  ".svg": "image/svg+xml",
+  ".png": "image/png",
+  ".jpg": "image/jpeg",
+  ".ico": "image/x-icon",
 };
 
 export async function registerUi(app: FastifyInstance, options: UiOptions): Promise<void> {

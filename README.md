@@ -33,6 +33,7 @@ pnpm test
 node packages/compiler/dist/cli.js check fixtures/travel     # diagnostics
 node packages/compiler/dist/cli.js ir fixtures/travel        # représentation intermédiaire (JSON)
 node packages/compiler/dist/cli.js build fixtures/travel --out out/travel   # application générée
+node packages/compiler/dist/cli.js launchpad launchpad.json --out out/launchpad   # launchpad (D37)
 ```
 
 Le dossier source est un export abapGit (`.abapgit.xml` et `src/`) ; la fixture de référence est
@@ -57,6 +58,33 @@ Le behavior pool peut appeler des API distantes avec le client HTTP d'ABAP Cloud
 proxy OData d'un service consumption model (SCM, SCM2) ; chaque destination se configure par
 variables d'environnement (`DESTINATION_<NOM>_URL`, `_USER`, `_PASSWORD`, `_TOKEN`, `_HEADERS`),
 listées dans le `.env.example` généré ([guide](docs/API_DISTANTES.md), [D31](docs/DECISIONS.md)).
+
+## Launchpad des applications (`rapt launchpad`)
+
+Quand plusieurs applications sont générées, un launchpad en OpenUI5 sert de point d'entrée,
+comme le Fiori launchpad (dont le shell n'existe que dans SAPUI5). Il affiche des tuiles affectées
+aux rôles de l'IdP, avec des compteurs (`$count`), une barre shell et la navigation par intent.
+Il sert les applications sous une même origine (`/apps/<id>/`, services à leurs chemins), avec
+une seule connexion OIDC que les applications lisent ([D37](docs/DECISIONS.md)). Le contenu est
+décrit dans un `launchpad.json` :
+
+```json
+{
+  "title": "Travel Agency",
+  "apps": [{ "id": "travel", "build": "out/travel", "url": "http://localhost:8080/" }],
+  "groups": [{
+    "title": "Travel Management",
+    "tiles": [{ "title": "Manage Travels", "app": "travel", "intent": "Travel-manage",
+                "icon": "sap-icon://flight", "count": "Travel",
+                "roles": ["travel_manager", "travel_agent", "travel_viewer"] }]
+  }]
+}
+```
+
+```sh
+node packages/compiler/dist/cli.js launchpad launchpad.json --out out/launchpad
+cd out/launchpad && docker compose up --build     # http://localhost:8090/ : launchpad et applications
+```
 
 ## Application générée (`rapt build`)
 

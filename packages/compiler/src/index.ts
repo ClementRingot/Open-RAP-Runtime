@@ -11,3 +11,5 @@ export { generateApplication, writeFiles, type GeneratedFile } from "./build.js"
 export { generateCsdl } from "./gen/csdl.js";
 export { generateSql, quoteIdentifier, sqlType } from "./gen/sql.js";
 export { generateUi, buildUiLayout, type UiLayout } from "./gen/ui/index.js";
+export { generateLaunchpad, generateLaunchpadUi, type LaunchpadOptions, type LaunchpadResult } from "./gen/launchpad/index.js";
+export { resolveLaunchpad, type LaunchpadResolution, type ResolvedApp } from "./launchpad/config.js";

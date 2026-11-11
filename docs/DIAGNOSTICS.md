@@ -81,4 +81,11 @@ Le code de retour est 1 dès qu'il y a une erreur (ou un avertissement avec
 | AUTH002 | avertissement | Rôle accordant un objet d'autorisation inconnu (ses champs ne sont pas contrôlés) |
 | AUTH003 | erreur | Rôle donnant une valeur à un champ que l'objet d'autorisation n'a pas |
 | AUTH004 | avertissement | Rôle accordant une activité (`ACTVT`) que l'objet d'autorisation ne permet pas |
+| LPD001 | erreur | `launchpad.json` illisible ou mal formé : groupes, titres, id ou URL d'une application, rôles d'une tuile |
+| LPD002 | erreur | Tuile sans cible, avec deux cibles (`app` et `url`), ou d'une application inconnue |
+| LPD003 | erreur ou avertissement | Dossier d'application qui n'a pas été généré par `rapt build` (erreur) ; application dont les services ne sont pas connus, ni `build` ni `servicePaths` (avertissement) |
+| LPD004 | erreur | Intent qui n'est pas de la forme `ObjetSemantique-action` |
+| LPD005 | erreur | Chemin de service sous un chemin du launchpad (`/ui`, `/apps`, `/auth`…), ou servi par deux applications |
+| LPD006 | erreur | Compteur sur un entity set inconnu du service, ou sur une tuile sans application |
+| LPD007 | avertissement | Rôle d'une tuile absent des `rapt/authorizations.json` des applications (l'IdP doit tout de même le donner) |
 | APP001 | erreur | Paquets du runtime introuvables (`dist/` non construit) pour l'application générée : `--runtime <dossier>` ou `pnpm build` |
