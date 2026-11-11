@@ -9,7 +9,7 @@
  */
 
 import { spawn, type ChildProcess } from "node:child_process";
-import { existsSync, lstatSync, mkdirSync, readdirSync, readFileSync, readlinkSync, rmSync, symlinkSync, watch, writeFileSync, type FSWatcher } from "node:fs";
+import { existsSync, lstatSync, mkdirSync, readdirSync, readFileSync, readlinkSync, rmSync, symlinkSync, unlinkSync, watch, writeFileSync, type FSWatcher } from "node:fs";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
 import { generateApplication, writeFiles, type GenerateOptions } from "./build.js";
@@ -275,17 +275,7 @@ export class DevSession {
 
   /** node_modules of the build: a link (a junction on Windows) to the runtime's. */
   private linkNodeModules(target: string): void {
-    const link = path.join(this.outDir, "node_modules");
-    if (existsSync(link) || isLink(link)) {
-      if (!isLink(link)) {
-        return; // a real folder, installed by the user: kept
-      }
-      if (path.resolve(this.outDir, readlinkSync(link)) === path.resolve(target)) {
-        return;
-      }
-      rmSync(link, { force: true });
-    }
-    symlinkSync(target, link, "junction");
+    linkFolder(path.join(this.outDir, "node_modules"), target);
   }
 
   private get pgliteDir(): string | undefined {
@@ -394,6 +384,30 @@ export function runtimeDependencies(runtimeDir: string): string | undefined {
     }
     dir = parent;
   }
+}
+
+/**
+ * Links `link` to the folder `target` (a junction on Windows), replacing a link to another folder.
+ * A real folder at `link` (installed by the user) is kept.
+ */
+export function linkFolder(link: string, target: string): void {
+  if (existsSync(link) || isLink(link)) {
+    if (!isLink(link)) {
+      return;
+    }
+    if (samePath(path.resolve(path.dirname(link), readlinkSync(link)), target)) {
+      return;
+    }
+    // unlinkSync removes the link itself; rmSync fails on a junction (ERR_FS_EISDIR, Node.js 24)
+    unlinkSync(link);
+  }
+  symlinkSync(target, link, "junction");
+}
+
+/** Paths are case-insensitive on Windows: `c:\` from VS Code, `C:\` read back from a junction. */
+function samePath(a: string, b: string): boolean {
+  const [x, y] = [path.resolve(a), path.resolve(b)];
+  return process.platform === "win32" ? x.toLowerCase() === y.toLowerCase() : x === y;
 }
 
 function isLink(file: string): boolean {
