@@ -21,8 +21,7 @@ dans [FEATURES.md](FEATURES.md), les écarts assumés dans [KNOWN_GAPS.md](../KN
 
 ## Autres pistes
 
-- Value helps : `additionalBinding`, listes déroulantes (`ValueListWithFixedValues`, valeurs fixes
-  des domaines).
+- Value helps : valeurs fixes des domaines, plusieurs value helps qualifiés par élément.
 - Vues standards : textes dans d'autres langues que l'anglais, taux de change d'une source
   configurable.
 - Variantes partagées entre utilisateurs, ordre des colonnes.

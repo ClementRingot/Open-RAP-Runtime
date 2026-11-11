@@ -102,10 +102,21 @@ function input(field: UiField, id: string | undefined): string {
       return `<DateTimePicker ${common}${required} value="{${field.property}}"/>`;
     case "time":
       return `<TimePicker ${common}${required} value="{${field.property}}"/>`;
-    default:
+    default: {
+      const help = field.valueHelp;
+      const property = `<customData><core:CustomData key="property" value="${esc(field.property)}"/></customData>`;
+      if (help?.fixedValues === true) {
+        // a drop-down list of the values (Common.ValueListWithFixedValues)
+        const description = help.columns.slice(1).find((c) => c.string);
+        // the elements of the items and of the additional bindings
+        const select = [...new Set([help.element, ...(description === undefined ? [] : [description.property]), ...(help.bindings ?? []).map((b) => b.element)])].join(",");
+        return `<ComboBox ${common}${required} width="100%"${description === undefined ? "" : ` showSecondaryValues="true"`} selectedKey="{${field.property}}" selectionChange=".onValueHelpChange" items="${esc(`{ path: '/${help.set}', templateShareable: false, length: 500, parameters: { $select: '${select}' } }`)}"><items><core:ListItem key="{${help.element}}" text="{${help.element}}"${description === undefined ? "" : ` additionalText="{${description.property}}"`}/></items>${property}</ComboBox>`;
+      }
+      const check = help !== undefined && (help.validation === true || (help.bindings ?? []).some((b) => b.usage !== "filter")) ? ` change=".onValueHelpChange"` : "";
       return `<Input ${common}${required} value="{${field.property}}"${field.unit === undefined ? "" : ` description="{${field.unit}}"`}${
-        field.valueHelp === undefined ? "/>" : ` showValueHelp="true" valueHelpRequest=".onValueHelp"><customData><core:CustomData key="property" value="${esc(field.property)}"/></customData></Input>`
+        help === undefined ? "/>" : ` showValueHelp="true" valueHelpRequest=".onValueHelp"${check}>${property}</Input>`
       }`;
+    }
   }
 }
 

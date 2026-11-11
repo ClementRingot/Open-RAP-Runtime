@@ -11,6 +11,8 @@ annotate entity ZRT_C_ORDER with
   Status;
   @UI: { lineItem: [ { position: 40 } ], identification: [ { position: 40 } ] }
   Priority;
+  @UI.identification: [ { position: 45 } ]
+  Category;
   @UI: { lineItem: [ { position: 50 } ], identification: [ { position: 50 } ] }
   Amount;
   @UI.identification: [ { position: 60 } ]

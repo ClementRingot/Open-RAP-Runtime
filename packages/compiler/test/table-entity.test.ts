@@ -73,6 +73,7 @@ describe("table entities and CDS types", () => {
       ["Name", "name"],
       ["Status", "status"],
       ["Priority", "priority"],
+      ["Category", "category"],
       ["Amount", "amount"],
       ["Currency", "currency"],
       ["Note", "note"],
@@ -85,6 +86,7 @@ describe("table entities and CDS types", () => {
       ["name", false, true],
       ["status", false, true],
       ["priority", false, true],
+      ["category", false, true],
       ["amount", false, true],
       ["currency", false, true],
       ["note", false, false],
@@ -120,6 +122,18 @@ describe("table entities and CDS types", () => {
       expect.stringContaining("ZRT_C_ORDER.Priority"),
     ]);
     expect(generateCsdl(standard.model as NonNullable<typeof standard.model>)).not.toContain("EnumType");
+  });
+
+  it("give the value helps their bindings, validation and fixed values", () => {
+    const { model } = buildModel(loadProject(FIXTURE));
+    const csdl = generateCsdl(model as NonNullable<typeof model>);
+    const category = /<Annotations Target="SAP__self.OrdersType\/Category">[\s\S]*?<\/Annotations>/.exec(csdl)?.[0] ?? "";
+    expect(category).toContain('<PropertyValue Property="CollectionPath" String="ZRT_ORDER_CAT"/>');
+    expect(category).toMatch(/<Record Type="Common.ValueListParameterOut">\s*<PropertyValue Property="LocalDataProperty" PropertyPath="Currency"\/>\s*<PropertyValue Property="ValueListProperty" String="DefaultCurrency"\/>/);
+    expect(category).toContain('<Annotation Term="Common.ValueListWithFixedValues"/>');
+    const currency = /<Annotations Target="SAP__self.OrdersType\/Currency">[\s\S]*?<\/Annotations>/.exec(csdl)?.[0] ?? "";
+    expect(currency).toContain('<Annotation Term="Common.ValueListForValidation" String=""/>');
+    expect(model?.service.entitySets.map((s) => s.name)).toEqual(expect.arrayContaining(["ZRT_ORDER_CAT", "I_Currency"]));
   });
 
   it("check the enumerated types", () => {

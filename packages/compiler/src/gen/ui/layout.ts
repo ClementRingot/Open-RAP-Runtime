@@ -62,6 +62,7 @@ export interface UiParameter {
   kind: FieldKind;
   edm: EdmType["type"];
   options?: UiOption[];
+  valueHelp?: UiValueHelp;
 }
 
 function optionsOf(edm: EdmType): UiOption[] | undefined {
@@ -319,6 +320,8 @@ class LayoutBuilder {
           kind: kindOf(p.edm, false, field !== undefined && isUuid(field.type), false),
           edm: p.edm.type,
           ...(p.edm.enum === undefined ? {} : { options: optionsOf(p.edm) ?? [] }),
+          // a value help of a parameter: its entity must be exposed by the service, as in RAP
+          ...(field === undefined || valueHelpOf(this.model, field) === undefined ? {} : { valueHelp: valueHelpOf(this.model, field) as UiValueHelp }),
         };
       }),
       dynamic: operation.dynamic,

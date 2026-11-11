@@ -177,7 +177,7 @@ ajoutent ce que la fixture n'utilise pas : numérotation, feature control global
 | Entités custom (`define custom entity`, `@ObjectModel.query.implementedBy`, `if_rap_query_provider`) | ✅ | Lectures OData par la classe de requête : plages et chaîne SQL du filtre, tri, pagination, compte, navigation, `$expand` (D43). |
 | BO `managed with unmanaged save` sur une entité custom | ✅ | Mode `enhanced` seulement (`rapt/config.json`, D45) : instances lues par la classe de requête, écrites par `save_modified` vers l'API (D43). |
 | Vues standards `I_Currency`, `I_UnitOfMeasure`, `I_Country`, `I_Language` et leurs textes | ✅ | Ajoutées quand une source les nomme, avec leurs données de référence (D44). |
-| Value helps (`@Consumption.valueHelpDefinition`) | ✅ | Entité et vue de textes exposées implicitement en lecture seule, `Common.ValueList` (D44). |
+| Value helps (`@Consumption.valueHelpDefinition`) | ✅ | Entité et vue de textes exposées implicitement en lecture seule, `Common.ValueList` (D44) ; `additionalBinding` (filtre, résultat), `useForValidation`, liste déroulante (`sizeCategory: #XS`), paramètres d'action (D56). |
 | Table entities (`define [root] table entity`) | ✅ | Table et view entity ; persistance implicite d'un BO managed ; `null`, clés, associations, compositions (D55). |
 | Types simples CDS (`define type x : abap.char(40);`) | ✅ | Objets DRTY (`.drty.acds`) : type et libellé des éléments (D55). |
 | Types énumérés CDS (`define type x : abap.char(1) enum { … }`) | ✅ | Valeurs de base en base ; constantes utilisables dans le behavior pool. Exposition OData : refusée en mode `standard` comme sur SAP (CDS021), `EnumType` en mode `enhanced` (D55). |

@@ -140,7 +140,19 @@ describe.skipIf(browserType === undefined)("enumerated types in the UI", () => {
     await select.waitFor({ timeout: 30_000 });
     await select.click();
     await page.locator("li.sapMSelectListItemBase", { hasText: "High" }).last().click();
+    // value help with fixed values (drop-down) whose additional binding fills the currency
+    await page.locator(`${id("OrdersObject", "field_General_Category")}-arrow`).click();
+    await page.locator("li", { hasText: "US purchases" }).last().click();
+    await expect.poll(async () => page.evaluate(`sap.ui.core.Element.getElementById("container-rapt---OrdersObject--field_General_Currency").getValue()`), { timeout: 10_000 }).toBe("USD");
+    // value help used for validation: an unknown currency is an error
+    await page.locator(`${id("OrdersObject", "field_General_Currency")}-inner`).fill("ZZZ");
+    await page.locator(`${id("OrdersObject", "field_General_Currency")}-inner`).press("Tab");
+    await expect.poll(async () => page.evaluate(`sap.ui.core.Element.getElementById("container-rapt---OrdersObject--field_General_Currency").getValueState()`), { timeout: 10_000 }).toBe("Error");
+    await page.locator(`${id("OrdersObject", "field_General_Currency")}-inner`).fill("USD");
+    await page.locator(`${id("OrdersObject", "field_General_Currency")}-inner`).press("Tab");
+    await expect.poll(async () => page.evaluate(`sap.ui.core.Element.getElementById("container-rapt---OrdersObject--field_General_Currency").getValueState()`), { timeout: 10_000 }).toBe("None");
     await page.locator(id("OrdersObject", "save")).click();
     await expect.poll(async () => (await get("Orders('00000002')")).body["Priority"], { timeout: 15_000 }).toBe("HIGH");
+    expect((await get("Orders('00000002')")).body).toMatchObject({ Category: "US", Currency: "USD" });
   }, 120_000);
 });

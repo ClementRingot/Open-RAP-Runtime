@@ -185,7 +185,9 @@ CurrencyCode,
 ```
 
 L'entité du value help est exposée automatiquement (comme RAP) ; l'UI ouvre un dialogue de
-sélection avec les descriptions.
+sélection avec les descriptions. `additionalBinding` (`#FILTER`, `#RESULT`), `useForValidation:
+true` et une entité `@ObjectModel.resultSet.sizeCategory: #XS` (liste déroulante) sont pris en
+charge ([D56](DECISIONS.md)).
 
 ### Behavior definition
 

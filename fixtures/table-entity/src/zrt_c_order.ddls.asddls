@@ -9,8 +9,12 @@ define root view entity ZRT_C_ORDER
       Name,
       Status,
       Priority,
+      @Consumption.valueHelpDefinition: [{ entity: { name: 'ZRT_ORDER_CAT', element: 'Category' },
+                                           additionalBinding: [{ localElement: 'Currency', element: 'DefaultCurrency', usage: #RESULT }] }]
+      Category,
       @Semantics.amount.currencyCode: 'Currency'
       Amount,
+      @Consumption.valueHelpDefinition: [{ entity: { name: 'I_Currency', element: 'Currency' }, useForValidation: true }]
       Currency,
       Note
 }

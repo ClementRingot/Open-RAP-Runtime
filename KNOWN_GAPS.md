@@ -151,7 +151,7 @@ Versions de référence : `@abaplint/core` 2.120.98, `@abaplint/transpiler` 2.14
 | `I_BusinessUserBasic` | Un utilisateur n'y figure qu'après sa première requête ; pas de synchronisation avec l'IdP (départs, changements de nom). |
 | Données de référence | Textes en anglais seulement ; unités : une trentaine d'unités courantes (le contenu de SAP en compte bien plus) ; pas de décalage des décimales (`TCURX`) : `Decimals` est une information. |
 | Éléments des vues standards | Ceux d'usage courant ; les autres éléments des vues de SAP (et leurs associations) n'existent pas. |
-| Value help | Pas de `additionalBinding` (filtres et résultats supplémentaires), ni de `useForValidation`, ni de `Common.ValueListWithFixedValues` (liste déroulante). |
+| Value help | Un seul value help par élément (le premier si plusieurs, sans `qualifier`) ; `useForValidation` contrôlé dans l'UI, pas par le service (comme RAP) ; pas de `distinctValues`, ni de `presentationVariantQualifier`. |
 
 ## Draft (D54)
 

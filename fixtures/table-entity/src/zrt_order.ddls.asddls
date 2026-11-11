@@ -8,6 +8,8 @@ define root table entity ZRT_ORDER
       Name     : zrt_order_name;
       Status   : zrt_order_status;
       Priority : zrt_priority;
+      @EndUserText.label: 'Category'
+      Category : abap.char(2);
       @Semantics.amount.currencyCode: 'Currency'
       Amount   : abap.curr(15,2);
       Currency : abap.cuky;

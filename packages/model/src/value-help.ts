@@ -21,6 +21,15 @@ export interface ValueHelp {
    * entity set, the element matching the value, the text, the language element.
    */
   text?: { set: string; key: string; element: string; label: string; language?: string };
+  /**
+   * `additionalBinding`: other elements of the value help bound to local elements, as filter
+   * (the local value restricts the list), result (the chosen row fills the local element) or both.
+   */
+  bindings?: Array<{ local: string; element: string; usage: "filter" | "result" | "filterAndResult" }>;
+  /** `useForValidation: true`: a value that is not in the list is an error (Common.ValueListForValidation). */
+  validation?: boolean;
+  /** `@ObjectModel.resultSet.sizeCategory: #XS` on the value help entity: a drop-down list (Common.ValueListWithFixedValues). */
+  fixedValues?: boolean;
 }
 
 export function valueHelpOf(model: Model, field: FieldModel): ValueHelp | undefined {
@@ -55,6 +64,29 @@ export function valueHelpOf(model: Model, field: FieldModel): ValueHelp | undefi
       label: typeof entityLabel === "string" ? entityLabel : entity.name,
       columns: [key, ...others].map((f) => ({ property: f.name, label: label(f), string: edmTypeOf(f.type).type === "Edm.String" })),
     };
+    const bindings: NonNullable<ValueHelp["bindings"]> = [];
+    for (const binding of Array.isArray(definition["additionalbinding"]) ? definition["additionalbinding"] : []) {
+      if (typeof binding !== "object" || binding === null || Array.isArray(binding)) {
+        continue;
+      }
+      const local = binding["localelement"];
+      const remote = binding["element"];
+      const usage = typeof binding["usage"] === "string" ? binding["usage"].replace(/^#/, "").toUpperCase() : "FILTER_AND_RESULT";
+      const remoteField = typeof remote === "string" ? entity.fields.find((f) => same(f.name, remote)) : undefined;
+      if (typeof local !== "string" || remoteField === undefined) {
+        continue;
+      }
+      bindings.push({ local, element: remoteField.name, usage: usage === "FILTER" ? "filter" : usage === "RESULT" ? "result" : "filterAndResult" });
+    }
+    if (bindings.length > 0) {
+      help.bindings = bindings;
+    }
+    if (definition["useforvalidation"] === true) {
+      help.validation = true;
+    }
+    if (getAnnotation(entity.annotations, "ObjectModel.resultSet.sizeCategory") === "#XS") {
+      help.fixedValues = true;
+    }
     for (const association of entity.associations) {
       const textEntity = findEntity(model, association.target);
       const textSet = model.service.entitySets.find((s) => same(s.entity, association.target));

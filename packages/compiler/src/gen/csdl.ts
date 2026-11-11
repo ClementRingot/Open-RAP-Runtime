@@ -294,12 +294,25 @@ class CsdlBuilder {
                 {},
                 collection(
                   record("Common.ValueListParameterInOut", pv("LocalDataProperty", { PropertyPath: property.name }), pv("ValueListProperty", { String: help.element })),
-                  ...help.columns.slice(1).map((c) => record("Common.ValueListParameterDisplayOnly", pv("ValueListProperty", { String: c.property }))),
+                  // additionalBinding: In (filter), Out (result), InOut (both)
+                  ...(help.bindings ?? []).map((b) =>
+                    record(
+                      b.usage === "filter" ? "Common.ValueListParameterIn" : b.usage === "result" ? "Common.ValueListParameterOut" : "Common.ValueListParameterInOut",
+                      pv("LocalDataProperty", { PropertyPath: b.local }),
+                      pv("ValueListProperty", { String: b.element }),
+                    ),
+                  ),
+                  ...help.columns
+                    .slice(1)
+                    .filter((c) => !(help.bindings ?? []).some((b) => b.element === c.property))
+                    .map((c) => record("Common.ValueListParameterDisplayOnly", pv("ValueListProperty", { String: c.property }))),
                 ),
               ),
             ),
           ),
         );
+        if (help.validation === true) children.push(annotation("Common.ValueListForValidation", { String: "" }));
+        if (help.fixedValues === true) children.push(annotation("Common.ValueListWithFixedValues"));
       }
       const text = getArray(a, "ObjectModel.text.element")?.map(str).find((t) => t !== undefined);
       if (text !== undefined) {

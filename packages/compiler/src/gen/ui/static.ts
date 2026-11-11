@@ -304,6 +304,16 @@ export const SUPPORT = `sap.ui.define([
             oControl = new CheckBox();
           } else if (oParameter.kind === "enum") {
             oControl = new Select({ forceSelection: true, items: oParameter.options.map(function (o) { return new Item({ key: o.key, text: o.text }); }) });
+          } else if (oParameter.valueHelp) {
+            oControl = new Input({ showValueHelp: true });
+            oControl.attachValueHelpRequest(function () {
+              var oInput = this;
+              support.valueHelp(oView, oParameter.valueHelp, false).then(function (aValues) {
+                if (aValues.length > 0) {
+                  oInput.setValue(aValues[0]);
+                }
+              });
+            }, oControl);
           } else {
             oControl = new Input({ type: oParameter.kind === "integer" || oParameter.kind === "decimal" ? "Number" : "Text" });
           }
@@ -397,14 +407,68 @@ export const SUPPORT = `sap.ui.define([
       });
     },
 
-    /** Opens the value help of a field; resolves the chosen values (none when cancelled). */
-    valueHelp: function (oView, oHelp, bMulti) {
+    /**
+     * Opens the value help of a field; resolves the chosen values (none when cancelled). With the
+     * context of the instance, the bindings of usage filter restrict the list, and the chosen rows
+     * are given as second argument (results of the additional bindings).
+     */
+    valueHelp: function (oView, oHelp, bMulti, oContext) {
       return support.valueHelpTexts(oView, oHelp).then(function (mTexts) {
-        return support._valueHelpDialog(oView, oHelp, bMulti, mTexts);
+        return support._valueHelpDialog(oView, oHelp, bMulti, mTexts, oContext);
       });
     },
 
-    _valueHelpDialog: function (oView, oHelp, bMulti, mTexts) {
+    /** The filters of the additional bindings of usage filter, from the values of the instance. */
+    valueHelpFilters: function (oHelp, oContext) {
+      if (!oContext || !oHelp.bindings) {
+        return [];
+      }
+      return oHelp.bindings.filter(function (b) {
+        var vValue = oContext.getProperty(b.local);
+        return b.usage !== "result" && vValue !== undefined && vValue !== null && vValue !== "";
+      }).map(function (b) {
+        return new Filter(b.element, "EQ", oContext.getProperty(b.local));
+      });
+    },
+
+    /** Copies the elements of a chosen row to the local elements (additional bindings of usage result). */
+    applyValueHelpResults: function (oHelp, oContext, oRow) {
+      (oHelp.bindings || []).forEach(function (b) {
+        if (b.usage !== "filter" && oRow && oRow[b.element] !== undefined) {
+          oContext.setProperty(b.local, oRow[b.element]);
+        }
+      });
+    },
+
+    /**
+     * Checks a typed value against the value help (useForValidation) and fills the additional
+     * bindings of usage result; resolves false when the value is not in the list.
+     */
+    checkValueHelp: function (oView, oHelp, oContext, sValue) {
+      if (sValue === "" || sValue === null || sValue === undefined) {
+        return Promise.resolve(true);
+      }
+      var aConditions = [oHelp.element + " eq '" + String(sValue).replace(/'/g, "''") + "'"];
+      support.valueHelpFilters(oHelp, oContext).forEach(function (oFilter) {
+        aConditions.push(oFilter.getPath() + " eq '" + String(oFilter.getValue1()).replace(/'/g, "''") + "'");
+      });
+      return fetch(oView.getModel().getServiceUrl() + oHelp.set + "?$top=1&$filter=" + encodeURIComponent(aConditions.join(" and ")), {
+        credentials: "same-origin",
+        headers: { accept: "application/json" }
+      }).then(function (oResponse) {
+        return oResponse.ok ? oResponse.json() : { value: [] };
+      }).then(function (oData) {
+        var oRow = (oData.value || [])[0];
+        if (oRow) {
+          support.applyValueHelpResults(oHelp, oContext, oRow);
+        }
+        return oRow !== undefined;
+      }).catch(function () {
+        return true;
+      });
+    },
+
+    _valueHelpDialog: function (oView, oHelp, bMulti, mTexts, oContext) {
       var bTexts = Object.keys(mTexts).length > 0;
       var aColumns = oHelp.columns.slice();
       if (bTexts) {
@@ -412,10 +476,14 @@ export const SUPPORT = `sap.ui.define([
       }
       return new Promise(function (resolve) {
         var bDone = false;
-        var done = function (aValues) {
+        var aBase = support.valueHelpFilters(oHelp, oContext);
+        var done = function (aValues, aRows) {
           if (!bDone) {
             bDone = true;
             resolve(aValues);
+            if (aRows && aRows.length > 0 && oContext) {
+              support.applyValueHelpResults(oHelp, oContext, aRows[0]);
+            }
           }
         };
         var oDialog = new TableSelectDialog({
@@ -438,11 +506,18 @@ export const SUPPORT = `sap.ui.define([
             }).slice(0, 30).forEach(function (k) {
               aFilters.push(new Filter(oHelp.element, "EQ", k));
             });
-            oEvent.getSource().getBinding("items").filter(sValue === "" || aFilters.length === 0 ? [] : new Filter({ filters: aFilters, and: false }));
+            var aAll = aBase.slice();
+            if (sValue !== "" && aFilters.length > 0) {
+              aAll.push(new Filter({ filters: aFilters, and: false }));
+            }
+            oEvent.getSource().getBinding("items").filter(aAll.length === 0 ? [] : new Filter({ filters: aAll, and: true }));
           },
           confirm: function (oEvent) {
-            done((oEvent.getParameter("selectedItems") || []).map(function (oItem) {
+            var aItems = oEvent.getParameter("selectedItems") || [];
+            done(aItems.map(function (oItem) {
               return String(oItem.getBindingContext().getProperty(oHelp.element));
+            }), aItems.map(function (oItem) {
+              return oItem.getBindingContext().getObject();
             }));
           },
           cancel: function () {
@@ -455,7 +530,9 @@ export const SUPPORT = `sap.ui.define([
         });
         oDialog.bindAggregation("items", {
           path: "/" + oHelp.set,
-          parameters: { $count: true },
+          // the elements of the columns and of the additional bindings
+          parameters: { $count: true, $select: aColumns.filter(function (c) { return !c.text; }).map(function (c) { return c.property; }).concat((oHelp.bindings || []).map(function (b) { return b.element; })).filter(function (p, i, a) { return a.indexOf(p) === i; }).join(",") },
+          filters: aBase.length === 0 ? undefined : new Filter({ filters: aBase, and: true }),
           template: new ColumnListItem({
             cells: aColumns.map(function (c) {
               return c.text
@@ -1780,9 +1857,39 @@ export const OBJECT_CONTROLLER = `sap.ui.define([
       if (!oField || !oField.valueHelp) {
         return;
       }
-      support.valueHelp(this.getView(), oField.valueHelp, false).then(function (aValues) {
+      var oContext = oInput.getBindingContext();
+      support.valueHelp(this.getView(), oField.valueHelp, false, oContext).then(function (aValues) {
         if (aValues.length > 0) {
-          oInput.getBindingContext().setProperty(sProperty, aValues[0]);
+          oContext.setProperty(sProperty, aValues[0]);
+          oInput.setValueState("None");
+        }
+      });
+    },
+
+    /** A value typed or chosen in a field with a value help: validation, additional bindings. */
+    onValueHelpChange: function (oEvent) {
+      var oControl = oEvent.getSource();
+      var sProperty = oControl.data("property");
+      var oField = this._page().fields[sProperty] || this._childField(oControl, sProperty);
+      var oContext = oControl.getBindingContext();
+      if (!oField || !oField.valueHelp || !oContext) {
+        return;
+      }
+      var oHelp = oField.valueHelp;
+      var oItem = oEvent.getParameter("selectedItem") || (oControl.getSelectedItem && oControl.getSelectedItem());
+      if (oItem) {
+        // drop-down list: the row of the chosen item
+        support.applyValueHelpResults(oHelp, oContext, oItem.getBindingContext().getObject());
+        oControl.setValueState("None");
+        return;
+      }
+      var sValue = oControl.getValue ? oControl.getValue() : "";
+      support.checkValueHelp(this.getView(), oHelp, oContext, sValue).then(function (bFound) {
+        if (!bFound && oHelp.validation) {
+          oControl.setValueState("Error");
+          oControl.setValueStateText("Enter a valid value: " + sValue + " is not in " + oHelp.label);
+        } else {
+          oControl.setValueState("None");
         }
       });
     },

@@ -1097,3 +1097,23 @@ et la conséquence. Les numéros D1 à D13 correspondent aux points 1 à 13 du �
   l'exposition en énumération est une extension (D45).
 - **Tests** : `compiler/test/table-entity.test.ts`, `runtime/test/table-entity.test.ts`
   (OData, ABAP, navigateur), fixture `fixtures/table-entity`.
+
+## D56 — Value helps : liaisons, validation, valeurs fixes, paramètres d'action
+
+- **Contexte** : D44 donnait le value help simple (`entity: { name, element }`) ; les BO RAP
+  utilisent aussi `additionalBinding`, `useForValidation` et des listes déroulantes.
+- **Décision** :
+  - `additionalBinding: [{ localElement, element, usage }]` : `#FILTER` restreint la liste par la
+    valeur locale (`Common.ValueListParameterIn`), `#RESULT` copie l'élément de la ligne choisie
+    dans l'élément local (`ValueListParameterOut`), sans usage les deux (`InOut`) ;
+  - `useForValidation: true` : `Common.ValueListForValidation` ; l'UI signale une valeur saisie
+    absente de la liste (état d'erreur du champ) ;
+  - `@ObjectModel.resultSet.sizeCategory: #XS` sur l'entité du value help :
+    `Common.ValueListWithFixedValues`, et une liste déroulante (valeur et description) dans l'UI ;
+  - les paramètres d'action (entité abstraite) ont leur value help dans le dialogue, si son
+    entité est exposée par le service (comme RAP, qui ne l'ajoute pas implicitement).
+- **Pourquoi** : ce sont les formes de value help des BO RAP courants, et Fiori Elements les
+  interprète depuis le `$metadata`.
+- **Tests** : `compiler/test/table-entity.test.ts` (CSDL), `runtime/test/table-entity.test.ts`
+  (liste déroulante qui remplit la devise, validation, dans le navigateur),
+  `runtime/test/standard-views.test.ts`.
