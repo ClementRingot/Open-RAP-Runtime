@@ -19,6 +19,7 @@ import { RapWriteHandler } from "./odata/write.js";
 import type { RapRuntime } from "./rap/runtime.js";
 import { registerUi, type UiOptions } from "./ui/plugin.js";
 import { UiVariants, VariantError } from "./ui/variants.js";
+import { BUSINESS_USER_TABLE, BusinessUsers } from "./auth/business-users.js";
 import type { Kysely } from "kysely";
 
 export interface AppOptions {
@@ -92,6 +93,8 @@ export async function createApp(options: AppOptions): Promise<FastifyInstance> {
   const csrf = new CsrfTokens(options.csrfSecret);
   const auth = options.auth;
   const variants = new UiVariants(() => options.db);
+  // I_BusinessUserBasic (D44): the users who used the application
+  const businessUsers = options.model.tables.some((t) => t.name === BUSINESS_USER_TABLE) ? new BusinessUsers(() => options.db) : undefined;
   const sessions = auth?.mode === "oidc" && auth.session !== undefined ? new OidcSessions(authenticator, { ...auth, session: auth.session }) : undefined;
 
   // bodies are read as text: the OData layer parses JSON (decimals as strings) and multipart
@@ -124,6 +127,7 @@ export async function createApp(options: AppOptions): Promise<FastifyInstance> {
         throw new AuthenticationError("authentication required");
       }
       request.user = user;
+      businessUsers?.record(user);
     } catch (error) {
       const status = error instanceof AuthenticationError ? error.status : 401;
       const odata = new ODataError(status, status === 403 ? "FORBIDDEN" : "UNAUTHORIZED", (error as Error).message, undefined, [], status === 401 ? { "WWW-Authenticate": 'Bearer realm="rap-transpiler"' } : {});

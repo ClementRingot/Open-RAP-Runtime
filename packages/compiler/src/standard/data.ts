@@ -427,3 +427,114 @@ ZW|ZWE|ZWG||Zimbabwe`;
 export function rows(text: string): string[][] {
   return text.split("\n").map((line) => line.split("|"));
 }
+
+/** Country | region (SAP code) | name. United States, Canada, Germany, Australia. */
+export const REGIONS = `US|AL|Alabama
+US|AK|Alaska
+US|AZ|Arizona
+US|AR|Arkansas
+US|CA|California
+US|CO|Colorado
+US|CT|Connecticut
+US|DE|Delaware
+US|DC|District of Columbia
+US|FL|Florida
+US|GA|Georgia
+US|HI|Hawaii
+US|ID|Idaho
+US|IL|Illinois
+US|IN|Indiana
+US|IA|Iowa
+US|KS|Kansas
+US|KY|Kentucky
+US|LA|Louisiana
+US|ME|Maine
+US|MD|Maryland
+US|MA|Massachusetts
+US|MI|Michigan
+US|MN|Minnesota
+US|MS|Mississippi
+US|MO|Missouri
+US|MT|Montana
+US|NE|Nebraska
+US|NV|Nevada
+US|NH|New Hampshire
+US|NJ|New Jersey
+US|NM|New Mexico
+US|NY|New York
+US|NC|North Carolina
+US|ND|North Dakota
+US|OH|Ohio
+US|OK|Oklahoma
+US|OR|Oregon
+US|PA|Pennsylvania
+US|RI|Rhode Island
+US|SC|South Carolina
+US|SD|South Dakota
+US|TN|Tennessee
+US|TX|Texas
+US|UT|Utah
+US|VT|Vermont
+US|VA|Virginia
+US|WA|Washington
+US|WV|West Virginia
+US|WI|Wisconsin
+US|WY|Wyoming
+CA|AB|Alberta
+CA|BC|British Columbia
+CA|MB|Manitoba
+CA|NB|New Brunswick
+CA|NL|Newfoundland and Labrador
+CA|NS|Nova Scotia
+CA|NT|Northwest Territories
+CA|NU|Nunavut
+CA|ON|Ontario
+CA|PE|Prince Edward Island
+CA|QC|Quebec
+CA|SK|Saskatchewan
+CA|YT|Yukon
+DE|01|Schleswig-Holstein
+DE|02|Hamburg
+DE|03|Lower Saxony
+DE|04|Bremen
+DE|05|North Rhine-Westphalia
+DE|06|Hesse
+DE|07|Rhineland-Palatinate
+DE|08|Baden-Wuerttemberg
+DE|09|Bavaria
+DE|10|Saarland
+DE|11|Berlin
+DE|12|Brandenburg
+DE|13|Mecklenburg-Western Pomerania
+DE|14|Saxony
+DE|15|Saxony-Anhalt
+DE|16|Thuringia
+AU|ACT|Australian Capital Territory
+AU|NSW|New South Wales
+AU|NT|Northern Territory
+AU|QLD|Queensland
+AU|SA|South Australia
+AU|TAS|Tasmania
+AU|VIC|Victoria
+AU|WA|Western Australia`;
+
+/** Time zone (SAP key) | UTC difference | IANA time zone | name. */
+export const TIMEZONES = `UTC|+0000|Etc/UTC|Coordinated Universal Time
+GMTUK|+0000|Europe/London|United Kingdom
+CET|+0100|Europe/Paris|Central Europe
+EET|+0200|Europe/Athens|Eastern Europe
+RUS03|+0300|Europe/Moscow|Moscow
+UAE|+0400|Asia/Dubai|United Arab Emirates
+INDIA|+0530|Asia/Kolkata|India
+CHINA|+0800|Asia/Shanghai|China
+SINGAP|+0800|Asia/Singapore|Singapore
+JAPAN|+0900|Asia/Tokyo|Japan
+AUSNSW|+1000|Australia/Sydney|Australia (New South Wales)
+NZTA|+1200|Pacific/Auckland|New Zealand
+BRAZIL|-0300|America/Sao_Paulo|Brazil (Sao Paulo)
+EST|-0500|America/New_York|Eastern Time (US)
+CST|-0600|America/Chicago|Central Time (US)
+MST|-0700|America/Denver|Mountain Time (US)
+PST|-0800|America/Los_Angeles|Pacific Time (US)
+ALAW|-0900|America/Anchorage|Alaska
+HAW|-1000|Pacific/Honolulu|Hawaii`;

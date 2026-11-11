@@ -17,7 +17,7 @@ import {
   type Model,
   type TableModel,
 } from "@rap-transpiler/model";
-import { standardRows } from "../standard/index.js";
+import { standardRows, standardSql } from "../standard/index.js";
 
 export function quoteIdentifier(name: string): string {
   return `"${name.replace(/"/g, '""')}"`;
@@ -422,6 +422,11 @@ export function generateSql(model: Model): SqlOutput {
 function standardData(model: Model): string[] {
   const statements: string[] = [];
   for (const table of model.tables.filter((t) => t.standard === true)) {
+    const computed = standardSql(table.name);
+    if (computed !== undefined) {
+      statements.push(`-- reference data of ${table.name} (standard views, D44)\n${computed}`);
+      continue;
+    }
     const data = standardRows(table.name);
     if (data.length === 0) {
       continue;

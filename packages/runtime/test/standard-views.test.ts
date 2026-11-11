@@ -23,6 +23,9 @@ beforeAll(async () => {
   fixture = await generatedVariant({
     "zrt_c_travel.ddls.asddls": (c) => edit(c, [["      CurrencyCode,", VALUE_HELP]]),
     "zrt_c_booking.ddls.asddls": (c) => edit(c, [["      CurrencyCode,", VALUE_HELP]]),
+    // the other standard views, exposed as they are
+    "zrt_ui_travel.srvd.srvdsrv": (c) =>
+      edit(c, [["  expose ZRT_C_Booking as Booking;", "  expose ZRT_C_Booking as Booking;\n  expose I_Region as Region;\n  expose I_RegionText as RegionText;\n  expose I_CalendarDate as CalendarDate;\n  expose I_TimeZone as TimeZone;\n  expose I_BusinessUserBasic as BusinessUser;\n  expose I_ExchangeRate as ExchangeRate;"]]),
   });
   t = await writableApp(Promise.resolve(fixture), { ui: { dir: path.join(fixture.dir, "ui"), resourcesFrom: RUNTIME_DIR } });
   await t.app.listen({ port: 0, host: "127.0.0.1" });
@@ -49,7 +52,7 @@ describe("standard views (I_Currency)", () => {
         { name: "I_CurrencyText", entity: "I_CurrencyText", valueHelp: true },
       ]),
     );
-    expect(fixture.model.tables.filter((t) => t.standard === true).map((t) => t.name)).toEqual(["rapt_currency", "rapt_currencyt"]);
+    expect(fixture.model.tables.filter((t) => t.standard === true).map((t) => t.name)).toEqual(expect.arrayContaining(["rapt_currency", "rapt_currencyt", "rapt_calendar", "rapt_region", "rapt_bususer"]));
     expect(fixture.schema).toContain('ON CONFLICT ("waers") DO NOTHING;');
     expect(fixture.metadata).toContain('<PropertyValue Property="CollectionPath" String="I_Currency"/>');
   });
@@ -80,4 +83,16 @@ describe("standard views (I_Currency)", () => {
     await page.getByText("Changes saved").first().waitFor({ timeout: 30_000 });
     expect((await odata(`Travel(${T2})`))["CurrencyCode"]).toBe("CHF");
   }, 120_000);
+
+  it("delivers the regions, the calendar, the time zones; records the users; reads the exchange rates of the seed", async () => {
+    expect((await odata("Region?$filter=Country eq 'DE'&$count=true&$top=0"))["@odata.count"]).toBe(16);
+    expect((await odata("RegionText?$filter=Country eq 'US' and Region eq 'CA'"))["value"]).toEqual([expect.objectContaining({ RegionName: "California" })]);
+    expect((await odata("CalendarDate(2026-12-31)"))).toMatchObject({ CalendarYear: "2026", CalendarQuarter: "4", CalendarMonth: "12", CalendarWeek: "53", WeekDay: "4", CalendarDayOfYear: "365", YearWeek: "202653", FirstDayOfWeekDate: "2026-12-28", FirstDayOfMonthDate: "2026-12-01" });
+    expect((await odata("CalendarDate?$count=true&$top=0"))["@odata.count"]).toBe(25933);
+    expect((await odata("TimeZone('CET')"))).toMatchObject({ TimeZoneUTCDifference: "+0100", TimeZoneIANACode: "Europe/Paris" });
+    // the user of the requests above (development user)
+    await expect.poll(async () => ((await odata("BusinessUser"))["value"] as Array<Record<string, unknown>>).map((u) => u["UserID"])).toContain("DEVELOPER");
+    expect(((await odata("BusinessUser"))["value"] as Array<Record<string, unknown>>)[0]).toMatchObject({ BusinessPartner: "0000000001" });
+    expect((await odata("ExchangeRate"))["value"]).toEqual([]);
+  });
 });

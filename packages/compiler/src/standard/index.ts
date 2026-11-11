@@ -6,7 +6,7 @@
  * D44). The element names are those of SAP, the tables are rap-transpiler's own.
  */
 
-import { COUNTRIES, CURRENCIES, LANGUAGES, rows, UNITS } from "./data.js";
+import { COUNTRIES, CURRENCIES, LANGUAGES, REGIONS, rows, TIMEZONES, UNITS } from "./data.js";
 
 export interface StandardObject {
   /** Object name, upper case. */
@@ -305,6 +305,264 @@ define view entity I_LanguageText
 `,
     ["rapt_languaget"],
   ),
+  // ------------------------------------------------------------------------------------ regions
+  table(
+    "rapt_region",
+    "Regions (I_Region)",
+    `  key land1 : abap.char(3) not null;
+  key bland : abap.char(3) not null;`,
+  ),
+  table(
+    "rapt_regiont",
+    "Region texts (I_RegionText)",
+    `  key spras : abap.lang not null;
+  key land1 : abap.char(3) not null;
+  key bland : abap.char(3) not null;
+  bezei : abap.char(20);`,
+  ),
+  view(
+    "I_Region",
+    `@AccessControl.authorizationCheck: #NOT_REQUIRED
+@EndUserText.label: 'Region'
+@ObjectModel.representativeKey: 'Region'
+@ObjectModel.dataCategory: #VALUE_HELP
+@Search.searchable: true
+define view entity I_Region
+  as select from rapt_region
+  association [0..*] to I_RegionText as _RegionText on $projection.Country = _RegionText.Country
+                                                      and $projection.Region = _RegionText.Region
+  association [1..1] to I_Country as _Country on $projection.Country = _Country.Country
+{
+      @EndUserText.label: 'Country/Region'
+  key land1 as Country,
+      @Search.defaultSearchElement: true
+      @EndUserText.label: 'Region'
+  key bland as Region,
+      _RegionText,
+      _Country
+}
+`,
+    ["rapt_region", "I_RegionText", "I_Country"],
+  ),
+  view(
+    "I_RegionText",
+    `@AccessControl.authorizationCheck: #NOT_REQUIRED
+@EndUserText.label: 'Region - Text'
+@ObjectModel.dataCategory: #TEXT
+@ObjectModel.representativeKey: 'Region'
+@Search.searchable: true
+define view entity I_RegionText
+  as select from rapt_regiont
+{
+      @Semantics.language: true
+      @EndUserText.label: 'Language'
+  key spras as Language,
+      @EndUserText.label: 'Country/Region'
+  key land1 as Country,
+      @EndUserText.label: 'Region'
+  key bland as Region,
+      @Semantics.text: true
+      @Search.defaultSearchElement: true
+      @EndUserText.label: 'Region Name'
+      bezei as RegionName
+}
+`,
+    ["rapt_regiont"],
+  ),
+  // ---------------------------------------------------------------------------------- calendar
+  table(
+    "rapt_calendar",
+    "Calendar dates (I_CalendarDate)",
+    `  key calendardate : abap.dats not null;
+  calendaryear : abap.numc(4);
+  calendarquarter : abap.numc(1);
+  calendarmonth : abap.numc(2);
+  calendarweek : abap.numc(2);
+  calendarday : abap.numc(2);
+  yearmonth : abap.numc(6);
+  yearquarter : abap.numc(5);
+  yearweek : abap.numc(6);
+  weekday : abap.numc(1);
+  dayofyear : abap.numc(3);
+  firstdayofweek : abap.dats;
+  firstdayofmonth : abap.dats;`,
+  ),
+  view(
+    "I_CalendarDate",
+    `@AccessControl.authorizationCheck: #NOT_REQUIRED
+@EndUserText.label: 'Calendar Date'
+@ObjectModel.representativeKey: 'CalendarDate'
+define view entity I_CalendarDate
+  as select from rapt_calendar
+{
+      @EndUserText.label: 'Calendar Date'
+  key calendardate    as CalendarDate,
+      @EndUserText.label: 'Calendar Year'
+      calendaryear    as CalendarYear,
+      @EndUserText.label: 'Calendar Quarter'
+      calendarquarter as CalendarQuarter,
+      @EndUserText.label: 'Calendar Month'
+      calendarmonth   as CalendarMonth,
+      @EndUserText.label: 'Calendar Week'
+      calendarweek    as CalendarWeek,
+      @EndUserText.label: 'Calendar Day'
+      calendarday     as CalendarDay,
+      @EndUserText.label: 'Year Month'
+      yearmonth       as YearMonth,
+      @EndUserText.label: 'Year Quarter'
+      yearquarter     as YearQuarter,
+      @EndUserText.label: 'Year Week'
+      yearweek        as YearWeek,
+      @EndUserText.label: 'Weekday'
+      weekday         as WeekDay,
+      @EndUserText.label: 'Day of Year'
+      dayofyear       as CalendarDayOfYear,
+      @EndUserText.label: 'First Day of Week'
+      firstdayofweek  as FirstDayOfWeekDate,
+      @EndUserText.label: 'First Day of Month'
+      firstdayofmonth as FirstDayOfMonthDate
+}
+`,
+    ["rapt_calendar"],
+  ),
+  // -------------------------------------------------------------------------------- time zones
+  table(
+    "rapt_timezone",
+    "Time zones (I_TimeZone)",
+    `  key tzone : abap.char(6) not null;
+  utcdiff : abap.char(5);
+  iana : abap.char(40);`,
+  ),
+  table(
+    "rapt_timezonet",
+    "Time zone texts (I_TimeZoneText)",
+    `  key spras : abap.lang not null;
+  key tzone : abap.char(6) not null;
+  descript : abap.char(40);`,
+  ),
+  view(
+    "I_TimeZone",
+    `@AccessControl.authorizationCheck: #NOT_REQUIRED
+@EndUserText.label: 'Time Zone'
+@ObjectModel.representativeKey: 'TimeZoneID'
+@ObjectModel.dataCategory: #VALUE_HELP
+@Search.searchable: true
+define view entity I_TimeZone
+  as select from rapt_timezone
+  association [0..*] to I_TimeZoneText as _Text on $projection.TimeZoneID = _Text.TimeZoneID
+{
+      @Search.defaultSearchElement: true
+      @EndUserText.label: 'Time Zone'
+  key tzone   as TimeZoneID,
+      @EndUserText.label: 'UTC Difference'
+      utcdiff as TimeZoneUTCDifference,
+      @EndUserText.label: 'IANA Time Zone'
+      iana    as TimeZoneIANACode,
+      _Text
+}
+`,
+    ["rapt_timezone", "I_TimeZoneText"],
+  ),
+  view(
+    "I_TimeZoneText",
+    `@AccessControl.authorizationCheck: #NOT_REQUIRED
+@EndUserText.label: 'Time Zone - Text'
+@ObjectModel.dataCategory: #TEXT
+@ObjectModel.representativeKey: 'TimeZoneID'
+@Search.searchable: true
+define view entity I_TimeZoneText
+  as select from rapt_timezonet
+{
+      @Semantics.language: true
+      @EndUserText.label: 'Language'
+  key spras    as Language,
+      @EndUserText.label: 'Time Zone'
+  key tzone    as TimeZoneID,
+      @Semantics.text: true
+      @Search.defaultSearchElement: true
+      @EndUserText.label: 'Description'
+      descript as TimeZoneText
+}
+`,
+    ["rapt_timezonet"],
+  ),
+  // ----------------------------------------------------------------------------- business users
+  table(
+    "rapt_bususer",
+    "Business users (I_BusinessUserBasic)",
+    `  key userid : abap.char(12) not null;
+  partner : abap.char(10);
+  fullname : abap.char(80);
+  firstname : abap.char(40);
+  lastname : abap.char(40);
+  email : abap.char(241);`,
+  ),
+  view(
+    "I_BusinessUserBasic",
+    `@AccessControl.authorizationCheck: #NOT_REQUIRED
+@EndUserText.label: 'Business User'
+@ObjectModel.representativeKey: 'UserID'
+@ObjectModel.dataCategory: #VALUE_HELP
+@Search.searchable: true
+define view entity I_BusinessUserBasic
+  as select from rapt_bususer
+{
+      @Search.defaultSearchElement: true
+      @EndUserText.label: 'User'
+  key userid    as UserID,
+      @EndUserText.label: 'Business Partner'
+      partner   as BusinessPartner,
+      @Semantics.text: true
+      @Search.defaultSearchElement: true
+      @EndUserText.label: 'Full Name'
+      fullname  as PersonFullName,
+      @EndUserText.label: 'First Name'
+      firstname as FirstName,
+      @EndUserText.label: 'Last Name'
+      lastname  as LastName,
+      @EndUserText.label: 'E-Mail Address'
+      email     as DefaultEmailAddress
+}
+`,
+    ["rapt_bususer"],
+  ),
+  // ----------------------------------------------------------------------------- exchange rates
+  table(
+    "rapt_exchrate",
+    "Exchange rates (I_ExchangeRate)",
+    `  key kurst : abap.char(4) not null;
+  key fcurr : abap.cuky not null;
+  key tcurr : abap.cuky not null;
+  key gdatu : abap.dats not null;
+  ukurs : abap.dec(9,5);
+  ffact : abap.dec(9,0);
+  tfact : abap.dec(9,0);`,
+  ),
+  view(
+    "I_ExchangeRate",
+    `@AccessControl.authorizationCheck: #NOT_REQUIRED
+@EndUserText.label: 'Exchange Rate'
+define view entity I_ExchangeRate
+  as select from rapt_exchrate
+{
+      @EndUserText.label: 'Exchange Rate Type'
+  key kurst as ExchangeRateType,
+      @EndUserText.label: 'Source Currency'
+  key fcurr as SourceCurrency,
+      @EndUserText.label: 'Target Currency'
+  key tcurr as TargetCurrency,
+      @EndUserText.label: 'Valid From'
+  key gdatu as ValidityStartDate,
+      @EndUserText.label: 'Exchange Rate'
+      ukurs as ExchangeRate,
+      @EndUserText.label: 'Source Currency Units'
+      ffact as NumberOfSourceCurrencyUnits,
+      @EndUserText.label: 'Target Currency Units'
+      tfact as NumberOfTargetCurrencyUnits
+}
+`,
+    ["rapt_exchrate"],
+  ),
 ];
 
 const BY_NAME = new Map(STANDARD_OBJECTS.map((o) => [o.name, o]));
@@ -330,7 +588,7 @@ export function standardObjectsFor(sources: Array<{ type: string; name: string; 
     object.uses.forEach(add);
   };
   for (const source of sources) {
-    if (!["DDLS", "DDLX", "BDEF", "CLAS", "INTF", "DCLS"].includes(source.type)) {
+    if (!["DDLS", "DDLX", "BDEF", "CLAS", "INTF", "DCLS", "SRVD"].includes(source.type)) {
       continue;
     }
     for (const match of source.content.matchAll(REFERENCE)) {
@@ -358,9 +616,33 @@ export function standardRows(tableName: string): Array<Record<string, string | n
       return rows(COUNTRIES).map(([country = "", , , , name = ""]) => ({ spras: "E", land1: country, landx50: short(name, 50), landx: short(name, 15) }));
     case "rapt_language":
       return rows(LANGUAGES).map(([language = "", iso = ""]) => ({ spras: language, laiso: iso }));
+    case "rapt_region":
+      return rows(REGIONS).map(([country = "", region = ""]) => ({ land1: country, bland: region }));
+    case "rapt_regiont":
+      return rows(REGIONS).map(([country = "", region = "", name = ""]) => ({ spras: "E", land1: country, bland: region, bezei: short(name, 20) }));
+    case "rapt_timezone":
+      return rows(TIMEZONES).map(([zone = "", diff = "", iana = ""]) => ({ tzone: zone, utcdiff: diff, iana }));
+    case "rapt_timezonet":
+      return rows(TIMEZONES).map(([zone = "", , , name = ""]) => ({ spras: "E", tzone: zone, descript: short(name, 40) }));
     case "rapt_languaget":
       return rows(LANGUAGES).map(([language = "", , name = ""]) => ({ spras: "E", sprsl: language, sptxt: short(name, 16) }));
     default:
       return [];
   }
+}
+
+/**
+ * Reference data written as SQL (too many rows to list): the calendar of I_CalendarDate, 1990 to
+ * 2060, computed by PostgreSQL once (ISO weeks; weekday 1 = Monday, as SAP).
+ */
+export function standardSql(tableName: string): string | undefined {
+  if (tableName.toLowerCase() !== "rapt_calendar") {
+    return undefined;
+  }
+  return `INSERT INTO "rapt_calendar" ("calendardate", "calendaryear", "calendarquarter", "calendarmonth", "calendarweek", "calendarday", "yearmonth", "yearquarter", "yearweek", "weekday", "dayofyear", "firstdayofweek", "firstdayofmonth")
+SELECT d::date, to_char(d, 'YYYY'), to_char(d, 'Q'), to_char(d, 'MM'), to_char(d, 'IW'), to_char(d, 'DD'), to_char(d, 'YYYYMM'),
+  to_char(d, 'YYYY') || to_char(d, 'Q'), to_char(d, 'IYYY') || to_char(d, 'IW'), to_char(d, 'ID'), to_char(d, 'DDD'),
+  (d - ((extract(isodow from d)::int - 1) * interval '1 day'))::date, date_trunc('month', d)::date
+FROM generate_series(date '1990-01-01', date '2060-12-31', interval '1 day') AS g(d)
+WHERE NOT EXISTS (SELECT 1 FROM "rapt_calendar" LIMIT 1);`;
 }
