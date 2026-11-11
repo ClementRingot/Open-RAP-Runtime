@@ -138,6 +138,22 @@ ajoutent ce que la fixture n'utilise pas : numérotation, feature control global
 | `$batch`, `$expand`, deep insert, navigation par association, actions et fonctions distantes, value controls | ❌ | Voir KNOWN_GAPS.md. |
 | Communication targets, SOAP (`cl_soap_destination_provider`), RFC | ❌ | |
 
+## Classes utilitaires d'ABAP Cloud dans l'ABP (D40)
+
+| Fonctionnalité | Statut | Note |
+|---|---|---|
+| JSON : `/ui2/cl_json` (`serialize`, `deserialize`), `xco_cp_json` (`from_string`, `from_abap`, `apply`, `write_to`, `builder`) | ✅ | Modes de nommage, `compress`, `name_mappings`, booléens, dates, horodatages ISO, base64. Guide : [UTILITAIRES.md](UTILITAIRES.md). |
+| Encodages : `cl_web_http_utility`, `cl_abap_conv_codepage`, `cl_abap_gzip`, `xco_cp=>string` / `xstring` | ✅ | Base64, UTF-8/16, ISO-8859-1, windows-1252, URL, HTML, gzip. |
+| Texte : `cl_abap_char_utilities`, `cl_abap_string_utilities`, types `string_table`, `xstring_table` | ✅ | |
+| Numérotation : `cl_numberrange_runtime` | ✅ | Intervalles de `rapt/number-ranges.json`, table `rapt_number_range`. |
+| Dates : `cl_abap_tstmp`, `cl_abap_utclong`, `xco_cp=>sy`, `xco_cp_time` | ✅ | Fuseau UTC. |
+| Journal applicatif : `cl_bali_*` | ✅ | Tables `rapt_application_log(_item)`, lecture par filtre. |
+| Hachage : `cl_abap_message_digest`, `cl_abap_hmac` | ✅ | MD5, SHA1, SHA2. |
+| Nombres aléatoires : `cl_abap_random*` | ✅ | Générateur déterministe par graine (non cryptographique). |
+| Expressions régulières : `cl_abap_regex`, `cl_abap_matcher`, types `match_result(_tab)` | ✅ | Moteur JavaScript. |
+| RTTS : `cl_abap_typedescr` et sous-classes | 🟡 | `describe_by_data(_ref)`, `describe_by_object_ref` ; pas `describe_by_name` ni la création de types. |
+| Traitement en arrière-plan (`cl_bgmc_process_factory`), e-mail (`cl_bcs_mail_message`) | ❌ | Demandent une infrastructure (file d'attente, serveur SMTP). |
+
 ## Projection
 
 | Fonctionnalité | Statut | Note |

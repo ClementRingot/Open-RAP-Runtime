@@ -706,3 +706,44 @@ et la conséquence. Les numéros D1 à D13 correspondent aux points 1 à 13 du �
   des lignes JSON, `rapt check --json` et `rapt dev --json` lancés réellement.
   `compiler/test/cli.test.ts` et `dev.test.ts` couvrent la sortie JSON et les événements.
   L'interface de l'extension (commandes, barre d'état) n'est pas testée dans VS Code.
+
+## D40 — Classes utilitaires d'ABAP Cloud dans le behavior pool
+
+- **Contexte** : après le client HTTP (D31), les behavior pools ont besoin des autres classes
+  libérées d'usage courant : JSON pour les API, encodages, numérotation, dates, journal
+  applicatif, hachage, aléatoire, expressions régulières, RTTS. Sans elles, du code ABAP Cloud
+  ordinaire ne passe pas la vérification.
+- **Décision** : une implémentation clean-room en ABAP de ces classes
+  (`gen/abap/framework-utils.ts`), écrite à partir des signatures publiques documentées par SAP,
+  avec des méthodes du noyau `ZRAP_EML` pour ce que l'ABAP ne peut pas faire seul
+  (`runtime/src/abap/utils.ts`). Guide : [UTILITAIRES.md](UTILITAIRES.md).
+  - **Fermeture** : seuls les objets nommés par les sources du projet, puis ceux qu'ils nomment,
+    sont donnés au transpiler. Un projet qui n'en utilise aucun garde la même construction et le
+    même temps de vérification ; un objet du projet de même nom l'emporte.
+  - **Le noyau** : JSON (analyseur qui garde les nombres tels qu'écrits, parcours des données
+    de `@abaplint/runtime` par type, noms des membres selon le mode), pages de codes, base64,
+    gzip (zlib), hachage et HMAC (crypto), graine aléatoire, expressions régulières (RegExp avec
+    `d` pour les sous-correspondances, mode étendu et classes POSIX traduits), calendrier et
+    horodatages en dixièmes de microseconde (BigInt), description d'une donnée pour les RTTS.
+    Les RTTS se construisent en ABAP, un niveau à la fois : `ASSIGN COMPONENT` pour les
+    structures, `CREATE DATA … LIKE LINE OF` pour les tables.
+  - **Numérotation** : intervalles de `rapt/number-ranges.json` (diagnostic NR001), insérés par
+    `db/schema.sql` sans toucher au numéro courant ; table `rapt_number_range`, écrite dans la LUW
+    (les LUW sont sérialisées : pas de conflit). Un intervalle non configuré commence à 1, pour
+    développer sans configuration.
+  - **Journal applicatif** : tables `rapt_application_log` et `rapt_application_log_item`, dans la
+    LUW ; lecture par filtre.
+  - **Tables** : générées seulement quand le code utilise `cl_numberrange_runtime` ou
+    `cl_bali_*` (`model.services`), pour ne pas changer le schéma des autres applications.
+  - **Types globaux** : `string_table`, `xstring_table`, `match_result(_tab)`,
+    `submatch_result(_tab)` comme objets DDIC (TABL, TTYP), et un type-pool `ABAP`
+    (`abap_compdescr_tab`, `abap_component_tab`…), que l'analyse d'abaplint résout.
+  - **Constructeurs de classe** : ils s'exécutent au chargement des modules, avant le noyau ;
+    ceux des utilitaires n'appellent donc pas `ZRAP_EML` (`cl_abap_char_utilities` écrit ses
+    caractères de contrôle en littéraux).
+- **Tests** : `runtime/test/utilities.test.ts` exécute un auto-test écrit en ABAP dans un behavior
+  pool (`test/utilities/selftest.abap` : plus de soixante-dix vérifications sur toutes les classes,
+  dont les valeurs de référence de SHA-256, MD5 et HMAC), tire des numéros jusqu'à épuisement d'un
+  intervalle et écrit puis relit un journal. `compiler/test/utilities.test.ts` couvre la
+  fermeture, la vérification de toutes les classes et `rapt/number-ranges.json`.
+

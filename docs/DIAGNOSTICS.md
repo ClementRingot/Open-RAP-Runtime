@@ -88,4 +88,5 @@ Le code de retour est 1 dès qu'il y a une erreur (ou un avertissement avec
 | LPD005 | erreur | Chemin de service sous un chemin du launchpad (`/ui`, `/apps`, `/auth`…), ou servi par deux applications |
 | LPD006 | erreur | Compteur sur un entity set inconnu du service, ou sur une tuile sans application |
 | LPD007 | avertissement | Rôle d'une tuile absent des `rapt/authorizations.json` des applications (l'IdP doit tout de même le donner) |
+| NR001 | erreur | `rapt/number-ranges.json` illisible ou mal formé : objet de plus de 10 caractères, intervalle de plus de 2 caractères, bornes non numériques ou inversées |
 | APP001 | erreur | Paquets du runtime introuvables (`dist/` non construit) pour l'application générée : `--runtime <dossier>` ou `pnpm build` |

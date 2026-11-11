@@ -9,6 +9,7 @@ import { same, type ActionModel } from "@rap-transpiler/model";
 import { setSubrc } from "../abap/bridge.js";
 import { installHttp } from "../abap/http.js";
 import { installODataClient } from "../abap/odata-client.js";
+import { installUtilities } from "../abap/utils.js";
 import { abapGlobal, abapString, appendRow, component, rowsOf, type AbapData } from "../abap/convert.js";
 import { isInitial } from "../values.js";
 import { entityOfTable, type BoEntity } from "./bo.js";
@@ -283,6 +284,8 @@ export function installKernel(runtime: RapRuntime): void {
   // consumption of remote APIs: HTTP client and OData client proxy (D31)
   installHttp(kernel);
   installODataClient(kernel);
+  // utilities of ABAP Cloud: JSON, encodings, number ranges, application log, RTTS… (D40)
+  installUtilities(kernel, { db: () => runtime.context().tx.db, user: () => runtime.context().user.abapName });
 
   // AUTHORITY-CHECK: the transpiler calls the kernel class KERNEL_AUTHORITY_CHECK (D34)
   abap.Classes["KERNEL_AUTHORITY_CHECK"] = {

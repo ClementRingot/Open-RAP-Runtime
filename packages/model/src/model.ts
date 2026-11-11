@@ -33,6 +33,10 @@ export interface Model {
   authorizations?: AuthorizationsModel;
   /** Access controls (DCL) of the exposed entities (D35). */
   accessControls?: AccessControlModel[];
+  /** Intervals of the number ranges (D40): `rapt/number-ranges.json` next to the sources. */
+  numberRanges?: NumberRangeIntervalModel[];
+  /** Services of the clean-room framework the behavior pools use, with tables of their own (D40). */
+  services?: { numberRanges?: boolean; applicationLog?: boolean };
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -399,4 +403,16 @@ export interface AbapModel {
   modules: string[];
   /** BDEF name → name of the generated interface holding its derived types. */
   derivedTypes: Record<string, string>;
+}
+
+/** An interval of a number range object (cl_numberrange_runtime, D40). */
+export interface NumberRangeIntervalModel {
+  object: string;
+  /** Two characters, e.g. 01. */
+  interval: string;
+  subobject?: string;
+  toyear?: string;
+  /** Decimal digits (up to 20). */
+  from: string;
+  to: string;
 }

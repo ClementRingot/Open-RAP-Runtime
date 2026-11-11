@@ -5,6 +5,7 @@
  */
 
 import { HTTP_FRAMEWORK_SOURCES, HTTP_KERNEL_DEFINITIONS, HTTP_KERNEL_IMPLEMENTATIONS } from "./framework-http.js";
+import { UTILS_KERNEL_DEFINITIONS, UTILS_KERNEL_IMPLEMENTATIONS } from "./framework-utils.js";
 
 export interface FrameworkSource {
   fileName: string;
@@ -427,7 +428,7 @@ const ZRAP_EML = `CLASS zrap_eml DEFINITION PUBLIC ABSTRACT FINAL.
                 rows       TYPE ANY TABLE OPTIONAL
                 row        TYPE any OPTIONAL
                 indicators TYPE abap_bool DEFAULT abap_false.
-${HTTP_KERNEL_DEFINITIONS}ENDCLASS.
+${HTTP_KERNEL_DEFINITIONS}${UTILS_KERNEL_DEFINITIONS}ENDCLASS.
 
 CLASS zrap_eml IMPLEMENTATION.
   METHOD begin.
@@ -473,7 +474,8 @@ CLASS zrap_eml IMPLEMENTATION.
   METHOD sql_write.
   ENDMETHOD.
 
-${HTTP_KERNEL_IMPLEMENTATIONS}ENDCLASS.
+${HTTP_KERNEL_IMPLEMENTATIONS}
+${UTILS_KERNEL_IMPLEMENTATIONS}ENDCLASS.
 `;
 
 export const FRAMEWORK_SOURCES: FrameworkSource[] = [

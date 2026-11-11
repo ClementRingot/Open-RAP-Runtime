@@ -86,6 +86,12 @@ Connexion OIDC (Keycloak fourni dans le profil `oidc` de docker-compose, utilisa
 `AUTH_MODE=oidc docker compose --profile oidc up --build`. Les variables sont décrites dans le
 `README.md` et le `.env.example` de l'application générée.
 
+Le behavior pool peut utiliser les classes utilitaires d'ABAP Cloud : `/ui2/cl_json` et
+`xco_cp_json`, `cl_web_http_utility`, `cl_abap_conv_codepage`, `cl_numberrange_runtime`
+(intervalles dans `rapt/number-ranges.json`), `cl_abap_tstmp` et `xco_cp_time`, journal
+applicatif `cl_bali_*`, hachage, aléatoire, expressions régulières, RTTS
+([guide](docs/UTILITAIRES.md), [D40](docs/DECISIONS.md)).
+
 Le behavior pool peut appeler des API distantes avec le client HTTP d'ABAP Cloud et le client
 proxy OData d'un service consumption model (SCM, SCM2) ; chaque destination se configure par
 variables d'environnement (`DESTINATION_<NOM>_URL`, `_USER`, `_PASSWORD`, `_TOKEN`, `_HEADERS`),

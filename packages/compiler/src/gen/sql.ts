@@ -410,8 +410,67 @@ export function generateSql(model: Model): SqlOutput {
   const drop = views.length === 0 ? "" : `DROP VIEW IF EXISTS ${[...views].reverse().map((v) => quoteIdentifier(v.sqlView ?? "")).join(", ")} CASCADE;\n`;
   const viewStatements = views.map((v) => createView(model, v));
   const abapSql = abapSqlSchema(model, views);
-  const schema = [header, "-- tables", ...tables, "-- compositions", ...foreignKeys(model), "-- CDS views", drop, ...viewStatements, "-- ABAP SQL of the behavior pools (values in ABAP form)", ...abapSql].join("\n");
+  const schema = [header, "-- tables", ...tables, "-- compositions", ...foreignKeys(model), ...[frameworkTables(model)].filter((t) => t !== ""), "-- CDS views", drop, ...viewStatements, "-- ABAP SQL of the behavior pools (values in ABAP form)", ...abapSql].join("\n");
   return { schema, tables: model.tables.map((t) => t.name), views: views.map((v) => v.sqlView ?? "") };
+}
+
+/**
+ * The tables of the services of the clean-room framework (D40): the number ranges of
+ * cl_numberrange_runtime (and the intervals of rapt/number-ranges.json) and the application log
+ * of cl_bali_*. A configured interval keeps its current number when its bounds change.
+ */
+function frameworkTables(model: Model): string {
+  const numberRanges = model.services?.numberRanges === true || (model.numberRanges ?? []).length > 0;
+  const applicationLog = model.services?.applicationLog === true;
+  if (!numberRanges && !applicationLog) {
+    return "";
+  }
+  const literal = (value: string): string => `'${value.replace(/'/g, "''")}'`;
+  const intervals = (model.numberRanges ?? []).map(
+    (i) =>
+      `INSERT INTO rapt_number_range (nr_object, nr_subobject, nr_interval, nr_toyear, from_number, to_number) VALUES (${literal(i.object)}, ${literal(i.subobject ?? "")}, ${literal(i.interval)}, ${literal(i.toyear ?? "")}, ${i.from}, ${i.to})\n  ON CONFLICT (nr_object, nr_subobject, nr_interval, nr_toyear) DO UPDATE SET from_number = excluded.from_number, to_number = excluded.to_number;`,
+  );
+  const parts = ["-- number ranges and application log of the behavior pools (D40)"];
+  if (numberRanges) {
+    parts.push(`CREATE TABLE IF NOT EXISTS "rapt_number_range" (
+  "nr_object" text NOT NULL,
+  "nr_subobject" text NOT NULL DEFAULT '',
+  "nr_interval" text NOT NULL,
+  "nr_toyear" text NOT NULL DEFAULT '',
+  "from_number" numeric(20) NOT NULL,
+  "to_number" numeric(20) NOT NULL,
+  "current_number" numeric(20),
+  PRIMARY KEY ("nr_object", "nr_subobject", "nr_interval", "nr_toyear")
+);`, ...intervals);
+  }
+  if (applicationLog) {
+    parts.push(`CREATE TABLE IF NOT EXISTS "rapt_application_log" (
+  "log_handle" text PRIMARY KEY,
+  "log_object" text NOT NULL,
+  "log_subobject" text NOT NULL DEFAULT '',
+  "external_id" text NOT NULL DEFAULT '',
+  "log_user" text NOT NULL DEFAULT '',
+  "log_timestamp" timestamptz NOT NULL DEFAULT now(),
+  "expiry_date" date
+);
+CREATE INDEX IF NOT EXISTS "rapt_application_log_object_idx" ON "rapt_application_log" ("log_object", "log_subobject", "external_id");
+CREATE TABLE IF NOT EXISTS "rapt_application_log_item" (
+  "log_handle" text NOT NULL REFERENCES "rapt_application_log" ON DELETE CASCADE,
+  "item_number" integer NOT NULL,
+  "severity" text NOT NULL DEFAULT '',
+  "category" text NOT NULL DEFAULT '',
+  "message_text" text NOT NULL DEFAULT '',
+  "msgid" text NOT NULL DEFAULT '',
+  "msgno" text NOT NULL DEFAULT '',
+  "msgv1" text NOT NULL DEFAULT '',
+  "msgv2" text NOT NULL DEFAULT '',
+  "msgv3" text NOT NULL DEFAULT '',
+  "msgv4" text NOT NULL DEFAULT '',
+  "item_timestamp" numeric(21,7),
+  PRIMARY KEY ("log_handle", "item_number")
+);`);
+  }
+  return `${parts.join("\n")}\n`;
 }
 
 /** The view of the base (view) entity behind a projection: the one the RAP runtime reads. */
