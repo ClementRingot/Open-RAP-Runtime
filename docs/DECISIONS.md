@@ -780,3 +780,45 @@ et la conséquence. Les numéros D1 à D13 correspondent aux points 1 à 13 du �
   autre envoie un mail (HTML, copie, pièces jointes texte et binaire), gardé sans serveur, envoyé
   à un serveur SMTP de test avec `MAIL_SMTP_URL`, et rien n'est envoyé quand la LUW est annulée.
 
+## D42 — Écrire seulement de l'ABAP : tables en source, `rapt abapgit`, `rapt new`, données initiales
+
+- **Contexte** : un export abapGit demande, pour chaque objet, un fichier XML de métadonnées, et
+  les tables n'existent qu'en XML (DD02V, DD09L, DD03P). Écrire ces fichiers à la main décourage un
+  développeur qui veut écrire son BO dans VS Code sans système SAP.
+- **Décision** :
+  - **Tables en source** : `nom.tabl.astabl`, avec la syntaxe de l'éditeur de tables des ABAP
+    Development Tools (`define table … { key client : abap.clnt not null; … }`, annotations
+    `@EndUserText.label`, `@AbapCatalog.*`, `@Semantics.amount.currencyCode` /
+    `@Semantics.quantity.unitOfMeasure` pour les références, `include`, `define structure`).
+    `loadProject` en tire le XML abapGit en mémoire : le reste du compilateur ne lit que le XML, et
+    les diagnostics des tables portent la ligne du champ dans la source. La source l'emporte sur un
+    XML présent à côté. Les clés étrangères (`with foreign key`) sont signalées (TABL002) et non
+    transférées.
+  - **`rapt abapgit <src>`** écrit ce qui manque pour qu'abapGit puisse importer le dépôt dans un
+    système SAP : `.abapgit.xml` (qui ignore `*.astabl`, inconnu d'abapGit), `package.devc.xml`, le
+    XML des tables en source (régénéré à chaque fois), et le XML absent des entités CDS (type de
+    source déduit : vue, projection, entité abstraite, custom entity…), metadata extensions,
+    access controls, BDEF, SRVD, classes et interfaces (description de `@EndUserText.label` ou du
+    texte court ABAP Doc). Un XML présent n'est jamais modifié. `--check` ne fait que signaler ce
+    qui manque (code retour 1), pour la CI.
+  - **`rapt new <src> <Entité> [--prefix ZRT] [--description …]`** écrit un BO managed complet et
+    activable sur SAP : table en source, vue racine et projection, metadata extension (List Report
+    et Object Page), BDEF et projection, behavior pool (autorisation globale, une détermination),
+    SRVD et SRVB OData V4, `rapt/seed.json`, `.gitignore` (`.rapt/`, `node_modules/`), puis les XML
+    de `rapt abapgit`. Les fichiers existants ne sont jamais écrasés. Commande *RAP : Nouveau
+    business object* dans l'extension.
+  - **Données initiales** : `rapt/seed.json` (table → lignes, noms de champs du dictionnaire, en
+    minuscules, sans le mandant) et `rapt/seed.sql`, vérifiés à la compilation (SEED001, SEED002)
+    et copiés dans `db/` de l'application. Avec `SEED=auto` (valeur par défaut de `rapt dev`),
+    l'application les charge à son premier démarrage, quand toutes ses tables sont vides : une
+    clé UUID absente est tirée au hasard, un NUMC reçoit ses zéros de tête. Sans `SEED=auto` (en
+    production par défaut), rien n'est chargé.
+- **Pourquoi pas un XML « sans source »** : abapGit ne sait sérialiser les tables qu'en XML ; la
+  source `.astabl` est ce qu'un développeur ADT lit et écrit déjà, et la conversion vers le XML
+  est déterministe. Garder les deux fichiers dans le dépôt (le XML régénéré par `rapt abapgit`)
+  permet l'import dans SAP sans outil.
+- **Tests** : `compiler/test/authoring.test.ts` (la source de `zrt_booking` donne le même XML et le
+  même modèle que la fixture ; erreurs positionnées ; `rapt abapgit` recrée les XML retirés de la
+  fixture à l'identique ; `rapt new` produit un BO qui compile sans diagnostic) et
+  `runtime/test/seed.test.ts`.
+

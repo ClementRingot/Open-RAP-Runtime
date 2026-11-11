@@ -188,6 +188,8 @@ LOG_LEVEL=info
 DATABASE_URL=postgres://app:app@localhost:5432/app
 # SCHEMA=skip to manage the schema yourself (db/schema.sql)
 SCHEMA=apply
+# auto: load db/seed.json and db/seed.sql (rapt/seed.json, rapt/seed.sql) when the tables are empty
+# SEED=auto
 # none (development user DEV_USER) or oidc
 AUTH_MODE=none
 DEV_USER=DEVELOPER

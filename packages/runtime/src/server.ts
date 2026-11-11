@@ -4,6 +4,7 @@
  * - `PORT` (8080), `HOST` (0.0.0.0), `PUBLIC_URL` (http://localhost:<PORT>/), `LOG_LEVEL` (info);
  * - `DATABASE_URL` (PostgreSQL), or `PGLITE_DIR` for an embedded PGlite database (development);
  *   `SCHEMA=skip` to leave the database schema alone (default: applied at start-up, idempotent);
+ *   `SEED=auto` to load db/seed.json and db/seed.sql when the tables are empty (D42);
  * - `AUTH_MODE` = `none` (development user `DEV_USER`, its roles `DEV_ROLES` — default: all —
  *   and claims `DEV_ATTRIBUTES`) or `oidc`: `OIDC_ISSUER`, `OIDC_DISCOVERY_URL`, `OIDC_AUDIENCE`,
  *   `OIDC_CLIENT_ID`, `OIDC_CLIENT_SECRET`, `OIDC_REQUIRED_ROLE`, `OIDC_ROLES_CLAIM`,
@@ -20,6 +21,7 @@ import { createApp } from "./app.js";
 import { authFromEnvironment } from "./auth/environment.js";
 import { Authorizations, rolesFromJson } from "./auth/authorizations.js";
 import { applySchema, createDatabase, createPostgresDatabase, PGLITE_PARSERS, type Database } from "./db/database.js";
+import { applySeed } from "./db/seed.js";
 import { RapRuntime } from "./rap/runtime.js";
 
 export interface StartOptions {
@@ -75,6 +77,12 @@ export async function start(options: StartOptions): Promise<RunningServer> {
   const db = options.db ?? (await databaseFromEnvironment(env));
   if ((env["SCHEMA"] ?? "apply") !== "skip") {
     await applySchema(db, readFileSync(path.join(dir, "db", "schema.sql"), "utf8"));
+  }
+  if (env["SEED"] === "auto") {
+    const rows = await applySeed(db, model, dir);
+    if (rows !== undefined) {
+      process.stderr.write(`seed data loaded (${rows} rows)\n`);
+    }
   }
   const rap = model.abap === undefined ? undefined : await RapRuntime.load(model, path.join(dir, "abap"));
   if (rap !== undefined) {
