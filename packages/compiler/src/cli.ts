@@ -27,6 +27,8 @@ Usage:
 
 Options:
   --service <name>   service definition to build (required when the sources have several)
+  --mode <mode>      standard (as on SAP, the default) or enhanced (rap-transpiler extensions);
+                     overrides "mode" of rapt/config.json
   --binding <name>   service binding name (default: the SRVB of the service, else <SRVD>_O4)
   --path <path>      service root path (default: /sap/opu/odata4/sap/<binding>/srvd/sap/<srvd>/0001/)
   --runtime <dir>    @rap-transpiler/runtime package to embed in the application (default: next to rapt)
@@ -60,6 +62,7 @@ export async function main(argv: string[]): Promise<number> {
       allowPositionals: true,
       options: {
         service: { type: "string" },
+        mode: { type: "string" },
         binding: { type: "string" },
         path: { type: "string" },
         out: { type: "string" },
@@ -111,6 +114,7 @@ export async function main(argv: string[]): Promise<number> {
   const options: GenerateOptions = {};
   if (typeof parsed.values["service"] === "string") options.service = parsed.values["service"];
   if (typeof parsed.values["binding"] === "string") options.binding = parsed.values["binding"];
+  if (typeof parsed.values["mode"] === "string") options.mode = parsed.values["mode"];
   if (typeof parsed.values["path"] === "string") options.path = parsed.values["path"];
   if (typeof parsed.values["runtime"] === "string") options.runtimeDir = parsed.values["runtime"];
 

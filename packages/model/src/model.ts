@@ -18,8 +18,16 @@ export interface SourceRef {
   column: number;
 }
 
+/**
+ * `standard`: as on SAP. `enhanced`: rap-transpiler extensions (D45): managed BO with unmanaged
+ * save on a custom entity, mandatory fields checked when saving.
+ */
+export type ProjectMode = "standard" | "enhanced";
+
 export interface Model {
   formatVersion: typeof MODEL_FORMAT_VERSION;
+  /** Absent: standard (rapt/config.json, D45). */
+  mode?: ProjectMode;
   generator: { name: string; version: string };
   service: ServiceModel;
   tables: TableModel[];

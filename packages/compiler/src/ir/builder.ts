@@ -27,8 +27,12 @@ import { checkAuthorityChecks, loadAuthorizations } from "./authorizations.js";
 import { loadNumberRanges, usedServices } from "./number-ranges.js";
 import { abaplintRegistry, attachHandlers, syntaxCheck } from "./handlers.js";
 import { selectService, type ServiceOptions } from "./service.js";
+import { loadConfig } from "./config.js";
 
-export type BuildOptions = ServiceOptions;
+export interface BuildOptions extends ServiceOptions {
+  /** Mode of the project, overriding rapt/config.json (D45): standard or enhanced. */
+  mode?: string;
+}
 
 export interface BuildResult {
   model?: Model;
@@ -82,6 +86,7 @@ export function buildModel(project: Project, options: BuildOptions = {}): BuildR
   for (const issue of project.issues) {
     diagnostics.add(issue.severity, issue.code, issue.message, { file: issue.file, line: issue.line, column: issue.column });
   }
+  const config = loadConfig(project, diagnostics, options.mode);
   const dictionary = new Dictionary(project, diagnostics);
   const entities = new EntityResolver(project, dictionary, diagnostics);
 
@@ -167,7 +172,7 @@ export function buildModel(project: Project, options: BuildOptions = {}): BuildR
     if (!relevant) {
       continue;
     }
-    const behavior = buildBehavior(name, ast, file, { diagnostics, dictionary, entity: resolveForBehavior });
+    const behavior = buildBehavior(name, ast, file, { diagnostics, dictionary, entity: resolveForBehavior, mode: config.mode });
     if (behavior !== undefined) {
       behaviors.push(behavior);
     }
@@ -271,6 +276,7 @@ export function buildModel(project: Project, options: BuildOptions = {}): BuildR
   const model: Model = {
     formatVersion: MODEL_FORMAT_VERSION,
     generator: { name: "rap-transpiler", version: COMPILER_VERSION },
+    ...(config.mode === "enhanced" ? { mode: config.mode } : {}),
     service,
     tables: [...tables.values()].sort((a, b) => a.name.localeCompare(b.name)),
     entities: sortedEntities,

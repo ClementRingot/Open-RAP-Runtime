@@ -7,7 +7,7 @@
 
 import { randomUUID } from "node:crypto";
 import { sql, type Kysely } from "kysely";
-import { abapName, derivedType, same, type ActionModel, type DeterminationModel, type EntityModel, type FieldModel, type HandlerRef, type TriggerModel, type ValidationModel } from "@rap-transpiler/model";
+import { abapName, derivedType, getAnnotation, same, type ActionModel, type DeterminationModel, type EntityModel, type FieldModel, type HandlerRef, type TriggerModel, type ValidationModel } from "@rap-transpiler/model";
 import type { AbapBridge } from "../abap/bridge.js";
 import { appendRow, component, isFlagOn, rowsOf, setFlag, type AbapData } from "../abap/convert.js";
 import type { User } from "../auth/user.js";
@@ -1139,6 +1139,9 @@ export class Transaction {
       throw new RapRuntimeError("the transaction is already saved");
     }
     const responses = await this.determine("save");
+    if (this.bo.model.mode === "enhanced") {
+      responses.add(this.checkMandatory());
+    }
     for (const bo of this.bo.entities) {
       for (const validation of bo.behavior.validations) {
         const keys = this.triggeredInLuw(bo, validation.triggers);
@@ -1156,6 +1159,42 @@ export class Transaction {
     // makes the caller roll the LUW back
     responses.add(await this.saveModified());
     this.saved = !responses.hasFailed;
+    return responses;
+  }
+
+  /**
+   * Enhanced mode (D45): `field ( mandatory )` is checked when saving, as a validation on save
+   * would (on SAP, the mandatory characteristic is only a hint for the consumer, D20): each
+   * created or changed instance with an initial mandatory field fails, with a message per field.
+   */
+  private checkMandatory(): Responses {
+    const responses = new Responses();
+    for (const instance of this.instances.values()) {
+      const created = instance.persisted === undefined;
+      if (instance.deleted || (!created && instance.changed.size === 0)) {
+        continue;
+      }
+      const bo = instance.bo;
+      const missing = bo.fields.filter((field) => {
+        const characteristics = this.bo.characteristics(bo, field.name);
+        return (characteristics.includes("mandatory") || (created && characteristics.includes("mandatoryCreate"))) && isInitial(field.type, instance.row[field.name]);
+      });
+      if (missing.length === 0) {
+        continue;
+      }
+      const key = keyOf(bo, instance.row);
+      this.failure(responses, bo, { cause: "unspecific", key });
+      for (const field of missing) {
+        const label = getAnnotation(field.annotations, "EndUserText.label");
+        responses.reported.push({
+          entity: bo.entity.name,
+          key,
+          message: { severity: "E", text: `${typeof label === "string" ? label : field.name} is mandatory` },
+          elements: [field.name],
+          global: false,
+        });
+      }
+    }
     return responses;
   }
 

@@ -23,14 +23,15 @@ const HEADERS = { "content-type": "application/json", accept: "application/json"
 
 let app: FastifyInstance;
 let db: Database;
-let warnings: string[];
+let rapt027: string | undefined;
 
 beforeAll(async () => {
   const result = await generateApplication(loadProject(FIXTURE), { scaffold: false });
   if (result.model === undefined || result.diagnostics.hasErrors()) {
     throw new Error(JSON.stringify(result.diagnostics.items));
   }
-  warnings = result.diagnostics.items.filter((d) => d.severity === "warning").map((d) => d.code);
+  expect(result.diagnostics.items.filter((d) => d.severity !== "info")).toEqual([]);
+  rapt027 = result.diagnostics.items.find((d) => d.code === "BDEF027")?.severity;
   const out = fileURLToPath(new URL(`./.generated/custom-${process.pid}-${Math.random().toString(36).slice(2, 8)}`, import.meta.url));
   mkdirSync(out, { recursive: true });
   writeFiles(out, result.files);
@@ -62,8 +63,8 @@ async function call(method: "POST" | "PATCH" | "DELETE", url: string, body?: unk
 const ids = (body: Record<string, unknown>): unknown[] => (body["value"] as Array<Record<string, unknown>>).map((r) => r["ProductID"]);
 
 describe("custom entities", () => {
-  it("are flagged when a managed BO is defined on them (rap-transpiler only)", () => {
-    expect(warnings).toEqual(["BDEF027"]);
+  it("are flagged when a managed BO is defined on them (enhanced mode, rap-transpiler only)", () => {
+    expect(rapt027).toBe("info");
   });
 
   it("are read through their query class: ranges, sort, paging and count", async () => {
@@ -101,6 +102,12 @@ describe("custom entities", () => {
     expect((await call("POST", "Product", { ProductID: "P1", Name: "Duplicate", Price: 1, Currency: "EUR" })).status).toBe(409);
     expect((await call("PATCH", "Product('P2')", { Price: 549 })).status).toBe(200);
     expect((await call("POST", "Product", { ProductID: "P8", Name: "Negative", Price: -1, Currency: "EUR" })).status).toBe(400);
+    // enhanced mode (D45): the mandatory fields are checked when saving, without a validation
+    const missing = await call("POST", "Product", { ProductID: "P7", Price: 1 });
+    expect(missing.status).toBe(400);
+    expect(JSON.stringify(missing.body)).toContain("Name is mandatory");
+    expect(JSON.stringify(missing.body)).toContain("Currency is mandatory");
+    expect((await call("PATCH", "Product('P2')", { Name: "" })).status).toBe(400);
     expect((await call("DELETE", "Product('P3')")).status).toBe(204);
     const all = await get("Product?$select=ProductID,Price&$orderby=Price");
     expect((all.body["value"] as Array<Record<string, unknown>>).map((p) => [p["ProductID"], p["Price"]])).toEqual([
