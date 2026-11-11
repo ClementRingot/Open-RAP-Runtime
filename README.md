@@ -40,6 +40,22 @@ Le dossier source est un export abapGit (`.abapgit.xml` et `src/`) ; la fixture 
 [fixtures/travel](fixtures/travel). Les codes de diagnostic sont décrits dans
 [docs/DIAGNOSTICS.md](docs/DIAGNOSTICS.md).
 
+## Boucle de développement (`rapt dev`)
+
+```sh
+node packages/compiler/dist/cli.js dev fixtures/travel      # http://localhost:8080/ui/index.html
+```
+
+`rapt dev` construit l'application, la démarre avec une base PGlite embarquée (sans Docker ni
+PostgreSQL), puis la reconstruit et la redémarre à chaque modification des sources. Les
+diagnostics s'affichent au format `fichier:ligne:colonne: sévérité CODE message`. Une
+construction en erreur laisse tourner la précédente. Les données sont gardées d'une construction
+à l'autre, sauf quand le schéma de la base change : la base de développement est alors
+réinitialisée. La construction va dans `<src>/.rapt/dev` (`--out` pour un autre dossier), le port
+est 8080 (`--port`). Les variables de l'application s'appliquent (`AUTH_MODE`, `DEV_ROLES`,
+`DATABASE_URL` pour un PostgreSQL…) ; par défaut, `AUTH_MODE=none` et écoute sur 127.0.0.1
+([D38](docs/DECISIONS.md)).
+
 ## Lancer l'application générée
 
 ```sh

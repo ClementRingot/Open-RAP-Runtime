@@ -5,6 +5,7 @@ import { writeFileSync } from "node:fs";
 import path from "node:path";
 import { generateApplication, writeFiles, type GenerateOptions } from "./build.js";
 import { parseArgs } from "node:util";
+import { DevSession, type DevOptions } from "./dev.js";
 import { formatDiagnostic, type Diagnostics } from "./diagnostics.js";
 import { generateLaunchpad } from "./gen/launchpad/index.js";
 import { loadProject } from "./input/project.js";
@@ -18,13 +19,15 @@ Usage:
   rapt ir    <src> [--service <SRVD>] [--out f] print (or write) the intermediate representation
   rapt build <src> --out <dir> [--service <SRVD>] generate the application into <dir>
   rapt launchpad <launchpad.json> --out <dir>    generate the launchpad of applications into <dir>
+  rapt dev   <src> [--port <n>] [--out <dir>]    build, run with an embedded database, rebuild on change
 
 Options:
   --service <name>   service definition to build (required when the sources have several)
   --binding <name>   service binding name (default: the SRVB of the service, else <SRVD>_O4)
   --path <path>      service root path (default: /sap/opu/odata4/sap/<binding>/srvd/sap/<srvd>/0001/)
   --runtime <dir>    @rap-transpiler/runtime package to embed in the application (default: next to rapt)
-  --out <path>       output file (rapt ir) or folder (rapt build, rapt launchpad)
+  --out <path>       output file (rapt ir) or folder (rapt build, rapt launchpad, rapt dev: <src>/.rapt/dev)
+  --port <n>         port of the application (rapt dev, default: PORT, else 8080)
   --warnings-as-errors
   -h, --help
 `;
@@ -52,6 +55,7 @@ export async function main(argv: string[]): Promise<number> {
         path: { type: "string" },
         out: { type: "string" },
         runtime: { type: "string" },
+        port: { type: "string" },
         "warnings-as-errors": { type: "boolean" },
         help: { type: "boolean", short: "h" },
       },
@@ -91,6 +95,9 @@ export async function main(argv: string[]): Promise<number> {
   if (typeof parsed.values["path"] === "string") options.path = parsed.values["path"];
   if (typeof parsed.values["runtime"] === "string") options.runtimeDir = parsed.values["runtime"];
 
+  if (command === "dev") {
+    return dev(source, options, parsed.values["out"], parsed.values["port"]);
+  }
   const project = loadProject(source);
   if (command === "build") {
     const out = parsed.values["out"];
@@ -139,6 +146,29 @@ export async function main(argv: string[]): Promise<number> {
       process.stderr.write(`unknown command ${command}\n\n${USAGE}`);
       return 2;
   }
+}
+
+/** rapt dev: runs until SIGINT or SIGTERM. */
+async function dev(source: string, generate: GenerateOptions, out: unknown, port: unknown): Promise<number> {
+  const options: DevOptions = { ...generate };
+  if (typeof out === "string") options.outDir = out;
+  if (typeof port === "string") {
+    const value = Number(port);
+    if (!Number.isInteger(value) || value <= 0 || value > 65535) {
+      process.stderr.write(`invalid --port ${port}\n`);
+      return 2;
+    }
+    options.port = value;
+  }
+  const session = new DevSession(source, options);
+  const stopped = new Promise<void>((resolve) => {
+    for (const signal of ["SIGINT", "SIGTERM"] as const) {
+      process.once(signal, () => void session.close().then(resolve));
+    }
+  });
+  await session.watch();
+  await stopped;
+  return 0;
 }
 
 const invokedDirectly = process.argv[1] !== undefined && import.meta.url === new URL(`file://${process.argv[1]}`).href;

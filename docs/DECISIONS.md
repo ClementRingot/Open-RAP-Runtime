@@ -628,3 +628,34 @@ et la conséquence. Les numéros D1 à D13 correspondent aux points 1 à 13 du �
   `runtime/test/launchpad-ui.test.ts` teste dans le navigateur les tuiles d'un viewer, le
   compteur, la recherche, l'application ouverte avec la barre shell, le retour et l'intent.
   `compiler/test/launchpad.test.ts` couvre les diagnostics, les fichiers générés et la CLI.
+
+## D38 — Boucle de développement (`rapt dev`)
+
+- **Contexte** : construire, installer et lancer l'application générée prend quatre commandes
+  (`rapt build`, `npm install`, une base PostgreSQL, `npm start`) à chaque modification d'une
+  source. L'application autonome est la cible : la boucle d'édition doit être immédiate.
+- **Décision** : `rapt dev <src>` construit l'application sans son scaffold (ni `vendor/`, ni
+  `package.json`, ni Docker) dans `<src>/.rapt/dev`, la démarre, surveille les sources et
+  recommence à chaque modification (regroupées sur 150 ms, une construction à la fois).
+  - **Dépendances** : le `node_modules` de la construction est un lien (une jonction sous
+    Windows) vers celui du paquet `@rap-transpiler/runtime`, qui contient le runtime abaplint,
+    PGlite et OpenUI5. Le module ABAP transpilé et le runtime chargent ainsi le même
+    `@abaplint/runtime`. Aucune installation npm.
+  - **Processus enfant** : le serveur tourne dans un processus séparé (`dev-server.mjs`), arrêté
+    par un message IPC (PGlite ferme ses fichiers) puis relancé. Le code ABAP transpilé pose un
+    état global (l'objet `abap`) et les modules ES ne se déchargent pas : un redémarrage dans le
+    même processus garderait l'ancien behavior pool.
+  - **Erreurs** : une construction en erreur ne touche pas à l'application qui tourne ; les
+    diagnostics gardent le format de `rapt check`.
+  - **Base** : PGlite dans `.rapt/dev/data`, gardée entre les constructions. Le schéma appliqué
+    est mémorisé ; s'il change, la base est supprimée et recréée (données de développement,
+    pas de migration). Avec `DATABASE_URL`, la base donnée est utilisée telle quelle.
+  - **Surveillance** : un `fs.watch` par dossier, pas le mode récursif. Sous Linux, le mode
+    récursif de Node.js perd les fichiers remplacés par un renommage, ce que font la plupart des
+    éditeurs à l'enregistrement. Les dossiers commençant par un point et `node_modules` sont
+    ignorés, sauf `.abapgit.xml`.
+  - **Valeurs par défaut** : `AUTH_MODE=none`, `HOST=127.0.0.1`, `LOG_LEVEL=warn` ; chaque
+    variable de l'environnement les remplace.
+- **Tests** : `compiler/test/dev.test.ts` couvre la construction, le behavior pool exécuté, la
+  conservation des données, la construction en erreur, la réinitialisation sur changement de
+  schéma et la surveillance d'un fichier remplacé par un renommage.
