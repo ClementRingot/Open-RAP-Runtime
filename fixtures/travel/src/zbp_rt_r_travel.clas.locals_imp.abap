@@ -35,6 +35,9 @@ CLASS lhc_travel DEFINITION INHERITING FROM cl_abap_behavior_handler.
 
     METHODS validateDates FOR VALIDATE ON SAVE
       IMPORTING keys FOR Travel~validateDates.
+
+    METHODS validateMandatory FOR VALIDATE ON SAVE
+      IMPORTING keys FOR Travel~validateMandatory.
 ENDCLASS.
 
 CLASS lhc_travel IMPLEMENTATION.
@@ -279,27 +282,134 @@ CLASS lhc_travel IMPLEMENTATION.
     ENDLOOP.
   ENDMETHOD.
 
+  METHOD validateMandatory.
+    " field ( mandatory ) is only a consumer hint, without runtime check: the check is this
+    " validation (BeginDate and EndDate are checked by validateDates).
+    READ ENTITIES OF zrt_r_travel IN LOCAL MODE
+      ENTITY Travel
+        FIELDS ( TravelID AgencyID CustomerID CurrencyCode ) WITH CORRESPONDING #( keys )
+      RESULT DATA(travels).
+
+    LOOP AT travels INTO DATA(travel).
+      IF travel-TravelID IS INITIAL.
+        APPEND VALUE #( %tky = travel-%tky ) TO failed-travel.
+        APPEND VALUE #( %tky              = travel-%tky
+                        %msg              = new_message_with_text(
+                                              severity = if_abap_behv_message=>severity-error
+                                              text     = 'Travel ID is required' )
+                        %element-TravelID = if_abap_behv=>mk-on ) TO reported-travel.
+      ENDIF.
+      IF travel-AgencyID IS INITIAL.
+        APPEND VALUE #( %tky = travel-%tky ) TO failed-travel.
+        APPEND VALUE #( %tky              = travel-%tky
+                        %msg              = new_message_with_text(
+                                              severity = if_abap_behv_message=>severity-error
+                                              text     = 'Agency ID is required' )
+                        %element-AgencyID = if_abap_behv=>mk-on ) TO reported-travel.
+      ENDIF.
+      IF travel-CustomerID IS INITIAL.
+        APPEND VALUE #( %tky = travel-%tky ) TO failed-travel.
+        APPEND VALUE #( %tky                = travel-%tky
+                        %msg                = new_message_with_text(
+                                                severity = if_abap_behv_message=>severity-error
+                                                text     = 'Customer ID is required' )
+                        %element-CustomerID = if_abap_behv=>mk-on ) TO reported-travel.
+      ENDIF.
+      IF travel-CurrencyCode IS INITIAL.
+        APPEND VALUE #( %tky = travel-%tky ) TO failed-travel.
+        APPEND VALUE #( %tky                  = travel-%tky
+                        %msg                  = new_message_with_text(
+                                                  severity = if_abap_behv_message=>severity-error
+                                                  text     = 'Currency is required' )
+                        %element-CurrencyCode = if_abap_behv=>mk-on ) TO reported-travel.
+      ENDIF.
+    ENDLOOP.
+  ENDMETHOD.
+
 ENDCLASS.
 
 CLASS lhc_booking DEFINITION INHERITING FROM cl_abap_behavior_handler.
   PRIVATE SECTION.
     METHODS calculateTotalPrice FOR DETERMINE ON MODIFY
       IMPORTING keys FOR Booking~calculateTotalPrice.
+
+    METHODS validateMandatory FOR VALIDATE ON SAVE
+      IMPORTING keys FOR Booking~validateMandatory.
 ENDCLASS.
 
 CLASS lhc_booking IMPLEMENTATION.
 
   METHOD calculateTotalPrice.
-    " A new or changed flight price changes the total price of the travel.
+    " A new, changed or deleted flight price changes the total price of the travel.
+    " New and changed bookings: their travel by the to-parent association.
     READ ENTITIES OF zrt_r_travel IN LOCAL MODE
       ENTITY Booking BY \_Travel
         FIELDS ( TravelUUID ) WITH CORRESPONDING #( keys )
-      RESULT DATA(travels).
+      RESULT DATA(travels)
+      FAILED DATA(not_readable).
+
+    " A deleted booking can no longer be read in the transactional buffer: its travel is read on
+    " the database, where the deletion is only written by the save sequence.
+    LOOP AT not_readable-booking INTO DATA(deleted).
+      SELECT SINGLE FROM zrt_r_booking
+        FIELDS TravelUUID
+        WHERE BookingUUID = @deleted-BookingUUID
+        INTO @DATA(travel_uuid).
+      IF sy-subrc = 0.
+        APPEND VALUE #( TravelUUID = travel_uuid ) TO travels.
+      ENDIF.
+    ENDLOOP.
+
+    SORT travels BY TravelUUID.
+    DELETE ADJACENT DUPLICATES FROM travels COMPARING TravelUUID.
 
     MODIFY ENTITIES OF zrt_r_travel IN LOCAL MODE
       ENTITY Travel
         EXECUTE reCalcTotalPrice
         FROM CORRESPONDING #( travels ).
+  ENDMETHOD.
+
+  METHOD validateMandatory.
+    " field ( mandatory ) is only a consumer hint, without runtime check: the check is this validation.
+    READ ENTITIES OF zrt_r_travel IN LOCAL MODE
+      ENTITY Booking
+        FIELDS ( BookingID CarrierID ConnectionID FlightDate ) WITH CORRESPONDING #( keys )
+      RESULT DATA(bookings).
+
+    LOOP AT bookings INTO DATA(booking).
+      IF booking-BookingID IS INITIAL.
+        APPEND VALUE #( %tky = booking-%tky ) TO failed-booking.
+        APPEND VALUE #( %tky               = booking-%tky
+                        %msg               = new_message_with_text(
+                                               severity = if_abap_behv_message=>severity-error
+                                               text     = 'Booking ID is required' )
+                        %element-BookingID = if_abap_behv=>mk-on ) TO reported-booking.
+      ENDIF.
+      IF booking-CarrierID IS INITIAL.
+        APPEND VALUE #( %tky = booking-%tky ) TO failed-booking.
+        APPEND VALUE #( %tky               = booking-%tky
+                        %msg               = new_message_with_text(
+                                               severity = if_abap_behv_message=>severity-error
+                                               text     = 'Airline is required' )
+                        %element-CarrierID = if_abap_behv=>mk-on ) TO reported-booking.
+      ENDIF.
+      IF booking-ConnectionID IS INITIAL.
+        APPEND VALUE #( %tky = booking-%tky ) TO failed-booking.
+        APPEND VALUE #( %tky                  = booking-%tky
+                        %msg                  = new_message_with_text(
+                                                  severity = if_abap_behv_message=>severity-error
+                                                  text     = 'Flight number is required' )
+                        %element-ConnectionID = if_abap_behv=>mk-on ) TO reported-booking.
+      ENDIF.
+      IF booking-FlightDate IS INITIAL.
+        APPEND VALUE #( %tky = booking-%tky ) TO failed-booking.
+        APPEND VALUE #( %tky                = booking-%tky
+                        %msg                = new_message_with_text(
+                                                severity = if_abap_behv_message=>severity-error
+                                                text     = 'Flight date is required' )
+                        %element-FlightDate = if_abap_behv=>mk-on ) TO reported-booking.
+      ENDIF.
+    ENDLOOP.
   ENDMETHOD.
 
 ENDCLASS.
