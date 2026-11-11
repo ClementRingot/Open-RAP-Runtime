@@ -55,7 +55,7 @@ ajoutent ce que la fixture n'utilise pas : numérotation, feature control global
 | Fonctionnalité | Statut | Note |
 |---|---|---|
 | `readonly` | ✅ | Ignoré pour un consommateur OData (D25) ; modifiable en local mode. |
-| `mandatory` | ✅ | Pas de contrôle runtime, comme RAP (D20). |
+| `mandatory` | ✅ | Pas de contrôle runtime, comme RAP (D20). En mode `enhanced` (D45) : contrôlé à la sauvegarde, sans validation, un message par champ. |
 | `numbering : managed` | ✅ | |
 | `readonly : update`, `mandatory : create` | ✅ | |
 | `features : instance` (feature control dynamique des champs) | ✅ | `__FieldControl` (`Common.FieldControl`), modification d'un champ en lecture seule refusée (400), champ non modifiable dans l'UI. |
@@ -174,7 +174,10 @@ ajoutent ce que la fixture n'utilise pas : numérotation, feature control global
 | Métadonnées d'extension (DDLX) et fusion des annotations | ✅ | |
 | Entités abstraites (paramètres et résultats d'actions et de fonctions) | ✅ | |
 | Entités custom (`define custom entity`, `@ObjectModel.query.implementedBy`, `if_rap_query_provider`) | ✅ | Lectures OData par la classe de requête : plages et chaîne SQL du filtre, tri, pagination, compte, navigation, `$expand` (D43). |
-| BO `managed with unmanaged save` sur une entité custom | ✅ | Propre à rap-transpiler (BDEF027) : instances lues par la classe de requête, écrites par `save_modified` vers l'API (D43). |
+| BO `managed with unmanaged save` sur une entité custom | ✅ | Mode `enhanced` seulement (`rapt/config.json`, D45) : instances lues par la classe de requête, écrites par `save_modified` vers l'API (D43). |
+| Vues standards `I_Currency`, `I_UnitOfMeasure`, `I_Country`, `I_Language` et leurs textes | ✅ | Ajoutées quand une source les nomme, avec leurs données de référence (D44). |
+| Value helps (`@Consumption.valueHelpDefinition`) | ✅ | Entité et vue de textes exposées implicitement en lecture seule, `Common.ValueList` (D44). |
+| Table entities (`define table entity`) | ❌ | abaplint les analyse ; prise en charge sur la feuille de route ([ROADMAP.md](ROADMAP.md)). |
 | Expressions CDS (CASE, CAST, calculs, littéraux) | ❌ | Prévu après le MVP. |
 | Contrôle d'accès DCL (`define role … grant select on … where …`) | ✅ | Lectures OData filtrées pour l'utilisateur : `aspect pfcg_auth` (filtres `ACTVT = '03'`, n-uplets), `aspect user`, `?=`, comparaisons, `like`, `is [not] null`, `and`/`or`/`not`, chemins `_Assoc.Element` (to-one), `inheriting conditions from entity` (D35). Tests `rap-authorizations.test.ts`, `dcl.test.ts`. |
 | Side effects (`side effects { … }`) | ✅ | `Common.SideEffects` dans le `$metadata` ; l'UI générée ne les exploite pas encore (rechargement de l'objet après sauvegarde). |
@@ -211,7 +214,11 @@ ajoutent ce que la fixture n'utilise pas : numérotation, feature control global
 | Fonctionnalité | Statut | Note |
 |---|---|---|
 | List Report : colonnes (`UI.lineItem`), tri (`UI.presentationVariant`), pagination continue | ✅ | `sap.f.DynamicPage`, `sap.m.Table`. |
-| Champs de filtre (`UI.selectionField`), recherche (`@Search.searchable`) | ✅ | Texte : `contains` insensible à la casse ; dates et nombres : égalité. |
+| Champs de filtre (`UI.selectionField`), recherche (`@Search.searchable`) | ✅ | Conditions comme SAP Fiori (`=`, `!=`, `>`, `>=`, `<`, `<=`, `a...b`, `*x*`), plusieurs valeurs par champ, NUMC sans zéros de tête, plages de dates ; *Clear*, *Adapt Filters* (colonnes ajoutées comme filtres), résumé « Filtered By » (D51). |
+| Variantes de l'utilisateur (`sap.m.VariantManagement`) | ✅ | Filtres, filtres et colonnes visibles, tri ; enregistrées par utilisateur par le service (`$variants`) ; variante par défaut, favoris (D51). |
+| Paramètres du tableau : colonnes visibles, tri | ✅ | `sap.m.p13n.Popup` ; nombre de lignes dans le titre du tableau. |
+| Aide à la saisie (`@Consumption.valueHelpDefinition`) | ✅ | Entité exposée implicitement, `Common.ValueList`, dialogue avec les descriptions de la vue de textes, dans les filtres et l'Object Page (D44). |
+| Rafraîchissement de la liste après une modification sur l'Object Page, fil d'Ariane | ✅ | D51. |
 | Création non-draft depuis la List Report | ✅ | Object Page en mode création, `POST` à l'enregistrement. |
 | Suppression, actions de la table (`#FOR_ACTION` dans `UI.lineItem`) | ✅ | Sur la ligne sélectionnée. |
 | Object Page : en-tête (`UI.headerInfo`), sections (`UI.facet` : identification, groupes de champs, tables) | ✅ | `sap.uxap.ObjectPageLayout`. |
@@ -222,7 +229,7 @@ ajoutent ce que la fixture n'utilise pas : numérotation, feature control global
 | Champs en lecture seule, obligatoires, modifiables à la création seulement | ✅ | Depuis les caractéristiques de champ de la BDEF. |
 | Messages (erreurs, succès) | ✅ | `MessageBox`, `MessageToast`, `MessagePopover`. |
 | Boutons selon les autorisations de l'utilisateur | ✅ | Create masqué sans autorisation globale de création (`$permissions`) ; Edit, Delete, actions et création d'enfants désactivés par instance (`__EntityControl`, `__OperationControl`, D36). Test `ui-authorizations.test.ts`. |
-| Aide à la saisie (value help), variantes, personnalisation de table | ❌ | Prévu après le MVP. |
+| Autres floorplans (Worklist, Analytical List Page, Overview Page), draft | ❌ | Feuille de route ([ROADMAP.md](ROADMAP.md)). |
 
 ## Launchpad (D37)
 
@@ -237,7 +244,9 @@ ajoutent ce que la fixture n'utilise pas : numérotation, feature control global
 | Connexion unique : session OIDC du launchpad lue par les applications | ✅ | Autorisations, DCL, CSRF et rôle obligatoire de chaque application conservés ; testé (`launchpad.test.ts`). |
 | Tuiles externes (URL) | ✅ | Ouvertes dans un nouvel onglet. |
 | Docker : launchpad, applications et leurs bases, Keycloak (profil `oidc`) | ✅ | `docker-compose.yml` généré. |
-| Personnalisation, spaces et pages, notifications, navigation entre applications depuis une application | ❌ | Voir KNOWN_GAPS. |
+| Spaces et pages (`spaces` → `pages` → `sections`), affectés à des rôles | ✅ | Onglets des spaces, liste des pages, dernier space mémorisé (D48). |
+| Launchpad de développement (`rapt dev`) : application, documentation, `$metadata`, MCP | ✅ | D49. |
+| Personnalisation par l'utilisateur, notifications, navigation entre applications depuis une application | ❌ | Voir KNOWN_GAPS. |
 
 ## Application générée et exploitation
 
@@ -252,4 +261,6 @@ ajoutent ce que la fixture n'utilise pas : numérotation, feature control global
 | OIDC : jetons porteurs (JWKS), sessions navigateur (code + PKCE), CSRF, déconnexion | ✅ | Déconnexion avec `id_token_hint` : pas de page de confirmation chez le fournisseur (D37). |
 | Rôle obligatoire (`OIDC_REQUIRED_ROLE`) | ✅ | Rôles Keycloak (`realm_access.roles`) ou revendication configurable. |
 | Bundle UI5 optimisé (`ui5 build`) | ❌ | Ressources servies depuis les sources npm (D27). |
+| Cloud Foundry (SAP BTP) : `manifest.yml`, route et PostgreSQL lié lus de `VCAP_*` | ✅ | D50, guide [DEPLOIEMENT.md](DEPLOIEMENT.md). |
+| Serveur MCP du service (`rapt mcp`, `/mcp`) | ✅ | Un outil par opération, descriptions dans `rapt/mcp.json` (D47, guide [MCP.md](MCP.md)). |
 

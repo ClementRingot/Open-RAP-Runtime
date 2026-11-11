@@ -159,7 +159,7 @@ describe("rapt new", () => {
     try {
       const result = newBusinessObject(dir, "Ticket", { prefix: "ZHD", description: "Help desk ticket" });
       expect(result.error).toBeUndefined();
-      expect(result.written).toEqual(expect.arrayContaining(["src/zhd_ticket.tabl.astabl", "src/zhd_ticket.tabl.xml", "src/zhd_r_ticket.ddls.xml", "src/package.devc.xml", ".abapgit.xml", ".gitignore", "rapt/seed.json"]));
+      expect(result.written).toEqual(expect.arrayContaining(["src/zhd_ticket.tabl.astabl", "src/zhd_ticket.tabl.xml", "src/zhd_r_ticket.ddls.xml", "src/package.devc.xml", ".abapgit.xml", ".gitignore", "rapt/seed.json", "AGENTS.md"]));
       expect(readFileSync(path.join(dir, ".gitignore"), "utf8")).toContain(".rapt/");
       expect(generateAbapGitFiles(dir, { check: true }).written).toEqual([]);
       const app = await generateApplication(loadProject(dir), { scaffold: false });

@@ -44,6 +44,8 @@ export function inline(text: string): string {
     return `\u0000${codes.length - 1}\u0000`;
   });
   s = escape(s);
+  // images: shown from an absolute URL; the images of the repository are left out of the app
+  s = s.replace(/!\[([^\]]*)\]\(([^)\s]+)\)/g, (_m, alt: string, src: string) => (/^https?:\/\//i.test(src) ? `<img src="${src}" alt="${alt}" style="max-width:100%">` : ""));
   s = s.replace(/\[([^\]]+)\]\(([^)\s]+)\)/g, (_m, label: string, href: string) => {
     const target = link(href.replace(/&amp;/g, "&"));
     return `<a href="${escape(target.href)}"${target.external ? ' target="_blank" rel="noopener"' : ""}>${label}</a>`;

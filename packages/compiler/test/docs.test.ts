@@ -40,6 +40,7 @@ rapt dev <src>
     expect(html).toContain("<td><code>x | y</code></td>");
     expect(html).toContain('<pre><code class="language-sh">rapt dev &lt;src&gt;</code></pre>');
     expect(html).toContain("<blockquote><p>note</p></blockquote>");
+    expect(inline("![capture](docs/images/x.png) texte")).toBe(" texte");
     expect(inline("[site](https://example.org)")).toBe('<a href="https://example.org" target="_blank" rel="noopener">site</a>');
     expect(headingId("D44 — Vues standards (`I_Currency`)")).toBe("d44--vues-standards-i_currency");
   });

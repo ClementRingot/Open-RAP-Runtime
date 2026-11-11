@@ -265,7 +265,7 @@ function breadcrumbs(page: UiPage, layout: UiLayout): string {
   if (parent !== undefined) {
     links.push(`<Link id="crumbParent" text="${esc(parent.typeName)}" press=".onNavBack"/>`);
   }
-  return links.length === 0 ? "" : `<uxap:breadcrumbs><Breadcrumbs id="breadcrumbs">${links.join("")}</Breadcrumbs></uxap:breadcrumbs>`;
+  return links.length === 0 ? "" : `<uxap:breadcrumbs><Breadcrumbs id="breadcrumbs" currentLocationText="${esc(page.typeName)}">${links.join("")}</Breadcrumbs></uxap:breadcrumbs>`;
 }
 
 function tablesOf(section: UiSection): UiTable[] {

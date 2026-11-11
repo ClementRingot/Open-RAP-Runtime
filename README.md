@@ -1,167 +1,115 @@
 # rap-transpiler
 
-Compilateur open source qui transforme les sources d'un business object RAP (tables, vues CDS,
-métadonnées d'extension, BDEF, behavior pool ABAP, définition de service), exportées au format
-abapGit, en une application Node.js autonome : service OData V4, base PostgreSQL, interface
-OpenUI5 de type List Report / Object Page, sans système SAP.
+**Développez, testez et déployez vos business objects RAP sans système SAP.**
 
-- 100 % open source, licences permissives ([LICENSES.md](LICENSES.md)) ; aucune bibliothèque SAP
-  propriétaire (ni CAP, ni SAPUI5, ni `sap.fe`).
-- Cible : un BO RAP **managed non-draft** complet ([docs/FEATURES.md](docs/FEATURES.md)).
-- Plan, choix techniques et décisions : [PLAN.md](PLAN.md), [docs/DECISIONS.md](docs/DECISIONS.md).
-- Écarts connus : [KNOWN_GAPS.md](KNOWN_GAPS.md).
+Vous écrivez votre BO RAP comme dans les ABAP Development Tools — tables, vues CDS, annotations UI,
+behavior definition, behavior pool en ABAP, service — et rap-transpiler en fait une application
+qui tourne partout : un service OData V4, le runtime RAP managed avec votre code ABAP, une base
+PostgreSQL et une interface List Report / Object Page en OpenUI5. Les mêmes sources s'importent
+ensuite dans SAP avec abapGit.
 
-## État
+![List Report généré](docs/images/list-report.png)
 
-| Jalon | Contenu | État |
-|---|---|---|
-| J1 | Parser BDEF (Chevrotain), parser SRVD, adaptateur CDS (abaplint), IR, `rapt check`, `rapt ir` | fait |
-| J2 | Générateurs SQL (PostgreSQL) et `$metadata` (CSDL), `rapt build` | fait |
-| J3 | Runtime OData V4 en lecture (Fastify, `$batch`, CSRF, OIDC Bearer) | fait |
-| J4 | Écriture, runtime RAP managed, EML, behavior pool transpilé | fait |
-| J5 | UI OpenUI5 générée (List Report, Object Page) | fait |
-| J6 | Application packagée (npm, Docker, docker-compose), sessions OIDC, test de bout en bout | fait |
+## À quoi ça sert
 
-## Démarrage
+- **Apprendre et enseigner RAP** sans licence ni système : le cycle complet BDEF → behavior pool →
+  OData → Fiori, en local, en quelques secondes.
+- **Prototyper** un BO et le montrer à un client ou à un métier avant d'ouvrir un système.
+- **Tester** la logique d'un BO (déterminations, validations, actions, autorisations) en CI.
+- **Livrer une petite application autonome** (Docker, SAP BTP Cloud Foundry, un serveur interne)
+  quand un système SAP n'est pas justifié.
+- **Ouvrir le BO aux agents IA** : le service devient un serveur MCP dont chaque outil applique
+  les contrôles du BO.
 
-Prérequis : Node.js 22+, pnpm 10.
+Tout est open source et sous licences permissives : ni CAP, ni SAPUI5, ni bibliothèque SAP
+propriétaire ([LICENSES.md](LICENSES.md)).
+
+## Démarrer en deux minutes
+
+**Dans VS Code** : installer l'extension `rap-transpiler-vscode.vsix` (elle contient tout), puis
+*RAP : Nouveau business object* et *RAP : Lancer rapt dev*. Le navigateur s'ouvre sur le
+launchpad de développement.
+
+**En ligne de commande** (Node.js 22, depuis un clone : `pnpm install && pnpm build`, puis
+`node packages/compiler/dist/cli.js` à la place de `rapt`) :
+
+```sh
+rapt new mon-projet Travel --prefix ZRT    # un BO managed complet, avec des données
+rapt dev mon-projet                         # http://localhost:8080/ — rechargé à chaque enregistrement
+```
+
+![Launchpad de développement](docs/images/dev-launchpad.png)
+
+## Ce que vous obtenez
+
+| Vous écrivez (format abapGit) | rap-transpiler produit |
+|---|---|
+| Tables (`define table`, comme dans ADT) | Tables PostgreSQL, données initiales |
+| Vues CDS, projections, DCL | Vues SQL, `$metadata` OData V4, contrôles d'accès par utilisateur |
+| Metadata extensions (`@UI`) | List Report (filtres Fiori, vues de l'utilisateur, value helps) et Object Page |
+| Behavior definition | Runtime RAP managed : verrous, ETags, numérotation, autorisations, feature control, déterminations, validations, actions |
+| Behavior pool (ABAP Cloud) | Le même code, transpilé et exécuté : EML, messages, ABAP SQL, classes libérées (JSON, HTTP, bgPF, e-mail…) |
+| Définition de service | Service OData V4 aux chemins de SAP, `$batch`, CSRF, OIDC |
+| `rapt/mcp.json` | Serveur MCP pour les agents IA |
+| `launchpad.json` | Launchpad OpenUI5 : spaces, pages, tuiles par rôle, connexion unique |
+
+![Object Page en édition](docs/images/object-page.png)
+
+## Fonctionnalités clés
+
+- **Écrire seulement de l'ABAP** : `rapt new` (un BO complet), `rapt generate` (une table, une vue
+  depuis sa table, une projection, une BDEF avec ses compositions, un behavior pool…),
+  `rapt abapgit` (les XML pour l'import dans SAP).
+- **Boucle de développement** `rapt dev` : base embarquée, reconstruction à chaque enregistrement,
+  diagnostics positionnés (`fichier:ligne:colonne`), launchpad de développement avec la
+  documentation intégrée.
+- **Modes** : `standard` (strictement comme SAP, activable sur SAP) ou `enhanced` (extensions :
+  champs obligatoires contrôlés automatiquement, BO managed sur entité custom).
+- **Vues standards** `I_Currency`, `I_UnitOfMeasure`, `I_Country`, `I_Language` avec leurs
+  données, pour vos value helps.
+- **UI Fiori** : filtres avec conditions (`>100`, `1...5`, `*abc*`), vues enregistrées par
+  utilisateur, paramètres du tableau, aide à la saisie, actions, compositions éditables.
+- **Sécurité** : OIDC (Keycloak, SAP Cloud Identity Services, Entra ID…), objets d'autorisation et
+  `AUTHORITY-CHECK`, DCL, rôles.
+- **Déploiement** : Docker, `docker compose`, SAP BTP Cloud Foundry (`cf push`), n'importe quel
+  serveur Node.js.
+- **Extension VS Code** : commandes, diagnostics dans l'onglet Problèmes, coloration ABAP, CDS et
+  BDEF.
+
+## Documentation
+
+| Document | Contenu |
+|---|---|
+| [Guide](docs/GUIDE.md) | Tout ce que fait rap-transpiler et comment s'en servir (humains et agents IA) |
+| [Fonctionnalités](docs/FEATURES.md) | Couverture RAP, fonctionnalité par fonctionnalité |
+| [Diagnostics](docs/DIAGNOSTICS.md) | Les codes de `rapt check` |
+| [Serveur MCP](docs/MCP.md) | Le service pour les agents IA |
+| [Déploiement](docs/DEPLOIEMENT.md) | Docker, SAP BTP Cloud Foundry, HTTPS |
+| [Classes utilitaires](docs/UTILITAIRES.md), [API distantes](docs/API_DISTANTES.md) | Le behavior pool au-delà de RAP |
+| [Écarts connus](KNOWN_GAPS.md), [Feuille de route](docs/ROADMAP.md) | Ce qui manque, ce qui vient (draft, table entities…) |
+| [Décisions](docs/DECISIONS.md), [Plan](PLAN.md) | Les choix techniques et leurs raisons |
+
+La même documentation s'ouvre depuis le launchpad de `rapt dev` (tuile *Documentation*).
+
+## Contribuer
 
 ```sh
 pnpm install
 pnpm build
-pnpm test
-node packages/compiler/dist/cli.js check fixtures/travel     # diagnostics
-node packages/compiler/dist/cli.js ir fixtures/travel        # représentation intermédiaire (JSON)
-node packages/compiler/dist/cli.js build fixtures/travel --out out/travel   # application générée
-node packages/compiler/dist/cli.js launchpad launchpad.json --out out/launchpad   # launchpad (D37)
+pnpm test                    # vitest : compilateur, runtime, navigateur (Playwright si présent)
 ```
-
-Le dossier source est un export abapGit (`.abapgit.xml` et `src/`) ; la fixture de référence est
-[fixtures/travel](fixtures/travel).
-
-### Écrire seulement de l'ABAP
-
-```sh
-rapt new mon-projet Travel --prefix ZRT    # un BO managed complet, avec données initiales
-rapt dev mon-projet                         # l'application tourne, rechargée à chaque modification
-rapt abapgit mon-projet                     # les XML abapGit qui manquent, pour l'import dans SAP
-```
-
-Les tables s'écrivent en source (`zrt_travel.tabl.astabl`, syntaxe `define table` des ABAP
-Development Tools) ; les fichiers XML d'abapGit sont générés par `rapt abapgit`, qui ne touche
-pas aux XML existants. `rapt/seed.json` (ou `rapt/seed.sql`) donne les données chargées au
-premier démarrage de `rapt dev` ([D42](docs/DECISIONS.md)). Les codes de diagnostic sont décrits dans
-[docs/DIAGNOSTICS.md](docs/DIAGNOSTICS.md).
-
-## Boucle de développement (`rapt dev`)
-
-```sh
-node packages/compiler/dist/cli.js dev fixtures/travel      # http://localhost:8080/ui/index.html
-```
-
-`rapt dev` construit l'application, la démarre avec une base PGlite embarquée (sans Docker ni
-PostgreSQL), puis la reconstruit et la redémarre à chaque modification des sources. Les
-diagnostics s'affichent au format `fichier:ligne:colonne: sévérité CODE message`. Une
-construction en erreur laisse tourner la précédente. Les données sont gardées d'une construction
-à l'autre, sauf quand le schéma de la base change : la base de développement est alors
-réinitialisée. La construction va dans `<src>/.rapt/dev` (`--out` pour un autre dossier), le port
-est 8080 (`--port`). Les variables de l'application s'appliquent (`AUTH_MODE`, `DEV_ROLES`,
-`DATABASE_URL` pour un PostgreSQL…) ; par défaut, `AUTH_MODE=none` et écoute sur 127.0.0.1
-([D38](docs/DECISIONS.md)).
-
-### Extension VS Code
-
-[packages/vscode](packages/vscode) ajoute à VS Code les diagnostics de `rapt check` dans l'onglet
-Problèmes à chaque enregistrement, les commandes *RAP : Lancer rapt dev*, *Vérifier le BO*,
-*Générer l'application*, *Nouveau business object* et *Générer les fichiers abapGit*, et l'état de `rapt dev` dans la barre d'état. Elle appelle la CLI avec
-`--json` (une sortie JSON pour `check` et `build`, un événement JSON par ligne pour `dev`) et ne
-compile rien elle-même ([D39](docs/DECISIONS.md)).
-
-Le `.vsix` est autonome : il contient rapt, OpenUI5 et PGlite, et lance rapt avec le Node.js
-de VS Code (1.101 ou plus). Rien d'autre à installer. La CI le publie en artefact
-(`rap-transpiler-vscode`) ; pour le construire :
-
-```sh
-cd packages/vscode && pnpm run package && code --install-extension rap-transpiler-vscode.vsix
-```
-
-## Lancer l'application générée
-
-```sh
-node packages/compiler/dist/cli.js build fixtures/travel --out out/travel
-cd out/travel
-docker compose up --build                 # http://localhost:8080/ (sans connexion)
-# ou, avec Node.js 22 et un PostgreSQL :
-npm install && DATABASE_URL=postgres://user:password@localhost:5432/app npm start
-```
-
-Connexion OIDC (Keycloak fourni dans le profil `oidc` de docker-compose, utilisateur `alice`) :
-`AUTH_MODE=oidc docker compose --profile oidc up --build`. Les variables sont décrites dans le
-`README.md` et le `.env.example` de l'application générée.
-
-Le behavior pool peut utiliser les classes utilitaires d'ABAP Cloud : `/ui2/cl_json` et
-`xco_cp_json`, `cl_web_http_utility`, `cl_abap_conv_codepage`, `cl_numberrange_runtime`
-(intervalles dans `rapt/number-ranges.json`), `cl_abap_tstmp` et `xco_cp_time`, journal
-applicatif `cl_bali_*`, hachage, aléatoire, expressions régulières, RTTS, traitement en
-arrière-plan `cl_bgmc_process_factory` et e-mail `cl_bcs_mail_message` (envoyé par
-`MAIL_SMTP_URL`) ([guide](docs/UTILITAIRES.md), [D40, D41](docs/DECISIONS.md)).
-
-Le behavior pool peut appeler des API distantes avec le client HTTP d'ABAP Cloud et le client
-proxy OData d'un service consumption model (SCM, SCM2) ; chaque destination se configure par
-variables d'environnement (`DESTINATION_<NOM>_URL`, `_USER`, `_PASSWORD`, `_TOKEN`, `_HEADERS`),
-listées dans le `.env.example` généré ([guide](docs/API_DISTANTES.md), [D31](docs/DECISIONS.md)).
-
-## Launchpad des applications (`rapt launchpad`)
-
-Quand plusieurs applications sont générées, un launchpad en OpenUI5 sert de point d'entrée,
-comme le Fiori launchpad (dont le shell n'existe que dans SAPUI5). Il affiche des tuiles affectées
-aux rôles de l'IdP, avec des compteurs (`$count`), une barre shell et la navigation par intent.
-Il sert les applications sous une même origine (`/apps/<id>/`, services à leurs chemins), avec
-une seule connexion OIDC que les applications lisent ([D37](docs/DECISIONS.md)). Le contenu est
-décrit dans un `launchpad.json` :
-
-```json
-{
-  "title": "Travel Agency",
-  "apps": [{ "id": "travel", "build": "out/travel", "url": "http://localhost:8080/" }],
-  "groups": [{
-    "title": "Travel Management",
-    "tiles": [{ "title": "Manage Travels", "app": "travel", "intent": "Travel-manage",
-                "icon": "sap-icon://flight", "count": "Travel",
-                "roles": ["travel_manager", "travel_agent", "travel_viewer"] }]
-  }]
-}
-```
-
-```sh
-node packages/compiler/dist/cli.js launchpad launchpad.json --out out/launchpad
-cd out/launchpad && docker compose up --build     # http://localhost:8090/ : launchpad et applications
-```
-
-## Application générée (`rapt build`)
-
-```
-model/model.json     IR lue par le runtime
-db/schema.sql        tables et vues PostgreSQL
-odata/metadata.xml   $metadata (CSDL avec annotations UI)
-abap/*.mjs           behavior pool transpilé (abap/init.mjs charge l'ensemble)
-abap/src/            ABAP donné au transpiler : sources réécrites, types dérivés, socle clean-room
-ui/                  UI OpenUI5 : List Report et Object Pages générées depuis les annotations @UI
-package.json         dépendances ; vendor/ embarque le runtime et le modèle (aucun registre privé)
-server.mjs           démarrage (variables d'environnement : .env.example)
-Dockerfile, docker-compose.yml, keycloak/   image, PostgreSQL, Keycloak (profil oidc)
-```
-
-Le behavior pool est réécrit avant transpilation : types dérivés de la BDEF, signatures des
-handlers, EML abaissé vers la classe noyau `ZRAP_EML` (décision D2). Les diagnostics ABAP
-(ABP004 à ABP008) pointent sur les lignes des sources d'origine.
-
-## Organisation
 
 ```
 packages/model/      types de l'IR (model.json), conventions de nommage partagées
-packages/compiler/   CLI rapt, parsers, construction de l'IR, générateurs
-packages/runtime/    runtime des applications générées (OData V4, RAP managed)
+packages/compiler/   CLI rapt, parsers (BDEF, CDS, SRVD, DCL), IR, générateurs
+packages/runtime/    runtime des applications générées (OData V4, RAP managed, launchpad, MCP)
 packages/vscode/     extension VS Code (appelle la CLI rapt)
-fixtures/travel/     BO de référence Travel / Booking (format abapGit)
+fixtures/            BO de référence : travel (Travel / Booking), custom-entity
 ```
+
+Les règles de travail sur le dépôt (pour les humains comme pour les agents) sont dans
+[AGENTS.md](AGENTS.md).
+
+## Licence
+
+MIT ([LICENSE](LICENSE)) ; dépendances sous licences permissives ([LICENSES.md](LICENSES.md)).

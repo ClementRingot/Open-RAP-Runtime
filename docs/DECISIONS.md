@@ -854,3 +854,138 @@ et la conséquence. Les numéros D1 à D13 correspondent aux points 1 à 13 du �
   compte, navigation, `$expand`, filtre refusé, création, doublon, validation, modification,
   suppression) et `compiler/test/custom-entity.test.ts`.
 
+
+## D44 — Vues standards de SAP (I_Currency…) et value helps
+
+- **Contexte** : sur SAP (ABAP Cloud comme S/4HANA), les vues CDS libérées `I_Currency`,
+  `I_UnitOfMeasure`, `I_Country`, `I_Language` et leurs vues de textes existent dans tout système,
+  avec un contenu livré et maintenu par SAP (devises ISO, unités, pays, langues). Un BO RAP s'en
+  sert pour ses value helps (`@Consumption.valueHelpDefinition`) et ses associations. Sans elles,
+  une source activable sur SAP échouait ici (CDS005) et le value help était ignoré.
+- **Décision** :
+  - **Vues standards** : une source du projet qui nomme une de ces vues sans la définir la reçoit,
+    avec sa vue de textes (`_Text`, catégorie `#TEXT`) et ses tables (`rapt_currency`,
+    `rapt_currencyt`, `rapt_uom`, `rapt_uomt`, `rapt_country`, `rapt_countryt`, `rapt_language`,
+    `rapt_languaget`). Les éléments ont les noms de SAP ; les tables sont propres à rap-transpiler
+    (le code ABAP Cloud ne lit pas les tables de SAP). Une vue définie par le projet l'emporte.
+    Les fichiers sont virtuels (`<standard>/…`) : `rapt abapgit` ne les écrit jamais.
+  - **Données de référence** : devises ISO 4217 (avec leurs décimales), pays ISO 3166 (code à trois
+    lettres, devise, appartenance à l'UE), unités courantes (code SAP, code ISO, dimension),
+    langues (clé SAP d'un caractère, code ISO) ; textes en anglais. `db/schema.sql` les insère
+    (`ON CONFLICT DO NOTHING`) : une ligne ajoutée ou changée par l'application reste. Les tables
+    standards ne comptent pas pour « toutes les tables sont vides » des données initiales (D42).
+  - **Value helps** : comme RAP, l'entité d'un value help et sa vue de textes sont exposées
+    implicitement par le service, en lecture seule, sans page dans l'UI. `$metadata` porte
+    `Common.ValueList` (`CollectionPath`, paramètre `InOut`, colonnes `DisplayOnly`). L'UI ouvre
+    un dialogue de sélection (recherche sur les colonnes texte et sur les descriptions) depuis
+    les champs de l'Object Page et les filtres du List Report.
+- **Réponse à la question « faut-il maintenir les devises comme sur BTP ? »** : sur BTP, le
+  contenu de ces vues est livré par SAP et n'est pas à saisir ; ici il est livré avec
+  rap-transpiler de la même façon. Les autres vues libérées utiles ensuite : `I_Region`,
+  `I_CalendarDate` (calendrier), `I_Timezone`, `I_BusinessUserBasic` (utilisateurs, à relier à
+  l'IdP), `I_ExchangeRate` (taux de change, à relier à une source de taux) — voir la feuille de route.
+- **Tests** : `compiler/test/standard.test.ts`, `runtime/test/standard-views.test.ts` (lecture,
+  textes, lecture seule, value help dans le navigateur).
+
+## D45 — Modes `standard` et `enhanced`
+
+- **Décision** : `rapt/config.json` (`{ "mode": "enhanced" }`) ou `--mode` choisit le mode du
+  projet. `standard` (par défaut) : les sources se comportent comme sur SAP et ce que SAP refuse
+  est refusé ; un projet qui se construit dans ce mode s'importe et s'active sur SAP.
+  `enhanced` : les extensions de rap-transpiler, qui n'existent pas sur SAP :
+  - BO managed avec unmanaged save sur une entité custom (D43) : erreur BDEF027 en `standard`,
+    information en `enhanced` ;
+  - `field ( mandatory )` contrôlé à la sauvegarde sans validation : chaque instance créée ou
+    modifiée dont un champ obligatoire est initial échoue, avec un message par champ (`%element`).
+    En `standard`, comme RAP (D20), seul `mandatory : create` est contrôlé.
+- **Pourquoi un fichier** : le mode est une propriété du projet, versionnée avec ses sources ; la
+  CLI, `rapt dev` et l'extension VS Code (commande *Choisir le mode du projet*) le lisent.
+- **Tests** : `compiler/test/config.test.ts`, `runtime/test/custom-entity.test.ts`.
+
+## D46 — `rapt generate` : un objet à la fois, dérivé des objets existants
+
+- **Décision** : `rapt generate <src> <type> <nom> [--from X] [--for Y] [--expose A,B] [--root]`
+  écrit un objet avec les noms de fichiers d'abapGit, puis son XML : table, vue (depuis une table,
+  éléments en CamelCase, annotations administratives), projection (associations redirigées par le
+  même renommage : `ZC_Travel ← ZR_Travel` donne `ZC_Booking`), metadata extension, access
+  control, BDEF (managed avec ses compositions : verrous, autorisations et ETag des enfants,
+  numérotation UUID, champs administratifs en lecture seule, mapping ; ou BDEF de projection),
+  behavior pool (un handler par entité, autorisation globale), entité abstraite, entité custom et
+  sa classe de requête, classe, interface, définition et binding de service. Un fichier existant
+  n'est jamais écrasé.
+- **Pourquoi** : les assistants de création d'ADT dérivent un objet du précédent ; `rapt new`
+  écrit un BO entier, `rapt generate` accompagne la construction pas à pas.
+- **VS Code** : *Nouvel objet RAP…* (type, objet source choisi dans une liste, nom proposé).
+- **Tests** : `compiler/test/generate.test.ts` (un BO complet construit commande par commande,
+  sans diagnostic), `vscode/test/rapt.test.ts`.
+
+## D47 — Serveur MCP du service
+
+- **Décision** : `rapt mcp <src>` écrit `rapt/mcp.json`, un outil par opération du service
+  (`<Set>_list`, `_get`, `_create`, `_update`, `_delete`, `_create<_Composition>`, `_<action>`),
+  chacun avec une description à compléter pour expliquer à un agent ce que fait l'outil et quand
+  s'en servir ; `false` retire un outil. Relancer la commande garde les descriptions écrites,
+  ajoute les nouveaux outils et retire ceux que le service n'a plus. L'application construite avec
+  ce fichier sert les outils sur `/mcp` (Model Context Protocol, transport « Streamable HTTP »,
+  réponses JSON, sans flux SSE).
+- **Exécution** : chaque appel est une requête OData exécutée par le service, pour l'utilisateur
+  de la requête MCP : autorisations, DCL, feature control, validations et messages sont ceux de
+  l'OData. Les erreurs du BO reviennent en texte (`isError`), le résultat en `structuredContent`.
+- **Authentification** : jeton porteur (OIDC) ou utilisateur de développement ; jamais le cookie de
+  session du navigateur (une page web pourrait sinon appeler les outils au nom de l'utilisateur).
+- **Tests** : `compiler/test/mcp.test.ts`, `runtime/test/mcp.test.ts` (protocole, lecture,
+  écriture avec messages, actions, création par composition).
+
+## D48 — Spaces et pages du launchpad
+
+- **Décision** : `launchpad.json` accepte `spaces` (titre, rôles) → `pages` → `sections` de tuiles,
+  comme le SAP Fiori launchpad en mode spaces. Un utilisateur voit les spaces de ses rôles en
+  onglets, les pages d'un space dans une liste ; le dernier space est mémorisé (stockage local du
+  navigateur) ; la recherche couvre tous les spaces. Un fichier avec `groups` seulement donne un
+  space d'une page. `groups` du modèle reste la liste de toutes les sections (intents, recherche).
+- **Tests** : `compiler/test/launchpad.test.ts`, `runtime/test/launchpad-ui.test.ts`.
+
+## D49 — Launchpad de développement et application de documentation
+
+- **Décision** : `rapt dev` sert à `/` un launchpad de développement : l'application (avec le
+  nombre d'instances de sa liste), la documentation de rap-transpiler, le `$metadata` et, avec
+  `rapt/mcp.json`, le serveur MCP. L'application et la documentation y affichent la barre shell.
+  La documentation est une application OpenUI5 (liste des pages, recherche, liens entre pages)
+  dont les pages sont rendues depuis le Markdown du dépôt à la construction (rendu propre, sans
+  dépendance) ; elle est copiée à côté du compilateur (`packages/compiler/docs`) pour que le rapt
+  empaqueté (npm, extension VS Code) l'ait aussi. Rien de cela n'est dans `rapt build` : c'est un
+  outil de développement.
+- **Tests** : `compiler/test/docs.test.ts`, `compiler/test/dev.test.ts`.
+
+## D50 — Déploiement hors de localhost
+
+- **Décision** : l'application et le launchpad générés se déploient tels quels partout où Node.js
+  22 ou un conteneur tourne. En plus du Dockerfile, ils ont un `manifest.yml` Cloud Foundry (SAP
+  BTP) et un `.cfignore`. Le runtime lit l'environnement de Cloud Foundry : `PUBLIC_URL` depuis la
+  route (`VCAP_APPLICATION`), `DATABASE_URL` et `DATABASE_CA` depuis un service PostgreSQL lié
+  (`VCAP_SERVICES`) ; une variable donnée explicitement l'emporte. `DATABASE_CA` donne le
+  certificat du serveur PostgreSQL (connexion TLS vérifiée). `rapt dev --host 0.0.0.0` ouvre le
+  serveur de développement au réseau. Guide : [DEPLOIEMENT.md](DEPLOIEMENT.md).
+- **Tests** : `runtime/test/platform.test.ts`, `compiler/test/app-scaffold.test.ts`.
+
+## D51 — UI : barre de filtres, variantes de l'utilisateur, rafraîchissement
+
+- **Barre de filtres** : les boutons *Go*, *Clear* et *Adapt Filters* sont alignés sur les champs.
+  Chaque filtre accepte des conditions comme SAP Fiori (`=x`, `!=x`, `>x`, `>=x`, `<x`, `<=x`,
+  `a...b`, `*x*`, `x*`, `*x` ; une valeur seule : « contient » pour un texte, « égal » sinon),
+  plusieurs par champ (jetons : valeurs incluses en OU, exclusions en ET) ; une suite de chiffres
+  (NUMC) se saisit sans ses zéros de tête ; dates en plage, date-heure par jours entiers (UTC).
+  *Adapt Filters* ajoute les colonnes de la liste comme filtres. Le résumé « Filtered By » s'affiche
+  quand l'en-tête est replié.
+- **Variantes** : `sap.m.VariantManagement` (OpenUI5) : filtres, filtres visibles, colonnes
+  visibles et tri (*paramètres du tableau*) enregistrés par utilisateur par le service
+  (`$variants?page=…`, table `rapt_ui_variant` créée au premier usage), variante par défaut,
+  favoris, renommage et suppression ; dans le stockage local du navigateur si le service ne les
+  garde pas.
+- **Rafraîchissement** : la liste se recharge quand on y revient après une modification
+  enregistrée sur une Object Page (suppression, sauvegarde, action) ; le titre du tableau donne le
+  nombre de lignes.
+- **Object Page** : fil d'Ariane vers la liste ; les modifications non enregistrées sont
+  abandonnées (avec confirmation) en quittant la page, et ne partent plus avec la sauvegarde
+  suivante.
+- **Tests** : `compiler/test/ui.test.ts` (conditions), `runtime/test/ui.test.ts` (dans le navigateur).

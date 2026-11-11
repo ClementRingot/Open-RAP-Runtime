@@ -109,7 +109,8 @@ Versions de référence : `@abaplint/core` 2.120.98, `@abaplint/transpiler` 2.14
 | Navigation entre applications depuis une application (CrossApplicationNavigation, liens d'intent dans une Object Page) | Non prévu : les intents s'ouvrent depuis le launchpad (`/#…`, `/go/…`). |
 | Paramètres d'intent transmis en query string, que l'UI générée n'exploite pas (pas d'ouverture directe d'une instance) | Écart. |
 | Application chargée en pleine page, pas dans un conteneur du shell | Assumé : une application par page ; la barre shell est affichée par l'application. |
-| Personnalisation (groupes et tuiles de l'utilisateur), spaces et pages, notifications, recherche d'entreprise | Non prévu. |
+| Personnalisation (groupes et tuiles de l'utilisateur), notifications, recherche d'entreprise | Non prévu. Les spaces et pages sont pris en charge (D48). |
+| Pages d'un space : liste déroulante au-dessus des sections | Assumé : SAP les montre dans le menu de l'onglet du space. |
 | Compteurs des tuiles lus au chargement seulement | Écart : pas d'intervalle de rafraîchissement. |
 | Session partagée : même `SESSION_SECRET` pour le launchpad et ses applications, pas de révocation avant l'expiration | Assumé : une même confiance, comme les sessions (D28). |
 | Applications derrière le launchpad en `AUTH_MODE=none` : leur utilisateur de développement, indépendant de celui du launchpad | Développement seulement. |
@@ -131,3 +132,33 @@ Versions de référence : `@abaplint/core` 2.120.98, `@abaplint/transpiler` 2.14
 | Traitement en arrière-plan (D41) | Les opérations restent en mémoire jusqu'à leur exécution : un processus pas encore exécuté quand l'application s'arrête ne l'est jamais (il reste `NEW`). Pas de reprise ni de nouvel essai d'un processus `ERRONEOUS`, pas de file par nom (`set_name` sert au suivi), pas de vérification de la phase transactionnelle d'appel (sur SAP, `save_for_execution` d'une opération contrôlée se fait en phase de sauvegarde). `if_bgmc_process_monitor` : états `NEW`, `SUCCESSFUL`, `ERRONEOUS` (noms propres à rap-transpiler). Un seul `COMMIT ENTITIES` par opération. |
 | E-mail (D41) | Envoyé après la validation de la LUW, sans nouvel essai ; `send( )` rend toujours l'état `W` (en attente). Pas de modèles d'e-mail (`cl_bcs_mail_message=>create_instance_by_template`), ni de signature, ni de chiffrement. |
 
+
+## Vues standards et value helps (D44)
+
+| Écart | Statut |
+|---|---|
+| Vues standards disponibles | `I_Currency`, `I_UnitOfMeasure`, `I_Country`, `I_Language` et leurs vues de textes. Les autres vues libérées (`I_Region`, `I_CalendarDate`, `I_ExchangeRate`…) ne sont pas fournies : CDS005. |
+| Données de référence | Textes en anglais seulement ; unités : une trentaine d'unités courantes (le contenu de SAP en compte bien plus) ; pas de décalage des décimales (`TCURX`) : `Decimals` est une information. |
+| Éléments des vues standards | Ceux d'usage courant ; les autres éléments des vues de SAP (et leurs associations) n'existent pas. |
+| Value help | Pas de `additionalBinding` (filtres et résultats supplémentaires), ni de `useForValidation`, ni de `Common.ValueListWithFixedValues` (liste déroulante). |
+
+## Mode enhanced (D45)
+
+| Écart | Statut |
+|---|---|
+| Contrôle des champs obligatoires | À la sauvegarde seulement (pas pendant la saisie) ; champs sous feature control dynamique (`fc-mandatory` d'instance) non contrôlés. |
+
+## MCP (D47)
+
+| Écart | Statut |
+|---|---|
+| Transport | HTTP, réponses JSON ; pas de flux SSE, ni de session MCP, ni de notifications du serveur. Pas de transport stdio (un client qui ne parle que stdio passe par un relais HTTP). |
+| Authentification | Jeton porteur ou utilisateur de développement ; pas d'autorisation OAuth intégrée au protocole MCP (découverte des métadonnées OAuth). |
+| Outils | Pas de ressources ni de prompts MCP ; `$expand` non proposé dans `_list`. |
+
+## Variantes de l'UI (D51)
+
+| Écart | Statut |
+|---|---|
+| Variantes partagées (publiques), variante appliquée automatiquement, contextes | Non pris en charge : variantes personnelles. |
+| Ordre des colonnes, groupement | Non pris en charge (visibilité et tri seulement). |

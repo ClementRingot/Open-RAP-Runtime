@@ -32,6 +32,7 @@ Le code de retour est 1 dès qu'il y a une erreur (ou un avertissement avec
 | CDS015 | erreur | Composition sans association to parent dans l'enfant |
 | CDS016 | erreur | Entité custom sans `@ObjectModel.query.implementedBy: 'ABAP:<classe>'` |
 | CDS017 | erreur | Classe de requête d'une entité custom absente des sources |
+| CDS018 | avertissement | Value help (`@Consumption.valueHelpDefinition`) sur une entité inconnue : value help omis |
 | DDIC001 | erreur | Élément de données inconnu |
 | DDIC002 | erreur | Type de données non pris en charge |
 | DDIC003 | erreur | Structure incluse non prise en charge |
@@ -47,7 +48,7 @@ Le code de retour est 1 dès qu'il y a une erreur (ou un avertissement avec
 | BDEF005 | erreur | Élément inconnu |
 | BDEF006 | erreur | Association inconnue |
 | BDEF007 | erreur | Table persistante inconnue |
-| BDEF027 | avertissement | BO managed avec unmanaged save sur une entité custom : propre à rap-transpiler, non activable sur SAP (D43) |
+| BDEF027 | erreur ou info | BO managed avec unmanaged save sur une entité custom : extension de rap-transpiler, non activable sur SAP (D43). Erreur en mode `standard`, info en mode `enhanced` (D45) |
 | BDEF008 | erreur | Mapping incohérent avec la vue CDS ou la table |
 | BDEF009 | erreur | Élément sans colonne correspondante |
 | BDEF010 | erreur | Type d'implémentation absent |
@@ -93,7 +94,12 @@ Le code de retour est 1 dès qu'il y a une erreur (ou un avertissement avec
 | LPD005 | erreur | Chemin de service sous un chemin du launchpad (`/ui`, `/apps`, `/auth`…), ou servi par deux applications |
 | LPD006 | erreur | Compteur sur un entity set inconnu du service, ou sur une tuile sans application |
 | LPD007 | avertissement | Rôle d'une tuile absent des `rapt/authorizations.json` des applications (l'IdP doit tout de même le donner) |
+| LPD008 | erreur | Space ou page mal formé dans `launchpad.json` (titre, pages, sections, rôles) (D48) |
 | SEED001 | erreur | `rapt/seed.json` illisible ou mal formé (objet table → tableau de lignes attendu) |
 | SEED002 | erreur | `rapt/seed.json` : table ou champ inconnu de l'application |
 | NR001 | erreur | `rapt/number-ranges.json` illisible ou mal formé : objet de plus de 10 caractères, intervalle de plus de 2 caractères, bornes non numériques ou inversées |
+| CFG001 | erreur | `rapt/config.json` illisible, ou mode inconnu (`standard` ou `enhanced`), dans le fichier ou `--mode` (D45) |
+| CFG002 | avertissement | Réglage inconnu dans `rapt/config.json`, ignoré |
+| MCP001 | erreur | `rapt/mcp.json` illisible ou mal formé (D47) |
+| MCP002 | avertissement | `rapt/mcp.json` décrit un outil que le service n'a plus : relancer `rapt mcp` |
 | APP001 | erreur | Paquets du runtime introuvables (`dist/` non construit) pour l'application générée : `--runtime <dossier>` ou `pnpm build` |

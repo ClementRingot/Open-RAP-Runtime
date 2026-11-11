@@ -351,6 +351,38 @@ function seed(n: Names): string {
   return `${JSON.stringify({ [n.table]: rows }, null, 2)}\n`;
 }
 
+/** AGENTS.md of a new project: how an AI agent works on a RAP project with rap-transpiler. */
+function agentsFile(n: Names): string {
+  return `# AGENTS.md
+
+This project is a SAP RAP business object (${n.description}) in abapGit format, run without an SAP
+system by rap-transpiler (\`rapt\`). The same sources are imported into SAP with abapGit.
+
+## Commands
+
+\`\`\`sh
+rapt check .            # diagnostics: file:line:column: severity CODE message (--json for tools)
+rapt dev .              # http://localhost:8080/: the app, rebuilt on every save (--json: events)
+rapt generate . <kind> <name> [--from X]   # a new object with the right file names (no kind: list)
+rapt abapgit .          # the abapGit XML files the sources lack
+rapt mcp .              # rapt/mcp.json: the MCP tools of the service, to describe
+\`\`\`
+
+## Rules
+
+- Write ABAP Cloud and CDS as in the ABAP Development Tools; RAP managed, without draft.
+- Run \`rapt check .\` after every change until there is no error; the codes are explained in
+  the documentation (tile *Documentation* of \`rapt dev\`, or docs/DIAGNOSTICS.md of rap-transpiler).
+- Keep \`rapt/config.json\` in mode \`standard\` when the BO must activate on SAP; \`enhanced\`
+  allows rap-transpiler extensions (mandatory fields checked automatically, managed BO on a
+  custom entity).
+- Objects: ${n.table} (table), ${n.root} (root view), ${n.projection} (projection and UI
+  annotations), ${n.pool.toUpperCase()} (behavior pool), ${n.service} (service).
+- \`rapt/\` holds the configuration of rap-transpiler (seed data, roles, number ranges, MCP); it is
+  not imported into SAP. Never edit \`.rapt/\` (build output).
+`;
+}
+
 /** Writes the sources of a new business object into the project `dir` (created if needed). */
 export function newBusinessObject(dir: string, entity: string, options: NewBoOptions = {}): NewBoResult {
   const root = path.resolve(dir);
@@ -376,6 +408,11 @@ export function newBusinessObject(dir: string, entity: string, options: NewBoOpt
   const seedFile = path.join(root, "rapt", "seed.json");
   if (!existsSync(seedFile)) {
     files.push([seedFile, seed(names)]);
+  }
+  // instructions for the AI agents working on the project
+  const agents = path.join(root, "AGENTS.md");
+  if (!existsSync(agents)) {
+    files.push([agents, agentsFile(names)]);
   }
   const existing = files.filter(([file]) => existsSync(file)).map(([file]) => path.relative(root, file));
   if (existing.length > 0) {
