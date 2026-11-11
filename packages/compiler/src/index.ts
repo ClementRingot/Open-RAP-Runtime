@@ -13,3 +13,4 @@ export { generateSql, quoteIdentifier, sqlType } from "./gen/sql.js";
 export { generateUi, buildUiLayout, type UiLayout } from "./gen/ui/index.js";
 export { generateLaunchpad, generateLaunchpadUi, type LaunchpadOptions, type LaunchpadResult } from "./gen/launchpad/index.js";
 export { resolveLaunchpad, type LaunchpadResolution, type ResolvedApp } from "./launchpad/config.js";
+export { DevSession, type DevOptions, type RebuildResult } from "./dev.js";
