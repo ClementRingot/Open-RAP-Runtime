@@ -87,6 +87,8 @@ export interface UiTable {
   orderby?: string;
   /** The rows open an object page. */
   navigable: boolean;
+  /** Entities of a draft BO (D54): changes are sent at once (draft). */
+  draft?: boolean;
 }
 
 export type UiSection =
@@ -131,6 +133,8 @@ export interface UiCard {
 
 export interface UiPage {
   set: string;
+  /** A draft BO (D54): Edit opens a draft, Save activates it, Cancel discards it. */
+  draft?: { root: boolean };
   /** The floorplan of the start page of a root entity set (D53). */
   floorplan: "listReport" | "worklist" | "analyticalListPage" | "formEntry";
   /** The charts of the entity (`@UI.chart`), for the Analytical List Page and the cards. */
@@ -351,6 +355,7 @@ class LayoutBuilder {
       insertable: navigation === undefined ? entitySet?.insertable === true : false,
       deletable: entitySet?.deletable === true,
       navigable: true,
+      ...(entitySet?.draft === undefined ? {} : { draft: true }),
     };
     if (navigation !== undefined) {
       table.navigation = navigation;
@@ -395,6 +400,7 @@ class LayoutBuilder {
       deletableDynamic: type.entityControl?.deletable === true,
       fields: Object.fromEntries(type.properties.map((p) => [p.name, this.field(type, entity, p.name) as UiField])),
       floorplan: this.model.ui?.floorplans?.[set] ?? "listReport",
+      ...(entitySet?.draft === undefined ? {} : { draft: entitySet.draft }),
       charts: this.charts(type, entity),
       selectionVariants: this.selectionVariants(entity),
     };

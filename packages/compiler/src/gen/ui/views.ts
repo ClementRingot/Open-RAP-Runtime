@@ -127,7 +127,8 @@ function placeholderOf(f: UiField): string {
 function listReport(page: UiPage): string {
   const list = page.list as NonNullable<UiPage["list"]>;
   const table = list.table;
-  const parameters = [`$count: true`, ...(table.orderby === undefined ? [] : [`$orderby: '${table.orderby}'`])];
+  // draft (D54): the active instances and the new drafts; an edited instance shows its marker
+  const parameters = [`$count: true`, ...(table.orderby === undefined ? [] : [`$orderby: '${table.orderby}'`]), ...(page.draft === undefined ? [] : [`$filter: 'IsActiveEntity eq true or HasActiveEntity eq false'`])];
   const filters = list.filterFields
     .map((f) => `<VBox id="filterItem_${idOf(f.property)}" class="raptFilterItem" width="12rem" visible="{= %{lr>/visible/${f.property}} === true }"><Label text="${esc(f.label)}" labelFor="filter_${idOf(f.property)}"/>${filterControl(f)}</VBox>`)
     .join("\n          ");
@@ -218,11 +219,13 @@ function listReport(page: UiPage): string {
         </headerToolbar>
         <columns>
             ${listColumns(table)}
+            ${page.draft === undefined ? "" : `<Column id="${esc(idOf(table.set))}Col_EditingStatus" width="8rem"><Text text="Editing Status"/></Column>`}
         </columns>
         <items>
           <ColumnListItem type="Navigation" press=".onItemPress">
             <cells>
               ${table.columns.map(display).join("\n              ")}
+              ${page.draft === undefined ? "" : `<ObjectMarker type="${esc("{= ${IsActiveEntity} ? 'Locked' : 'Draft' }")}" visible="${esc("{= !${IsActiveEntity} || ${HasDraftEntity} }")}"/>`}
             </cells>
           </ColumnListItem>
         </items>
@@ -309,7 +312,7 @@ function childTable(section: Extract<UiSection, { kind: "table" }>): string {
   const table = section.table;
   const id = `table_${idOf(section.id)}`;
   return `<Table id="${id}" growing="true" growingThreshold="20" mode="{= \${ui>/editMode} ? 'SingleSelectLeft' : 'None' }" selectionChange=".onChildSelectionChange"
-              items="{path: '${esc(table.navigation ?? "")}', parameters: {$$updateGroupId: 'changes'${table.orderby === undefined ? "" : `, $orderby: '${esc(table.orderby)}'`}}}">
+              items="{path: '${esc(table.navigation ?? "")}', parameters: {$$updateGroupId: '${table.draft === true ? "$auto" : "changes"}'${table.orderby === undefined ? "" : `, $orderby: '${esc(table.orderby)}'`}}}">
               <customData><core:CustomData key="set" value="${esc(table.set)}"/></customData>
               <headerToolbar>
                 <OverflowToolbar>
@@ -397,8 +400,9 @@ function objectPage(page: UiPage, layout: UiLayout): string {
       <OverflowToolbar>
         <Button id="messages" icon="sap-icon://message-popup" type="Negative" text="{= \${message>/}.length }" visible="{= \${message>/}.length > 0 }" press=".onMessages"/>
         <ToolbarSpacer/>
+        <ObjectStatus id="draftStatus" text="Draft" state="Information" icon="sap-icon://edit" visible="{ui>/draft}" class="sapUiSmallMarginBegin"/>
         <Button id="save" text="{= \${ui>/createMode} ? 'Create' : 'Save' }" type="Emphasized" press=".onSave"/>
-        <Button id="cancel" text="Cancel" press=".onCancel"/>
+        <Button id="cancel" text="{= \${ui>/draft} ? 'Discard Draft' : 'Cancel' }" press=".onCancel"/>
       </OverflowToolbar>
     </uxap:footer>
   </uxap:ObjectPageLayout>

@@ -184,7 +184,7 @@ export const COMPONENT = `sap.ui.define([
 
     init: function () {
       UIComponent.prototype.init.apply(this, arguments);
-      var oUi = new JSONModel({ editMode: false, createMode: false, busy: false, tableSelected: false, childSelected: false, permissions: {} });
+      var oUi = new JSONModel({ editMode: false, createMode: false, draft: false, busy: false, tableSelected: false, childSelected: false, permissions: {} });
       this.setModel(oUi, "ui");
       this.setModel(Messaging.getMessageModel(), "message");
       // the creations the user may perform (global authorization): Create is hidden otherwise
@@ -1231,7 +1231,9 @@ export const LIST_CONTROLLER = `sap.ui.define([
       var sKey = oEvent.getParameter("key");
       var oVariant = this._page().selectionVariants.find(function (v) { return v.key === sKey; });
       this._oLr.setProperty("/tab", sKey);
-      this.byId("table").getBinding("items").changeParameters({ $filter: oVariant && oVariant.filter ? oVariant.filter : undefined });
+      var sDraft = this._page().draft ? "IsActiveEntity eq true or HasActiveEntity eq false" : "";
+      var sFilter = [sDraft, oVariant && oVariant.filter ? oVariant.filter : ""].filter(Boolean).map(function (f) { return "(" + f + ")"; }).join(" and ");
+      this.byId("table").getBinding("items").changeParameters({ $filter: sFilter || undefined });
     },
 
     _loadTabCounts: function () {
@@ -1457,6 +1459,18 @@ export const LIST_CONTROLLER = `sap.ui.define([
 
     onCreate: function () {
       var oModel = this.getView().getModel();
+      var that = this;
+      if (this._page().draft) {
+        // draft (D54): a new draft at once, then its object page in edit mode
+        var oDraft = oModel.bindList("/" + this._sSet, undefined, undefined, undefined, { $$updateGroupId: "$auto" }).create({});
+        oDraft.created().then(function () {
+          that.getOwnerComponent().markStale();
+          that.getOwnerComponent().getRouter().navTo(that._sSet + "Object", { key: support.keyOf(oDraft.getPath()) });
+        }, function (oError) {
+          MessageBox.error(support.errorText(oError));
+        });
+        return;
+      }
       var oBinding = oModel.bindList("/" + this._sSet, undefined, undefined, undefined, { $$updateGroupId: "changes" });
       this.getOwnerComponent().setTransient(oBinding.create({}));
       this.getOwnerComponent().getRouter().navTo(this._sSet + "New");
@@ -1628,10 +1642,39 @@ export const OBJECT_CONTROLLER = `sap.ui.define([
       this.getView().getModel().resetChanges("changes");
       this._mode(false, false);
       Messaging.removeAllMessages();
+      var sKey = oEvent.getParameter("arguments").key;
+      // a draft (D54): edited at once, each change saved in the draft
+      var bDraft = /IsActiveEntity=false/.test(sKey);
+      this._ui().setProperty("/draft", bDraft);
       this.getView().bindElement({
-        path: "/" + this._sSet + "(" + oEvent.getParameter("arguments").key + ")",
-        parameters: { $$updateGroupId: "changes" }
+        path: "/" + this._sSet + "(" + sKey + ")",
+        parameters: { $$updateGroupId: bDraft ? "$auto" : "changes" }
       });
+      if (bDraft) {
+        // a new draft (no active instance) is a creation: its keys may still be entered
+        var that = this;
+        var sService = this.getOwnerComponent().getManifestEntry("/sap.app/dataSources/mainService/uri");
+        this._bHasActive = true;
+        fetch(sService + this._sSet + "(" + sKey + ")?$select=HasActiveEntity", { credentials: "same-origin", headers: { accept: "application/json" } })
+          .then(function (r) { return r.ok ? r.json() : { HasActiveEntity: true }; })
+          .then(function (oData) {
+            that._bHasActive = oData.HasActiveEntity !== false;
+            that._mode(true, !that._bHasActive);
+          }, function () {
+            that._mode(true, false);
+          });
+      }
+    },
+
+    /** Runs an action of the draft on the bound instance; resolves the context it returns. */
+    _draftAction: function (sName, oParameters) {
+      var oView = this.getView();
+      var oNamespace = oView.getModel("layout").getProperty("/namespace");
+      var oAction = oView.getModel().bindContext(oNamespace + "." + sName + "(...)", oView.getBindingContext(), { $$inheritExpandSelect: true });
+      Object.keys(oParameters || {}).forEach(function (sParameter) {
+        oAction.setParameter(sParameter, oParameters[sParameter]);
+      });
+      return oAction.invoke("$auto");
     },
 
     _onFormEntryMatched: function () {
@@ -1729,10 +1772,28 @@ export const OBJECT_CONTROLLER = `sap.ui.define([
 
     onEdit: function () {
       Messaging.removeAllMessages();
+      if (this._page().draft) {
+        // draft (D54): Edit opens the draft of the instance
+        var that = this;
+        this._ui().setProperty("/busy", true);
+        this._draftAction("Edit", { PreserveChanges: false }).then(function (oDraft) {
+          that._ui().setProperty("/busy", false);
+          that.getOwnerComponent().markStale();
+          that.getOwnerComponent().getRouter().navTo(that._sSet + "Object", { key: support.keyOf(oDraft.getPath()) }, true);
+        }, function (oError) {
+          that._ui().setProperty("/busy", false);
+          MessageBox.error(support.errorText(oError));
+        });
+        return;
+      }
       this._mode(true, false);
     },
 
     onSave: function () {
+      if (this._ui().getProperty("/draft")) {
+        this._activate();
+        return;
+      }
       var oView = this.getView();
       var oModel = oView.getModel();
       var oUi = this._ui();
@@ -1771,7 +1832,53 @@ export const OBJECT_CONTROLLER = `sap.ui.define([
       });
     },
 
+    /** Save of a draft: Activate, then the active instance (D54). */
+    _activate: function () {
+      var that = this;
+      var oUi = this._ui();
+      Messaging.removeAllMessages();
+      oUi.setProperty("/busy", true);
+      this.getView().getModel().submitBatch("$auto").then(function () {
+        return that._draftAction("Activate");
+      }).then(function (oActive) {
+        oUi.setProperty("/busy", false);
+        that.getOwnerComponent().markStale();
+        MessageToast.show(oUi.getProperty("/createMode") ? "Object created" : "Changes saved");
+        that.getOwnerComponent().getRouter().navTo(that._sSet + "Object", { key: support.keyOf(oActive.getPath()) }, true);
+      }, function (oError) {
+        oUi.setProperty("/busy", false);
+        MessageBox.error(support.errorText(oError));
+      });
+    },
+
     onCancel: function () {
+      if (this._ui().getProperty("/draft")) {
+        // draft (D54): Discard, back to the active instance (or the list)
+        var that = this;
+        var oContext = this.getView().getBindingContext();
+        MessageBox.confirm("Discard this draft?", {
+          onClose: function (sAction) {
+            if (sAction !== MessageBox.Action.OK) {
+              return;
+            }
+            var bHasActive = that._bHasActive;
+            var sActive = support.keyOf(oContext.getPath()).replace("IsActiveEntity=false", "IsActiveEntity=true");
+            // DELETE of the draft root discards the draft (D54)
+            oContext.delete("$auto").then(function () {
+              that.getOwnerComponent().markStale();
+              MessageToast.show("Draft discarded");
+              if (bHasActive) {
+                that.getOwnerComponent().getRouter().navTo(that._sSet + "Object", { key: sActive }, true);
+              } else {
+                that._back();
+              }
+            }, function (oError) {
+              MessageBox.error(support.errorText(oError));
+            });
+          }
+        });
+        return;
+      }
       var bCreate = this._ui().getProperty("/createMode");
       this.getView().getModel().resetChanges("changes");
       Messaging.removeAllMessages();
@@ -1837,7 +1944,7 @@ export const OBJECT_CONTROLLER = `sap.ui.define([
       var oTable = this.byId(oEvent.getSource().data("table"));
       var oItem = oTable.getSelectedItem();
       if (oItem) {
-        oItem.getBindingContext().delete("changes");
+        oItem.getBindingContext().delete(this._ui().getProperty("/draft") ? "$auto" : "changes");
         this._ui().setProperty("/childSelected", false);
       }
     },
