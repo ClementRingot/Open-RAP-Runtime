@@ -47,11 +47,16 @@ describe("rapt dev", () => {
     const { dev, base } = session(variant.dir, lines);
 
     expect((await dev.rebuild()).ok).toBe(true);
-    expect(lines).toContain(`rapt dev: ready at ${base}ui/index.html`);
+    expect(lines).toContain(`rapt dev: ready at ${base}`);
     expect(dev.outDir).toBe(path.join(variant.dir, ".rapt", "dev"));
     expect(lstatSync(path.join(dev.outDir, "node_modules")).isSymbolicLink()).toBe(true);
     expect(existsSync(path.join(dev.outDir, "vendor"))).toBe(false);
     expect((await fetch(`${base}ui/index.html`)).status).toBe(200);
+    // the development launchpad (D49): at /, with the documentation app and the shell bar config
+    expect((await fetch(base, { redirect: "manual" })).headers.get("location")).toBe("/home/index.html");
+    expect((await fetch(`${base}home/index.html`)).status).toBe(200);
+    expect((await fetch(`${base}docs/pages.json`)).status).toBe(200);
+    expect(((await (await fetch(`${base}launchpad/config`)).json()) as { spaces: unknown[] }).spaces).toHaveLength(1);
     // the behavior pool runs (determination setStatusOpen)
     expect((await createTravel(base, TRAVEL))["OverallStatus"]).toBe("O");
 
@@ -109,7 +114,7 @@ describe("rapt dev", () => {
     cleanups.push(() => dev.close());
     expect((await dev.rebuild()).ok).toBe(true);
     expect(events.map((e) => e.type)).toEqual(["building", "diagnostics", "ready"]);
-    expect(events[2]).toEqual({ type: "ready", url: `http://localhost:${port}/ui/index.html` });
+    expect(events[2]).toEqual({ type: "ready", url: `http://localhost:${port}/` });
   });
 
   it("finds the dependencies of the runtime, in a pnpm workspace or installed flat", () => {

@@ -77,7 +77,7 @@ describe("rapt from the extension", () => {
     const port = 20000 + Math.floor(Math.random() * 20000);
     const dev = new DevProcess(resolveCli({ workspaceFolders: [REPO], execPath: process.execPath, nodePath: process.execPath }), dir, port, (e) => events.push(e), () => undefined);
     cleanups.push(() => dev.stop());
-    await expect.poll(() => events.find((e) => e.type === "ready"), { timeout: 60_000, interval: 200 }).toEqual({ type: "ready", url: `http://localhost:${port}/ui/index.html` });
+    await expect.poll(() => events.find((e) => e.type === "ready"), { timeout: 60_000, interval: 200 }).toEqual({ type: "ready", url: `http://localhost:${port}/` });
     expect((await fetch(`http://localhost:${port}/ui/index.html`)).status).toBe(200);
     await dev.stop();
     expect(dev.running).toBe(false);

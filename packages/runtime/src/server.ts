@@ -16,7 +16,8 @@ import { existsSync, readFileSync } from "node:fs";
 import path from "node:path";
 import type { FastifyInstance } from "fastify";
 import { PGliteDialect, sql } from "kysely";
-import type { McpToolsModel, Model } from "@rap-transpiler/model";
+import type { LaunchpadModel, McpToolsModel, Model } from "@rap-transpiler/model";
+import { registerDevLaunchpad } from "./launchpad/dev.js";
 import { createApp } from "./app.js";
 import { authFromEnvironment } from "./auth/environment.js";
 import { Authorizations, rolesFromJson } from "./auth/authorizations.js";
@@ -90,6 +91,9 @@ export async function start(options: StartOptions): Promise<RunningServer> {
   }
   const uiDir = path.join(dir, "ui");
   // the MCP server (D47): mcp/tools.json, written when the sources have rapt/mcp.json
+  // the development launchpad of rapt dev (D49): home/launchpad.json of the development build
+  const devFile = path.join(dir, "home", "launchpad.json");
+  const devLaunchpad = existsSync(devFile) && env["DEV_LAUNCHPAD"] !== "off" ? (JSON.parse(readFileSync(devFile, "utf8")) as LaunchpadModel) : undefined;
   const mcpFile = path.join(dir, "mcp", "tools.json");
   const mcp = existsSync(mcpFile) && env["MCP"] !== "off" ? (JSON.parse(readFileSync(mcpFile, "utf8")) as McpToolsModel) : undefined;
   const app = await createApp({
@@ -101,7 +105,8 @@ export async function start(options: StartOptions): Promise<RunningServer> {
     ...(rap === undefined ? {} : { rap }),
     authorizations,
     ...(env["SESSION_SECRET"] === undefined ? {} : { csrfSecret: env["SESSION_SECRET"] }),
-    ...(existsSync(uiDir) && env["UI"] !== "off" ? { ui: { dir: uiDir, resourcesFrom: dir } } : {}),
+    ...(existsSync(uiDir) && env["UI"] !== "off" ? { ui: { dir: uiDir, resourcesFrom: dir, ...(devLaunchpad === undefined ? {} : { home: "/home/index.html" }) } } : {}),
+    ...(devLaunchpad === undefined ? {} : { extend: (instance, services) => registerDevLaunchpad(instance, { dir, config: devLaunchpad, authenticator: services.authenticator }) }),
     ...(mcp === undefined ? {} : { mcp }),
   });
   let url = publicUrl;

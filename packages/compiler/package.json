@@ -15,12 +15,16 @@
   "bin": {
     "rapt": "./dist/cli.js"
   },
-  "files": ["dist", "framework"],
+  "files": [
+    "dist",
+    "framework",
+    "docs"
+  ],
   "engines": {
     "node": ">=22"
   },
   "scripts": {
-    "build": "tsc -p tsconfig.build.json"
+    "build": "tsc -p tsconfig.build.json && node scripts/copy-docs.mjs"
   },
   "dependencies": {
     "@abaplint/core": "2.120.98",

@@ -13,6 +13,8 @@ export interface UiOptions {
   dir: string;
   /** A folder whose node_modules hold the OpenUI5 packages (default: the parent of `dir`). */
   resourcesFrom?: string;
+  /** Where `/` leads (default: the application, `/ui/index.html`). */
+  home?: string;
 }
 
 const TYPES: Record<string, string> = {
@@ -55,5 +57,5 @@ export async function registerUi(app: FastifyInstance, options: UiOptions): Prom
   });
 
   app.get("/ui", async (_request, reply) => reply.redirect("/ui/index.html"));
-  app.get("/", async (_request, reply) => reply.redirect("/ui/index.html"));
+  app.get("/", async (_request, reply) => reply.redirect(options.home ?? "/ui/index.html"));
 }

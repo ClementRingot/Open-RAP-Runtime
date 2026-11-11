@@ -16,6 +16,10 @@ import { generateApplication, writeFiles, type GenerateOptions } from "./build.j
 import { countDiagnostics, formatDiagnostic, type Diagnostic, type Diagnostics } from "./diagnostics.js";
 import { packageDir } from "./gen/vendor.js";
 import { loadProject } from "./input/project.js";
+import { generateDocsApp } from "./gen/docs/index.js";
+import { generateLaunchpadUi } from "./gen/launchpad/index.js";
+import { buildUiLayout } from "./gen/ui/index.js";
+import type { LaunchpadModel, LaunchpadTile, Model } from "@rap-transpiler/model";
 
 export interface DevOptions extends Omit<GenerateOptions, "scaffold" | "transpile"> {
   /** Folder of the development build (default: `<src>/.rapt/dev`). */
@@ -78,7 +82,7 @@ export interface RebuildResult {
 }
 
 /** Folders written by a build; the others (data/, node_modules) are kept between builds. */
-const GENERATED = ["model", "db", "odata", "abap", "ui"];
+const GENERATED = ["model", "db", "odata", "abap", "ui", "mcp", "home", "docs"];
 const READY = "rapt-dev-ready";
 const SCHEMA_STAMP = ".schema.sql";
 
@@ -111,9 +115,9 @@ export class DevSession {
     this.runtimeDir = packageDir("@rap-transpiler/runtime", "runtime", options.runtimeDir);
   }
 
-  /** The URL of the generated UI. */
+  /** The URL of the development launchpad (the application, the documentation). */
   public get uiUrl(): string {
-    return `http://localhost:${this.port}/ui/index.html`;
+    return `http://localhost:${this.port}/`;
   }
 
   /** Builds the application; on success, (re)starts the server. A failed build keeps the running server. */
@@ -143,6 +147,12 @@ export class DevSession {
       rmSync(path.join(this.outDir, folder), { recursive: true, force: true });
     }
     writeFiles(this.outDir, files);
+    if (result.model !== undefined) {
+      // the development launchpad and the documentation app (D49)
+      const launchpad = devLaunchpadModel(result.model, files.some((f) => f.path === "mcp/tools.json"));
+      writeFiles(path.join(this.outDir, "home"), [...generateLaunchpadUi(launchpad), { path: "launchpad.json", content: `${JSON.stringify(launchpad, null, 2)}\n` }]);
+      writeFiles(path.join(this.outDir, "docs"), generateDocsApp());
+    }
     this.linkNodeModules(runtimeNodeModules);
     writeFileSync(path.join(this.outDir, "dev-server.mjs"), devServer(pathToFileURL(path.join(this.runtimeDir!, "dist", "index.js")).href));
     this.resetDatabaseOnSchemaChange();
@@ -366,6 +376,41 @@ export class DevSession {
     await exited;
     clearTimeout(timeout);
   }
+}
+
+/**
+ * The development launchpad (D49): the application (with the number of instances of its list),
+ * the documentation of rap-transpiler, the $metadata of the service and, with rapt/mcp.json, the
+ * MCP server.
+ */
+export function devLaunchpadModel(model: Model, mcp: boolean): LaunchpadModel {
+  const layout = buildUiLayout(model);
+  const tile = (t: Omit<LaunchpadTile, "external" | "roles"> & { external?: boolean }): LaunchpadTile => ({ external: false, roles: [], ...t });
+  const application = tile({
+    id: "app",
+    title: layout.title,
+    subtitle: model.service.name,
+    icon: "sap-icon://product",
+    target: "/ui/index.html",
+    ...(layout.start === "" ? {} : { count: `${model.service.path}${layout.start}/$count` }),
+  });
+  const tools = [
+    tile({ id: "docs", title: "Documentation", subtitle: "rap-transpiler", icon: "sap-icon://learning-assistant", target: "/docs/index.html" }),
+    tile({ id: "metadata", title: "Service metadata", subtitle: "OData V4 $metadata", icon: "sap-icon://source-code", target: `${model.service.path}$metadata`, external: true }),
+    ...(mcp ? [tile({ id: "mcp", title: "MCP server", subtitle: "Tools for AI agents", info: "/mcp", icon: "sap-icon://da", target: "/docs/index.html#/page/mcp" })] : []),
+  ];
+  const sections = [
+    { title: "Application", tiles: [application] },
+    { title: "Development tools", tiles: tools },
+  ];
+  return {
+    title: `${layout.title} – rapt dev`,
+    apps: [],
+    groups: sections,
+    spaces: [{ id: "dev", title: "Development", roles: [], pages: [{ id: "dev", title: "Development", sections }] }],
+    claims: [],
+    roles: [],
+  };
 }
 
 /**
