@@ -7,12 +7,12 @@
 
 import { randomUUID } from "node:crypto";
 import { sql, type Kysely } from "kysely";
-import { abapName, derivedType, same, type ActionModel, type DeterminationModel, type FieldModel, type HandlerRef, type TriggerModel, type ValidationModel } from "@rap-transpiler/model";
+import { abapName, derivedType, same, type ActionModel, type DeterminationModel, type EntityModel, type FieldModel, type HandlerRef, type TriggerModel, type ValidationModel } from "@rap-transpiler/model";
 import type { AbapBridge } from "../abap/bridge.js";
 import { appendRow, component, isFlagOn, rowsOf, setFlag, type AbapData } from "../abap/convert.js";
 import type { User } from "../auth/user.js";
 import { withSavepoint } from "../db/database.js";
-import { fromSql, initialValue, isInitial, toSql } from "../values.js";
+import { fromSql, initialValue, isInitial, toSql, type CanonicalValue } from "../values.js";
 import { keyOf, keyString, type BoAssociation, type BoEntity, type BoModel } from "./bo.js";
 import { RapRuntimeError, Responses, type AccessMode, type FailCause, type FailedOperation, type Row } from "./types.js";
 
@@ -82,6 +82,8 @@ interface ChangeEvent {
 export interface TransactionServices {
   bo: BoModel;
   bridge: AbapBridge;
+  /** Reads the instances of a custom entity through its query class (D43): rows by element. */
+  customRead?: (entity: EntityModel, equalities: Array<{ name: string; value: CanonicalValue }>) => Promise<Row[]>;
   /** Time stamps of the administrative fields: ISO UTC with microseconds, strictly increasing. */
   now(): string;
 }
@@ -130,7 +132,19 @@ export class Transaction {
     return `${bo.entity.name.toUpperCase()}|${keyString(bo, key)}`;
   }
 
+  /** The instances of a custom entity meeting equalities, read by its query class (D43). */
+  private async readCustom(bo: BoEntity, equalities: Array<{ name: string; value: CanonicalValue }>): Promise<Row[]> {
+    if (this.services.customRead === undefined) {
+      throw new RapRuntimeError(`${bo.entity.name}: custom entities need their query class`);
+    }
+    const rows = await this.services.customRead(bo.entity, equalities);
+    return rows.map((record) => Object.fromEntries(bo.fields.map((f) => [f.name, record[f.name] ?? initialValue(f.type)])) as Row);
+  }
+
   private async load(bo: BoEntity, key: Row): Promise<Row | undefined> {
+    if (bo.entity.kind === "custom") {
+      return (await this.readCustom(bo, bo.keys.map((k) => ({ name: k.name, value: (key[k.name] ?? null) as CanonicalValue }))))[0];
+    }
     const conditions = bo.keys.map((k) => sql`${sql.id(bo.columns.get(k.name) ?? abapName(k.name))} = ${toSql(k.type, key[k.name] ?? null)}`);
     const result = await sql<Record<string, unknown>>`SELECT * FROM ${sql.id(bo.table.name)} WHERE ${sql.join(conditions, sql` AND `)}`.execute(this.db);
     const record = result.rows[0];
@@ -191,11 +205,17 @@ export class Transaction {
       const field = target.fields.find((f) => same(f.name, pair.target)) as FieldModel;
       return { field, value: source[bo.fields.find((f) => same(f.name, pair.source))?.name ?? pair.source] ?? null };
     });
-    const sqlConditions = conditions.map(({ field, value }) => sql`${sql.id(target.columns.get(field.name) ?? abapName(field.name))} = ${toSql(field.type, value)}`);
-    const result = await sql<Record<string, unknown>>`SELECT * FROM ${sql.id(target.table.name)} WHERE ${sql.join(sqlConditions, sql` AND `)}`.execute(this.db);
+    const read =
+      target.entity.kind === "custom"
+        ? await this.readCustom(target, conditions.map(({ field, value }) => ({ name: field.name, value: value as CanonicalValue })))
+        : (
+            await sql<Record<string, unknown>>`SELECT * FROM ${sql.id(target.table.name)} WHERE ${sql.join(
+              conditions.map(({ field, value }) => sql`${sql.id(target.columns.get(field.name) ?? abapName(field.name))} = ${toSql(field.type, value)}`),
+              sql` AND `,
+            )}`.execute(this.db)
+          ).rows.map((record) => this.fromRecord(target, record));
     const rows = new Map<string, Row>();
-    for (const record of result.rows) {
-      const row = this.fromRecord(target, record);
+    for (const row of read) {
       const id = this.id(target, row);
       const buffered = this.instances.get(id);
       if (buffered === undefined) {
@@ -260,6 +280,11 @@ export class Transaction {
     }
     const buffered = this.instances.get(id);
     if (buffered !== undefined && buffered.persisted === undefined) {
+      this.locked.add(id);
+      return true;
+    }
+    if (master.entity.kind === "custom") {
+      // instances of an API: no database lock, the LUWs of the application are serialized (D43)
       this.locked.add(id);
       return true;
     }

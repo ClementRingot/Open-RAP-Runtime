@@ -822,3 +822,35 @@ et la conséquence. Les numéros D1 à D13 correspondent aux points 1 à 13 du �
   fixture à l'identique ; `rapt new` produit un BO qui compile sans diagnostic) et
   `runtime/test/seed.test.ts`.
 
+## D43 — Entités custom (unmanaged query) et BO managed sur une entité custom
+
+- **Contexte** : les données d'un BO viennent parfois d'API, pas de tables. ABAP Cloud les expose
+  avec une entité custom (`define custom entity`) dont une classe de requête
+  (`@ObjectModel.query.implementedBy: 'ABAP:<classe>'`, interface `if_rap_query_provider`) fournit
+  les lignes.
+- **Décision** :
+  - **Entité custom** (activable sur SAP) : le modèle la garde sans vue SQL, avec sa classe de
+    requête, ses éléments typés et ses associations (`_X : association … to … on …`). Les lectures
+    OData (collection, instance, navigation, `$count`, `$expand` d'un niveau, vers ou depuis une
+    entité custom) appellent `select` avec la requête d'ABAP Cloud : filtre en chaîne ABAP SQL
+    (`get_as_sql_string`) et en plages (`get_as_ranges`, `cx_rap_query_filter_no_range` quand le
+    filtre ne s'y prête pas), tri, pagination (`get_paging`), éléments demandés,
+    `is_total_numb_of_rec_requested`, `is_data_requested`, recherche. `set_data` et
+    `set_total_number_of_records` rendent le résultat au runtime (kernel `zrap_eml=>query_data`,
+    `query_total`). Comme dans SAP, la classe applique elle-même filtre, tri et pagination ; le
+    runtime garantit seulement les clés et les conditions de navigation (lignes en trop
+    écartées) et coupe la page à `$top`. Les interfaces et classes de la requête sont écrites
+    d'après leurs signatures publiques (D24).
+  - **BO managed with unmanaged save sur une entité custom** (propre à rap-transpiler,
+    avertissement BDEF027) : le runtime RAP lit les instances (READ ENTITIES, contrôle de
+    l'existence, ETag, associations) par la classe de requête, avec un filtre sur les clés, dans
+    la LUW en cours ; `save_modified` écrit les changements vers l'API. Pas de verrou en base : les
+    LUW de l'application sont sérialisées. Sur SAP, le même besoin se traite par un BO unmanaged.
+- **Pourquoi** : c'est la manière d'ABAP Cloud de lire une API ; le BO managed sur l'entité custom
+  évite d'écrire à la main le buffer transactionnel d'un BO unmanaged, au prix d'un écart
+  assumé et signalé.
+- **Tests** : fixture `fixtures/custom-entity` (produits lus depuis une « API » simulée par une
+  table, avis en constantes) ; `runtime/test/custom-entity.test.ts` (plages, tri, pagination,
+  compte, navigation, `$expand`, filtre refusé, création, doublon, validation, modification,
+  suppression) et `compiler/test/custom-entity.test.ts`.
+

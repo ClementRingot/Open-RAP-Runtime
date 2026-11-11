@@ -17,7 +17,7 @@ import { Authorizations } from "../auth/authorizations.js";
 import type { User } from "../auth/user.js";
 import { BoModel } from "./bo.js";
 import { installKernel } from "./kernel.js";
-import { Transaction } from "./transaction.js";
+import { Transaction, type TransactionServices } from "./transaction.js";
 import { Responses, type AccessMode } from "./types.js";
 
 /** An EML statement being executed (between ZRAP_EML=>begin and =>end). */
@@ -58,6 +58,8 @@ export class RapRuntime {
   private readonly storage = new AsyncLocalStorage<LuwContext>();
   private tail: Promise<unknown> = Promise.resolve();
   private lastMicros = 0n;
+  /** Reads the instances of custom entities (D43), set by the OData reads of the application. */
+  public customRead?: TransactionServices["customRead"];
   /** Work started after commits that has not ended yet (see idle). */
   private readonly pending = new Set<Promise<void>>();
 
@@ -86,6 +88,11 @@ export class RapRuntime {
     });
     abap.MSAG = model.messageClasses;
     return runtime;
+  }
+
+  /** Whether the caller runs in a LUW (ABAP code, the RAP runtime). */
+  public inLuw(): boolean {
+    return this.storage.getStore() !== undefined;
   }
 
   /** The LUW of the running ABAP code. */
@@ -117,7 +124,11 @@ export class RapRuntime {
     const afterCommit: AfterCommit[] = [];
     const run = async (): Promise<T> =>
       db.transaction().execute(async (trx) => {
-        const tx = new Transaction({ bo: this.bo, bridge: this.bridge, now: () => this.now() }, trx as unknown as Kysely<unknown>, user);
+        const services: TransactionServices = { bo: this.bo, bridge: this.bridge, now: () => this.now() };
+        if (this.customRead !== undefined) {
+          services.customRead = this.customRead;
+        }
+        const tx = new Transaction(services, trx as unknown as Kysely<unknown>, user);
         if (options.background !== undefined && !options.background.controlled) {
           // a transactionally uncontrolled operation may write the database at any time
           tx.inSaver = true;

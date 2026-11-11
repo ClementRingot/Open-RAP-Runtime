@@ -30,6 +30,8 @@ Le code de retour est 1 dès qu'il y a une erreur (ou un avertissement avec
 | CDS013 | erreur | La projection n'expose pas les champs nécessaires à une association |
 | CDS014 | erreur | Type inconnu dans une entité abstraite |
 | CDS015 | erreur | Composition sans association to parent dans l'enfant |
+| CDS016 | erreur | Entité custom sans `@ObjectModel.query.implementedBy: 'ABAP:<classe>'` |
+| CDS017 | erreur | Classe de requête d'une entité custom absente des sources |
 | DDIC001 | erreur | Élément de données inconnu |
 | DDIC002 | erreur | Type de données non pris en charge |
 | DDIC003 | erreur | Structure incluse non prise en charge |
@@ -45,6 +47,7 @@ Le code de retour est 1 dès qu'il y a une erreur (ou un avertissement avec
 | BDEF005 | erreur | Élément inconnu |
 | BDEF006 | erreur | Association inconnue |
 | BDEF007 | erreur | Table persistante inconnue |
+| BDEF027 | avertissement | BO managed avec unmanaged save sur une entité custom : propre à rap-transpiler, non activable sur SAP (D43) |
 | BDEF008 | erreur | Mapping incohérent avec la vue CDS ou la table |
 | BDEF009 | erreur | Élément sans colonne correspondante |
 | BDEF010 | erreur | Type d'implémentation absent |

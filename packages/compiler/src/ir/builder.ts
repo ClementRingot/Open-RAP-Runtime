@@ -163,6 +163,16 @@ export function buildModel(project: Project, options: BuildOptions = {}): BuildR
     }
     checkAuthorityChecks(registry, project, authorizations, diagnostics);
   }
+  // query classes of the custom entities (D43)
+  const queryClasses = [...required.values()].filter((e) => e.kind === "custom" && e.queryClass !== undefined);
+  for (const entity of queryClasses) {
+    if (!project.files.some((f) => f.type === "CLAS" && f.name === entity.queryClass)) {
+      diagnostics.error("CDS017", `${entity.name}: query class ${entity.queryClass ?? ""} not found in the sources`, entity.src);
+    }
+  }
+  if (queryClasses.length > 0) {
+    syntaxCheck(project, abaplintRegistry(project), queryClasses.map((e) => e.queryClass ?? ""), diagnostics);
+  }
 
   // --------------------------------------------------------------------------- tables, texts
   const tables = new Map<string, TableModel>();

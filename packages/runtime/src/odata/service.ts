@@ -41,7 +41,8 @@ export class ServiceRuntime {
     for (const set of this.odata.entitySets) {
       const type = this.odata.entityTypes.find((t) => t.name === set.entityType);
       const entity = findEntity(model, set.entity);
-      if (type === undefined || entity === undefined || entity.sqlView === undefined) {
+      // custom entities have no SQL view: their query class reads them (D43)
+      if (type === undefined || entity === undefined || (entity.sqlView === undefined && entity.kind !== "custom")) {
         continue;
       }
       const properties = new Map<string, { property: ODataProperty; field: FieldModel }>();
@@ -55,7 +56,7 @@ export class ServiceRuntime {
         type,
         set,
         entity,
-        view: entity.sqlView,
+        view: entity.sqlView ?? "",
         properties,
         navigations: new Map(type.navigations.map((n) => [n.name, n])),
       };

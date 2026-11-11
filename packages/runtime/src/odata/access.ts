@@ -15,6 +15,11 @@ import { toSql, type CanonicalValue } from "../values.js";
 
 const reader = new AsyncLocalStorage<User>();
 
+/** The user of the running read, if any. */
+export function currentReader(): User | undefined {
+  return reader.getStore();
+}
+
 /** Runs `fn` with the user whose access controls apply to the reads. */
 export function withReader<T>(user: User, fn: () => Promise<T>): Promise<T> {
   return reader.run(user, fn);

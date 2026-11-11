@@ -173,6 +173,8 @@ ajoutent ce que la fixture n'utilise pas : numérotation, feature control global
 | Associations vers des entités sans BO (entity sets en lecture seule) | ✅ | Entités exposées sans comportement : lecture seule. |
 | Métadonnées d'extension (DDLX) et fusion des annotations | ✅ | |
 | Entités abstraites (paramètres et résultats d'actions et de fonctions) | ✅ | |
+| Entités custom (`define custom entity`, `@ObjectModel.query.implementedBy`, `if_rap_query_provider`) | ✅ | Lectures OData par la classe de requête : plages et chaîne SQL du filtre, tri, pagination, compte, navigation, `$expand` (D43). |
+| BO `managed with unmanaged save` sur une entité custom | ✅ | Propre à rap-transpiler (BDEF027) : instances lues par la classe de requête, écrites par `save_modified` vers l'API (D43). |
 | Expressions CDS (CASE, CAST, calculs, littéraux) | ❌ | Prévu après le MVP. |
 | Contrôle d'accès DCL (`define role … grant select on … where …`) | ✅ | Lectures OData filtrées pour l'utilisateur : `aspect pfcg_auth` (filtres `ACTVT = '03'`, n-uplets), `aspect user`, `?=`, comparaisons, `like`, `is [not] null`, `and`/`or`/`not`, chemins `_Assoc.Element` (to-one), `inheriting conditions from entity` (D35). Tests `rap-authorizations.test.ts`, `dcl.test.ts`. |
 | Side effects (`side effects { … }`) | ✅ | `Common.SideEffects` dans le `$metadata` ; l'UI générée ne les exploite pas encore (rechargement de l'objet après sauvegarde). |

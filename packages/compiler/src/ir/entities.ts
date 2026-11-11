@@ -123,6 +123,9 @@ export class EntityResolver {
       case "abstract":
         entity = this.abstract(parsed);
         break;
+      case "custom":
+        entity = this.custom(parsed);
+        break;
       default:
         this.diagnostics.error("CDS002", `${parsed.ast.name}: ${parsed.ast.statement} is not supported`, { file: parsed.file.path, ...parsed.ast.loc });
     }
@@ -297,7 +300,18 @@ export class EntityResolver {
       annotations: this.entityAnnotations(parsed),
       src: this.loc(file, ast.loc),
     };
-    entity.associations = ast.associations.map((a) => {
+    entity.associations = this.associationsOf(parsed, entity);
+    if (fields.filter((f) => f.key).length === 0) {
+      this.diagnostics.error("CDS011", `${ast.name}: no key element`, this.loc(file, ast.loc));
+    }
+    this.checkExtensionElements(parsed, entity);
+    return entity;
+  }
+
+  /** The associations of a view or custom entity, ON conditions resolved. */
+  private associationsOf(parsed: ParsedEntity, entity: EntityModel): AssociationModel[] {
+    const { ast, file } = parsed;
+    return ast.associations.map((a) => {
       const association: AssociationModel = {
         name: a.alias,
         target: this.ast(a.target)?.ast.name ?? a.target,
@@ -323,11 +337,6 @@ export class EntityResolver {
       }
       return association;
     });
-    if (fields.filter((f) => f.key).length === 0) {
-      this.diagnostics.error("CDS011", `${ast.name}: no key element`, this.loc(file, ast.loc));
-    }
-    this.checkExtensionElements(parsed, entity);
-    return entity;
   }
 
   private addDataElementLabels(fields: FieldModel[], _table: string): void {
@@ -489,6 +498,42 @@ export class EntityResolver {
 
   // -------------------------------------------------------------------------------------------
   // abstract entities (action parameters)
+
+  /** A custom entity: typed elements, read by the class of `@ObjectModel.query.implementedBy` (D43). */
+  private custom(parsed: ParsedEntity): EntityModel | undefined {
+    const { ast, file } = parsed;
+    const fields: FieldModel[] = [];
+    for (const element of ast.elements) {
+      const declared = element.declaredType ?? "";
+      const type = parseBuiltInType(declared) ?? this.dictionary.dataElement(declared)?.type;
+      if (type === undefined) {
+        this.diagnostics.error("CDS014", `${ast.name}.${element.name}: unknown type ${declared}`, this.loc(file, element.loc));
+        continue;
+      }
+      fields.push(this.fieldFromElement(parsed, element, type, undefined));
+    }
+    const implementedBy = getAnnotation(ast.annotations, "ObjectModel.query.implementedBy");
+    const entity: EntityModel = {
+      name: ast.name,
+      kind: "custom",
+      root: ast.root,
+      fields,
+      associations: [],
+      annotations: this.entityAnnotations(parsed),
+      src: this.loc(file, ast.loc),
+    };
+    if (typeof implementedBy === "string" && /^ABAP:\s*\S+$/i.test(implementedBy)) {
+      entity.queryClass = implementedBy.replace(/^ABAP:\s*/i, "").toUpperCase();
+    } else {
+      this.diagnostics.error("CDS016", `${ast.name}: a custom entity needs @ObjectModel.query.implementedBy: 'ABAP:<query class>'`, this.loc(file, ast.loc));
+    }
+    entity.associations = this.associationsOf(parsed, entity);
+    if (fields.filter((f) => f.key).length === 0) {
+      this.diagnostics.error("CDS011", `${ast.name}: no key element`, this.loc(file, ast.loc));
+    }
+    this.checkExtensionElements(parsed, entity);
+    return entity;
+  }
 
   private abstract(parsed: ParsedEntity): EntityModel | undefined {
     const { ast, file } = parsed;

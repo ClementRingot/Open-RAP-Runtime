@@ -14,6 +14,7 @@ import type { Project, SourceFile } from "../../input/project.js";
 import { abaplintRegistry } from "../../ir/handlers.js";
 import { generateDerivedTypes } from "./derived-types.js";
 import { FRAMEWORK_SOURCES } from "./framework.js";
+import { QUERY_FRAMEWORK_SOURCES } from "./framework-query.js";
 import { frameworkClosure, frameworkObjectName } from "./framework-utils.js";
 import { BdefCatalog, findModelProviders, findSaverClasses, poolBdefOf, rewriteAbapFile } from "./rewrite.js";
 import { frameworkDictionary, shadowEntity, shadowTable } from "./shadow.js";
@@ -48,7 +49,11 @@ function objectsToRewrite(project: Project, model: Model, registry: abaplint.Reg
   for (const key of candidates.keys()) {
     names.set(key.slice(5).toLowerCase(), key);
   }
-  const pools = model.behaviors.flatMap((b) => [b.implementationClass, ...b.entities.map((e) => e.implementationClass)]).filter((c): c is string => c !== undefined);
+  const pools = [
+    ...model.behaviors.flatMap((b) => [b.implementationClass, ...b.entities.map((e) => e.implementationClass)]),
+    // the query classes of the custom entities (D43)
+    ...model.entities.map((e) => e.queryClass),
+  ].filter((c): c is string => c !== undefined);
   const wanted = new Set<string>(pools.map((p) => `CLAS:${p.toUpperCase()}`).filter((k) => candidates.has(k)));
   const queue = [...wanted];
   while (queue.length > 0) {
@@ -96,7 +101,12 @@ export function abapSources(project: Project, model: Model, diagnostics: Diagnos
   for (const table of model.tables) {
     projectObjects.add(`TABL:${table.name.toUpperCase()}`);
   }
-  for (const entity of model.entities.filter((e) => (e.sqlView !== undefined || e.kind === "abstract") && !projectObjects.has(`TABL:${e.name.toUpperCase()}`))) {
+  if (model.entities.some((e) => e.kind === "custom")) {
+    for (const source of QUERY_FRAMEWORK_SOURCES) {
+      sources.push({ fileName: source.fileName, content: source.source });
+    }
+  }
+  for (const entity of model.entities.filter((e) => (e.sqlView !== undefined || e.kind === "abstract" || e.kind === "custom") && !projectObjects.has(`TABL:${e.name.toUpperCase()}`))) {
     const shadow = shadowEntity(entity);
     sources.push({ fileName: shadow.fileName, content: shadow.content });
     projectObjects.add(`TABL:${entity.name.toUpperCase()}`);

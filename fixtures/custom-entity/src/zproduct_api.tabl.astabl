@@ -1,0 +1,13 @@
+@EndUserText.label : 'Products of the simulated catalog API'
+@AbapCatalog.enhancement.category : #NOT_EXTENSIBLE
+@AbapCatalog.tableCategory : #TRANSPARENT
+@AbapCatalog.deliveryClass : #A
+@AbapCatalog.dataMaintenance : #RESTRICTED
+define table zproduct_api {
+  key client     : abap.clnt not null;
+  key product_id : abap.char(10) not null;
+  name           : abap.char(40);
+  @Semantics.amount.currencyCode : 'zproduct_api.currency'
+  price          : abap.curr(15,2);
+  currency       : abap.cuky;
+}

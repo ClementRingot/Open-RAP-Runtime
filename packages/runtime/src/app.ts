@@ -10,6 +10,7 @@ import { Authorizations } from "./auth/authorizations.js";
 import { AccessControls, withReader } from "./odata/access.js";
 import { CsrfTokens } from "./odata/csrf.js";
 import { errorResponse, isIeee754, ODataHandler, type HandlerContext, type ODataRequest, type ODataResponse, type WriteHandler } from "./odata/handler.js";
+import { CustomQueries } from "./odata/custom.js";
 import { ReadEngine } from "./odata/read.js";
 import { ServiceRuntime } from "./odata/service.js";
 import { ODataError } from "./odata/errors.js";
@@ -76,6 +77,9 @@ export async function createApp(options: AppOptions): Promise<FastifyInstance> {
   const authorizations = options.authorizations ?? options.rap?.authorizations ?? new Authorizations(options.model.authorizations);
   // the access controls (DCL) of the reads, for the user of each request (D35)
   const read = new ReadEngine(service, () => options.db, new AccessControls(options.model.accessControls, authorizations));
+  if (options.rap !== undefined && options.model.entities.some((e) => e.kind === "custom")) {
+    read.queries = new CustomQueries(service, () => options.db, options.rap);
+  }
   const writes = options.writes?.(service, read, options.db) ?? (options.rap === undefined ? undefined : new RapWriteHandler(service, read, options.db as unknown as Kysely<unknown>, options.rap));
   const handler = new ODataHandler(service, read, options.metadata, writes);
   const servicePath = options.model.service.path;
