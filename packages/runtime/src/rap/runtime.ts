@@ -27,11 +27,27 @@ export interface Statement {
   responses: Responses;
 }
 
+/** Work to do once the LUW is committed (background processes, mails, D41). */
+export type AfterCommit = (luw: { db: Kysely<unknown>; user: User; language: string }) => Promise<void>;
+
+/** A LUW of a background process (bgPF, D41): controlled (if_bgmc_op_single) or not. */
+export interface BackgroundLuw {
+  controlled: boolean;
+  /** COMMIT ENTITIES ran (the save sequence). */
+  committed: boolean;
+  /** ROLLBACK ENTITIES ran: the LUW is rolled back at the end of the operation. */
+  rolledBack: boolean;
+  /** The responses of the last COMMIT ENTITIES, for RESPONSE OF. */
+  responses?: Responses;
+}
+
 export interface LuwContext {
   tx: Transaction;
   user: User;
   language: string;
   statements: Statement[];
+  afterCommit: AfterCommit[];
+  background?: BackgroundLuw;
 }
 
 export class RapRuntime {
@@ -42,6 +58,8 @@ export class RapRuntime {
   private readonly storage = new AsyncLocalStorage<LuwContext>();
   private tail: Promise<unknown> = Promise.resolve();
   private lastMicros = 0n;
+  /** Work started after commits that has not ended yet (see idle). */
+  private readonly pending = new Set<Promise<void>>();
 
   private constructor(public readonly model: Model) {
     this.bo = new BoModel(model);
@@ -92,19 +110,48 @@ export class RapRuntime {
 
   /**
    * Runs `fn` in a new LUW: one database transaction (committed when `fn` returns, rolled back when
-   * it throws), ABAP serialized with the other LUWs.
+   * it throws), ABAP serialized with the other LUWs. After the commit, the work the LUW registered
+   * (background processes, mails) starts, each in its own LUW.
    */
-  public async transaction<T>(db: Kysely<unknown>, user: User, language: string, fn: (tx: Transaction) => Promise<T>): Promise<T> {
+  public async transaction<T>(db: Kysely<unknown>, user: User, language: string, fn: (tx: Transaction) => Promise<T>, options: { background?: BackgroundLuw } = {}): Promise<T> {
+    const afterCommit: AfterCommit[] = [];
     const run = async (): Promise<T> =>
       db.transaction().execute(async (trx) => {
         const tx = new Transaction({ bo: this.bo, bridge: this.bridge, now: () => this.now() }, trx as unknown as Kysely<unknown>, user);
-        return this.storage.run({ tx, user, language, statements: [] }, async () => {
+        if (options.background !== undefined && !options.background.controlled) {
+          // a transactionally uncontrolled operation may write the database at any time
+          tx.inSaver = true;
+        }
+        const context: LuwContext = { tx, user, language, statements: [], afterCommit, ...(options.background === undefined ? {} : { background: options.background }) };
+        return this.storage.run(context, async () => {
           setSystemFields(user, language);
           return fn(tx);
         });
       });
     const result = this.tail.then(run, run);
     this.tail = result.catch(() => undefined);
-    return result;
+    const value = await result;
+    for (const work of afterCommit) {
+      this.start(() => work({ db, user, language }));
+    }
+    return value;
+  }
+
+  /** Starts work after the current request (its failure is the work's own business). */
+  private start(work: () => Promise<void>): void {
+    const promise: Promise<void> = new Promise<void>((resolve) => setImmediate(resolve))
+      .then(work)
+      .catch((error: unknown) => {
+        process.stderr.write(`rap-transpiler: background work failed: ${(error as Error).stack ?? String(error)}\n`);
+      })
+      .finally(() => this.pending.delete(promise));
+    this.pending.add(promise);
+  }
+
+  /** Resolves when the work started after commits has ended (tests, shutdown). */
+  public async idle(): Promise<void> {
+    while (this.pending.size > 0) {
+      await Promise.all([...this.pending]);
+    }
   }
 }

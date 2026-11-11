@@ -124,5 +124,6 @@ Versions de référence : `@abaplint/core` 2.120.98, `@abaplint/transpiler` 2.14
 | RTTS | `describe_by_name` lève `cx_sy_rtti_type_not_released` ; pas de création de types (`cl_abap_structdescr=>create`, `CREATE DATA … TYPE HANDLE`), pas d'attributs ni de méthodes dans `cl_abap_classdescr`. `absolute_name` vient du nom qualifié du transpiler. |
 | `cl_abap_random*` | Générateur de Park-Miller (non cryptographique) : les suites diffèrent de celles de SAP pour une même graine. Pas de `cl_abap_random_packed*` ni `decfloat16`. |
 | `cl_abap_char_utilities=>minchar` | Absent (caractère nul). |
-| Traitement en arrière-plan (`cl_bgmc_process_factory`), e-mail (`cl_bcs_mail_message`) | Non pris en charge. |
+| Traitement en arrière-plan (D41) | Les opérations restent en mémoire jusqu'à leur exécution : un processus pas encore exécuté quand l'application s'arrête ne l'est jamais (il reste `NEW`). Pas de reprise ni de nouvel essai d'un processus `ERRONEOUS`, pas de file par nom (`set_name` sert au suivi), pas de vérification de la phase transactionnelle d'appel (sur SAP, `save_for_execution` d'une opération contrôlée se fait en phase de sauvegarde). `if_bgmc_process_monitor` : états `NEW`, `SUCCESSFUL`, `ERRONEOUS` (noms propres à rap-transpiler). Un seul `COMMIT ENTITIES` par opération. |
+| E-mail (D41) | Envoyé après la validation de la LUW, sans nouvel essai ; `send( )` rend toujours l'état `W` (en attente). Pas de modèles d'e-mail (`cl_bcs_mail_message=>create_instance_by_template`), ni de signature, ni de chiffrement. |
 

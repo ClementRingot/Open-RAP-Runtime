@@ -422,7 +422,9 @@ export function generateSql(model: Model): SqlOutput {
 function frameworkTables(model: Model): string {
   const numberRanges = model.services?.numberRanges === true || (model.numberRanges ?? []).length > 0;
   const applicationLog = model.services?.applicationLog === true;
-  if (!numberRanges && !applicationLog) {
+  const background = model.services?.background === true;
+  const mail = model.services?.mail === true;
+  if (!numberRanges && !applicationLog && !background && !mail) {
     return "";
   }
   const literal = (value: string): string => `'${value.replace(/'/g, "''")}'`;
@@ -430,7 +432,7 @@ function frameworkTables(model: Model): string {
     (i) =>
       `INSERT INTO rapt_number_range (nr_object, nr_subobject, nr_interval, nr_toyear, from_number, to_number) VALUES (${literal(i.object)}, ${literal(i.subobject ?? "")}, ${literal(i.interval)}, ${literal(i.toyear ?? "")}, ${i.from}, ${i.to})\n  ON CONFLICT (nr_object, nr_subobject, nr_interval, nr_toyear) DO UPDATE SET from_number = excluded.from_number, to_number = excluded.to_number;`,
   );
-  const parts = ["-- number ranges and application log of the behavior pools (D40)"];
+  const parts = ["-- number ranges, application log, background processes and mails of the behavior pools (D40, D41)"];
   if (numberRanges) {
     parts.push(`CREATE TABLE IF NOT EXISTS "rapt_number_range" (
   "nr_object" text NOT NULL,
@@ -468,6 +470,31 @@ CREATE TABLE IF NOT EXISTS "rapt_application_log_item" (
   "msgv4" text NOT NULL DEFAULT '',
   "item_timestamp" numeric(21,7),
   PRIMARY KEY ("log_handle", "item_number")
+);`);
+  }
+  if (background) {
+    parts.push(`CREATE TABLE IF NOT EXISTS "rapt_background_process" (
+  "process_id" text PRIMARY KEY,
+  "process_name" text NOT NULL DEFAULT '',
+  "state" text NOT NULL,
+  "error_text" text NOT NULL DEFAULT '',
+  "process_user" text NOT NULL DEFAULT '',
+  "created_at" timestamptz NOT NULL DEFAULT now(),
+  "finished_at" timestamptz
+);`);
+  }
+  if (mail) {
+    parts.push(`CREATE TABLE IF NOT EXISTS "rapt_mail" (
+  "mail_id" text PRIMARY KEY,
+  "sender" text NOT NULL,
+  "recipients" text NOT NULL,
+  "subject" text NOT NULL DEFAULT '',
+  "raw_message" text NOT NULL,
+  "state" text NOT NULL,
+  "error_text" text NOT NULL DEFAULT '',
+  "mail_user" text NOT NULL DEFAULT '',
+  "created_at" timestamptz NOT NULL DEFAULT now(),
+  "sent_at" timestamptz
 );`);
   }
   return `${parts.join("\n")}\n`;

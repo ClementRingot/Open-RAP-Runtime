@@ -160,6 +160,9 @@ const EXCEPTIONS: FrameworkSource[] = [
   exception("cx_nr_object_not_found", "cx_number_ranges"),
   exception("cx_nr_subobject", "cx_number_ranges"),
   textRoot("cx_bali_runtime", "cx_static_check"),
+  textRoot("cx_bgmc", "cx_static_check"),
+  textRoot("cx_bgmc_operation", "cx_static_check"),
+  textRoot("cx_bcs_mail", "cx_static_check"),
   exception("cx_bali_not_possible", "cx_bali_runtime"),
   exception("cx_bali_invalid_parameter", "cx_bali_runtime"),
 ];
@@ -3116,6 +3119,377 @@ const RTTS: FrameworkSource[] = [
   rttsClass("cl_abap_intfdescr", "cl_abap_objectdescr"),
 ];
 
+// ------------------------------------------------------------------------------ background processing (D41)
+
+const IF_BGMC_OP_SINGLE = `INTERFACE if_bgmc_op_single PUBLIC.
+  METHODS execute RAISING cx_bgmc_operation.
+ENDINTERFACE.
+`;
+
+const IF_BGMC_OP_SINGLE_TX_UNCONTR = `INTERFACE if_bgmc_op_single_tx_uncontr PUBLIC.
+  METHODS execute RAISING cx_bgmc_operation.
+ENDINTERFACE.
+`;
+
+const IF_BGMC_PROCESS_MONITOR = `INTERFACE if_bgmc_process_monitor PUBLIC.
+  TYPES ty_state TYPE string.
+  CONSTANTS:
+    BEGIN OF gcs_state,
+      new        TYPE ty_state VALUE \`NEW\`,
+      running    TYPE ty_state VALUE \`RUNNING\`,
+      successful TYPE ty_state VALUE \`SUCCESSFUL\`,
+      erroneous  TYPE ty_state VALUE \`ERRONEOUS\`,
+    END OF gcs_state.
+  METHODS get_state
+    RETURNING VALUE(rv_state) TYPE ty_state
+    RAISING   cx_bgmc.
+  METHODS get_process_id RETURNING VALUE(rv_process_id) TYPE string.
+ENDINTERFACE.
+`;
+
+const IF_BGMC_PROCESS_SINGLE_OP = `INTERFACE if_bgmc_process_single_op PUBLIC.
+  METHODS set_name
+    IMPORTING iv_name TYPE csequence
+    RETURNING VALUE(ro_process) TYPE REF TO if_bgmc_process_single_op.
+  METHODS set_operation
+    IMPORTING io_operation TYPE REF TO if_bgmc_op_single
+    RETURNING VALUE(ro_process) TYPE REF TO if_bgmc_process_single_op.
+  METHODS set_operation_tx_uncontrolled
+    IMPORTING io_operation TYPE REF TO if_bgmc_op_single_tx_uncontr
+    RETURNING VALUE(ro_process) TYPE REF TO if_bgmc_process_single_op.
+  METHODS save_for_execution
+    RETURNING VALUE(ro_process_monitor) TYPE REF TO if_bgmc_process_monitor
+    RAISING   cx_bgmc.
+ENDINTERFACE.
+`;
+
+const IF_BGMC_PROCESS_FACTORY = `INTERFACE if_bgmc_process_factory PUBLIC.
+  METHODS create
+    RETURNING VALUE(ro_process) TYPE REF TO if_bgmc_process_single_op
+    RAISING   cx_bgmc.
+ENDINTERFACE.
+`;
+
+const ZRAP_CL_BGMC_MONITOR = `CLASS zrap_cl_bgmc_monitor DEFINITION PUBLIC FINAL CREATE PUBLIC.
+  PUBLIC SECTION.
+    INTERFACES if_bgmc_process_monitor.
+    METHODS constructor IMPORTING id TYPE string.
+  PRIVATE SECTION.
+    DATA id TYPE string.
+ENDCLASS.
+
+CLASS zrap_cl_bgmc_monitor IMPLEMENTATION.
+  METHOD constructor.
+    me->id = id.
+  ENDMETHOD.
+
+  METHOD if_bgmc_process_monitor~get_state.
+    rv_state = zrap_eml=>bgmc_state( id ).
+  ENDMETHOD.
+
+  METHOD if_bgmc_process_monitor~get_process_id.
+    rv_process_id = id.
+  ENDMETHOD.
+ENDCLASS.
+`;
+
+const ZRAP_CL_BGMC_PROCESS = `CLASS zrap_cl_bgmc_process DEFINITION PUBLIC FINAL CREATE PUBLIC.
+  PUBLIC SECTION.
+    INTERFACES if_bgmc_process_single_op.
+    INTERFACES if_bgmc_process_factory.
+    "! Runs an operation (the kernel calls it after the commit of the LUW that saved the process).
+    CLASS-METHODS zrap_run
+      IMPORTING operation  TYPE REF TO object
+                controlled TYPE abap_bool
+      RAISING   cx_bgmc_operation.
+  PRIVATE SECTION.
+    DATA name TYPE string.
+    DATA operation TYPE REF TO object.
+    DATA controlled TYPE abap_bool.
+ENDCLASS.
+
+CLASS zrap_cl_bgmc_process IMPLEMENTATION.
+  METHOD if_bgmc_process_factory~create.
+    ro_process = NEW zrap_cl_bgmc_process( ).
+  ENDMETHOD.
+
+  METHOD if_bgmc_process_single_op~set_name.
+    name = iv_name.
+    ro_process = me.
+  ENDMETHOD.
+
+  METHOD if_bgmc_process_single_op~set_operation.
+    operation = io_operation.
+    controlled = abap_true.
+    ro_process = me.
+  ENDMETHOD.
+
+  METHOD if_bgmc_process_single_op~set_operation_tx_uncontrolled.
+    operation = io_operation.
+    controlled = abap_false.
+    ro_process = me.
+  ENDMETHOD.
+
+  METHOD if_bgmc_process_single_op~save_for_execution.
+    IF operation IS INITIAL.
+      RAISE EXCEPTION NEW cx_bgmc( zrap_text = \`the process has no operation: set_operation or set_operation_tx_uncontrolled\` ).
+    ENDIF.
+    ro_process_monitor = NEW zrap_cl_bgmc_monitor( zrap_eml=>bgmc_save( operation = operation name = name controlled = controlled ) ).
+  ENDMETHOD.
+
+  METHOD zrap_run.
+    DATA single TYPE REF TO if_bgmc_op_single.
+    DATA uncontrolled TYPE REF TO if_bgmc_op_single_tx_uncontr.
+    IF controlled = abap_true.
+      single ?= operation.
+      single->execute( ).
+    ELSE.
+      uncontrolled ?= operation.
+      uncontrolled->execute( ).
+    ENDIF.
+  ENDMETHOD.
+ENDCLASS.
+`;
+
+const CL_BGMC_PROCESS_FACTORY = `CLASS cl_bgmc_process_factory DEFINITION PUBLIC FINAL CREATE PRIVATE.
+  PUBLIC SECTION.
+    CLASS-METHODS get_default
+      RETURNING VALUE(ro_factory) TYPE REF TO if_bgmc_process_factory.
+ENDCLASS.
+
+CLASS cl_bgmc_process_factory IMPLEMENTATION.
+  METHOD get_default.
+    ro_factory = NEW zrap_cl_bgmc_process( ).
+  ENDMETHOD.
+ENDCLASS.
+`;
+
+const CL_ABAP_TX = `CLASS cl_abap_tx DEFINITION PUBLIC FINAL CREATE PRIVATE.
+  PUBLIC SECTION.
+    "! Transactional phase of a controlled background operation: database writes after save( ).
+    CLASS-METHODS save.
+    CLASS-METHODS modify.
+ENDCLASS.
+
+CLASS cl_abap_tx IMPLEMENTATION.
+  METHOD save.
+    zrap_eml=>tx_phase( \`save\` ).
+  ENDMETHOD.
+
+  METHOD modify.
+    zrap_eml=>tx_phase( \`modify\` ).
+  ENDMETHOD.
+ENDCLASS.
+`;
+
+// ------------------------------------------------------------------------------ e-mail (D41)
+
+const CL_BCS_MAIL_BODYPART = `CLASS cl_bcs_mail_bodypart DEFINITION PUBLIC ABSTRACT CREATE PUBLIC.
+  PUBLIC SECTION.
+    DATA content_type TYPE string READ-ONLY.
+    DATA filename TYPE string READ-ONLY.
+    DATA text TYPE string READ-ONLY.
+    DATA binary TYPE xstring READ-ONLY.
+    DATA is_binary TYPE abap_bool READ-ONLY.
+    METHODS zrap_set
+      IMPORTING content_type TYPE csequence
+                filename     TYPE csequence OPTIONAL
+                text         TYPE string OPTIONAL
+                binary       TYPE xstring OPTIONAL
+                is_binary    TYPE abap_bool DEFAULT abap_false.
+ENDCLASS.
+
+CLASS cl_bcs_mail_bodypart IMPLEMENTATION.
+  METHOD zrap_set.
+    me->content_type = content_type.
+    me->filename = filename.
+    me->text = text.
+    me->binary = binary.
+    me->is_binary = is_binary.
+  ENDMETHOD.
+ENDCLASS.
+`;
+
+const CL_BCS_MAIL_TEXTPART = `CLASS cl_bcs_mail_textpart DEFINITION PUBLIC INHERITING FROM cl_bcs_mail_bodypart FINAL CREATE PUBLIC.
+  PUBLIC SECTION.
+    CLASS-METHODS create_instance
+      IMPORTING iv_content         TYPE string
+                iv_content_type    TYPE string DEFAULT \`text/plain\`
+                iv_filename        TYPE string OPTIONAL
+      RETURNING VALUE(ro_instance) TYPE REF TO cl_bcs_mail_textpart
+      RAISING   cx_bcs_mail.
+    CLASS-METHODS create_text_plain
+      IMPORTING iv_content         TYPE string
+                iv_filename        TYPE string OPTIONAL
+      RETURNING VALUE(ro_instance) TYPE REF TO cl_bcs_mail_textpart
+      RAISING   cx_bcs_mail.
+    CLASS-METHODS create_text_html
+      IMPORTING iv_content         TYPE string
+                iv_filename        TYPE string OPTIONAL
+      RETURNING VALUE(ro_instance) TYPE REF TO cl_bcs_mail_textpart
+      RAISING   cx_bcs_mail.
+ENDCLASS.
+
+CLASS cl_bcs_mail_textpart IMPLEMENTATION.
+  METHOD create_instance.
+    ro_instance = NEW cl_bcs_mail_textpart( ).
+    ro_instance->zrap_set( content_type = iv_content_type filename = iv_filename text = iv_content ).
+  ENDMETHOD.
+
+  METHOD create_text_plain.
+    ro_instance = create_instance( iv_content = iv_content iv_content_type = \`text/plain\` iv_filename = iv_filename ).
+  ENDMETHOD.
+
+  METHOD create_text_html.
+    ro_instance = create_instance( iv_content = iv_content iv_content_type = \`text/html\` iv_filename = iv_filename ).
+  ENDMETHOD.
+ENDCLASS.
+`;
+
+const CL_BCS_MAIL_BINARYPART = `CLASS cl_bcs_mail_binarypart DEFINITION PUBLIC INHERITING FROM cl_bcs_mail_bodypart FINAL CREATE PUBLIC.
+  PUBLIC SECTION.
+    CLASS-METHODS create_instance
+      IMPORTING iv_content         TYPE xstring
+                iv_content_type    TYPE string
+                iv_filename        TYPE string OPTIONAL
+      RETURNING VALUE(ro_instance) TYPE REF TO cl_bcs_mail_binarypart
+      RAISING   cx_bcs_mail.
+ENDCLASS.
+
+CLASS cl_bcs_mail_binarypart IMPLEMENTATION.
+  METHOD create_instance.
+    ro_instance = NEW cl_bcs_mail_binarypart( ).
+    ro_instance->zrap_set( content_type = iv_content_type filename = iv_filename binary = iv_content is_binary = abap_true ).
+  ENDMETHOD.
+ENDCLASS.
+`;
+
+const CL_BCS_MAIL_MESSAGE = `CLASS cl_bcs_mail_message DEFINITION PUBLIC FINAL CREATE PRIVATE.
+  PUBLIC SECTION.
+    TYPES ty_copy TYPE c LENGTH 1.
+    TYPES ty_status TYPE c LENGTH 1.
+    TYPES: BEGIN OF ty_recipient_status,
+             recipient TYPE string,
+             status    TYPE ty_status,
+           END OF ty_recipient_status.
+    TYPES tt_status TYPE STANDARD TABLE OF ty_recipient_status WITH EMPTY KEY.
+    CONSTANTS to TYPE ty_copy VALUE 'T'.
+    CONSTANTS cc TYPE ty_copy VALUE 'C'.
+    CONSTANTS bcc TYPE ty_copy VALUE 'B'.
+    "! The id of the mail in rapt_mail once sent.
+    DATA zrap_mail_id TYPE string READ-ONLY.
+    CLASS-METHODS create_instance
+      RETURNING VALUE(ro_mail_message) TYPE REF TO cl_bcs_mail_message
+      RAISING   cx_bcs_mail.
+    METHODS set_sender
+      IMPORTING iv_address TYPE csequence
+      RAISING   cx_bcs_mail.
+    METHODS set_reply_to
+      IMPORTING iv_address TYPE csequence
+      RAISING   cx_bcs_mail.
+    METHODS add_recipient
+      IMPORTING iv_address TYPE csequence
+                iv_copy    TYPE ty_copy DEFAULT to
+      RAISING   cx_bcs_mail.
+    METHODS set_subject
+      IMPORTING iv_subject TYPE csequence
+      RAISING   cx_bcs_mail.
+    METHODS set_main
+      IMPORTING io_main TYPE REF TO cl_bcs_mail_bodypart
+      RAISING   cx_bcs_mail.
+    METHODS add_attachment
+      IMPORTING io_attachment TYPE REF TO cl_bcs_mail_bodypart
+      RAISING   cx_bcs_mail.
+    METHODS send
+      EXPORTING et_status      TYPE tt_status
+                ev_mail_status TYPE ty_status
+      RAISING   cx_bcs_mail.
+    METHODS send_async
+      RAISING cx_bcs_mail.
+    TYPES: BEGIN OF zrap_ty_recipient,
+             address TYPE string,
+             kind    TYPE ty_copy,
+           END OF zrap_ty_recipient.
+    TYPES: BEGIN OF zrap_ty_part,
+             main         TYPE abap_bool,
+             content_type TYPE string,
+             filename     TYPE string,
+             text         TYPE string,
+             binary       TYPE xstring,
+             is_binary    TYPE abap_bool,
+           END OF zrap_ty_part.
+  PRIVATE SECTION.
+    DATA sender TYPE string.
+    DATA reply_to TYPE string.
+    DATA subject TYPE string.
+    DATA recipients TYPE STANDARD TABLE OF zrap_ty_recipient WITH EMPTY KEY.
+    DATA parts TYPE STANDARD TABLE OF zrap_ty_part WITH EMPTY KEY.
+    METHODS part
+      IMPORTING part        TYPE REF TO cl_bcs_mail_bodypart
+                main        TYPE abap_bool
+      RETURNING VALUE(line) TYPE zrap_ty_part.
+ENDCLASS.
+
+CLASS cl_bcs_mail_message IMPLEMENTATION.
+  METHOD create_instance.
+    ro_mail_message = NEW cl_bcs_mail_message( ).
+  ENDMETHOD.
+
+  METHOD set_sender.
+    sender = iv_address.
+  ENDMETHOD.
+
+  METHOD set_reply_to.
+    reply_to = iv_address.
+  ENDMETHOD.
+
+  METHOD add_recipient.
+    APPEND VALUE #( address = |{ iv_address }| kind = iv_copy ) TO recipients.
+  ENDMETHOD.
+
+  METHOD set_subject.
+    subject = iv_subject.
+  ENDMETHOD.
+
+  METHOD part.
+    line-main = main.
+    line-content_type = part->content_type.
+    line-filename = part->filename.
+    line-text = part->text.
+    line-binary = part->binary.
+    line-is_binary = part->is_binary.
+  ENDMETHOD.
+
+  METHOD set_main.
+    DELETE parts WHERE main = abap_true.
+    INSERT part( part = io_main main = abap_true ) INTO parts INDEX 1.
+  ENDMETHOD.
+
+  METHOD add_attachment.
+    APPEND part( part = io_attachment main = abap_false ) TO parts.
+  ENDMETHOD.
+
+  METHOD send.
+    DATA recipient TYPE zrap_ty_recipient.
+    zrap_mail_id = zrap_eml=>mail_send( sender     = sender
+                                        reply_to   = reply_to
+                                        subject    = subject
+                                        recipients = recipients
+                                        parts      = parts ).
+    " sent once the LUW is committed
+    ev_mail_status = 'W'.
+    CLEAR et_status.
+    LOOP AT recipients INTO recipient.
+      APPEND VALUE #( recipient = recipient-address status = 'W' ) TO et_status.
+    ENDLOOP.
+  ENDMETHOD.
+
+  METHOD send_async.
+    send( ).
+  ENDMETHOD.
+ENDCLASS.
+`;
+
 // ------------------------------------------------------------------------------ the kernel
 
 /** Methods of ZRAP_EML for the utilities; their bodies are replaced at run time. */
@@ -3286,6 +3660,25 @@ export const UTILS_KERNEL_DEFINITIONS = `    "! /ui2/cl_json and xco_cp_json: mo
     CLASS-METHODS class_name
       IMPORTING object      TYPE REF TO object
       RETURNING VALUE(name) TYPE string.
+    "! bgPF (D41): saves a process in the LUW; it runs after the commit. Returns its id.
+    CLASS-METHODS bgmc_save
+      IMPORTING operation  TYPE REF TO object
+                name       TYPE string OPTIONAL
+                controlled TYPE abap_bool
+      RETURNING VALUE(id)  TYPE string.
+    CLASS-METHODS bgmc_state
+      IMPORTING id           TYPE string
+      RETURNING VALUE(state) TYPE string.
+    CLASS-METHODS tx_phase
+      IMPORTING phase TYPE string.
+    "! cl_bcs_mail_message (D41): keeps the mail in the LUW; it is sent after the commit. Returns its id.
+    CLASS-METHODS mail_send
+      IMPORTING sender     TYPE string OPTIONAL
+                reply_to   TYPE string OPTIONAL
+                subject    TYPE string OPTIONAL
+                recipients TYPE ANY TABLE
+                parts      TYPE ANY TABLE
+      RETURNING VALUE(id)  TYPE string.
 `;
 
 export const UTILS_KERNEL_METHODS = [
@@ -3323,6 +3716,10 @@ export const UTILS_KERNEL_METHODS = [
   "bali_delete",
   "rtti_describe",
   "class_name",
+  "bgmc_save",
+  "bgmc_state",
+  "tx_phase",
+  "mail_send",
 ];
 
 export const UTILS_KERNEL_IMPLEMENTATIONS = UTILS_KERNEL_METHODS.map((m) => `  METHOD ${m}.\n  ENDMETHOD.\n`).join("\n");
@@ -3401,6 +3798,19 @@ export const UTILS_FRAMEWORK_SOURCES: FrameworkSource[] = [
   clas("cl_abap_matcher", CL_ABAP_MATCHER),
   clas("cl_abap_typedescr", CL_ABAP_TYPEDESCR),
   ...RTTS,
+  intf("if_bgmc_op_single", IF_BGMC_OP_SINGLE),
+  intf("if_bgmc_op_single_tx_uncontr", IF_BGMC_OP_SINGLE_TX_UNCONTR),
+  intf("if_bgmc_process_monitor", IF_BGMC_PROCESS_MONITOR),
+  intf("if_bgmc_process_single_op", IF_BGMC_PROCESS_SINGLE_OP),
+  intf("if_bgmc_process_factory", IF_BGMC_PROCESS_FACTORY),
+  clas("zrap_cl_bgmc_monitor", ZRAP_CL_BGMC_MONITOR),
+  clas("zrap_cl_bgmc_process", ZRAP_CL_BGMC_PROCESS),
+  clas("cl_bgmc_process_factory", CL_BGMC_PROCESS_FACTORY),
+  clas("cl_abap_tx", CL_ABAP_TX),
+  clas("cl_bcs_mail_bodypart", CL_BCS_MAIL_BODYPART),
+  clas("cl_bcs_mail_textpart", CL_BCS_MAIL_TEXTPART),
+  clas("cl_bcs_mail_binarypart", CL_BCS_MAIL_BINARYPART),
+  clas("cl_bcs_mail_message", CL_BCS_MAIL_MESSAGE),
 ];
 
 /** Name of the object of a framework file: `/ui2/cl_json` for `#ui2#cl_json.clas.abap`. */

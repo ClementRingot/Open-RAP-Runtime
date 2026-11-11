@@ -31,6 +31,8 @@ aucun ne change pas.
 | Nombres aléatoires | `cl_abap_random`, `cl_abap_random_int`, `cl_abap_random_int8`, `cl_abap_random_float`, `cl_abap_random_decfloat34` | `cl_abap_random=>seed( )`, `create( seed min max )->get_next( )` ; `int`, `intinrange`, `float` |
 | Expressions régulières | `cl_abap_regex`, `cl_abap_matcher` | `create_pcre`, `create_posix`, `create_matcher`, `cl_abap_matcher=>create`, `create_pcre`, `matches`, `contains`, `find_next`, `find_all`, `match`, `get_match`, `get_offset`, `get_length`, `get_submatch`, `replace_all`, `replace_found`, `replace_next` |
 | RTTS | `cl_abap_typedescr`, `cl_abap_elemdescr`, `cl_abap_structdescr`, `cl_abap_tabledescr`, `cl_abap_refdescr`, `cl_abap_classdescr` | `describe_by_data`, `describe_by_data_ref`, `describe_by_object_ref` ; `type_kind`, `kind`, `length`, `decimals`, `absolute_name`, `components`, `get_components( )`, `get_component_type( )`, `get_table_line_type( )`, constantes `typekind_*` et `kind_*` |
+| Traitement en arrière-plan | `cl_bgmc_process_factory`, `if_bgmc_op_single`, `if_bgmc_op_single_tx_uncontr`, `cl_abap_tx` | `get_default( )->create( )`, `set_name`, `set_operation`, `set_operation_tx_uncontrolled`, `save_for_execution( )` → moniteur (`get_state( )`), `cl_abap_tx=>save( )` / `modify( )` |
+| E-mail | `cl_bcs_mail_message`, `cl_bcs_mail_textpart`, `cl_bcs_mail_binarypart` | `create_instance`, `set_sender`, `set_reply_to`, `add_recipient` (`to`, `cc`, `bcc`), `set_subject`, `set_main`, `add_attachment`, `send` (`et_status`, `ev_mail_status`), `send_async` ; `create_text_plain`, `create_text_html` |
 | Types | `string_table`, `xstring_table`, `match_result(_tab)`, `submatch_result(_tab)`, `abap_compdescr_tab`, `abap_component_tab` | |
 
 ## Numérotation : `rapt/number-ranges.json`
@@ -59,6 +61,30 @@ lève `cx_number_ranges`.
 (tables `rapt_application_log` et `rapt_application_log_item`), avec l'utilisateur et l'heure de
 la requête. Les objets et sous-objets de journal n'ont pas à être déclarés. Les tables ne sont
 créées que si le code utilise le journal (ou la numérotation, pour `rapt_number_range`).
+
+## Traitement en arrière-plan (bgPF)
+
+`save_for_execution( )` enregistre le processus dans la LUW de la requête (table
+`rapt_background_process`, état `NEW`). Une fois la LUW validée, l'opération s'exécute dans une LUW
+à elle, avec le même utilisateur, après la réponse à la requête ; une LUW annulée ne lance rien.
+
+- **Opération contrôlée** (`if_bgmc_op_single`) : l'EML de l'opération (sans `IN LOCAL MODE`) est
+  sauvegardé à sa fin, comme par le framework RAP ; l'ABAP SQL n'écrit qu'après
+  `cl_abap_tx=>save( )`.
+- **Opération non contrôlée** (`if_bgmc_op_single_tx_uncontr`) : l'ABAP SQL écrit quand il veut ;
+  `COMMIT ENTITIES` (avec `RESPONSE OF`) sauvegarde l'EML, `ROLLBACK ENTITIES` annule la LUW.
+- **État** : `SUCCESSFUL` ou `ERRONEOUS` (avec le texte de l'exception) dans
+  `rapt_background_process`, lu par `get_state( )` du moniteur.
+
+## E-mail
+
+`send( )` compose le mail (HTML ou texte, pièces jointes texte et binaires, copies) et le garde dans
+la table `rapt_mail` de la LUW (état `WAITING`, `ev_mail_status` = `W`). Une fois la LUW validée,
+il part par le serveur SMTP de `MAIL_SMTP_URL` (`smtp://utilisateur:motdepasse@serveur:587`, ou
+`smtps://…:465`) : état `SENT`, ou `ERROR` avec la raison. Sans `MAIL_SMTP_URL`, le mail reste dans
+`rapt_mail` (état `STORED`, message MIME complet dans `raw_message`) : pratique avec `rapt dev`.
+`MAIL_FROM` donne l'expéditeur quand le code n'appelle pas `set_sender`. Une LUW annulée n'envoie
+rien.
 
 ## Différences avec SAP
 

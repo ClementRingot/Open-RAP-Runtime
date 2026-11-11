@@ -61,16 +61,18 @@ export function loadNumberRanges(project: Project, diagnostics: Diagnostics): Nu
   return intervals;
 }
 
-/** The services with tables of their own the ABAP of the project uses (number ranges, application log). */
-export function usedServices(project: Project): { numberRanges?: boolean; applicationLog?: boolean } | undefined {
+/** The services with tables of their own the ABAP of the project uses (D40, D41). */
+export function usedServices(project: Project): { numberRanges?: boolean; applicationLog?: boolean; background?: boolean; mail?: boolean } | undefined {
   const code = project.files
     .filter((f) => (f.type === "CLAS" || f.type === "INTF") && f.extension.endsWith("abap"))
     .map((f) => f.content.toLowerCase())
     .join("\n");
-  const numberRanges = code.includes("cl_numberrange_runtime");
-  const applicationLog = /\bcl_bali_/.test(code);
-  if (!numberRanges && !applicationLog) {
-    return undefined;
-  }
-  return { ...(numberRanges ? { numberRanges } : {}), ...(applicationLog ? { applicationLog } : {}) };
+  const services = {
+    numberRanges: code.includes("cl_numberrange_runtime"),
+    applicationLog: /\bcl_bali_/.test(code),
+    background: code.includes("cl_bgmc_process_factory"),
+    mail: code.includes("cl_bcs_mail_message"),
+  };
+  const used = Object.fromEntries(Object.entries(services).filter(([, value]) => value));
+  return Object.keys(used).length === 0 ? undefined : used;
 }

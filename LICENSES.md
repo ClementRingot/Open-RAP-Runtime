@@ -35,6 +35,7 @@ Aucune dépendance externe.
 | `pg` | 8.23.1 | MIT | Pilote PostgreSQL | 2026-11-09 |
 | `chevrotain` | 13.2.0 | Apache-2.0 | Grammaire des URL OData (`$filter`, `$orderby`, `$select`, `$expand`) | 2026-11-09 |
 | `jose` | 6.2.16 | MIT | Vérification des JWT et JWKS (OIDC) | 2026-11-09 |
+| `nodemailer` | 10.5.0 | MIT-0 | Composition MIME et envoi SMTP des mails de `cl_bcs_mail_message` (D41) | 2026-11-11 |
 | `@abaplint/runtime` | 2.14.24 | MIT | Exécution du JavaScript transpilé de l'ABP (types et instructions ABAP) | 2026-11-09 |
 | `fast-xml-parser` | 5.12.0 | MIT | Lecture du `$metadata` des services OData distants (client proxy, D31) | 2026-11-10 |
 

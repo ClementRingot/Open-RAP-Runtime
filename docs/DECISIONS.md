@@ -747,3 +747,36 @@ et la conséquence. Les numéros D1 à D13 correspondent aux points 1 à 13 du �
   intervalle et écrit puis relit un journal. `compiler/test/utilities.test.ts` couvre la
   fermeture, la vérification de toutes les classes et `rapt/number-ranges.json`.
 
+## D41 — Traitement en arrière-plan (bgPF) et e-mail
+
+- **Contexte** : `cl_bgmc_process_factory` et `cl_bcs_mail_message` sont d'usage courant dans les
+  BO RAP (travail différé après la sauvegarde, notifications). Les deux s'appuient sur la LUW : le
+  processus ne démarre et le mail ne part qu'après le `COMMIT WORK`.
+- **Décision** : le runtime garde, pour chaque LUW, le travail à faire après sa validation
+  (`LuwContext.afterCommit`). Une LUW annulée l'oublie ; une LUW validée le démarre après la
+  réponse (`setImmediate`), chaque élément dans une LUW à lui, sérialisée avec les autres.
+  - **bgPF** : `save_for_execution` écrit le processus (`rapt_background_process`, `NEW`) dans la
+    LUW et garde la référence de l'opération ABAP. L'exécution appelle `execute` dans une LUW
+    marquée « arrière-plan » : contrôlée (`if_bgmc_op_single`), l'EML est sauvegardé à la fin et
+    l'ABAP SQL écrit après `cl_abap_tx=>save( )` ; non contrôlée, l'ABAP SQL écrit toujours,
+    `COMMIT ENTITIES` lance la séquence de sauvegarde (une fois) et `ROLLBACK ENTITIES` annule la
+    LUW. Hors arrière-plan, `COMMIT ENTITIES` reste refusé dans un behavior pool. L'état final
+    (`SUCCESSFUL`, `ERRONEOUS` avec le texte de l'exception) est écrit dans une LUW séparée, pour
+    survivre à l'annulation de celle de l'opération.
+  - **Pourquoi en mémoire** : SAP sérialise l'objet opération pour l'exécuter plus tard, ailleurs.
+    Sérialiser un objet du runtime d'abaplint (références, objets imbriqués) demanderait un
+    mécanisme général ; l'application étant un seul processus, la référence suffit. Limite : un
+    processus non exécuté à l'arrêt n'est pas repris.
+  - **E-mail** : `send( )` compose le message MIME avec nodemailer (MIT-0), le garde dans
+    `rapt_mail` (`WAITING`), puis l'envoie après la validation par le serveur de `MAIL_SMTP_URL`
+    (`SENT` / `ERROR`). Sans serveur, le mail reste dans la table (`STORED`) avec son message
+    complet : le développement n'a besoin d'aucun serveur. `MAIL_FROM` donne l'expéditeur par
+    défaut ; les deux variables sont dans le `.env.example` des applications qui envoient des
+    mails.
+  - **Tables** : générées seulement si le code utilise `cl_bgmc_process_factory` ou
+    `cl_bcs_mail_message` (`model.services`, D40).
+- **Tests** : `runtime/test/background.test.ts` : une action lance trois processus (contrôlé avec
+  EML, non contrôlé avec `COMMIT ENTITIES`, en échec) et vérifie leurs états et leurs effets ; une
+  autre envoie un mail (HTML, copie, pièces jointes texte et binaire), gardé sans serveur, envoyé
+  à un serveur SMTP de test avec `MAIL_SMTP_URL`, et rien n'est envoyé quand la LUW est annulée.
+

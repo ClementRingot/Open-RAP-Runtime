@@ -69,4 +69,23 @@ describe("utilities of ABAP Cloud (D40)", () => {
       variant.cleanup();
     }
   });
+
+  it("creates the tables of bgPF and mails and lists the mail settings when the code uses them (D41)", async () => {
+    const variant = fixtureVariant({
+      "zbp_rt_r_travel.clas.locals_imp.abap": (c) =>
+        c.replace("METHOD validateDates.", "METHOD validateDates.\n    DATA(factory) = cl_bgmc_process_factory=>get_default( ).\n    DATA(mail) = cl_bcs_mail_message=>create_instance( )."),
+    });
+    try {
+      const result = await generateApplication(loadProject(variant.dir));
+      expect(result.diagnostics.errors()).toEqual([]);
+      expect(result.model?.services).toEqual({ background: true, mail: true });
+      const schema = result.files.find((f) => f.path === "db/schema.sql")?.content ?? "";
+      expect(schema).toContain('CREATE TABLE IF NOT EXISTS "rapt_background_process"');
+      expect(schema).toContain('CREATE TABLE IF NOT EXISTS "rapt_mail"');
+      expect(schema).not.toContain("rapt_number_range");
+      expect(result.files.find((f) => f.path === ".env.example")?.content).toContain("MAIL_SMTP_URL=");
+    } finally {
+      variant.cleanup();
+    }
+  });
 });

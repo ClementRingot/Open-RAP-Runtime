@@ -152,7 +152,8 @@ ajoutent ce que la fixture n'utilise pas : numérotation, feature control global
 | Nombres aléatoires : `cl_abap_random*` | ✅ | Générateur déterministe par graine (non cryptographique). |
 | Expressions régulières : `cl_abap_regex`, `cl_abap_matcher`, types `match_result(_tab)` | ✅ | Moteur JavaScript. |
 | RTTS : `cl_abap_typedescr` et sous-classes | 🟡 | `describe_by_data(_ref)`, `describe_by_object_ref` ; pas `describe_by_name` ni la création de types. |
-| Traitement en arrière-plan (`cl_bgmc_process_factory`), e-mail (`cl_bcs_mail_message`) | ❌ | Demandent une infrastructure (file d'attente, serveur SMTP). |
+| Traitement en arrière-plan : `cl_bgmc_process_factory`, `if_bgmc_op_single`, `if_bgmc_op_single_tx_uncontr`, `cl_abap_tx` (D41) | ✅ | Après la validation de la LUW, dans une LUW à part ; `COMMIT ENTITIES` dans une opération non contrôlée ; état dans `rapt_background_process`. Test `background.test.ts`. |
+| E-mail : `cl_bcs_mail_message`, `cl_bcs_mail_textpart`, `cl_bcs_mail_binarypart` (D41) | ✅ | Envoyé après la validation de la LUW par `MAIL_SMTP_URL`, sinon gardé dans `rapt_mail`. |
 
 ## Projection
 

@@ -36,7 +36,7 @@ export interface Model {
   /** Intervals of the number ranges (D40): `rapt/number-ranges.json` next to the sources. */
   numberRanges?: NumberRangeIntervalModel[];
   /** Services of the clean-room framework the behavior pools use, with tables of their own (D40). */
-  services?: { numberRanges?: boolean; applicationLog?: boolean };
+  services?: { numberRanges?: boolean; applicationLog?: boolean; background?: boolean; mail?: boolean };
 }
 
 // ---------------------------------------------------------------------------------------------

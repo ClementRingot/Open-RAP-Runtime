@@ -89,8 +89,9 @@ Connexion OIDC (Keycloak fourni dans le profil `oidc` de docker-compose, utilisa
 Le behavior pool peut utiliser les classes utilitaires d'ABAP Cloud : `/ui2/cl_json` et
 `xco_cp_json`, `cl_web_http_utility`, `cl_abap_conv_codepage`, `cl_numberrange_runtime`
 (intervalles dans `rapt/number-ranges.json`), `cl_abap_tstmp` et `xco_cp_time`, journal
-applicatif `cl_bali_*`, hachage, aléatoire, expressions régulières, RTTS
-([guide](docs/UTILITAIRES.md), [D40](docs/DECISIONS.md)).
+applicatif `cl_bali_*`, hachage, aléatoire, expressions régulières, RTTS, traitement en
+arrière-plan `cl_bgmc_process_factory` et e-mail `cl_bcs_mail_message` (envoyé par
+`MAIL_SMTP_URL`) ([guide](docs/UTILITAIRES.md), [D40, D41](docs/DECISIONS.md)).
 
 Le behavior pool peut appeler des API distantes avec le client HTTP d'ABAP Cloud et le client
 proxy OData d'un service consumption model (SCM, SCM2) ; chaque destination se configure par
