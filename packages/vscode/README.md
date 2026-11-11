@@ -6,6 +6,9 @@ et en affiche les résultats.
 
 ## Fonctions
 
+- **Coloration syntaxique** de l'ABAP (`.abap`, grammaire de
+  [larshp/vscode-abap](https://github.com/larshp/vscode-abap), MIT), des sources CDS (`.asddls`,
+  `.asddlxs`, `.asdcls`, `.srvdsrv`, tables `.astabl`) et des behavior definitions (`.asbdef`).
 - **Problèmes** : les diagnostics de `rapt check` (BDEF, CDS, behavior pool…) à chaque
   enregistrement, soulignés dans le code.
 - **RAP : Lancer rapt dev** : l'application tourne avec une base PGlite et se reconstruit à
@@ -27,7 +30,8 @@ et rapt tourne sur le Node.js intégré à VS Code (1.101 ou plus, Node.js 22).
 code --install-extension rap-transpiler-vscode.vsix
 ```
 
-Le `.vsix` est produit par la CI à chaque commit (artefact `rap-transpiler-vscode`).
+Le `.vsix` est joint à chaque [release GitHub](https://github.com/ClementRingot/rap-transpiler/releases)
+(tag `v*`) et produit par la CI à chaque commit (artefact `rap-transpiler-vscode`).
 
 Pour utiliser une autre version de rapt (un clone en cours de développement, par exemple) :
 réglage `rapt.cliPath`. Sans version intégrée (extension construite sans `pnpm run stage`),
@@ -43,6 +47,17 @@ travail, puis la commande `rapt` du PATH.
 | `rapt.checkOnSave` | `true` | vérifier à chaque enregistrement |
 | `rapt.dev.port` | `8080` | port de l'application |
 | `rapt.dev.openUi` | `true` | ouvrir le navigateur au démarrage de rapt dev |
+
+## Publier une version
+
+Pousser un tag `v1.2.3` : le workflow `release.yml` construit le `.vsix` (version 1.2.3) et le
+joint à la release GitHub du tag. Il le publie aussi sur le Visual Studio Marketplace si le
+secret `VSCE_PAT` est défini (éditeur `clementringot` à créer sur le Marketplace), et sur
+Open VSX (VSCodium, Cursor…) si le secret `OVSX_PAT` est défini.
+
+```sh
+git tag v0.1.0 && git push origin v0.1.0
+```
 
 ## Construire l'extension
 

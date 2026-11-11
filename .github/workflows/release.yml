@@ -1,0 +1,49 @@
+name: Release
+
+# A tag v1.2.3 publishes the VS Code extension: the .vsix is attached to the GitHub release of
+# the tag, and published to the Visual Studio Marketplace and Open VSX when their tokens are set
+# (repository secrets VSCE_PAT and OVSX_PAT).
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write
+
+jobs:
+  vscode:
+    runs-on: ubuntu-latest
+    env:
+      VSCE_PAT: ${{ secrets.VSCE_PAT }}
+      OVSX_PAT: ${{ secrets.OVSX_PAT }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm build
+      - name: Version of the extension from the tag
+        working-directory: packages/vscode
+        run: npm pkg set version="${GITHUB_REF_NAME#v}"
+      - name: Package the extension (.vsix)
+        run: pnpm --filter rap-transpiler-vscode run package
+      - name: Embedded rapt works
+        run: node packages/vscode/rapt/node_modules/@rap-transpiler/compiler/dist/cli.js check fixtures/travel --warnings-as-errors
+      - name: GitHub release with the .vsix
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          cp packages/vscode/rap-transpiler-vscode.vsix "rap-transpiler-vscode-${GITHUB_REF_NAME#v}.vsix"
+          gh release create "$GITHUB_REF_NAME" "rap-transpiler-vscode-${GITHUB_REF_NAME#v}.vsix" --title "$GITHUB_REF_NAME" --generate-notes \
+            || gh release upload "$GITHUB_REF_NAME" "rap-transpiler-vscode-${GITHUB_REF_NAME#v}.vsix" --clobber
+      - name: Visual Studio Marketplace
+        if: env.VSCE_PAT != ''
+        working-directory: packages/vscode
+        run: pnpm exec vsce publish --packagePath rap-transpiler-vscode.vsix --pat "$VSCE_PAT"
+      - name: Open VSX
+        if: env.OVSX_PAT != ''
+        working-directory: packages/vscode
+        run: npx --yes ovsx@0.10 publish rap-transpiler-vscode.vsix --pat "$OVSX_PAT"

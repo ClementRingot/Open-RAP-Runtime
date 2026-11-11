@@ -1,0 +1,139 @@
+{
+    "comments": {
+        "lineComment": "\""
+    },
+    "autoClosingPairs": [
+        [
+            "( ",
+            " )"
+        ],
+        [
+            "[ ",
+            " ]"
+        ],
+        [
+            "<",
+            ">"
+        ],
+        [
+            "`",
+            "`"
+        ],
+        [
+            "'",
+            "'"
+        ],
+        [
+            "|",
+            "|"
+        ]
+    ],
+    "surroundingPairs": [
+        [
+            "`",
+            "`"
+        ],
+        [
+            "'",
+            "'"
+        ],
+        [
+            "|",
+            "|"
+        ],
+        [
+            "<",
+            ">"
+        ]
+    ],
+    "indentationRules": {
+        "increaseIndentPattern": {
+            "pattern": "^\\s*(METHOD|IF|LOOP|CLASS|CASE|DO|FORM|ELSE|WHILE|TRY|CATCH).*\\.$",
+            "flags": "i"
+        },
+        "decreaseIndentPattern": {
+            "pattern": "^\\s*(ENDMETHOD|ENDIF|ENDLOOP|ENDCLASS|ENDCASE|ENDDO|ENDFORM|ELSE|ENDWHILE|ENDTRY|CATCH)\\.$",
+            "flags": "i"
+        },
+    },
+    "folding": {
+      "markers": {
+        "start": "^\\*\\s*#?region\\b",
+        "end": "^\\*\\s*#?endregion\\b"
+      }
+    },
+    "colorizedBracketPairs": [
+        [
+            "(",
+            ")"
+        ],
+        [
+            "[",
+            "]"
+        ],
+        [
+            "METHOD",
+            "ENDMETHOD"
+        ],
+        [
+            "method",
+            "endmethod"
+        ],
+        [
+            "IF",
+            "ENDIF"
+        ],
+        [
+            "if",
+            "endif"
+        ],
+        [
+            "CASE",
+            "ENDCASE"
+        ],
+        [
+            "case",
+            "endcase"
+        ],
+        [
+            "LOOP",
+            "ENDLOOP"
+        ],
+        [
+            "loop",
+            "endloop"
+        ],
+        [
+            "TRY",
+            "ENDTRY"
+        ],
+        [
+            "try",
+            "endtry"
+        ],
+        [
+            "WHILE",
+            "ENDWHILE"
+        ],
+        [
+            "while",
+            "endwhile"
+        ],
+        [
+            "DO",
+            "ENDDO"
+        ],
+        [
+            "do",
+            "enddo"
+        ],
+        [
+            "BEGIN",
+            "END"
+        ],
+        [
+            "begin",
+            "end"
+        ]
+    ]
+}

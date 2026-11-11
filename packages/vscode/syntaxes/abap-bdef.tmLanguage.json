@@ -1,0 +1,106 @@
+{
+  "$schema": "https://raw.githubusercontent.com/martinring/tmlanguage/master/tmlanguage.json",
+  "name": "ABAP Behavior Definition",
+  "scopeName": "source.abapbdef",
+  "fileTypes": [
+    "asbdef"
+  ],
+  "patterns": [
+    {
+      "include": "#comments"
+    },
+    {
+      "include": "#strings"
+    },
+    {
+      "include": "#self"
+    },
+    {
+      "include": "#cardinality"
+    },
+    {
+      "include": "#keywords"
+    },
+    {
+      "include": "#numbers"
+    },
+    {
+      "include": "#association-name"
+    },
+    {
+      "include": "#tilde"
+    }
+  ],
+  "repository": {
+    "comments": {
+      "patterns": [
+        {
+          "name": "comment.line.double-slash.abapbdef",
+          "match": "//.*$"
+        },
+        {
+          "name": "comment.block.abapbdef",
+          "begin": "/\\*",
+          "end": "\\*/"
+        }
+      ]
+    },
+    "strings": {
+      "patterns": [
+        {
+          "name": "string.quoted.single.abapbdef",
+          "begin": "'",
+          "end": "'"
+        }
+      ]
+    },
+    "self": {
+      "patterns": [
+        {
+          "name": "variable.language.abapbdef",
+          "match": "\\$self\\b"
+        }
+      ]
+    },
+    "cardinality": {
+      "patterns": [
+        {
+          "name": "constant.numeric.cardinality.abapbdef",
+          "match": "\\[\\s*\\d+\\s*(?:\\.\\.\\s*(?:\\d+|\\*)\\s*)?\\]"
+        }
+      ]
+    },
+    "keywords": {
+      "patterns": [
+        {
+          "name": "keyword.other.abapbdef",
+          "match": "(?i)(?<![\\w$/])(implementation|authorization|collaborative|corresponding|determination|association|permissions|additional|descendant|extensible|persistent|projection|transition|validation|dependent|determine|documents|exclusive|extension|hierarchy|interface|mandatory|numbering|optimized|parameter|selective|supported|unmanaged|abstract|activate|ancestor|behavior|business|external|features|function|instance|internal|messages|precheck|provider|readonly|reported|semantic|actions|affects|cleanup|control|default|discard|effects|factory|foreign|managed|mapping|prepare|private|action|change|create|define|delete|entity|failed|global|master|modify|raised|result|resume|static|strict|unique|update|alias|class|draft|early|event|field|query|table|total|deep|edit|etag|from|late|lock|none|save|side|with|for|key|not|own|use|by|in|on)(?![\\w/])"
+        }
+      ]
+    },
+    "numbers": {
+      "patterns": [
+        {
+          "name": "constant.numeric.abapbdef",
+          "match": "\\b\\d+\\b"
+        }
+      ]
+    },
+    "association-name": {
+      "patterns": [
+        {
+          "name": "variable.other.association.abapbdef",
+          "match": "\\b_[A-Za-z][\\w]*"
+        }
+      ]
+    },
+    "tilde": {
+      "patterns": [
+        {
+          "name": "keyword.operator.abapbdef",
+          "match": "~|=|:"
+        }
+      ]
+    }
+  }
+}
