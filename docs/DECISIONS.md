@@ -883,9 +883,16 @@ et la conséquence. Les numéros D1 à D13 correspondent aux points 1 à 13 du �
   contenu de ces vues est livré par SAP et n'est pas à saisir ; ici il est livré avec
   rap-transpiler de la même façon. Les autres vues libérées utiles ensuite : `I_Region`,
   `I_CalendarDate` (calendrier), `I_Timezone`, `I_BusinessUserBasic` (utilisateurs, à relier à
-  l'IdP), `I_ExchangeRate` (taux de change, à relier à une source de taux) — voir la feuille de route.
+  l'IdP), `I_ExchangeRate` (taux de change, à relier à une source de taux).
+- **Vues ajoutées ensuite** : `I_Region` et `I_RegionText` (régions des États-Unis, du Canada, de
+  l'Allemagne et de l'Australie), `I_CalendarDate` (calendrier de 1990 à 2060 calculé par
+  `generate_series` : année, trimestre, mois, semaine ISO, jour de la semaine), `I_TimeZone` et
+  `I_TimeZoneText` (fuseaux IANA courants), `I_BusinessUserBasic` (un utilisateur de l'IdP y est
+  enregistré à chaque requête authentifiée : identifiant, nom, e-mail) et `I_ExchangeRate`
+  (table vide `rapt_exchrate` : les taux sont des données de l'application). Une définition de
+  service qui expose une vue standard la reçoit aussi.
 - **Tests** : `compiler/test/standard.test.ts`, `runtime/test/standard-views.test.ts` (lecture,
-  textes, lecture seule, value help dans le navigateur).
+  textes, lecture seule, value help dans le navigateur, calendrier, utilisateurs).
 
 ## D45 — Modes `standard` et `enhanced`
 
@@ -989,3 +996,102 @@ et la conséquence. Les numéros D1 à D13 correspondent aux points 1 à 13 du �
   abandonnées (avec confirmation) en quittant la page, et ne partent plus avec la sauvegarde
   suivante.
 - **Tests** : `compiler/test/ui.test.ts` (conditions), `runtime/test/ui.test.ts` (dans le navigateur).
+
+## D52 — `$apply` : agrégation dans le runtime OData
+
+- **Contexte** : l'Analytical List Page et l'Overview Page (D53) ont besoin de totaux et de
+  groupes ; Fiori Elements les demande par `$apply` (OData Data Aggregation).
+- **Décision** : le runtime lit `$apply` avec `filter(…)`, puis une transformation
+  `groupby((P,…))`, `groupby((P,…),aggregate(…))` ou `aggregate(…)` ; méthodes `sum`, `min`,
+  `max`, `average`, `countdistinct` et `$count as Alias`. La requête SQL est un `GROUP BY` sur la
+  vue de l'entité, avec les contrôles d'accès (DCL) de l'utilisateur ; `$orderby` sur les
+  dimensions et les alias, `$top`, `$skip`, `$count`. Les autres transformations (`topcount`,
+  `compute`, une transformation après le groupement…) répondent 501.
+- **Pourquoi** : c'est la partie d'OData Data Aggregation que les floorplans utilisent ; le reste
+  demande l'annotation `@Aggregation` que les BO transactionnels n'ont pas.
+- **Tests** : `runtime/test/odata-apply.test.ts`.
+
+## D53 — Floorplans : Worklist, Analytical List Page, Overview Page, Form entry
+
+- **Contexte** : Fiori Elements choisit le floorplan dans le descripteur de l'application ; les
+  sources RAP n'en disent rien. Le floorplan est donc un réglage du projet.
+- **Décision** : `ui` de `rapt/config.json` :
+  `{ "floorplans": { "<EntitySet>": "listReport" | "worklist" | "analyticalListPage" | "formEntry" },
+  "overview": { "title": "…", "cards": [ … ] } }`.
+  - *Worklist* : liste sans barre de filtres, un onglet par `@UI.selectionVariant` qualifié de
+    l'entité, avec le nombre d'instances de chaque onglet ;
+  - *Analytical List Page* : le premier `@UI.chart` de l'entité (dimension, mesures, `#COLUMN`,
+    `#BAR`, `#LINE`, `#PIE`, `#DONUT`) au-dessus du tableau, lu par `$apply` (D52) ; une valeur choisie
+    dans le graphique filtre le tableau ; vue graphique, tableau ou les deux ;
+  - *Form entry* : l'Object Page en création seule ; après l'enregistrement, un nouveau
+    formulaire vide ;
+  - *Overview Page* : page d'accueil de cartes (`kpi` : agrégat d'une mesure ou compte ; `list`,
+    `table` : instances filtrées et triées ; `chart` : un `@UI.chart`), chaque carte ouvre la liste
+    ou l'instance.
+  Le graphique est un contrôle OpenUI5 propre en SVG (`sap.viz` n'existe que dans SAPUI5).
+- **Pourquoi** : mêmes annotations que Fiori Elements (`UI.chart`, `UI.selectionVariant`), sans
+  bibliothèque propriétaire ; un réglage contrôlé (CFG003) plutôt qu'un descripteur à écrire.
+- **Tests** : `compiler/test/config.test.ts`, `compiler/test/ui.test.ts`,
+  `runtime/test/ui-floorplans.test.ts` (navigateur).
+
+## D54 — Draft (`with draft`)
+
+- **Contexte** : le draft est la façon standard d'éditer dans Fiori Elements V4 ; un BO RAP
+  managed le déclare par `with draft;` et une `draft table` par entité.
+- **Décision** :
+  - **BDEF** : `with draft`, `draft table`, `total etag`, `draft action Edit`, `Activate
+    optimized`, `Discard`, `Resume`, `draft determine action Prepare` ; une entité sans `draft
+    table` : BDEF028.
+  - **Base** : une table de brouillons par entité (les éléments de l'entité, `DraftUUID`,
+    `HasActiveEntity`, dates du brouillon) et `rapt_draft_admin` (utilisateur, création, dernière
+    modification) ; une vue `<projection>_all` réunit instances actives et brouillons.
+  - **OData** : clé `IsActiveEntity`, propriétés `HasActiveEntity`, `HasDraftEntity`, navigation
+    `DraftAdministrativeData`, actions `Edit`, `Activate`, `Prepare`, `Resume`, `Discard`,
+    `Common.DraftRoot` / `DraftNode`. Un utilisateur ne lit que ses propres brouillons.
+  - **Runtime** : création, modification et suppression dans le brouillon sans détermination ni
+    validation ; `Edit` copie l'instance et ses compositions (un brouillon par instance, verrou
+    exclusif de 15 minutes comme SAP) ; `Activate` rejoue le brouillon dans le runtime managed dans
+    le LUW de la requête (déterminations, validations, saver), clés conservées, puis supprime le
+    brouillon ; une instance active qui a un brouillon n'est pas modifiable directement (409).
+  - **UI** : Create ouvre un brouillon, chaque champ y est enregistré à la sortie, Save active,
+    Cancel et *Discard Draft* abandonnent ; la liste montre l'état d'édition.
+- **Pourquoi** : le comportement observable de SAP (URL, clés, actions, verrou) pour que les
+  sources et les clients restent ceux d'un système SAP.
+- **Tests** : `runtime/test/draft.test.ts`, `runtime/test/ui-draft.test.ts` (navigateur),
+  `compiler/test/ir.test.ts` (BDEF028).
+
+## D55 — Table entities, types simples et types énumérés CDS
+
+- **Contexte** : ABAP Cloud récent ajoute les CDS table entities (`define table entity` : une
+  table et son entité en un objet, persistance d'un BO RAP) et les types CDS (`define type`, objets
+  DRTY) : types simples et types énumérés (`enum`). SAP n'expose pas les types énumérés dans les
+  services OData RAP (« Development Constraints » de RAP).
+- **Décision** :
+  - **Types CDS** (`<nom>.drty.asdrty`, lus par rap-transpiler : abaplint connaît l'objet sans
+    l'analyser) : un type simple vaut son type de base (type intégré, élément de données ou autre
+    type CDS), avec son libellé ; un type énuméré a un type de base (`abap.int1`, `int2`, `int4`,
+    `char(1..8)`, `numc(1..8)`), exactement une constante `initial`, des constantes et des
+    valeurs uniques (TYPE001 à TYPE003). Un type typé par un type énuméré en reprend les constantes.
+    Ils typent les éléments des table entities, des entités abstraites et custom.
+  - **Table entity** : une table du même nom (éléments en minuscules ; `NOT NULL` sauf `null` ;
+    clés en tête ; `abap.string` déclaré `null`, CDS019-CDS020) et une view entity sur cette table.
+    Une BDEF managed sur la table entity n'écrit pas `persistent table` : la table entity est sa
+    persistance. Les vues et projections la lisent comme une entité ; l'ABAP SQL du behavior pool
+    lit et écrit sa table.
+  - **Valeurs énumérées** : stockées en base avec leur valeur de base. Dans le behavior pool, le
+    type est donné au transpiler comme un élément de données de son type de base et chaque
+    constante `type-constante` devient le littéral de sa valeur (même ligne, même sens).
+  - **OData** : en mode `standard`, un élément énuméré dans une entité exposée est une erreur
+    (CDS021), comme sur SAP. En mode `enhanced`, il devient un `EnumType` du `$metadata` : membres
+    nommés comme les constantes, valeur entière (la valeur de base si elle est entière, la position
+    sinon), libellé en `Core.Description`. Le JSON porte le nom du membre (`"Status": "OPEN"`) ;
+    `$filter` accepte `Status eq 'OPEN'`, `Ns.Type'OPEN'` et la valeur entière ; une valeur hors
+    du type est refusée (400). L'UI affiche les libellés et propose une liste de choix (OpenUI5 ne
+    sait pas écrire les littéraux d'énumération : le filtre passe par `$filter`).
+  - `rapt generate tableentity|type|enum`, DDLS de type `T` pour `rapt abapgit` ; le XML des
+    objets DRTY s'écrit dans ADT.
+- **Pourquoi** : la table entity est un BO complet en deux fichiers ; les types énumérés donnent
+  des valeurs nommées à l'API sans changer le stockage. Le mode `standard` reste activable sur SAP,
+  l'exposition en énumération est une extension (D45).
+- **Tests** : `compiler/test/table-entity.test.ts`, `runtime/test/table-entity.test.ts`
+  (OData, ABAP, navigateur), fixture `fixtures/table-entity`.

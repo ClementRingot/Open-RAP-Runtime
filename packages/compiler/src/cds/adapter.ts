@@ -24,6 +24,8 @@ export interface CdsElementAst {
   expression?: string;
   /** `name : abap.char( 10 )` or `name : data_element` in abstract entities. */
   declaredType?: string;
+  /** Table entities (D55): `name : type null`. */
+  nullable?: boolean;
   /** Projections: `_X : redirected to [composition child | parent] Target`. */
   redirect?: { kind: "compositionChild" | "parent" | "plain"; target: string };
   annotations: Annotations;
@@ -40,7 +42,7 @@ export interface CdsAssociationAst {
   loc: CdsLoc;
 }
 
-export type CdsEntityKind = "view" | "projection" | "abstract" | "custom" | "other";
+export type CdsEntityKind = "view" | "projection" | "abstract" | "custom" | "table" | "other";
 
 export interface CdsEntityAst {
   kind: CdsEntityKind;
@@ -117,7 +119,9 @@ class AdapterContext {
             ? "abstract"
             : statement instanceof E.CDSDefineCustom
               ? "custom"
-              : "other";
+              : statement instanceof E.CDSDefineTableEntity
+                ? "table"
+                : "other";
     const topTokens = tree.getChildren().filter(isToken).map((t) => tokenText(t).toUpperCase());
     const names = tree.findDirectExpressions(E.CDSName);
     const nameNode = names[0];
@@ -183,7 +187,7 @@ class AdapterContext {
       return entity;
     }
 
-    // abstract and custom entities: `[key] name : type;`, `_Assoc : association … ;`
+    // abstract, custom and table entities: `[key] name : type [null];`, `_Assoc : association … ;`
     const typed = this.typedElements(tree);
     entity.elements = typed.elements;
     entity.associations = typed.associations;
@@ -302,13 +306,20 @@ class AdapterContext {
     let name: abaplint.Nodes.ExpressionNode | undefined;
     const children = tree.getChildren();
     let afterBrace = false;
-    for (const child of children) {
+    // the fields of a table entity are nodes of their own (CDSTableField): their content is read alike
+    const flat = children.flatMap((c) => (!isToken(c) && c.get() instanceof E.CDSTableField ? c.getChildren() : [c]));
+    let previous: CdsElementAst | undefined;
+    for (const child of flat) {
       if (isToken(child)) {
         const text = tokenText(child).toUpperCase();
         if (text === "{") {
           afterBrace = true;
         } else if (text === "KEY" && afterBrace) {
           key = true;
+        } else if (text === "NULL" && previous !== undefined) {
+          previous.nullable = true;
+        } else if (text === ";") {
+          previous = undefined;
         }
         continue;
       }
@@ -321,13 +332,14 @@ class AdapterContext {
       } else if (statement instanceof E.CDSName && name === undefined) {
         name = child;
       } else if (statement instanceof E.CDSType && name !== undefined) {
-        result.push({
+        previous = {
           name: name.concatTokens(),
           key,
           declaredType: child.concatTokens().replace(/\s+/g, ""),
           annotations: this.annotations(pendingAnnotations),
           loc: this.loc(name),
-        });
+        };
+        result.push(previous);
         pendingAnnotations = [];
         key = false;
         name = undefined;

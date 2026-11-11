@@ -10,8 +10,10 @@ import {
   type AdminSemantics,
   type Annotations,
   type AssociationModel,
+  type ColumnModel,
   type EntityModel,
   type FieldModel,
+  type TableModel,
 } from "@rap-transpiler/model";
 import { parseCds, type CdsElementAst, type CdsEntityAst, type CdsMetadataExtensionAst } from "../cds/adapter.js";
 import { parseBuiltInType } from "../ddic/catalog.js";
@@ -82,6 +84,11 @@ export class EntityResolver {
     return [...this.parsed.values()].filter((p) => p.ast.kind === "abstract").map((p) => p.ast.name);
   }
 
+  /** Names of the table entities of the project (D55). */
+  public tableEntityNames(): string[] {
+    return [...this.parsed.values()].filter((p) => p.ast.kind === "table").map((p) => p.ast.name);
+  }
+
   /** Resolves an entity with its diagnostics in `sink` (an entity the BO may not need). */
   public resolveInto(name: string, sink: Diagnostics): EntityModel | undefined {
     const previous = this.diagnostics;
@@ -125,6 +132,9 @@ export class EntityResolver {
         break;
       case "custom":
         entity = this.custom(parsed);
+        break;
+      case "table":
+        entity = this.tableEntity(parsed);
         break;
       default:
         this.diagnostics.error("CDS002", `${parsed.ast.name}: ${parsed.ast.statement} is not supported`, { file: parsed.file.path, ...parsed.ast.loc });
@@ -230,6 +240,9 @@ export class EntityResolver {
     }
     if (ast.hasWhere) {
       this.diagnostics.warning("CDS002", `${ast.name}: the WHERE condition is not supported yet and is ignored`, this.loc(file, ast.loc));
+    }
+    if (this.parsed.get(ast.source.toUpperCase())?.ast.kind === "table") {
+      this.resolve(ast.source); // a table entity is read as its table (D55)
     }
     const table = this.dictionary.table(ast.source);
     const sourceEntity = table === undefined ? this.resolve(ast.source) : undefined;
@@ -494,6 +507,72 @@ export class EntityResolver {
       return undefined;
     }
     return this.resolve(name);
+  }
+
+  // -------------------------------------------------------------------------------------------
+  // table entities (D55)
+
+  /**
+   * A table entity: a table of the same name, whose columns are the elements in lower case, and
+   * a view entity on it. Its elements are typed with built-in types, data elements, CDS simple
+   * types or CDS enumerated types.
+   */
+  private tableEntity(parsed: ParsedEntity): EntityModel | undefined {
+    const { ast, file } = parsed;
+    if (ast.name.length > 25) {
+      this.diagnostics.error("CDS019", `${ast.name}: the name of a table entity has at most 25 characters`, this.loc(file, ast.loc));
+    }
+    const columns: ColumnModel[] = [];
+    const fields: FieldModel[] = [];
+    let keysDone = false;
+    for (const element of ast.elements) {
+      const declared = element.declaredType ?? "";
+      const type = parseBuiltInType(declared) ?? this.dictionary.dataElement(declared)?.type;
+      if (type === undefined) {
+        this.diagnostics.error("CDS014", `${ast.name}.${element.name}: unknown type ${declared}`, this.loc(file, element.loc));
+        continue;
+      }
+      if (element.key && keysDone) {
+        this.diagnostics.error("CDS020", `${ast.name}.${element.name}: the key elements come first, without gaps`, this.loc(file, element.loc));
+      }
+      keysDone ||= !element.key;
+      if (element.key && element.nullable === true) {
+        this.diagnostics.error("CDS020", `${ast.name}.${element.name}: a key element cannot be null`, this.loc(file, element.loc));
+      }
+      if ((type.kind === "string" || type.kind === "rawstring") && element.nullable !== true) {
+        this.diagnostics.error("CDS020", `${ast.name}.${element.name}: an element of type ${type.kind} is declared null (no default value on the database)`, this.loc(file, element.loc));
+      }
+      const column: ColumnModel = { name: element.name.toLowerCase(), type: { ...type }, key: element.key, notNull: element.nullable !== true, client: false };
+      columns.push(column);
+      const field = this.fieldFromElement(parsed, element, type, undefined);
+      field.column = column.name;
+      fields.push(field);
+    }
+    const table: TableModel = { name: sqlName(ast.name), columns, src: this.loc(file, ast.loc) };
+    const label = getString(ast.annotations, "EndUserText.label");
+    if (label !== undefined) {
+      table.description = label;
+    }
+    this.dictionary.registerEntityTable(table);
+    this.addDataElementLabels(fields, table.name);
+    const entity: EntityModel = {
+      name: ast.name,
+      kind: "view",
+      tableEntity: true,
+      root: ast.root,
+      source: table.name,
+      sqlView: `${sqlName(ast.name)}_entity`,
+      fields,
+      associations: [],
+      annotations: this.entityAnnotations(parsed),
+      src: this.loc(file, ast.loc),
+    };
+    entity.associations = this.associationsOf(parsed, entity);
+    if (fields.filter((f) => f.key).length === 0 && entity.associations.length > 0) {
+      this.diagnostics.error("CDS011", `${ast.name}: a table entity with associations needs key elements`, this.loc(file, ast.loc));
+    }
+    this.checkExtensionElements(parsed, entity);
+    return entity;
   }
 
   // -------------------------------------------------------------------------------------------

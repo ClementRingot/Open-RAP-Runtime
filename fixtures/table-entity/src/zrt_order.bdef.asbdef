@@ -1,0 +1,18 @@
+managed implementation in class zbp_rt_order unique;
+strict ( 2 );
+
+define behavior for ZRT_ORDER alias Order
+lock master
+authorization master ( global )
+{
+  create;
+  update;
+  delete;
+
+  field ( mandatory : create, readonly : update ) OrderId;
+  field ( readonly ) Status;
+
+  action complete result [1] $self;
+
+  determination setOpen on modify { create; }
+}

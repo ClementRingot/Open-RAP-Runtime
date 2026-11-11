@@ -54,6 +54,19 @@ export interface UiConfigModel {
   overview?: { title: string; cards: OverviewCardModel[] };
 }
 
+/**
+ * A CDS enumerated type (D55, `define type X : abap.char(1) enum { … }`): its constants and their
+ * values of the base type. Fields of this type carry `type.enumType`.
+ */
+export interface EnumTypeModel {
+  /** Name as written: ZRT_STATUS. */
+  name: string;
+  base: AbapType;
+  values: Array<{ name: string; value: string | number; label?: string; initial?: true }>;
+  label?: string;
+  src?: SourceRef;
+}
+
 export interface Model {
   formatVersion: typeof MODEL_FORMAT_VERSION;
   /** UI settings of rapt/config.json (D53). */
@@ -65,6 +78,8 @@ export interface Model {
   tables: TableModel[];
   entities: EntityModel[];
   behaviors: BehaviorModel[];
+  /** CDS enumerated types of the fields of the entities (D55). */
+  enumTypes?: EnumTypeModel[];
   /** Filled by the ABAP generator (behavior pool transpilation). */
   abap?: AbapModel;
   /** Texts of the message classes (MSAG) found in the sources: class → number → text. */
@@ -255,6 +270,11 @@ export interface EntityModel {
   sqlView?: string;
   /** Custom entities: the class of `@ObjectModel.query.implementedBy`, upper case. */
   queryClass?: string;
+  /**
+   * A CDS table entity (D55, `define table entity`): a view entity on a table of the same name
+   * (`source`), whose columns are its elements in lower case.
+   */
+  tableEntity?: true;
   /**
    * Draft (D54). On an exposed entity of a draft BO: the SQL view of its active instances and drafts
    * (`IsActiveEntity`), the draft table, the base entity. `admin`: the synthetic entity

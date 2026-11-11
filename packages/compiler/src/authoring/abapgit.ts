@@ -66,6 +66,7 @@ export function ddlSourceType(source: string): string | undefined {
   if (/\bdefine\s+(?:root\s+)?view\s+entity\b/i.test(code)) return "W";
   if (/\bdefine\s+(?:root\s+)?abstract\s+entity\b/i.test(code)) return "A";
   if (/\bdefine\s+(?:root\s+)?custom\s+entity\b/i.test(code)) return "Q";
+  if (/\bdefine\s+(?:root\s+)?table\s+entity\b/i.test(code)) return "T";
   if (/\bdefine\s+table\s+function\b/i.test(code)) return "F";
   if (/\bdefine\s+(?:root\s+)?hierarchy\b/i.test(code)) return "H";
   if (/\bdefine\s+(?:root\s+)?view\b/i.test(code)) return "V";
@@ -163,7 +164,7 @@ function objectXml(type: string, name: string, files: SourceFile[]): string | { 
     case "DDLS": {
       const ddl = source("asddls") ?? "";
       const sourceType = ddlSourceType(ddl);
-      return sourceType === undefined ? { reason: "unknown kind of CDS definition (view entity, projection, abstract or custom entity expected)" } : ddlsXml(name, ddl, sourceType);
+      return sourceType === undefined ? { reason: "unknown kind of CDS definition (view entity, projection, abstract, custom or table entity expected)" } : ddlsXml(name, ddl, sourceType);
     }
     case "DDLX": {
       const ddlx = source("asddlxs") ?? "";

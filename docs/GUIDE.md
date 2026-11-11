@@ -96,6 +96,7 @@ jamais modifié.
 | Objectif | Comme sur SAP : ce qui se construit s'active sur SAP | Extensions de rap-transpiler |
 | BO managed + unmanaged save sur une entité custom | refusé (BDEF027) | permis ([D43](DECISIONS.md)) |
 | `field ( mandatory )` | indication pour l'UI, comme RAP | contrôlé à la sauvegarde, un message par champ, sans validation à écrire |
+| Élément d'un type énuméré CDS exposé | refusé comme sur SAP (CDS021) | `EnumType` OData : `"Status": "OPEN"`, libellés et liste de choix dans l'UI ([D55](DECISIONS.md)) |
 
 `rapt check --mode enhanced` (ou `build`, `dev`) remplace le mode du fichier.
 
@@ -114,6 +115,9 @@ rapt generate . behavior ZC_ShopOrder          # BDEF de projection
 rapt generate . access ZC_ShopOrder            # DCL
 rapt generate . service ZUI_SHOPORDER --expose ZC_ShopOrder,ZC_ShopItem
 rapt generate . binding ZUI_SHOPORDER_O4 --for ZUI_SHOPORDER
+rapt generate . tableentity ZSHOP_ITEM --root   # table entity : table et entité en un objet
+rapt generate . type ZSHOP_NAME                 # type simple CDS
+rapt generate . enum ZSHOP_STATUS               # type énuméré CDS
 ```
 
 `rapt generate . ` sans type liste les types. Chaque objet est dérivé du précédent comme dans les
@@ -130,11 +134,50 @@ assistants d'ADT ; le XML abapGit est écrit avec ([D46](DECISIONS.md)).
   ([D35](DECISIONS.md)).
 - Pas d'expressions dans la liste de sélection (CASE, CAST, calculs, chemins) : CDS002.
 
+#### Table entities et types CDS ([D55](DECISIONS.md))
+
+Une table entity réunit la table et l'entité ; un BO managed s'écrit directement dessus, sans
+`persistent table` :
+
+```cds
+@ClientHandling.type: #CLIENT_DEPENDENT
+@AbapCatalog.deliveryClass: #APPLICATION_DATA
+@AccessControl.authorizationCheck: #NOT_REQUIRED
+@EndUserText.label: 'Orders'
+define root table entity ZRT_ORDER
+{
+  key OrderId  : abap.numc(8);
+      Name     : zrt_order_name;     // type simple CDS
+      Status   : zrt_order_status;   // type énuméré CDS
+      Note     : abap.string null;
+}
+```
+
+Les types CDS sont des sources `<nom>.drty.asdrty` :
+
+```cds
+@EndUserText.label: 'Order status'
+define type ZRT_ORDER_STATUS : abap.char(1) enum
+{
+  @EndUserText.label: 'New'
+  NEW = initial;
+  @EndUserText.label: 'Open'
+  OPEN = 'O';
+}
+```
+
+La base garde la valeur de base (`'O'`) ; le behavior pool écrit les constantes comme sur SAP
+(`Status = zrt_order_status-open`). SAP n'expose pas les types énumérés dans un service OData
+RAP : en mode `standard`, CDS021 ; en mode `enhanced`, le `$metadata` a un `EnumType`, le JSON
+porte le nom du membre (`"Status": "OPEN"`) et `$filter=Status eq 'OPEN'` fonctionne. Exemple
+complet : `fixtures/table-entity`.
+
 ### Vues standards de SAP
 
-`I_Currency`, `I_UnitOfMeasure`, `I_Country`, `I_Language` et leurs vues de textes existent comme
-sur SAP, avec leurs données (devises ISO, pays, unités courantes, langues) : il suffit de les
-nommer ([D44](DECISIONS.md)).
+`I_Currency`, `I_UnitOfMeasure`, `I_Country`, `I_Language`, `I_Region`, `I_TimeZone` et leurs vues
+de textes, `I_CalendarDate` (calendrier 1990-2060), `I_BusinessUserBasic` (les utilisateurs de
+l'IdP, enregistrés à leur première requête) et `I_ExchangeRate` (taux à charger) existent comme
+sur SAP, avec leurs données : il suffit de les nommer ([D44](DECISIONS.md)).
 
 ```cds
 @Consumption.valueHelpDefinition: [{ entity: { name: 'I_Currency', element: 'Currency' } }]
@@ -146,13 +189,19 @@ sélection avec les descriptions.
 
 ### Behavior definition
 
-Tout un BO RAP managed non-draft : `strict ( 2 )`, `lock master` / `dependent`, `etag master` /
+Tout un BO RAP managed, avec ou sans draft : `strict ( 2 )`, `lock master` / `dependent`, `etag master` /
 `dependent`, autorisations `global` / `instance`, numérotation managed, externe ou anticipée,
 `create`/`update`/`delete` (internes, `precheck`, `features`), champs `readonly`, `mandatory`,
 `readonly : update`, `features : instance`, déterminations `on modify` / `on save`, validations,
 actions (instance, statiques, factory, internes, avec paramètres et résultats), fonctions,
 `with additional save`, `with unmanaged save`, `with privileged mode`, projections (`use …`),
 side effects. Détails et exceptions : [FEATURES.md](FEATURES.md).
+
+**Draft** ([D54](DECISIONS.md)) : `with draft;`, une `draft table` par entité (BDEF028 sinon),
+`total etag`, `draft action Edit; draft action Activate optimized; draft action Discard; draft
+action Resume; draft determine action Prepare;`. La table de brouillons n'a pas à exister : elle
+est générée. Le service a la clé `IsActiveEntity`, `HasDraftEntity`, `DraftAdministrativeData` et
+les actions de SAP ; déterminations et validations s'exécutent à l'activation.
 
 ### Behavior pool (ABAP)
 
@@ -171,7 +220,7 @@ traitement en arrière-plan (`cl_bgmc_process_factory`) et e-mail (`cl_bcs_mail_
 
 | Fichier | Contenu | Décision |
 |---|---|---|
-| `config.json` | `{ "mode": "standard" \| "enhanced" }` | [D45](DECISIONS.md) |
+| `config.json` | `{ "mode": "standard" \| "enhanced", "ui": { "floorplans": …, "overview": … } }` | [D45](DECISIONS.md), [D53](DECISIONS.md) |
 | `seed.json` | `{ "table": [ { "champ": "valeur" } ] }` : données chargées au premier démarrage de `rapt dev` (`SEED=auto`) ; clés UUID tirées au hasard | [D42](DECISIONS.md) |
 | `seed.sql` | données en SQL | [D42](DECISIONS.md) |
 | `authorizations.json` | rôles de l'IdP → objets d'autorisation et valeurs (`{claim:agency}` : valeur lue du jeton) | [D34](DECISIONS.md) |
@@ -204,6 +253,35 @@ et actions de table), `selectionField`, `identification` (champs et actions d'en
 - **Object Page** : édition, création, suppression, actions (dialogue des paramètres), tables des
   compositions éditables, value helps, fil d'Ariane, messages du BO.
 - Les boutons suivent les autorisations et le feature control de l'utilisateur.
+- **Draft** : Create et Edit ouvrent un brouillon, chaque champ y est enregistré, Save active,
+  Cancel abandonne ; la liste montre les instances en cours d'édition.
+
+**Floorplans** ([D53](DECISIONS.md)) : le List Report est le défaut ; `rapt/config.json` en choisit
+un autre par entity set :
+
+```json
+{
+  "ui": {
+    "floorplans": { "Travel": "analyticalListPage" },
+    "overview": {
+      "title": "Travel Overview",
+      "cards": [
+        { "type": "kpi", "entitySet": "Travel", "title": "Revenue", "measure": "TotalPrice" },
+        { "type": "list", "entitySet": "Travel", "title": "Open travels", "filter": "OverallStatus eq 'O'", "top": 4 },
+        { "type": "chart", "entitySet": "Travel", "title": "By currency", "chart": "ByCurrency" }
+      ]
+    }
+  }
+}
+```
+
+| Floorplan | Annotations lues |
+|---|---|
+| `listReport` | `lineItem`, `selectionField`, `presentationVariant` |
+| `worklist` | un onglet par `@UI.selectionVariant` qualifié (`filter: 'OverallStatus EQ ''O'''`) |
+| `analyticalListPage` | le premier `@UI.chart` (dimension, mesures, `#COLUMN`, `#BAR`, `#LINE`, `#PIE`, `#DONUT`), lu par `$apply` |
+| `formEntry` | l'Object Page, en création seule |
+| `overview` | cartes `kpi`, `list`, `table`, `chart` de `rapt/config.json` |
 
 ## 7. Développer : `rapt dev`
 

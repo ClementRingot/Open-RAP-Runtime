@@ -160,10 +160,27 @@ export class RawJsonNumber {
 
 export type JsonValue = string | number | boolean | null | RawJsonNumber | JsonValue[] | { [key: string]: JsonValue };
 
+/** The member of an enumeration type (D55) from its name or its integral value: undefined if none. */
+export function enumMember(edm: EdmType, value: unknown): NonNullable<EdmType["enum"]>["members"][number] | undefined {
+  const members = edm.enum?.members ?? [];
+  if (typeof value === "string") {
+    const byName = members.find((m) => m.name.toUpperCase() === value.toUpperCase());
+    if (byName !== undefined || !/^-?\d+$/.test(value)) {
+      return byName;
+    }
+  }
+  return typeof value === "number" || typeof value === "string" ? members.find((m) => m.value === Number(value)) : undefined;
+}
+
 /** Canonical → OData JSON value. */
 export function toJson(edm: EdmType, value: CanonicalValue, ieee754: boolean): JsonValue {
   if (value === null) {
     return null;
+  }
+  if (edm.enum !== undefined) {
+    // the member of the base value (D55); a value outside the enumeration is written as is
+    const member = edm.enum.members.find((m) => String(m.base) === String(value));
+    return member === undefined ? (typeof value === "boolean" ? value : String(value)) : member.name;
   }
   switch (edm.type) {
     case "Edm.Decimal":
@@ -191,6 +208,20 @@ export function toJson(edm: EdmType, value: CanonicalValue, ieee754: boolean): J
 export function fromJson(t: AbapType, edm: EdmType, value: unknown, property: string): CanonicalValue {
   const bad = (expected: string): ODataError =>
     new ODataError(400, "INVALID_VALUE", `Property ${property}: ${JSON.stringify(value)} is not a valid ${expected}`, property);
+  if (edm.enum !== undefined && value !== null && value !== undefined) {
+    const member = enumMember(edm, value);
+    if (member === undefined) {
+      throw new ODataError(400, "INVALID_VALUE", `Property ${property}: ${JSON.stringify(value)} is not a member of ${edm.enum.name} (${edm.enum.members.map((m) => m.name).join(", ")})`, property);
+    }
+    return member.base;
+  }
+  if (edm.enum !== undefined && value !== null && value !== undefined) {
+    const member = enumMember(edm, value);
+    if (member === undefined) {
+      throw new ODataError(400, "INVALID_VALUE", `Property ${property}: ${JSON.stringify(value)} is not a member of ${edm.enum.name} (${edm.enum.members.map((m) => m.name).join(", ")})`, property);
+    }
+    return member.base;
+  }
   if (value === null || value === undefined) {
     return t.kind === "dats" || t.kind === "tims" || t.kind === "timestamp" || t.kind === "timestampl" || t.kind === "utclong" || t.kind === "raw" || t.kind === "rawstring"
       ? null
@@ -274,7 +305,8 @@ export function normalizeDecimal(text: string, scale: number | undefined, proper
 
 /** A literal of the URL ($filter, key predicates), already typed by the parser, → canonical for a property. */
 export interface UrlLiteral {
-  type: "string" | "int" | "decimal" | "date" | "datetime" | "time" | "guid" | "bool" | "null";
+  /** `enum`: `Namespace.Type'MEMBER'`, the value is the member (D55). */
+  type: "string" | "int" | "decimal" | "date" | "datetime" | "time" | "guid" | "bool" | "null" | "enum";
   value: string | boolean | null;
 }
 
@@ -283,6 +315,17 @@ export function literalToCanonical(t: AbapType, edm: EdmType, literal: UrlLitera
     new ODataError(400, "INVALID_LITERAL", `${property}: the literal ${literal.type === "string" ? `'${String(literal.value)}'` : String(literal.value)} does not match the type ${edm.type}`);
   if (literal.type === "null") {
     return null;
+  }
+  if (edm.enum !== undefined) {
+    // Namespace.Type'MEMBER', 'MEMBER' or the integral value (D55)
+    const member = literal.type === "string" || literal.type === "enum" || literal.type === "int" ? enumMember(edm, literal.value) : undefined;
+    if (member === undefined) {
+      throw new ODataError(400, "INVALID_LITERAL", `${property}: ${String(literal.value)} is not a member of ${edm.enum.name}`);
+    }
+    return member.base;
+  }
+  if (literal.type === "enum") {
+    throw bad();
   }
   switch (edm.type) {
     case "Edm.String":

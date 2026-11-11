@@ -27,9 +27,30 @@ function editable(field: UiField): string {
   return esc(`{= ${conditions.join(" && ")} }`);
 }
 
+/**
+ * The label of the member of an enumeration type (D55), as an expression binding: the raw value
+ * (%{…}) is the member name.
+ */
+function enumText(field: UiField): string {
+  const value = `%{${field.property}}`;
+  const cases = (field.options ?? []).map((o) => `${value} === '${o.key.replace(/'/g, "\\'")}' ? '${o.text.replace(/'/g, "\\'")}' : `).join("");
+  return esc(`{= ${cases}${value} }`);
+}
+
+/** The binding of an enumeration value: a string, the OData type of the member names. */
+function enumValue(field: UiField): string {
+  return esc(`{ path: '${field.property}', type: 'sap.ui.model.odata.type.String' }`);
+}
+
+function enumItems(field: UiField, empty: boolean): string {
+  return `${empty ? `<core:Item key="" text=""/>` : ""}${(field.options ?? []).map((o) => `<core:Item key="${esc(o.key)}" text="${esc(o.text)}"/>`).join("")}`;
+}
+
 /** A display control (list report cells). */
 function display(field: UiField): string {
   switch (field.kind) {
+    case "enum":
+      return `<Text text="${enumText(field)}"/>`;
     case "amount":
     case "decimal":
     case "integer":
@@ -45,6 +66,8 @@ function display(field: UiField): string {
 function text(field: UiField, id?: string): string {
   const idAttribute = id === undefined ? "" : ` id="${esc(id)}"`;
   switch (field.kind) {
+    case "enum":
+      return `<Text${idAttribute} text="${enumText(field)}" visible="${esc("{= !${ui>/editMode} }")}"/>`;
     case "boolean":
       return `<CheckBox${idAttribute} selected="{${field.property}}" editable="false" visible="${esc("{= !${ui>/editMode} }")}"/>`;
     case "amount":
@@ -69,6 +92,8 @@ function input(field: UiField, id: string | undefined): string {
   const common = `${id === undefined ? "" : `id="${esc(id)}" `}editable="${editable(field)}" visible="{ui>/editMode}"`;
   const required = field.mandatory ? ` required="{ui>/editMode}"` : "";
   switch (field.kind) {
+    case "enum":
+      return `<Select ${common}${required} forceSelection="false" width="100%" selectedKey="${enumValue(field)}">${enumItems(field, false)}</Select>`;
     case "boolean":
       return `<CheckBox ${common} selected="{${field.property}}"/>`;
     case "date":
@@ -114,6 +139,8 @@ function filterControl(f: UiField): string {
       return `<DateRangeSelection id="${controlId}" width="100%" change=".onFilterChange"/>`;
     case "boolean":
       return `<Select id="${controlId}" width="100%" change=".onFilterChange"><core:Item key="" text=""/><core:Item key="true" text="Yes"/><core:Item key="false" text="No"/></Select>`;
+    case "enum":
+      return `<Select id="${controlId}" width="100%" change=".onFilterChange">${enumItems(f, true)}</Select>`;
     default:
       return `<MultiInput id="${controlId}" width="100%" submit=".onFilterSubmit" tokenUpdate=".onFilterChange" showValueHelp="${f.valueHelp === undefined ? "false" : "true"}" valueHelpRequest=".onFilterValueHelp" placeholder="${esc(placeholderOf(f))}"><customData><core:CustomData key="property" value="${esc(f.property)}"/></customData></MultiInput>`;
   }

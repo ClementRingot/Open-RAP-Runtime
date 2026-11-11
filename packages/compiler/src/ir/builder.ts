@@ -263,6 +263,19 @@ export function buildModel(project: Project, options: BuildOptions = {}): BuildR
       addTable(entity.persistentTable ?? entity.mapping?.table);
     }
   }
+  // the table entities of the project (D55): their tables, for the ABAP SQL of the behavior pools
+  for (const name of entities.tableEntityNames()) {
+    if (tables.has(sqlName(name))) {
+      continue;
+    }
+    const quiet = new Diagnostics();
+    const entity = entities.resolveInto(name, quiet);
+    if (entity !== undefined && !quiet.hasErrors()) {
+      addTable(entity.source);
+    } else {
+      diagnostics.addAll(quiet);
+    }
+  }
   // the other transparent tables of the project, for the ABAP SQL of the behavior pools (D26):
   // one that cannot be built is left out, the BO does not need it
   for (const name of dictionary.transparentTableNames()) {
@@ -304,6 +317,11 @@ export function buildModel(project: Project, options: BuildOptions = {}): BuildR
     ...(numberRanges === undefined ? {} : { numberRanges }),
     ...(services === undefined ? {} : { services }),
   };
+  const enumTypes = dictionary.cdsTypeEntries().flatMap((t) => (t.info.enum === undefined ? [] : [t.info.enum]));
+  if (enumTypes.length > 0) {
+    model.enumTypes = enumTypes.sort((a, b) => a.name.localeCompare(b.name));
+  }
+  checkExposedTypes(model, diagnostics);
   applyDraft(model, diagnostics);
   // access controls (DCL) of the exposed entities (D35)
   const accessControls = loadAccessControls(project, model, authorizations, diagnostics);
@@ -311,6 +329,32 @@ export function buildModel(project: Project, options: BuildOptions = {}): BuildR
     model.accessControls = accessControls;
   }
   return diagnostics.hasErrors() ? { diagnostics, model } : { diagnostics, model };
+}
+
+/**
+ * CDS enumerated types in the service (D55): SAP does not expose them in RAP OData services, the
+ * enhanced mode exposes them as OData enumeration types. Exposed table entities need keys.
+ */
+function checkExposedTypes(model: Model, diagnostics: Diagnostics): void {
+  for (const set of model.service.entitySets) {
+    const entity = findEntity(model, set.entity);
+    if (entity === undefined) {
+      continue;
+    }
+    if (entity.fields.every((f) => !f.key)) {
+      diagnostics.error("CDS011", `${entity.name}: an exposed entity needs key elements`, entity.src);
+    }
+    if (model.mode === "enhanced") {
+      continue;
+    }
+    for (const field of entity.fields.filter((f) => f.type.enumType !== undefined)) {
+      diagnostics.error(
+        "CDS021",
+        `${entity.name}.${field.name}: SAP does not expose CDS enumerated types (${field.type.enumType ?? ""}) in RAP OData services; set "mode": "enhanced" in rapt/config.json to expose an OData enumeration type`,
+        field.src,
+      );
+    }
+  }
 }
 
 /** The entity of the administrative data of the drafts (D54), a table of the runtime. */

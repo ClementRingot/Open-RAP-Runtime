@@ -1,0 +1,18 @@
+@Metadata.layer: #CUSTOMER
+@UI.headerInfo: { typeName: 'Order', typeNamePlural: 'Orders', title: { value: 'Name' } }
+annotate entity ZRT_C_ORDER with
+{
+  @UI.facet: [ { id: 'Order', purpose: #STANDARD, type: #IDENTIFICATION_REFERENCE, label: 'Order', position: 10 } ]
+  @UI: { lineItem: [ { position: 10 } ], identification: [ { position: 10 } ], selectionField: [ { position: 10 } ] }
+  OrderId;
+  @UI: { lineItem: [ { position: 20 } ], identification: [ { position: 20 } ] }
+  Name;
+  @UI: { lineItem: [ { position: 30 }, { type: #FOR_ACTION, dataAction: 'complete', label: 'Complete' } ], identification: [ { position: 30 } ], selectionField: [ { position: 20 } ] }
+  Status;
+  @UI: { lineItem: [ { position: 40 } ], identification: [ { position: 40 } ] }
+  Priority;
+  @UI: { lineItem: [ { position: 50 } ], identification: [ { position: 50 } ] }
+  Amount;
+  @UI.identification: [ { position: 60 } ]
+  Note;
+}

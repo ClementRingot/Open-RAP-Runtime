@@ -1,0 +1,2 @@
+@EndUserText.label: 'Order name'
+define type ZRT_ORDER_NAME : abap.char(40);

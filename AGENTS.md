@@ -9,7 +9,7 @@ aussi un `AGENTS.md` dans les projets qu'il crée.
 Compilateur TypeScript (monorepo pnpm) qui transforme les sources d'un BO RAP (format abapGit) en
 application Node.js : OData V4, runtime RAP managed, ABAP transpilé par abaplint, PostgreSQL, UI
 OpenUI5. Lire d'abord [README.md](README.md), [docs/GUIDE.md](docs/GUIDE.md) et la liste des
-décisions [docs/DECISIONS.md](docs/DECISIONS.md) (D1 à D51).
+décisions [docs/DECISIONS.md](docs/DECISIONS.md) (D1 à D55).
 
 ```
 packages/model/      types de l'IR (model.json) et dérivations partagées (OData, value helps, MCP)
@@ -21,6 +21,7 @@ packages/runtime/    serveur Fastify (app.ts, server.ts), OData (odata/), RAP (r
 packages/vscode/     extension VS Code : appelle la CLI avec --json, ne compile rien
 fixtures/travel      BO de référence (doit rester importable et activable sur SAP)
 fixtures/custom-entity   entité custom, mode enhanced
+fixtures/table-entity    BO sur une table entity, types simples et énumérés, mode enhanced
 ```
 
 ## Commandes
@@ -65,6 +66,7 @@ lancer après une modification du compilateur.
 
 ## Ajouter une fonctionnalité, en pratique
 
+- Type CDS (DRTY) : `ddic/cds-types.ts` puis `ir/dictionary.ts` (comme un élément de données).
 - Construction CDS ou BDEF : parser (`cds/adapter.ts`, `bdef/parser.ts`) → IR (`ir/`) → modèle
   (`packages/model`) → générateurs et runtime → tests → documentation.
 - Classe ABAP Cloud libérée : implémentation clean-room dans `gen/abap/framework-*.ts` (signatures

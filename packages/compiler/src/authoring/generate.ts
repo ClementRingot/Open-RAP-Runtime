@@ -24,6 +24,9 @@ export const OBJECT_KINDS = {
   projection: "CDS projection view, from a view with --from (.ddls.asddls)",
   abstract: "CDS abstract entity, e.g. an action parameter (.ddls.asddls)",
   custom: "CDS custom entity and its query class (.ddls.asddls, .clas.abap)",
+  tableentity: "CDS table entity: a table and its entity, the persistence of a BO (.ddls.asddls)",
+  type: "CDS simple type (.drty.asdrty)",
+  enum: "CDS enumerated type (.drty.asdrty)",
   metadata: "metadata extension (UI annotations) of an entity (.ddlx.asddlxs)",
   access: "access control (DCL) of an entity (.dcls.asdcls)",
   behavior: "behavior definition of a root view or projection (.bdef.asbdef)",
@@ -200,6 +203,37 @@ function abstractSource(name: string, description: string): string {
 define abstract entity ${name}
 {
   Value : abap.char(40);
+}
+`;
+}
+
+function tableEntitySource(name: string, root: boolean, description: string): string {
+  return `@ClientHandling.type: #CLIENT_DEPENDENT
+@AbapCatalog.deliveryClass: #APPLICATION_DATA
+@AccessControl.authorizationCheck: #NOT_REQUIRED
+@EndUserText.label: '${description}'
+define ${root ? "root " : ""}table entity ${name}
+{
+  key ID          : abap.char(10);
+      Description : abap.char(40);
+}
+`;
+}
+
+function simpleTypeSource(name: string, description: string): string {
+  return `@EndUserText.label: '${description}'
+define type ${name} : abap.char(40);
+`;
+}
+
+function enumTypeSource(name: string, description: string): string {
+  return `@EndUserText.label: '${description}'
+define type ${name} : abap.char(1) enum
+{
+  @EndUserText.label: 'Initial'
+  INITIAL_VALUE = initial;
+  @EndUserText.label: 'Value A'
+  VALUE_A = 'A';
 }
 `;
 }
@@ -474,7 +508,7 @@ export function generateObject(dir: string, kind: string, name: string, options:
   if (!NAME.test(name)) {
     return { written: [], error: `${name}: an object name is made of letters, digits and _, starting with a letter` };
   }
-  const limit = kind === "table" ? 16 : 30;
+  const limit = kind === "table" ? 16 : kind === "tableentity" ? 25 : 30;
   if (name.length > limit) {
     return { written: [], error: `${name}: at most ${limit} characters` };
   }
@@ -506,6 +540,15 @@ export function generateObject(dir: string, kind: string, name: string, options:
     }
     case "abstract":
       files.push([`${lower}.ddls.asddls`, abstractSource(name, description)]);
+      break;
+    case "tableentity":
+      files.push([`${lower}.ddls.asddls`, tableEntitySource(name, options.root === true, description)]);
+      break;
+    case "type":
+      files.push([`${lower}.drty.asdrty`, simpleTypeSource(name, description)]);
+      break;
+    case "enum":
+      files.push([`${lower}.drty.asdrty`, enumTypeSource(name, description)]);
       break;
     case "custom": {
       const query = options.for ?? `zcl_${lower.replace(/^[zy]_?/, "")}_query`.slice(0, 30);

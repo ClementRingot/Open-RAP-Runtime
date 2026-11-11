@@ -3,7 +3,7 @@
  * ($metadata) and the runtime serves requests with it: both must agree, hence one derivation.
  */
 
-import { edmTypeOf, type EdmType } from "./abap-types.js";
+import { edmTypeOf, type AbapType, type EdmEnum, type EdmType } from "./abap-types.js";
 import { getBoolean } from "./annotations.js";
 import { baseEntityOf, entitySetOfEntity, findEntity, findEntityBehavior, same } from "./lookup.js";
 import type { ActionModel, EntityBehaviorModel, EntityModel, FieldCharacteristic, FieldModel, Model } from "./model.js";
@@ -128,6 +128,8 @@ export interface ODataService {
   entitySets: ODataEntitySet[];
   operations: ODataOperation[];
   complexTypes: ODataComplexType[];
+  /** Enhanced mode (D55): the enumeration types of the CDS enumerated types of the properties. */
+  enumTypes: EdmEnum[];
 }
 
 const NULLABLE_TYPES = new Set(["Edm.Date", "Edm.TimeOfDay", "Edm.DateTimeOffset", "Edm.Guid", "Edm.Binary"]);
@@ -244,6 +246,41 @@ function exposedActions(behavior: ExposedBehavior): ActionModel[] {
   return base.filter((a) => behavior.projection?.actions.some((p) => same(p.name, a.name)));
 }
 
+/**
+ * The OData enumeration type of a CDS enumerated type (D55): members named after the constants,
+ * valued by the base value when it is an integer, else by position.
+ */
+export function edmEnumOf(model: Model, name: string): EdmEnum | undefined {
+  const enumType = model.enumTypes?.find((e) => same(e.name, name));
+  if (enumType === undefined) {
+    return undefined;
+  }
+  const integral = ["int1", "int2", "int4"].includes(enumType.base.kind);
+  const underlyingType = enumType.base.kind === "int1" ? "Edm.Byte" : enumType.base.kind === "int2" ? "Edm.Int16" : "Edm.Int32";
+  return {
+    name: enumType.name.replace(/\//g, ""),
+    underlyingType,
+    members: enumType.values.map((v, i) => ({
+      name: v.name,
+      value: integral ? Number(v.value) : i,
+      base: v.value,
+      ...(v.label === undefined ? {} : { label: v.label }),
+    })),
+  };
+}
+
+/** The Edm type of a field: its base type, with its enumeration type in enhanced mode (D55). */
+export function edmTypeOfField(model: Model, type: AbapType): EdmType {
+  const edm = edmTypeOf(type);
+  if (type.enumType !== undefined && model.mode === "enhanced") {
+    const enumeration = edmEnumOf(model, type.enumType);
+    if (enumeration !== undefined) {
+      edm.enum = enumeration;
+    }
+  }
+  return edm;
+}
+
 export function buildODataService(model: Model): ODataService {
   const service: ODataService = {
     namespace: model.service.namespace,
@@ -253,6 +290,7 @@ export function buildODataService(model: Model): ODataService {
     entitySets: [],
     operations: [],
     complexTypes: [],
+    enumTypes: [],
   };
   const typeOfSet = (setName: string): string => `${setName}Type`;
   const complexTypes = new Map<string, EntityModel>();
@@ -270,7 +308,7 @@ export function buildODataService(model: Model): ODataService {
       if (characteristics.includes("suppress")) {
         continue;
       }
-      const edm = edmTypeOf(field.type);
+      const edm = edmTypeOfField(model, field.type);
       properties.push({
         name: field.name,
         field: field.name,
@@ -370,7 +408,7 @@ export function buildODataService(model: Model): ODataService {
       if (action.parameter !== undefined && action.parameter.toLowerCase() !== "$self") {
         const parameterEntity = findEntity(model, action.parameter);
         for (const field of parameterEntity?.fields ?? []) {
-          const edm = edmTypeOf(field.type);
+          const edm = edmTypeOfField(model, field.type);
           operation.parameters.push({ name: field.name, edm, nullable: isNullableType(edm) });
         }
       }
@@ -440,11 +478,20 @@ export function buildODataService(model: Model): ODataService {
     service.complexTypes.push({
       name: complexTypeName(entity),
       properties: entity.fields.map((f) => {
-        const edm = edmTypeOf(f.type);
+        const edm = edmTypeOfField(model, f.type);
         return { name: f.name, edm, nullable: isNullableType(edm) };
       }),
     });
   }
+  // the enumeration types the properties and parameters use
+  const enums = new Map<string, EdmEnum>();
+  const collect = (edm: EdmType): void => {
+    if (edm.enum !== undefined) enums.set(edm.enum.name, edm.enum);
+  };
+  service.entityTypes.forEach((t) => t.properties.forEach((p) => collect(p.edm)));
+  service.operations.forEach((o) => o.parameters.forEach((p) => collect(p.edm)));
+  service.complexTypes.forEach((t) => t.properties.forEach((p) => collect(p.edm)));
+  service.enumTypes = [...enums.values()].sort((a, b) => a.name.localeCompare(b.name));
   return service;
 }
 

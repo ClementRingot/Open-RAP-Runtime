@@ -1,0 +1,4 @@
+@EndUserText.label: 'Orders (table entity)'
+define service ZRT_UI_ORDER {
+  expose ZRT_C_ORDER as Orders;
+}

@@ -55,7 +55,8 @@
           ".asddlxs",
           ".asdcls",
           ".srvdsrv",
-          ".astabl"
+          ".astabl",
+          ".asdrty"
         ],
         "configuration": "./syntaxes/cds.language-configuration.json"
       },
@@ -199,7 +200,7 @@
       "editor/title": [
         {
           "command": "rapt.devStart",
-          "when": "!rapt.devRunning && resourceExtname =~ /^\\.(asbdef|asddls|asddlxs|asdcls|srvdsrv|astabl|abap|xml)$/",
+          "when": "!rapt.devRunning && resourceExtname =~ /^\\.(asbdef|asddls|asddlxs|asdcls|srvdsrv|astabl|asdrty|abap|xml)$/",
           "group": "navigation@90"
         },
         {

@@ -10,6 +10,8 @@ import type { AggregateItem, ApplyStep, ExpandItem, Expr, KeyPredicate, OrderIte
 
 const WhiteSpace = createToken({ name: "WhiteSpace", pattern: /\s+/, group: Lexer.SKIPPED });
 const StringLiteral = createToken({ name: "StringLiteral", pattern: /'(?:[^']|'')*'/ });
+/** `Namespace.EnumType'MEMBER'` (D55). */
+const EnumLiteral = createToken({ name: "EnumLiteral", pattern: /[A-Za-z_][A-Za-z0-9_]*(?:\.[A-Za-z_][A-Za-z0-9_]*)+'[^']*'/ });
 const DateTimeOffset = createToken({ name: "DateTimeOffset", pattern: /\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(?::\d{2}(?:\.\d+)?)?(?:Z|[+-]\d{2}:\d{2})/i });
 const GuidLiteral = createToken({ name: "GuidLiteral", pattern: /[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}/ });
 const DateLiteral = createToken({ name: "DateLiteral", pattern: /\d{4}-\d{2}-\d{2}/ });
@@ -54,6 +56,7 @@ const K = {
 
 const tokens: TokenType[] = [
   WhiteSpace,
+  EnumLiteral,
   StringLiteral,
   DateTimeOffset,
   GuidLiteral,
@@ -219,6 +222,7 @@ class ExpressionParser extends EmbeddedActionsParser {
   public literal = this.RULE("literal", (): Expr => {
     const literal = this.OR([
       { ALT: (): UrlLiteral => ({ type: "string", value: img(this.CONSUME(StringLiteral)).slice(1, -1).replace(/''/g, "'") }) },
+      { ALT: (): UrlLiteral => ({ type: "enum", value: (/'([^']*)'$/.exec(img(this.CONSUME(EnumLiteral)))?.[1] ?? "").split(",")[0] ?? "" }) },
       { ALT: (): UrlLiteral => ({ type: "datetime", value: img(this.CONSUME(DateTimeOffset)) }) },
       { ALT: (): UrlLiteral => ({ type: "guid", value: img(this.CONSUME(GuidLiteral)).toLowerCase() }) },
       { ALT: (): UrlLiteral => ({ type: "date", value: img(this.CONSUME(DateLiteral)) }) },

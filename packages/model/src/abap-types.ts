@@ -37,8 +37,13 @@ export interface AbapType {
   kind: AbapTypeKind;
   length?: number;
   decimals?: number;
-  /** Data element the type comes from, upper case, when there is one (e.g. SYSUUID_X16). */
+  /**
+   * Data element the type comes from, upper case, when there is one (e.g. SYSUUID_X16); also the
+   * CDS simple or enumerated type (D55).
+   */
   dataElement?: string;
+  /** A CDS enumerated type (D55): its name, upper case (`Model.enumTypes`); the type is its base type. */
+  enumType?: string;
 }
 
 export type EdmTypeName =
@@ -63,6 +68,18 @@ export interface EdmType {
   scale?: number;
   /** NUMC: the value is a string of digits (Common.IsDigitSequence). */
   digitSequence?: boolean;
+  /**
+   * Enhanced mode (D55): the property has the OData enumeration type of a CDS enumerated type.
+   * `type` stays the Edm type of the base type, the type of the values inside the runtime.
+   */
+  enum?: EdmEnum;
+}
+
+/** An OData enumeration type (D55): members with integral values, each with its CDS base value. */
+export interface EdmEnum {
+  name: string;
+  underlyingType: "Edm.Byte" | "Edm.Int16" | "Edm.Int32";
+  members: Array<{ name: string; value: number; base: string | number; label?: string }>;
 }
 
 /** RAW(16) is the RAP UUID type (SYSUUID_X16). */

@@ -33,6 +33,12 @@ Le code de retour est 1 dès qu'il y a une erreur (ou un avertissement avec
 | CDS016 | erreur | Entité custom sans `@ObjectModel.query.implementedBy: 'ABAP:<classe>'` |
 | CDS017 | erreur | Classe de requête d'une entité custom absente des sources |
 | CDS018 | avertissement | Value help (`@Consumption.valueHelpDefinition`) sur une entité inconnue : value help omis |
+| CDS019 | erreur | Nom de table entity de plus de 25 caractères (D55) |
+| CDS020 | erreur | Élément de table entity : clé `null`, clé après un élément non clé, `abap.string` ou `abap.rawstring` sans `null` (D55) |
+| CDS021 | erreur | Élément de type énuméré CDS dans une entité exposée : SAP n'expose pas les types énumérés dans les services OData RAP. En mode `enhanced`, type énumération OData (D55) |
+| TYPE001 | erreur | Source d'un type CDS (`.drty.asdrty`) illisible, ou nom différent de celui du fichier (D55) |
+| TYPE002 | erreur | Type CDS fondé sur un type inconnu (D55) |
+| TYPE003 | erreur | Type énuméré CDS incorrect : type de base (`abap.int1`, `int2`, `int4`, `char(1..8)`, `numc(1..8)`), pas exactement une constante `initial`, valeur hors du type de base, constantes ou valeurs en double (D55) |
 | DDIC001 | erreur | Élément de données inconnu |
 | DDIC002 | erreur | Type de données non pris en charge |
 | DDIC003 | erreur | Structure incluse non prise en charge |
@@ -42,12 +48,13 @@ Le code de retour est 1 dès qu'il y a une erreur (ou un avertissement avec
 | TABL001 | erreur | Erreur dans la source d'une table (`.tabl.astabl`) : syntaxe, type inconnu, nom différent de celui du fichier, table sans clé |
 | TABL002 | avertissement | Construction de la source d'une table non transférée au XML abapGit (clé étrangère) |
 | BDEF001 | erreur | Erreur de syntaxe BDEF |
-| BDEF002 | erreur | Fonctionnalité hors périmètre (draft, unmanaged, late numbering…) |
+| BDEF002 | erreur | Fonctionnalité hors périmètre (unmanaged, late numbering…) |
 | BDEF003 | avertissement | Construction ignorée |
 | BDEF004 | erreur | Entité CDS inconnue |
 | BDEF005 | erreur | Élément inconnu |
 | BDEF006 | erreur | Association inconnue |
 | BDEF007 | erreur | Table persistante inconnue |
+| BDEF028 | erreur | BO draft (`with draft`) dont une entité n'a pas de `draft table` (D54) |
 | BDEF027 | erreur ou info | BO managed avec unmanaged save sur une entité custom : extension de rap-transpiler, non activable sur SAP (D43). Erreur en mode `standard`, info en mode `enhanced` (D45) |
 | BDEF008 | erreur | Mapping incohérent avec la vue CDS ou la table |
 | BDEF009 | erreur | Élément sans colonne correspondante |
@@ -100,6 +107,7 @@ Le code de retour est 1 dès qu'il y a une erreur (ou un avertissement avec
 | NR001 | erreur | `rapt/number-ranges.json` illisible ou mal formé : objet de plus de 10 caractères, intervalle de plus de 2 caractères, bornes non numériques ou inversées |
 | CFG001 | erreur | `rapt/config.json` illisible, ou mode inconnu (`standard` ou `enhanced`), dans le fichier ou `--mode` (D45) |
 | CFG002 | avertissement | Réglage inconnu dans `rapt/config.json`, ignoré |
+| CFG003 | erreur | `ui` de `rapt/config.json` mal formé : floorplan inconnu, carte de l'Overview Page incomplète, entity set absent du service (D53) |
 | MCP001 | erreur | `rapt/mcp.json` illisible ou mal formé (D47) |
 | MCP002 | avertissement | `rapt/mcp.json` décrit un outil que le service n'a plus : relancer `rapt mcp` |
 | APP001 | erreur | Paquets du runtime introuvables (`dist/` non construit) pour l'application générée : `--runtime <dossier>` ou `pnpm build` |

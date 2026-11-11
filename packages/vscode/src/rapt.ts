@@ -78,6 +78,9 @@ const swapLayer = (entity: string, layer: string): string => (/^[ZY][A-Z0-9]*_[A
 
 export const GENERATE_KINDS: GenerateKind[] = [
   { kind: "table", label: "Table de base de données" },
+  { kind: "tableentity", label: "Table entity CDS (table et entité, persistance d'un BO)" },
+  { kind: "type", label: "Type simple CDS" },
+  { kind: "enum", label: "Type énuméré CDS (enum)" },
   {
     kind: "view",
     label: "Vue CDS (view entity) depuis une table",

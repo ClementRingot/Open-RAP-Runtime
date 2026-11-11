@@ -44,10 +44,10 @@ rapt dev mon-projet                         # http://localhost:8080/ — recharg
 
 | Vous écrivez (format abapGit) | rap-transpiler produit |
 |---|---|
-| Tables (`define table`, comme dans ADT) | Tables PostgreSQL, données initiales |
-| Vues CDS, projections, DCL | Vues SQL, `$metadata` OData V4, contrôles d'accès par utilisateur |
-| Metadata extensions (`@UI`) | List Report (filtres Fiori, vues de l'utilisateur, value helps) et Object Page |
-| Behavior definition | Runtime RAP managed : verrous, ETags, numérotation, autorisations, feature control, déterminations, validations, actions |
+| Tables (`define table`, comme dans ADT), table entities CDS | Tables PostgreSQL, données initiales |
+| Vues CDS, projections, types CDS (simples, énumérés), DCL | Vues SQL, `$metadata` OData V4, contrôles d'accès par utilisateur |
+| Metadata extensions (`@UI`) | List Report, Worklist, Analytical List Page, Overview Page (filtres Fiori, vues de l'utilisateur, value helps, graphiques) et Object Page |
+| Behavior definition | Runtime RAP managed : draft, verrous, ETags, numérotation, autorisations, feature control, déterminations, validations, actions |
 | Behavior pool (ABAP Cloud) | Le même code, transpilé et exécuté : EML, messages, ABAP SQL, classes libérées (JSON, HTTP, bgPF, e-mail…) |
 | Définition de service | Service OData V4 aux chemins de SAP, `$batch`, CSRF, OIDC |
 | `rapt/mcp.json` | Serveur MCP pour les agents IA |
@@ -64,11 +64,18 @@ rapt dev mon-projet                         # http://localhost:8080/ — recharg
   diagnostics positionnés (`fichier:ligne:colonne`), launchpad de développement avec la
   documentation intégrée.
 - **Modes** : `standard` (strictement comme SAP, activable sur SAP) ou `enhanced` (extensions :
-  champs obligatoires contrôlés automatiquement, BO managed sur entité custom).
-- **Vues standards** `I_Currency`, `I_UnitOfMeasure`, `I_Country`, `I_Language` avec leurs
-  données, pour vos value helps.
-- **UI Fiori** : filtres avec conditions (`>100`, `1...5`, `*abc*`), vues enregistrées par
-  utilisateur, paramètres du tableau, aide à la saisie, actions, compositions éditables.
+  champs obligatoires contrôlés automatiquement, BO managed sur entité custom, types énumérés CDS
+  exposés en `EnumType` OData).
+- **Draft** (`with draft`) : brouillons, Edit / Activate / Discard, verrou exclusif, comme Fiori
+  Elements.
+- **Table entities et types CDS** : un BO complet sur une `define table entity`, types simples et
+  énumérés.
+- **Vues standards** `I_Currency`, `I_UnitOfMeasure`, `I_Country`, `I_Language`, `I_Region`,
+  `I_CalendarDate`, `I_TimeZone`, `I_BusinessUserBasic`, `I_ExchangeRate` avec leurs données,
+  pour vos value helps.
+- **UI Fiori** : List Report, Worklist, Analytical List Page (`$apply`), Overview Page, Form entry ;
+  filtres avec conditions (`>100`, `1...5`, `*abc*`), vues enregistrées par utilisateur,
+  paramètres du tableau, aide à la saisie, actions, compositions éditables.
 - **Sécurité** : OIDC (Keycloak, SAP Cloud Identity Services, Entra ID…), objets d'autorisation et
   `AUTHORITY-CHECK`, DCL, rôles.
 - **Déploiement** : Docker, `docker compose`, SAP BTP Cloud Foundry (`cf push`), n'importe quel
@@ -86,7 +93,7 @@ rapt dev mon-projet                         # http://localhost:8080/ — recharg
 | [Serveur MCP](docs/MCP.md) | Le service pour les agents IA |
 | [Déploiement](docs/DEPLOIEMENT.md) | Docker, SAP BTP Cloud Foundry, HTTPS |
 | [Classes utilitaires](docs/UTILITAIRES.md), [API distantes](docs/API_DISTANTES.md) | Le behavior pool au-delà de RAP |
-| [Écarts connus](KNOWN_GAPS.md), [Feuille de route](docs/ROADMAP.md) | Ce qui manque, ce qui vient (draft, table entities…) |
+| [Écarts connus](KNOWN_GAPS.md), [Feuille de route](docs/ROADMAP.md) | Ce qui manque, ce qui vient |
 | [Décisions](docs/DECISIONS.md), [Plan](PLAN.md) | Les choix techniques et leurs raisons |
 
 La même documentation s'ouvre depuis le launchpad de `rapt dev` (tuile *Documentation*).
@@ -104,7 +111,7 @@ packages/model/      types de l'IR (model.json), conventions de nommage partagé
 packages/compiler/   CLI rapt, parsers (BDEF, CDS, SRVD, DCL), IR, générateurs
 packages/runtime/    runtime des applications générées (OData V4, RAP managed, launchpad, MCP)
 packages/vscode/     extension VS Code (appelle la CLI rapt)
-fixtures/            BO de référence : travel (Travel / Booking), custom-entity
+fixtures/            BO de référence : travel (Travel / Booking), custom-entity, table-entity
 ```
 
 Les règles de travail sur le dépôt (pour les humains comme pour les agents) sont dans

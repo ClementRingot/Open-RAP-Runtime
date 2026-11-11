@@ -245,8 +245,10 @@ export const SUPPORT = `sap.ui.define([
   "sap/m/Column",
   "sap/m/ColumnListItem",
   "sap/m/Text",
-  "sap/ui/model/Filter"
-], function (Dialog, Button, Label, Input, DatePicker, CheckBox, SimpleForm, Messaging, TableSelectDialog, Column, ColumnListItem, Text, Filter) {
+  "sap/ui/model/Filter",
+  "sap/m/Select",
+  "sap/ui/core/Item"
+], function (Dialog, Button, Label, Input, DatePicker, CheckBox, SimpleForm, Messaging, TableSelectDialog, Column, ColumnListItem, Text, Filter, Select, Item) {
   "use strict";
 
   function pad(n) {
@@ -300,6 +302,8 @@ export const SUPPORT = `sap.ui.define([
             oControl = new DatePicker({ valueFormat: "yyyy-MM-dd" });
           } else if (oParameter.kind === "boolean") {
             oControl = new CheckBox();
+          } else if (oParameter.kind === "enum") {
+            oControl = new Select({ forceSelection: true, items: oParameter.options.map(function (o) { return new Item({ key: o.key, text: o.text }); }) });
           } else {
             oControl = new Input({ type: oParameter.kind === "integer" || oParameter.kind === "decimal" ? "Number" : "Text" });
           }
@@ -318,6 +322,8 @@ export const SUPPORT = `sap.ui.define([
                 var p = o.parameter;
                 if (p.kind === "boolean") {
                   oValues[p.name] = o.control.getSelected();
+                } else if (p.kind === "enum") {
+                  oValues[p.name] = o.control.getSelectedKey();
                 } else if (p.kind === "integer") {
                   oValues[p.name] = o.control.getValue() === "" ? 0 : Number(o.control.getValue());
                 } else {
@@ -1034,7 +1040,7 @@ export const LIST_CONTROLLER = `sap.ui.define([
           if (oControl.getDateValue()) {
             oState.filters[oField.property] = { from: support.dateText(oControl.getDateValue()), to: oControl.getSecondDateValue() ? support.dateText(oControl.getSecondDateValue()) : "" };
           }
-        } else if (oField.kind === "boolean") {
+        } else if (oField.kind === "boolean" || oField.kind === "enum") {
           if (oControl.getSelectedKey() !== "") {
             oState.filters[oField.property] = oControl.getSelectedKey();
           }
@@ -1066,7 +1072,7 @@ export const LIST_CONTROLLER = `sap.ui.define([
         if (oField.kind === "date" || oField.kind === "datetime") {
           oControl.setDateValue(vValue ? new Date(vValue.from + "T00:00:00") : null);
           oControl.setSecondDateValue(vValue && vValue.to ? new Date(vValue.to + "T00:00:00") : null);
-        } else if (oField.kind === "boolean") {
+        } else if (oField.kind === "boolean" || oField.kind === "enum") {
           oControl.setSelectedKey(vValue || "");
         } else {
           oControl.setValue("");
@@ -1141,6 +1147,9 @@ export const LIST_CONTROLLER = `sap.ui.define([
         } else if (oField.kind === "boolean") {
           var sKey = oControl.getSelectedKey();
           oFilter = sKey === "" ? null : new Filter(oField.property, "EQ", sKey === "true");
+        } else if (oField.kind === "enum") {
+          var sMember = oControl.getSelectedKey();
+          oFilter = sMember === "" ? null : new Filter(oField.property, "EQ", sMember);
         } else {
           bValid = this._commitText(oControl) && bValid;
           var aConditions = oControl.getTokens().map(function (t) { return filters.parse(oField, t.getText()); }).filter(Boolean);
@@ -1173,7 +1182,25 @@ export const LIST_CONTROLLER = `sap.ui.define([
       if (this._page().floorplan === "analyticalListPage" && oChart && sSelection !== "") {
         aFilters.push(new Filter(oChart.dimension.property, "EQ", sSelection));
       }
-      this.byId("table").getBinding("items").filter(aFilters.length > 0 ? new Filter({ filters: aFilters, and: true }) : []);
+      // the members of an enumeration type (D55): OpenUI5 does not write their literals, they go
+      // to the $filter parameter of the binding (with the draft condition of the list)
+      var oPage = this._page();
+      var aEnum = [];
+      aFilters = aFilters.filter(function (oFilter) {
+        var oField = (oPage.fields || {})[oFilter.getPath()];
+        if (oField && oField.kind === "enum" && !oFilter.getFilters()) {
+          aEnum.push(oFilter.getPath() + " eq '" + String(oFilter.getValue1()).replace(/'/g, "''") + "'");
+          return false;
+        }
+        return true;
+      });
+      var oBinding = this.byId("table").getBinding("items");
+      if (aEnum.length > 0 || this._bEnumFilter) {
+        var aClauses = (oPage.draft ? ["(IsActiveEntity eq true or HasActiveEntity eq false)"] : []).concat(aEnum);
+        oBinding.changeParameters({ $filter: aClauses.length > 0 ? aClauses.join(" and ") : undefined });
+        this._bEnumFilter = aEnum.length > 0;
+      }
+      oBinding.filter(aFilters.length > 0 ? new Filter({ filters: aFilters, and: true }) : []);
     },
 
     _service: function () {

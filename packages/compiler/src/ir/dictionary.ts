@@ -1,7 +1,8 @@
 /** ABAP dictionary of the project: tables, data elements and domains, with type resolution. */
 
-import { sqlName, type AbapType, type ColumnModel, type TableModel } from "@rap-transpiler/model";
-import { catalogDataElement, ddicTypeKind } from "../ddic/catalog.js";
+import { sqlName, type AbapType, type ColumnModel, type EnumTypeModel, type TableModel } from "@rap-transpiler/model";
+import { catalogDataElement, ddicTypeKind, parseBuiltInType } from "../ddic/catalog.js";
+import { parseCdsTypeSource, type CdsTypeSource } from "../ddic/cds-types.js";
 import { readDomaXml, readDtelXml, readTablXml, type DomaXml, type DtelXml, type TablXml } from "../ddic/xml.js";
 import type { Diagnostics } from "../diagnostics.js";
 import { filesOfType, type Project, type SourceFile } from "../input/project.js";
@@ -10,10 +11,20 @@ export interface DataElementInfo {
   type: AbapType;
   /** Field labels of a data element defined in the sources. */
   label?: string;
+  /** A CDS enumerated type (D55). */
+  enum?: EnumTypeModel;
 }
+
+/** Base types of the CDS enumerated types (D55): INT1, INT2, INT4, CHAR(1..8), NUMC(1..8). */
+const ENUM_BASES = new Set(["int1", "int2", "int4", "char", "numc"]);
 
 export class Dictionary {
   private readonly tables = new Map<string, { xml: TablXml; file: SourceFile }>();
+  /** CDS simple and enumerated types (D55), and their resolution (undefined: not resolvable). */
+  private readonly cdsTypes = new Map<string, { source: CdsTypeSource; file: SourceFile }>();
+  private readonly resolvedTypes = new Map<string, DataElementInfo | undefined>();
+  /** Tables of the CDS table entities (D55). */
+  private readonly entityTables = new Set<string>();
   private readonly dataElements = new Map<string, { xml: DtelXml; file: SourceFile }>();
   private readonly domains = new Map<string, { xml: DomaXml; file: SourceFile }>();
   private readonly built = new Map<string, TableModel | undefined>();
@@ -42,10 +53,157 @@ export class Dictionary {
         this.domains.set(xml.name.toUpperCase(), { xml, file });
       }
     }
+    for (const file of filesOfType(project, "DRTY").filter((f) => f.extension === "asdrty")) {
+      const parsed = parseCdsTypeSource(file.content);
+      for (const issue of parsed.issues) {
+        diagnostics.add(issue.severity, issue.code, issue.message, { file: file.path, line: issue.line, column: issue.column });
+      }
+      if (parsed.type === undefined) {
+        continue;
+      }
+      if (parsed.type.name.toUpperCase() !== file.name) {
+        diagnostics.error("TYPE001", `the file defines ${parsed.type.name}, its name says ${file.name}`, { file: file.path, line: parsed.type.line, column: parsed.type.column });
+      }
+      this.cdsTypes.set(file.name, { source: parsed.type, file });
+    }
   }
 
   public hasTable(name: string): boolean {
-    return this.tables.has(name.toUpperCase());
+    return this.tables.has(name.toUpperCase()) || this.entityTables.has(name.toUpperCase());
+  }
+
+  /** The table of a CDS table entity (D55), known from then on like a dictionary table. */
+  public registerEntityTable(table: TableModel): void {
+    this.entityTables.add(table.name.toUpperCase());
+    this.built.set(table.name.toUpperCase(), table);
+  }
+
+  public isEntityTable(name: string): boolean {
+    return this.entityTables.has(name.toUpperCase());
+  }
+
+  /** Whether the name is a CDS simple or enumerated type of the sources (D55). */
+  public isCdsType(name: string): boolean {
+    return this.cdsTypes.has(name.toUpperCase());
+  }
+
+  /** The CDS types of the sources (D55): name, file and the resolved type, for the ABAP shadow types. */
+  public cdsTypeEntries(): Array<{ name: string; info: DataElementInfo }> {
+    const result: Array<{ name: string; info: DataElementInfo }> = [];
+    for (const [name, entry] of this.cdsTypes) {
+      const info = this.dataElement(name);
+      if (info !== undefined) {
+        result.push({ name: entry.source.name, info });
+      }
+    }
+    return result;
+  }
+
+  /** The CDS enumerated types resolved so far (D55). */
+  public enumTypes(): EnumTypeModel[] {
+    return [...this.resolvedTypes.values()].flatMap((i) => (i?.enum === undefined ? [] : [i.enum])).filter((e, i, all) => all.findIndex((x) => x.name === e.name) === i);
+  }
+
+  /**
+   * A CDS simple or enumerated type (D55): its base type, resolved through built-in types, data
+   * elements and other CDS types; the constants of an enumerated type are checked here.
+   */
+  private cdsType(upper: string): DataElementInfo | undefined {
+    if (this.resolvedTypes.has(upper)) {
+      return this.resolvedTypes.get(upper);
+    }
+    const entry = this.cdsTypes.get(upper);
+    if (entry === undefined) {
+      return undefined;
+    }
+    this.resolvedTypes.set(upper, undefined); // cycles
+    const { source, file } = entry;
+    const at = { file: file.path, line: source.line, column: source.column };
+    const baseUpper = source.base.toUpperCase();
+    const base = parseBuiltInType(source.base) ?? (baseUpper === upper ? undefined : this.dataElement(baseUpper));
+    if (base === undefined) {
+      this.diagnostics.error("TYPE002", `${source.name}: unknown type ${source.base}`, at);
+      return undefined;
+    }
+    const baseType = "type" in base ? base.type : base;
+    const type: AbapType = { ...baseType, dataElement: upper };
+    delete type.enumType;
+    const info: DataElementInfo = { type };
+    const label = source.label ?? ("label" in base ? base.label : undefined);
+    if (label !== undefined) {
+      info.label = label;
+    }
+    const stacked = "enum" in base ? base.enum : undefined;
+    if (source.enum !== undefined) {
+      const enumType = this.enumOf(source, at);
+      if (enumType === undefined) {
+        return undefined;
+      }
+      info.enum = enumType;
+    } else if (stacked !== undefined) {
+      // a type typed with an enumerated type is an enumerated type with the same constants
+      info.enum = { ...stacked, name: source.name, ...(source.label === undefined ? {} : { label: source.label }), src: { ...at } };
+    }
+    if (info.enum !== undefined) {
+      type.enumType = info.enum.name.toUpperCase();
+    }
+    this.resolvedTypes.set(upper, info);
+    return info;
+  }
+
+  private enumOf(source: CdsTypeSource, at: { file: string; line: number; column: number }): EnumTypeModel | undefined {
+    const constants = source.enum ?? [];
+    const builtIn = parseBuiltInType(source.base);
+    const length = builtIn?.length ?? 1;
+    if (builtIn === undefined || !ENUM_BASES.has(builtIn.kind) || ((builtIn.kind === "char" || builtIn.kind === "numc") && (length < 1 || length > 8))) {
+      this.diagnostics.error("TYPE003", `${source.name}: the base type of an enumerated type is abap.int1, abap.int2, abap.int4, abap.char(1..8) or abap.numc(1..8), not ${source.base}`, at);
+      return undefined;
+    }
+    let ok = true;
+    const initials = constants.filter((c) => c.value === "initial");
+    if (initials.length !== 1) {
+      this.diagnostics.error("TYPE003", `${source.name}: exactly one constant has the value initial (${initials.length} found)`, at);
+      ok = false;
+    }
+    const enumType: EnumTypeModel = { name: source.name, base: { ...builtIn }, values: [], src: { ...at } };
+    if (source.label !== undefined) {
+      enumType.label = source.label;
+    }
+    const names = new Set<string>();
+    const values = new Set<string>();
+    const range: Partial<Record<AbapType["kind"], [number, number]>> = { int1: [0, 255], int2: [-32768, 32767], int4: [-2147483648, 2147483647] };
+    for (const constant of constants) {
+      const where = { file: at.file, line: constant.line, column: constant.column };
+      let value: string | number;
+      if (constant.value === "initial") {
+        value = builtIn.kind === "char" ? "" : builtIn.kind === "numc" ? "0".repeat(length) : 0;
+      } else if (builtIn.kind === "char" || builtIn.kind === "numc") {
+        const text = String(constant.value);
+        if (typeof constant.value !== "string" || text.length > length || (builtIn.kind === "numc" && !/^\d+$/.test(text))) {
+          this.diagnostics.error("TYPE003", `${source.name}-${constant.name}: ${constant.literal} does not fit the base type ${source.base}`, where);
+          ok = false;
+          continue;
+        }
+        value = builtIn.kind === "numc" ? text.padStart(length, "0") : text.replace(/\s+$/, "");
+      } else {
+        const limits = range[builtIn.kind] ?? [0, 0];
+        if (typeof constant.value !== "number" || !Number.isInteger(constant.value) || constant.value < limits[0] || constant.value > limits[1]) {
+          this.diagnostics.error("TYPE003", `${source.name}-${constant.name}: ${constant.literal} does not fit the base type ${source.base}`, where);
+          ok = false;
+          continue;
+        }
+        value = constant.value;
+      }
+      if (names.has(constant.name.toUpperCase()) || values.has(String(value))) {
+        this.diagnostics.error("TYPE003", `${source.name}-${constant.name}: constants and values are unique in an enumerated type`, where);
+        ok = false;
+        continue;
+      }
+      names.add(constant.name.toUpperCase());
+      values.add(String(value));
+      enumType.values.push({ name: constant.name, value, ...(constant.label === undefined ? {} : { label: constant.label }), ...(constant.value === "initial" ? { initial: true as const } : {}) });
+    }
+    return ok ? enumType : undefined;
   }
 
   public tableFile(name: string): SourceFile | undefined {
@@ -59,6 +217,9 @@ export class Dictionary {
   /** The type of a data element: from the sources, else from the catalog of standard ones. */
   public dataElement(name: string): DataElementInfo | undefined {
     const upper = name.toUpperCase();
+    if (this.cdsTypes.has(upper)) {
+      return this.cdsType(upper);
+    }
     const local = this.dataElements.get(upper);
     if (local !== undefined) {
       const { xml } = local;

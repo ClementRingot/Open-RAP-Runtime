@@ -1,6 +1,7 @@
-# Couverture fonctionnelle : BO RAP managed non-draft
+# Couverture fonctionnelle : BO RAP managed
 
-Cible (décision D14) : toutes les fonctionnalités d'un BO RAP managed sans draft.
+Cible (décision D14) : toutes les fonctionnalités d'un BO RAP managed ; le draft est venu ensuite
+(D54).
 Ce tableau est mis à jour à chaque jalon.
 
 Légende : ✅ pris en charge et testé · 🟡 partiel ou non couvert par un test (voir la note) ·
@@ -33,7 +34,7 @@ ajoutent ce que la fixture n'utilise pas : numérotation, feature control global
 | `late numbering` | ❌ | Nécessite la phase `adjust_numbers` d'un saver. |
 | `with additional save`, `with unmanaged save` (en-tête ou entité, `with full data`) | ✅ | Classe saver `lsc_…` : `save_modified` et `cleanup` ; unmanaged : lecture et verrous par la vue CDS (D30). Tests `rap-variant-additional-save`, `rap-variant-unmanaged-save`. |
 | Saver hérité de `cl_abap_behavior_saver_failed` (`failed` dans `save_modified`) | ✅ | Annule la LUW, écriture managed comprise ; message renvoyé au client. |
-| `with draft` | ❌ | Exclu par le cahier des charges. |
+| `with draft`, `draft table`, `total etag`, `draft action Edit / Activate optimized / Discard / Resume`, `draft determine action Prepare` | ✅ | Tables de brouillons, `IsActiveEntity`, verrou exclusif, activation par le runtime managed (D54). Voir les écarts dans [KNOWN_GAPS.md](../KNOWN_GAPS.md). |
 | Implémentation `unmanaged` | ❌ | Hors cible (BO managed). |
 | `with privileged mode` | ✅ | `PRIVILEGED` saute les contrôles d'autorisation. |
 | `changedocuments`, `event`, `extensible` | ❌ | Pas d'infrastructure équivalente. |
@@ -177,7 +178,10 @@ ajoutent ce que la fixture n'utilise pas : numérotation, feature control global
 | BO `managed with unmanaged save` sur une entité custom | ✅ | Mode `enhanced` seulement (`rapt/config.json`, D45) : instances lues par la classe de requête, écrites par `save_modified` vers l'API (D43). |
 | Vues standards `I_Currency`, `I_UnitOfMeasure`, `I_Country`, `I_Language` et leurs textes | ✅ | Ajoutées quand une source les nomme, avec leurs données de référence (D44). |
 | Value helps (`@Consumption.valueHelpDefinition`) | ✅ | Entité et vue de textes exposées implicitement en lecture seule, `Common.ValueList` (D44). |
-| Table entities (`define table entity`) | ❌ | abaplint les analyse ; prise en charge sur la feuille de route ([ROADMAP.md](ROADMAP.md)). |
+| Table entities (`define [root] table entity`) | ✅ | Table et view entity ; persistance implicite d'un BO managed ; `null`, clés, associations, compositions (D55). |
+| Types simples CDS (`define type x : abap.char(40);`) | ✅ | Objets DRTY (`.drty.asdrty`) : type et libellé des éléments (D55). |
+| Types énumérés CDS (`define type x : abap.char(1) enum { … }`) | ✅ | Valeurs de base en base ; constantes utilisables dans le behavior pool. Exposition OData : refusée en mode `standard` comme sur SAP (CDS021), `EnumType` en mode `enhanced` (D55). |
+| Vues standards `I_Region`, `I_CalendarDate`, `I_TimeZone`, `I_BusinessUserBasic`, `I_ExchangeRate` | ✅ | Calendrier généré, utilisateurs de l'IdP enregistrés à la connexion, taux de change à maintenir (D44). |
 | Expressions CDS (CASE, CAST, calculs, littéraux) | ❌ | Prévu après le MVP. |
 | Contrôle d'accès DCL (`define role … grant select on … where …`) | ✅ | Lectures OData filtrées pour l'utilisateur : `aspect pfcg_auth` (filtres `ACTVT = '03'`, n-uplets), `aspect user`, `?=`, comparaisons, `like`, `is [not] null`, `and`/`or`/`not`, chemins `_Assoc.Element` (to-one), `inheriting conditions from entity` (D35). Tests `rap-authorizations.test.ts`, `dcl.test.ts`. |
 | Side effects (`side effects { … }`) | ✅ | `Common.SideEffects` dans le `$metadata` ; l'UI générée ne les exploite pas encore (rechargement de l'objet après sauvegarde). |
@@ -207,7 +211,9 @@ ajoutent ce que la fixture n'utilise pas : numérotation, feature control global
 | Erreurs au format OData V4 (`@Common.numericSeverity`, `details`, `target`) | ✅ | Statut selon la cause d'échec (D22). |
 | Paramètres `sap-*` | ✅ | Ignorés. |
 | Authentification : mode dev, Bearer JWT (OIDC, JWKS) | ✅ | Sessions navigateur : J6. |
-| `$apply`, JSON batch, `$value`, propriétés seules | ❌ | Hors MVP. |
+| `$apply` : `filter`, `groupby`, `aggregate` (`sum`, `min`, `max`, `average`, `countdistinct`, `$count`) | ✅ | Avec le DCL de l'utilisateur ; autres transformations : 501 (D52). |
+| Types énumération (`EnumType`) : JSON par nom de membre, littéraux `Ns.Type'M'` | ✅ | Mode `enhanced`, types énumérés CDS (D55). |
+| JSON batch, `$value`, propriétés seules | ❌ | Hors MVP. |
 
 ## UI générée (OpenUI5)
 
@@ -229,7 +235,9 @@ ajoutent ce que la fixture n'utilise pas : numérotation, feature control global
 | Champs en lecture seule, obligatoires, modifiables à la création seulement | ✅ | Depuis les caractéristiques de champ de la BDEF. |
 | Messages (erreurs, succès) | ✅ | `MessageBox`, `MessageToast`, `MessagePopover`. |
 | Boutons selon les autorisations de l'utilisateur | ✅ | Create masqué sans autorisation globale de création (`$permissions`) ; Edit, Delete, actions et création d'enfants désactivés par instance (`__EntityControl`, `__OperationControl`, D36). Test `ui-authorizations.test.ts`. |
-| Autres floorplans (Worklist, Analytical List Page, Overview Page), draft | ❌ | Feuille de route ([ROADMAP.md](ROADMAP.md)). |
+| Floorplans Worklist, Analytical List Page, Overview Page, Form entry | ✅ | `ui` de `rapt/config.json` ; graphiques `@UI.chart` en SVG, onglets `@UI.selectionVariant` (D53). |
+| Draft dans l'UI : création et édition en brouillon, enregistrement des champs, Save / Discard, état d'édition dans la liste | ✅ | D54. |
+| Valeurs d'un type énuméré : libellés, liste de choix en édition et en filtre | ✅ | Mode `enhanced` (D55). |
 
 ## Launchpad (D37)
 

@@ -191,7 +191,7 @@ function orderedViews(model: Model): EntityModel[] {
       return;
     }
     stack.add(entity.name);
-    const source = entity.source === undefined ? undefined : model.entities.find((e) => same(e.name, entity.source as string));
+    const source = sourceEntityOf(model, entity);
     if (source !== undefined) {
       visit(source, stack);
     }
@@ -203,9 +203,21 @@ function orderedViews(model: Model): EntityModel[] {
   return result;
 }
 
+/**
+ * The entity a view reads, undefined when it reads a table: a table entity (D55) has the name of
+ * its table, a view entity on it reads the table.
+ */
+function sourceEntityOf(model: Model, entity: EntityModel): EntityModel | undefined {
+  const source = entity.source;
+  if (source === undefined || (entity.kind === "view" && model.tables.some((t) => same(t.name, source)))) {
+    return undefined;
+  }
+  return model.entities.find((e) => same(e.name, source));
+}
+
 function createView(model: Model, entity: EntityModel): string {
   const source = entity.source ?? "";
-  const sourceEntity = model.entities.find((e) => same(e.name, source));
+  const sourceEntity = sourceEntityOf(model, entity);
   const from = sourceEntity?.sqlView ?? source.toLowerCase();
   const columns = entity.fields.filter((field) => field.draft !== true).map((field) => {
     const expression = sourceEntity === undefined ? field.column ?? field.name.toLowerCase() : field.baseField ?? field.name;

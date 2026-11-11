@@ -53,6 +53,10 @@ function enumName(value: string | undefined): string {
 }
 
 function edmAttributes(edm: EdmType): Record<string, string | number | undefined> {
+  if (edm.enum !== undefined) {
+    // an OData enumeration type of the enhanced mode (D55)
+    return { Type: `${SCHEMA_ALIAS}.${edm.enum.name}` };
+  }
   const attributes: Record<string, string | number | undefined> = { Type: edm.type };
   if (edm.maxLength !== undefined) attributes["MaxLength"] = edm.maxLength;
   if (edm.precision !== undefined) attributes["Precision"] = edm.precision;
@@ -192,6 +196,17 @@ class CsdlBuilder {
         el("ComplexType", { Name: complex.name }, ...complex.properties.map((p) => el("Property", { Name: p.name, ...edmAttributes(p.edm), Nullable: p.nullable ? undefined : "false" }))),
       );
     }
+    for (const enumeration of this.service.enumTypes ?? []) {
+      result.push(
+        el(
+          "EnumType",
+          { Name: enumeration.name, UnderlyingType: enumeration.underlyingType === "Edm.Int32" ? undefined : enumeration.underlyingType },
+          ...enumeration.members.map((m) =>
+            el("Member", { Name: m.name, Value: m.value }, m.label === undefined ? undefined : annotation("Core.Description", { String: m.label })),
+          ),
+        ),
+      );
+    }
     return result;
   }
 
@@ -257,7 +272,7 @@ class CsdlBuilder {
       } else if (property.mandatory) {
         children.push(annotation("Common.FieldControl", { EnumMember: "Common.FieldControlType/Mandatory" }));
       }
-      if (property.edm.digitSequence === true) children.push(annotation("Common.IsDigitSequence"));
+      if (property.edm.digitSequence === true && property.edm.enum === undefined) children.push(annotation("Common.IsDigitSequence"));
       if (field.type.kind === "cuky") children.push(annotation("Common.IsCurrency"));
       if (field.type.kind === "unit") children.push(annotation("Common.IsUnit"));
       if (field.currencyCode !== undefined) children.push(annotation("Measures.ISOCurrency", { Path: field.currencyCode }));

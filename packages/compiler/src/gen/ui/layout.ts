@@ -25,7 +25,10 @@ import {
   type ValueHelp,
 } from "@rap-transpiler/model";
 
-export type FieldKind = "text" | "digits" | "integer" | "decimal" | "amount" | "boolean" | "date" | "time" | "datetime" | "uuid";
+export type FieldKind = "text" | "digits" | "integer" | "decimal" | "amount" | "boolean" | "date" | "time" | "datetime" | "uuid" | "enum";
+
+/** The values of an enumeration type (D55): the member and its label. */
+export type UiOption = { key: string; text: string };
 
 export interface UiField {
   property: string;
@@ -46,6 +49,8 @@ export interface UiField {
   importance?: "High" | "Medium" | "Low";
   /** Value help of the field (`@Consumption.valueHelpDefinition`, `Common.ValueList`). */
   valueHelp?: UiValueHelp;
+  /** Enumeration type (enhanced mode, D55): the members, in the order of the CDS type. */
+  options?: UiOption[];
 }
 
 /** A value help: the entity set listing the values, its element and its columns (D44). */
@@ -56,6 +61,11 @@ export interface UiParameter {
   label: string;
   kind: FieldKind;
   edm: EdmType["type"];
+  options?: UiOption[];
+}
+
+function optionsOf(edm: EdmType): UiOption[] | undefined {
+  return edm.enum?.members.map((m) => ({ key: m.name, text: m.label ?? m.name }));
 }
 
 export interface UiAction {
@@ -196,6 +206,7 @@ function entriesOf(entity: EntityModel, path: string): Array<{ field: string; en
 
 function kindOf(edm: EdmType, key: boolean, uuid: boolean, currency: boolean): FieldKind {
   if (uuid) return "uuid";
+  if (edm.enum !== undefined) return "enum";
   switch (edm.type) {
     case "Edm.Boolean":
       return "boolean";
@@ -272,7 +283,9 @@ class LayoutBuilder {
       mandatory: property.mandatory,
       dynamic: property.dynamic,
     };
-    if (property.edm.maxLength !== undefined) result.maxLength = property.edm.maxLength;
+    if (property.edm.maxLength !== undefined && property.edm.enum === undefined) result.maxLength = property.edm.maxLength;
+    const options = optionsOf(property.edm);
+    if (options !== undefined) result.options = options;
     const help = valueHelpOf(this.model, field);
     if (help !== undefined) result.valueHelp = help;
     if (unit !== undefined && type.properties.some((p) => p.name === unit)) result.unit = unit;
@@ -305,6 +318,7 @@ class LayoutBuilder {
           label: str(getAnnotation(field?.annotations, "EndUserText.label")) ?? p.name,
           kind: kindOf(p.edm, false, field !== undefined && isUuid(field.type), false),
           edm: p.edm.type,
+          ...(p.edm.enum === undefined ? {} : { options: optionsOf(p.edm) ?? [] }),
         };
       }),
       dynamic: operation.dynamic,

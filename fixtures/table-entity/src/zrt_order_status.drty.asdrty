@@ -1,0 +1,12 @@
+@EndUserText.label: 'Order status'
+define type ZRT_ORDER_STATUS : abap.char(1) enum
+{
+  @EndUserText.label: 'New'
+  NEW = initial;
+  @EndUserText.label: 'Open'
+  OPEN = 'O';
+  @EndUserText.label: 'Done'
+  DONE = 'D';
+  @EndUserText.label: 'Cancelled'
+  CANCELLED = 'X';
+}

@@ -1,0 +1,7 @@
+{
+  "zrt_order": [
+    { "orderid": "00000001", "name": "Laptops for the team", "status": "O", "priority": 9, "amount": "4500.00", "currency": "EUR" },
+    { "orderid": "00000002", "name": "Office chairs", "status": "D", "priority": 5, "amount": "1200.00", "currency": "EUR" },
+    { "orderid": "00000003", "name": "Coffee machine", "status": "", "priority": 0, "amount": "300.00", "currency": "USD" }
+  ]
+}

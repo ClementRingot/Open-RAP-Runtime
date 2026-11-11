@@ -74,6 +74,13 @@ Versions de référence : `@abaplint/core` 2.120.98, `@abaplint/transpiler` 2.14
 | Contrôle d'accès DCL : autres aspects (`bypass when`, aspects définis par l'utilisateur), chemins de plusieurs associations, `$filter` sur une navigation | Une condition non évaluée n'accorde aucune ligne (DCL002) ; la sous-requête d'un `$filter` sur `_Travel/…` lit la cible sans son DCL. |
 | `@AccessControl.authorizationCheck` | Informatif : un rôle s'applique s'il existe, quelle que soit la valeur. |
 | Structures incluses (`.INCLUDE`) dans les tables | Diagnostic DDIC003 |
+| Table entities (D55) : `@ClientHandling.type` | Lu, sans effet : pas de colonne mandant (D9). |
+| Table entities : colonnes `null` | La colonne PostgreSQL garde sa valeur par défaut (valeur initiale ABAP) comme les autres ; `null` n'est un état distinct que pour les types sans valeur initiale. |
+| Table entities : `SOURCE_TYPE` du XML abapGit écrit par `rapt abapgit` | `T`, déduit de la documentation : à vérifier à la première importation ; ADT réécrit le XML à l'activation. |
+| Types CDS (D55) : XML abapGit des objets DRTY | Non écrit par `rapt abapgit` : créer le type dans ADT, ou reprendre le XML d'un objet exporté. |
+| Types énumérés : `CAST( x AS enum )`, constante `Type.#CONST` dans une vue, `CONV string( enum )` (nom de la constante) dans le behavior pool, `cl_abap_enumdescr` | Non gérés : les expressions CDS sont refusées (CDS002) ; dans le behavior pool, une valeur énumérée est sa valeur de base. |
+| Types énumérés dans le behavior pool : constante dans un modèle de chaîne (`|{ type-const }|`) | Non remplacée : le transpiler signale le nom inconnu (ABP004) ; passer par une variable. |
+| Types énumérés exposés en OData | Refusés en mode `standard` comme sur SAP (CDS021) ; `EnumType` en mode `enhanced` seulement. |
 | Conversion exits (ALPHA…), conversion ISO des langues | Non gérés |
 
 ## Base de données
@@ -88,7 +95,9 @@ Versions de référence : `@abaplint/core` 2.120.98, `@abaplint/transpiler` 2.14
 | Écart | Statut |
 |---|---|
 | Comparaisons `lt`/`le` sur une date initiale : en ABAP `00000000` est inférieure à toute date ; ici la valeur initiale est `NULL` et n'est retenue par aucune comparaison (sémantique OData de `null`). | Assumé |
-| `$filter` avec `any`/`all`, `$expand` imbriqué, `$apply`, JSON batch, `$value` | Réponse 501 ou 400 |
+| `$filter` avec `any`/`all`, `$expand` imbriqué, JSON batch, `$value` | Réponse 501 ou 400 |
+| `$apply` (D52) : transformations autres que `filter`, `groupby`, `aggregate` (`topcount`, `compute`, `concat`…), transformation après un groupement, annotation `@Aggregation` | Réponse 501 ; les agrégats portent sur les propriétés du type, sans hiérarchie. |
+| Littéraux d'énumération (D55) : un seul membre (`Ns.Type'A'`, pas de drapeaux `'A,B'`), opérateur `has` | Le premier membre est pris ; `has` : 400. |
 | `etag dependent by` : maître en unmanaged save, ou champ ETag du maître qui n'est pas un horodatage administratif | Le runtime ne change pas l'ETag du maître quand une entité dépendante change : `save_modified` ou l'application doit le faire (D32). |
 | `etag dependent by` à travers une projection qui n'expose pas l'association | Pas d'ETag pour l'entité dépendante (ni `@odata.etag`, ni contrôle de `If-Match`). |
 | Feature control global (`features : global`) dans les lectures | Exposé comme le feature control d'instance (`__EntityControl`, `__OperationControl` : même valeur pour toutes les instances), recalculé à chaque requête, sans cache. Action statique : contrôlé à l'exécution seulement (pas d'instance pour `Core.OperationAvailable`). |
@@ -137,10 +146,31 @@ Versions de référence : `@abaplint/core` 2.120.98, `@abaplint/transpiler` 2.14
 
 | Écart | Statut |
 |---|---|
-| Vues standards disponibles | `I_Currency`, `I_UnitOfMeasure`, `I_Country`, `I_Language` et leurs vues de textes. Les autres vues libérées (`I_Region`, `I_CalendarDate`, `I_ExchangeRate`…) ne sont pas fournies : CDS005. |
+| Vues standards disponibles | `I_Currency`, `I_UnitOfMeasure`, `I_Country`, `I_Language`, `I_Region`, `I_TimeZone` et leurs vues de textes, `I_CalendarDate`, `I_BusinessUserBasic`, `I_ExchangeRate`. Les autres vues libérées ne sont pas fournies : CDS005. |
+| `I_Region` | Régions des États-Unis, du Canada, de l'Allemagne et de l'Australie seulement. |
+| `I_ExchangeRate` | Aucun taux livré (table `rapt_exchrate` vide) : à charger par l'application ou `rapt/seed.json`. Pas de conversion de devises (`CURRENCY_CONVERSION`). |
+| `I_BusinessUserBasic` | Un utilisateur n'y figure qu'après sa première requête ; pas de synchronisation avec l'IdP (départs, changements de nom). |
 | Données de référence | Textes en anglais seulement ; unités : une trentaine d'unités courantes (le contenu de SAP en compte bien plus) ; pas de décalage des décimales (`TCURX`) : `Decimals` est une information. |
 | Éléments des vues standards | Ceux d'usage courant ; les autres éléments des vues de SAP (et leurs associations) n'existent pas. |
 | Value help | Pas de `additionalBinding` (filtres et résultats supplémentaires), ni de `useForValidation`, ni de `Common.ValueListWithFixedValues` (liste déroulante). |
+
+## Draft (D54)
+
+| Écart | Statut |
+|---|---|
+| Déterminations et validations pendant l'édition du brouillon (`on modify` sur le brouillon, `Prepare` qui valide) | Non exécutées dans le brouillon : elles s'exécutent à l'activation ; `Prepare` renvoie le brouillon sans contrôle. |
+| Actions de l'application sur un brouillon | Réponse 501 : activer d'abord. |
+| `SiblingEntity`, `draft query view`, brouillon collaboratif, `with draft` sur un BO à unmanaged save | Non pris en charge. |
+| Messages d'état (`%state_area`) | Renvoyés comme messages de transition à l'activation. |
+| Verrou exclusif | Repris par un autre utilisateur après 15 minutes sans modification, comme SAP ; pas de durée réglable. |
+
+## Floorplans (D53)
+
+| Écart | Statut |
+|---|---|
+| Analytical List Page | Un graphique (le premier `@UI.chart`) et une dimension ; pas de barre de filtres visuels, ni de graphiques multiples, ni de mesures de `@Aggregation`. |
+| Overview Page | Cartes `kpi`, `list`, `table`, `chart` décrites dans `rapt/config.json` (pas d'annotations `@UI.dataPoint` / `@UI.kpi`), sans filtre global. |
+| Graphiques | Contrôle SVG propre : colonnes, barres, lignes, secteurs, anneau ; pas de zoom, d'infobulle riche ni d'export. |
 
 ## Mode enhanced (D45)
 

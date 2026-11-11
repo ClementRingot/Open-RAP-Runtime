@@ -9,7 +9,8 @@
 import * as abaplint from "@abaplint/core";
 import { config as transpilerConfig, Transpiler, UnknownTypesEnum } from "@abaplint/transpiler";
 import { derivedTypesInterfaceName, type Model } from "@rap-transpiler/model";
-import type { Diagnostics } from "../../diagnostics.js";
+import { Diagnostics } from "../../diagnostics.js";
+import { Dictionary } from "../../ir/dictionary.js";
 import type { Project, SourceFile } from "../../input/project.js";
 import { abaplintRegistry } from "../../ir/handlers.js";
 import { generateDerivedTypes } from "./derived-types.js";
@@ -17,7 +18,8 @@ import { FRAMEWORK_SOURCES } from "./framework.js";
 import { QUERY_FRAMEWORK_SOURCES } from "./framework-query.js";
 import { frameworkClosure, frameworkObjectName } from "./framework-utils.js";
 import { BdefCatalog, findModelProviders, findSaverClasses, poolBdefOf, rewriteAbapFile } from "./rewrite.js";
-import { frameworkDictionary, shadowEntity, shadowTable } from "./shadow.js";
+import { frameworkDictionary, shadowDataElement, shadowEntity, shadowTable } from "./shadow.js";
+import { replaceEnumConstants } from "./enums.js";
 
 export interface AbapSource {
   fileName: string;
@@ -111,6 +113,14 @@ export function abapSources(project: Project, model: Model, diagnostics: Diagnos
     sources.push({ fileName: shadow.fileName, content: shadow.content });
     projectObjects.add(`TABL:${entity.name.toUpperCase()}`);
   }
+  // CDS simple and enumerated types (D55): data elements of their base types for the transpiler
+  for (const { name, info } of new Dictionary(project, new Diagnostics()).cdsTypeEntries()) {
+    if (!projectObjects.has(`DTEL:${name.toUpperCase()}`)) {
+      const shadow = shadowDataElement(name, { ...info.type, dataElement: name.toUpperCase() }, info.label ?? name);
+      sources.push({ fileName: shadow.fileName, content: shadow.content });
+      projectObjects.add(`DTEL:${name.toUpperCase()}`);
+    }
+  }
   for (const file of frameworkDictionary(projectObjects)) {
     sources.push({ fileName: file.fileName, content: file.content });
   }
@@ -133,7 +143,8 @@ export function abapSources(project: Project, model: Model, diagnostics: Diagnos
         continue;
       }
       const original = project.files.find((f) => f.fileName === file.getFilename());
-      const content = rewriteAbapFile(file, { catalog, diagnostics, file: original?.path ?? file.getFilename(), saverClasses, modelProviders, ...(pool === undefined ? {} : { pool }) });
+      const rewritten = rewriteAbapFile(file, { catalog, diagnostics, file: original?.path ?? file.getFilename(), saverClasses, modelProviders, ...(pool === undefined ? {} : { pool }) });
+      const content = replaceEnumConstants(rewritten, model.enumTypes ?? []);
       sources.push({ fileName: file.getFilename(), content, ...(original === undefined ? {} : { original: original.path }) });
     }
     for (const xml of project.files.filter((f) => f.type === type && f.name === name && f.extension === "xml")) {

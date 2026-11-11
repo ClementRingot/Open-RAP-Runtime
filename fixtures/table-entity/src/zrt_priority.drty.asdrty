@@ -1,0 +1,10 @@
+@EndUserText.label: 'Priority'
+define type ZRT_PRIORITY : abap.int1 enum
+{
+  @EndUserText.label: 'Low'
+  LOW = initial;
+  @EndUserText.label: 'Medium'
+  MEDIUM = 5;
+  @EndUserText.label: 'High'
+  HIGH = 9;
+}

@@ -279,6 +279,10 @@ function buildEntityBehavior(
     } else if (entity.kind !== "view") {
       diagnostics.error("BDEF013", `${entity.name}: a managed BDEF must be defined on a view entity, not a ${entity.kind}${entity.kind === "custom" ? " (except with unmanaged save, D43)" : ""}`, at(ast.entity.loc));
     }
+    if (model.persistentTable === undefined && !unmanagedSave && entity.tableEntity === true && entity.source !== undefined) {
+      // a table entity is its own persistence (D55)
+      model.persistentTable = entity.source;
+    }
     if (model.persistentTable === undefined && !unmanagedSave) {
       diagnostics.error("BDEF014", `${entity.name}: a managed entity needs a persistent table (or with unmanaged save)`, at(ast.loc));
     }
