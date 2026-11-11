@@ -16,7 +16,7 @@ import { existsSync, readFileSync } from "node:fs";
 import path from "node:path";
 import type { FastifyInstance } from "fastify";
 import { PGliteDialect, sql } from "kysely";
-import type { Model } from "@rap-transpiler/model";
+import type { McpToolsModel, Model } from "@rap-transpiler/model";
 import { createApp } from "./app.js";
 import { authFromEnvironment } from "./auth/environment.js";
 import { Authorizations, rolesFromJson } from "./auth/authorizations.js";
@@ -89,6 +89,9 @@ export async function start(options: StartOptions): Promise<RunningServer> {
     rap.authorizations = authorizations;
   }
   const uiDir = path.join(dir, "ui");
+  // the MCP server (D47): mcp/tools.json, written when the sources have rapt/mcp.json
+  const mcpFile = path.join(dir, "mcp", "tools.json");
+  const mcp = existsSync(mcpFile) && env["MCP"] !== "off" ? (JSON.parse(readFileSync(mcpFile, "utf8")) as McpToolsModel) : undefined;
   const app = await createApp({
     model,
     metadata,
@@ -99,6 +102,7 @@ export async function start(options: StartOptions): Promise<RunningServer> {
     authorizations,
     ...(env["SESSION_SECRET"] === undefined ? {} : { csrfSecret: env["SESSION_SECRET"] }),
     ...(existsSync(uiDir) && env["UI"] !== "off" ? { ui: { dir: uiDir, resourcesFrom: dir } } : {}),
+    ...(mcp === undefined ? {} : { mcp }),
   });
   let url = publicUrl;
   if (options.listen !== false) {

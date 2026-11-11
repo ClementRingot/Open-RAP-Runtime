@@ -6,3 +6,4 @@ export * from "./naming.js";
 export * from "./odata.js";
 export * from "./launchpad.js";
 export * from "./value-help.js";
+export * from "./mcp.js";

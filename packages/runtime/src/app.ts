@@ -1,7 +1,8 @@
 /** The Fastify application of a generated service. */
 
 import Fastify, { type FastifyInstance, type FastifyReply, type FastifyRequest, type FastifyServerOptions } from "fastify";
-import type { Model } from "@rap-transpiler/model";
+import type { McpToolsModel, Model } from "@rap-transpiler/model";
+import { registerMcp } from "./mcp/server.js";
 import { AuthenticationError, Authenticator, type AuthOptions } from "./auth/auth.js";
 import { OidcSessions } from "./auth/session.js";
 import type { User } from "./auth/user.js";
@@ -37,6 +38,8 @@ export interface AppOptions {
   authorizations?: Authorizations;
   /** The generated UI (`ui/` folder) and the OpenUI5 resources. */
   ui?: UiOptions;
+  /** The MCP tools of the service (D47), served at /mcp. */
+  mcp?: McpToolsModel;
   /** Extra plugins (UI, login routes), registered after the service. */
   extend?: (app: FastifyInstance, services: AppServices) => Promise<void> | void;
 }
@@ -191,6 +194,9 @@ export async function createApp(options: AppOptions): Promise<FastifyInstance> {
   app.route({ method: ["GET", "HEAD", "POST", "PATCH", "PUT", "DELETE"], url: `${root}/*`, handler: serve });
 
   app.get("/health", async () => ({ status: "ok" }));
+  if (options.mcp !== undefined) {
+    registerMcp(app, { tools: options.mcp, handler, authenticator });
+  }
   sessions?.register(app);
 
   if (options.ui !== undefined) {

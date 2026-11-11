@@ -8,6 +8,7 @@ import { generateAbap } from "./gen/abap/generate.js";
 import { findDestinations, generateScaffold } from "./gen/app/index.js";
 import { generateCsdl } from "./gen/csdl.js";
 import { generateSql } from "./gen/sql.js";
+import { buildMcpTools, loadMcpConfig } from "./gen/mcp.js";
 import { generateUi } from "./gen/ui/index.js";
 import type { Project } from "./input/project.js";
 import { buildModel, type BuildOptions } from "./ir/builder.js";
@@ -56,6 +57,11 @@ export async function generateApplication(project: Project, options: GenerateOpt
     ...abap.sources.map((s) => ({ path: `abap/src/${s.fileName}`, content: s.content })),
     ...generateUi(model).map((f) => ({ path: `ui/${f.path}`, content: f.content })),
   ];
+  // the MCP server of the service (D47), when rapt/mcp.json asks for it
+  const mcp = loadMcpConfig(project, diagnostics);
+  if (mcp !== undefined) {
+    files.push({ path: "mcp/tools.json", content: `${JSON.stringify(buildMcpTools(model, mcp, diagnostics), null, 2)}\n` });
+  }
   if (seed.json !== undefined) {
     files.push({ path: "db/seed.json", content: `${JSON.stringify(seed.json, null, 2)}\n` });
   }

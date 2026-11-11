@@ -298,6 +298,25 @@ async function generate(root: string): Promise<void> {
   }
 }
 
+/** "Générer le serveur MCP du service": rapt/mcp.json, opened to describe each tool (D47). */
+async function mcp(root: string): Promise<void> {
+  try {
+    const result = await runJson<GenerateResult & { tools: number; added: string[]; removed: string[]; file: string }>(cli(), ["mcp", root], root);
+    if (!result.ok) {
+      void vscode.window.showErrorMessage(`RAP : ${result.error ?? "génération impossible"}`);
+      return;
+    }
+    await vscode.window.showTextDocument(vscode.Uri.file(path.join(root, result.file)));
+    const port = config().get<number>("dev.port") ?? 8080;
+    output.appendLine(`rapt mcp: ${result.tools} outils (${result.added.length} nouveaux). Connexion : claude mcp add --transport http rap http://localhost:${port}/mcp`);
+    void vscode.window.showInformationMessage(
+      `RAP : ${result.tools} outils MCP. Décrivez chaque outil dans rapt/mcp.json ; l'application les sert sur /mcp (rapt dev : http://localhost:${port}/mcp).`,
+    );
+  } catch (e) {
+    cliFailed(e as Error);
+  }
+}
+
 /** "Choisir le mode du projet": standard (as on SAP) or enhanced, in rapt/config.json (D45). */
 async function setMode(root: string): Promise<void> {
   const file = path.join(root, "rapt", "config.json");
@@ -464,6 +483,7 @@ export function activate(context: vscode.ExtensionContext): void {
     vscode.commands.registerCommand("rapt.abapgit", withProject(abapGit)),
     vscode.commands.registerCommand("rapt.generate", withProject(generate)),
     vscode.commands.registerCommand("rapt.setMode", withProject(setMode)),
+    vscode.commands.registerCommand("rapt.mcp", withProject(mcp)),
     // check on save, unless rapt dev already rebuilds this project
     vscode.workspace.onDidSaveTextDocument((document) => {
       if (document.uri.scheme !== "file" || config().get<boolean>("checkOnSave") === false) {

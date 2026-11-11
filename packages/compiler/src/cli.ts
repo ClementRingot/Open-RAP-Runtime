@@ -5,6 +5,7 @@ import { writeFileSync } from "node:fs";
 import path from "node:path";
 import { generateAbapGitFiles, type AbapGitResult } from "./authoring/abapgit.js";
 import { generateObject, OBJECT_KINDS } from "./authoring/generate.js";
+import { writeMcpFile } from "./authoring/mcp.js";
 import { newBusinessObject } from "./authoring/new.js";
 import { generateApplication, writeFiles, type GenerateOptions } from "./build.js";
 import { parseArgs } from "node:util";
@@ -25,6 +26,8 @@ Usage:
   rapt dev   <src> [--port <n>] [--out <dir>]    build, run with an embedded database, rebuild on change
   rapt new   <src> <Entity> [--prefix Z…]        write the sources of a new business object (and their XML)
   rapt abapgit <src> [--check]                   write the abapGit XML files the sources lack
+  rapt mcp   <src>                               write rapt/mcp.json: the MCP tools of the service, to describe;
+                                                 the application then serves them at /mcp
   rapt generate <src> <kind> <name> [--from X]   write one new object (table, view, projection, behavior,
                                                  pool, metadata, access, service, binding…; no kind: the list)
 
@@ -103,6 +106,23 @@ export async function main(argv: string[]): Promise<number> {
   }
   if (command === "new") {
     return newCommand(source, parsed.positionals[2], parsed.values, parsed.values["json"] === true);
+  }
+  if (command === "mcp") {
+    const result = writeMcpFile(source, {
+      ...(typeof parsed.values["service"] === "string" ? { service: parsed.values["service"] } : {}),
+      ...(typeof parsed.values["mode"] === "string" ? { mode: parsed.values["mode"] } : {}),
+    });
+    if (parsed.values["json"] === true) {
+      process.stdout.write(`${JSON.stringify({ command: "mcp", ok: result.error === undefined, root: path.resolve(source), ...result })}\n`);
+      return result.error === undefined ? 0 : 1;
+    }
+    if (result.error !== undefined) {
+      process.stderr.write(`${result.error}\n`);
+      return 1;
+    }
+    process.stdout.write(`${result.file}: ${result.tools} tools (${result.added.length} new${result.removed.length === 0 ? "" : `, removed: ${result.removed.join(", ")}`})\n`);
+    process.stdout.write("describe each tool in that file; the application serves them at /mcp (rapt dev, rapt build)\n");
+    return 0;
   }
   if (command === "generate") {
     return generateCommand(source, parsed.positionals[2], parsed.positionals[3], parsed.values, parsed.values["json"] === true);
