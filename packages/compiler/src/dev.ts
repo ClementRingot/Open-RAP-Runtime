@@ -119,8 +119,8 @@ export class DevSession {
   /** Builds the application; on success, (re)starts the server. A failed build keeps the running server. */
   public async rebuild(): Promise<RebuildResult> {
     this.emit({ type: "building", root: this.root });
-    const runtimeNodeModules = this.runtimeDir === undefined ? undefined : path.join(this.runtimeDir, "node_modules");
-    if (runtimeNodeModules === undefined || !existsSync(runtimeNodeModules)) {
+    const runtimeNodeModules = this.runtimeDir === undefined ? undefined : runtimeDependencies(this.runtimeDir);
+    if (runtimeNodeModules === undefined) {
       this.emit({ type: "error", message: "the @rap-transpiler/runtime package (built, with its node_modules) is needed: run pnpm install and pnpm build, or give --runtime <dir>" });
       return this.failed();
     }
@@ -373,6 +373,26 @@ export class DevSession {
     const timeout = setTimeout(() => child.kill(), 5000);
     await exited;
     clearTimeout(timeout);
+  }
+}
+
+/**
+ * The node_modules folder that holds the dependencies of the runtime (@abaplint/runtime, OpenUI5,
+ * PGlite), searched like Node.js does: its own (pnpm workspace), then those of the parent folders
+ * (npm installation, flat, as in the VS Code extension).
+ */
+export function runtimeDependencies(runtimeDir: string): string | undefined {
+  let dir = path.resolve(runtimeDir);
+  for (;;) {
+    const candidate = path.basename(dir) === "node_modules" ? dir : path.join(dir, "node_modules");
+    if (existsSync(path.join(candidate, "@abaplint", "runtime"))) {
+      return candidate;
+    }
+    const parent = path.dirname(dir);
+    if (parent === dir) {
+      return undefined;
+    }
+    dir = parent;
   }
 }
 

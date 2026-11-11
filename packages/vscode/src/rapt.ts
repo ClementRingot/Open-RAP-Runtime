@@ -53,6 +53,20 @@ export type DevEvent =
 export interface Cli {
   command: string;
   args: string[];
+  /** Added to the environment (ELECTRON_RUN_AS_NODE when the Node.js of VS Code runs rapt). */
+  env?: Record<string, string>;
+}
+
+export interface CliOptions {
+  /** Setting rapt.cliPath: a cli.js, or a folder of rap-transpiler. */
+  cliPath?: string;
+  /** Setting rapt.nodePath: a Node.js 22+; empty for the Node.js of VS Code. */
+  nodePath?: string;
+  /** The rapt embedded in the extension (rapt/node_modules/@rap-transpiler/compiler/dist/cli.js). */
+  bundledCli?: string;
+  workspaceFolders: string[];
+  /** The executable of VS Code (process.execPath of the extension host). */
+  execPath: string;
 }
 
 /**
@@ -79,11 +93,12 @@ export function findProjectRoot(file: string, stop?: string, exists: (p: string)
 }
 
 /**
- * The CLI: the configured path (a cli.js, or a folder of rap-transpiler), else the compiler of a
- * rap-transpiler clone or of node_modules in a workspace folder, else `rapt` on the PATH.
+ * The CLI: the configured path (a cli.js, or a folder of rap-transpiler), else the rapt embedded
+ * in the extension, else the compiler of a rap-transpiler clone or of node_modules in a
+ * workspace folder, else `rapt` on the PATH. It runs on the configured Node.js, else on the
+ * Node.js of VS Code (ELECTRON_RUN_AS_NODE, Node.js 22 since VS Code 1.101).
  */
-export function resolveCli(options: { cliPath?: string; nodePath?: string; workspaceFolders: string[] }, exists: (p: string) => boolean = existsSync): Cli {
-  const node = options.nodePath !== undefined && options.nodePath !== "" ? options.nodePath : "node";
+export function resolveCli(options: CliOptions, exists: (p: string) => boolean = existsSync): Cli {
   const candidates: string[] = [];
   const configured = options.cliPath?.trim();
   if (configured !== undefined && configured !== "") {
@@ -92,12 +107,19 @@ export function resolveCli(options: { cliPath?: string; nodePath?: string; works
       candidates.push(path.join(configured, "dist", "cli.js"));
     }
   }
+  if (options.bundledCli !== undefined) {
+    candidates.push(options.bundledCli);
+  }
   for (const folder of options.workspaceFolders) {
     candidates.push(path.join(folder, "packages", "compiler", "dist", "cli.js"));
     candidates.push(path.join(folder, "node_modules", "@rap-transpiler", "compiler", "dist", "cli.js"));
   }
   const found = candidates.find((candidate) => exists(candidate));
-  return found === undefined ? { command: "rapt", args: [] } : { command: node, args: [found] };
+  if (found === undefined) {
+    return { command: "rapt", args: [] };
+  }
+  const node = options.nodePath?.trim();
+  return node !== undefined && node !== "" ? { command: node, args: [found] } : { command: options.execPath, args: [found], env: { ELECTRON_RUN_AS_NODE: "1" } };
 }
 
 /** Splits a stream into lines (the last, unfinished line is kept for the next chunk). */
@@ -133,7 +155,12 @@ export function parseDevEvent(line: string): DevEvent {
 
 function spawnCli(cli: Cli, args: string[], cwd: string): ChildProcess {
   // a bare `rapt` is a .cmd shim on Windows
-  return spawn(cli.command, [...cli.args, ...args], { cwd, shell: cli.args.length === 0 && process.platform === "win32", windowsHide: true });
+  return spawn(cli.command, [...cli.args, ...args], {
+    cwd,
+    env: { ...process.env, ...cli.env },
+    shell: cli.args.length === 0 && process.platform === "win32",
+    windowsHide: true,
+  });
 }
 
 /** Runs `rapt <command> … --json` and returns its result. */

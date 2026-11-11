@@ -91,3 +91,16 @@ copyleft limité aux fichiers de la bibliothèque elle-même, sans effet sur not
 | Image `node:22-alpine` | Node.js : MIT ; Alpine : paquets libres | Base de l'image Docker de l'application générée |
 | Image `postgres:16-alpine` | PostgreSQL License | Base de données du docker-compose généré |
 | Image `quay.io/keycloak/keycloak:26.0` | Apache-2.0 | Fournisseur OIDC du profil `oidc` du docker-compose (non embarqué dans l'image de l'application) |
+
+### Extension VS Code (`packages/vscode`)
+
+Le `.vsix` redistribue le compilateur, le runtime et leurs dépendances de production, ainsi
+qu'OpenUI5, `less-openui5` et PGlite pour `rapt dev` (D39) : toutes sous les licences listées
+ci-dessus (MIT, Apache-2.0…), avec leurs fichiers de licence dans `rapt/node_modules`. Outils de
+construction seulement, non redistribués :
+
+| Composant | Version | Licence | Usage |
+|---|---|---|---|
+| `esbuild` | 0.28.2 | MIT | Fichier unique CommonJS de l'extension |
+| `@vscode/vsce` | 3.9.2 | MIT | Construction du `.vsix` |
+| `@types/vscode` | 1.101.0 | MIT | Types de l'API VS Code |

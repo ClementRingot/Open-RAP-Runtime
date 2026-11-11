@@ -1,7 +1,8 @@
-import { existsSync, lstatSync, readFileSync, renameSync, writeFileSync } from "node:fs";
+import { existsSync, lstatSync, mkdirSync, mkdtempSync, readFileSync, renameSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
 import path from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
-import { DevSession, type DevEvent } from "../src/dev.js";
+import { DevSession, runtimeDependencies, type DevEvent } from "../src/dev.js";
 import { fixtureVariant } from "./helpers.js";
 
 const SERVICE = "sap/opu/odata4/sap/zrt_ui_travel_o4/srvd/sap/zrt_ui_travel/0001";
@@ -109,5 +110,18 @@ describe("rapt dev", () => {
     expect((await dev.rebuild()).ok).toBe(true);
     expect(events.map((e) => e.type)).toEqual(["building", "diagnostics", "ready"]);
     expect(events[2]).toEqual({ type: "ready", url: `http://localhost:${port}/ui/index.html` });
+  });
+
+  it("finds the dependencies of the runtime, in a pnpm workspace or installed flat", () => {
+    const root = mkdtempSync(path.join(tmpdir(), "rapt-deps-"));
+    cleanups.push(() => rmSync(root, { recursive: true, force: true }));
+    // pnpm: packages/runtime/node_modules
+    mkdirSync(path.join(root, "repo", "packages", "runtime", "node_modules", "@abaplint", "runtime"), { recursive: true });
+    expect(runtimeDependencies(path.join(root, "repo", "packages", "runtime"))).toBe(path.join(root, "repo", "packages", "runtime", "node_modules"));
+    // npm, flat (the VS Code extension): rapt/node_modules
+    mkdirSync(path.join(root, "rapt", "node_modules", "@rap-transpiler", "runtime"), { recursive: true });
+    mkdirSync(path.join(root, "rapt", "node_modules", "@abaplint", "runtime"), { recursive: true });
+    expect(runtimeDependencies(path.join(root, "rapt", "node_modules", "@rap-transpiler", "runtime"))).toBe(path.join(root, "rapt", "node_modules"));
+    expect(runtimeDependencies(path.join(root, "nothing"))).toBeUndefined();
   });
 });

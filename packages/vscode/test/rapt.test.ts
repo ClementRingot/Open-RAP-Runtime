@@ -34,10 +34,17 @@ describe("rapt from the extension", () => {
   });
 
   it("resolves the CLI", () => {
-    const exists = (p: string): boolean => p === path.resolve("/repo/packages/compiler/dist/cli.js");
-    expect(resolveCli({ workspaceFolders: ["/repo"] }, exists)).toEqual({ command: "node", args: [path.resolve("/repo/packages/compiler/dist/cli.js")] });
-    expect(resolveCli({ cliPath: "/repo", nodePath: "/opt/node22/bin/node", workspaceFolders: [] }, exists)).toEqual({ command: "/opt/node22/bin/node", args: [path.resolve("/repo/packages/compiler/dist/cli.js")] });
-    expect(resolveCli({ workspaceFolders: ["/elsewhere"] }, exists)).toEqual({ command: "rapt", args: [] });
+    const repo = path.resolve("/repo/packages/compiler/dist/cli.js");
+    const bundled = path.resolve("/ext/rapt/node_modules/@rap-transpiler/compiler/dist/cli.js");
+    const vscodeNode = { command: "/vscode/code", env: { ELECTRON_RUN_AS_NODE: "1" } };
+    const base = { workspaceFolders: ["/repo"], execPath: "/vscode/code" };
+    // the rapt of the extension, on the Node.js of VS Code
+    expect(resolveCli({ ...base, bundledCli: bundled }, (p) => p === bundled || p === repo)).toEqual({ ...vscodeNode, args: [bundled] });
+    // without it: a clone of the workspace
+    expect(resolveCli(base, (p) => p === repo)).toEqual({ ...vscodeNode, args: [repo] });
+    // the setting first, on the configured Node.js
+    expect(resolveCli({ ...base, bundledCli: bundled, cliPath: "/repo", nodePath: "/opt/node22/bin/node" }, (p) => p === bundled || p === repo)).toEqual({ command: "/opt/node22/bin/node", args: [repo] });
+    expect(resolveCli({ ...base, workspaceFolders: ["/elsewhere"] }, () => false)).toEqual({ command: "rapt", args: [] });
   });
 
   it("reads JSON lines", () => {
@@ -54,8 +61,8 @@ describe("rapt from the extension", () => {
 
   it("runs rapt check --json", async () => {
     const dir = copy();
-    const cli = resolveCli({ workspaceFolders: [REPO] });
-    expect(cli.command).toBe("node");
+    const cli = resolveCli({ workspaceFolders: [REPO], execPath: process.execPath, nodePath: process.execPath });
+    expect(cli.args[0]).toBe(path.join(REPO, "packages", "compiler", "dist", "cli.js"));
     const ok = await runJson(cli, ["check", dir], dir);
     expect(ok).toMatchObject({ command: "check", ok: true, counts: { error: 0 } });
     rmSync(path.join(dir, "src", "zrt_ui_travel.srvd.srvdsrv"));
@@ -68,7 +75,7 @@ describe("rapt from the extension", () => {
     const dir = copy();
     const events: DevEvent[] = [];
     const port = 20000 + Math.floor(Math.random() * 20000);
-    const dev = new DevProcess(resolveCli({ workspaceFolders: [REPO] }), dir, port, (e) => events.push(e), () => undefined);
+    const dev = new DevProcess(resolveCli({ workspaceFolders: [REPO], execPath: process.execPath, nodePath: process.execPath }), dir, port, (e) => events.push(e), () => undefined);
     cleanups.push(() => dev.stop());
     await expect.poll(() => events.find((e) => e.type === "ready"), { timeout: 60_000, interval: 200 }).toEqual({ type: "ready", url: `http://localhost:${port}/ui/index.html` });
     expect((await fetch(`http://localhost:${port}/ui/index.html`)).status).toBe(200);

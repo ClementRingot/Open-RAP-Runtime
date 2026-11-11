@@ -64,6 +64,10 @@ Problèmes à chaque enregistrement, les commandes *RAP : Lancer rapt dev*, *Vé
 `--json` (une sortie JSON pour `check` et `build`, un événement JSON par ligne pour `dev`) et ne
 compile rien elle-même ([D39](docs/DECISIONS.md)).
 
+Le `.vsix` est autonome : il contient rapt, OpenUI5 et PGlite, et lance rapt avec le Node.js
+de VS Code (1.101 ou plus). Rien d'autre à installer. La CI le publie en artefact
+(`rap-transpiler-vscode`) ; pour le construire :
+
 ```sh
 cd packages/vscode && pnpm run package && code --install-extension rap-transpiler-vscode.vsix
 ```

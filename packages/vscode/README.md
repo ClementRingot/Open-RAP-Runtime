@@ -18,20 +18,28 @@ et en affiche les résultats.
 Un projet est un dossier abapGit : le dossier qui contient `.abapgit.xml` (à défaut, le parent
 d'un dossier `src`).
 
-## Prérequis
+## Installation
 
-- Node.js 22 ou plus.
-- La CLI `rapt`. L'extension la cherche dans cet ordre : le réglage `rapt.cliPath` (chemin du
-  `cli.js` ou du clone rap-transpiler), un clone rap-transpiler ouvert dans l'espace de travail
-  (`packages/compiler/dist/cli.js`, après `pnpm install && pnpm build`), le `node_modules` d'un
-  dossier de l'espace de travail, puis la commande `rapt` du PATH.
+Rien d'autre à installer : le `.vsix` contient rapt (compilateur et runtime), OpenUI5 et PGlite,
+et rapt tourne sur le Node.js intégré à VS Code (1.101 ou plus, Node.js 22).
+
+```sh
+code --install-extension rap-transpiler-vscode.vsix
+```
+
+Le `.vsix` est produit par la CI à chaque commit (artefact `rap-transpiler-vscode`).
+
+Pour utiliser une autre version de rapt (un clone en cours de développement, par exemple) :
+réglage `rapt.cliPath`. Sans version intégrée (extension construite sans `pnpm run stage`),
+l'extension prend un clone rap-transpiler ou le `node_modules` d'un dossier de l'espace de
+travail, puis la commande `rapt` du PATH.
 
 ## Réglages
 
 | Réglage | Défaut | Rôle |
 |---|---|---|
-| `rapt.cliPath` | vide | `cli.js` de rapt ou dossier du clone |
-| `rapt.nodePath` | `node` | Node.js qui lance rapt |
+| `rapt.cliPath` | vide | `cli.js` de rapt ou dossier d'un clone (vide : rapt intégré) |
+| `rapt.nodePath` | vide | Node.js 22+ qui lance rapt (vide : celui de VS Code) |
 | `rapt.checkOnSave` | `true` | vérifier à chaque enregistrement |
 | `rapt.dev.port` | `8080` | port de l'application |
 | `rapt.dev.openUi` | `true` | ouvrir le navigateur au démarrage de rapt dev |
@@ -40,6 +48,9 @@ d'un dossier `src`).
 
 ```sh
 pnpm install && pnpm build
-cd packages/vscode && pnpm run package    # rap-transpiler-vscode.vsix
-code --install-extension rap-transpiler-vscode.vsix
+cd packages/vscode && pnpm run package    # rap-transpiler-vscode.vsix (~31 Mo)
 ```
+
+`pnpm run package` compile l'extension (esbuild), prépare `rapt/` (`scripts/stage-rapt.mjs` :
+paquets du dépôt et dépendances installés depuis le registre npm, fichiers inutiles retirés),
+puis appelle `vsce package`.

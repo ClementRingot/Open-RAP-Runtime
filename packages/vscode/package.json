@@ -1,7 +1,7 @@
 {
   "name": "rap-transpiler-vscode",
   "displayName": "RAP Transpiler",
-  "description": "Vérifier, générer et lancer un business object RAP avec rap-transpiler (rapt), sans système SAP.",
+  "description": "Vérifier, générer et lancer un business object RAP sans système SAP : rap-transpiler, OpenUI5 et PGlite sont intégrés, rien d'autre à installer.",
   "version": "0.1.0",
   "publisher": "clementringot",
   "private": true,
@@ -12,7 +12,7 @@
     "url": "https://github.com/ClementRingot/rap-transpiler"
   },
   "engines": {
-    "vscode": "^1.95.0"
+    "vscode": "^1.101.0"
   },
   "categories": [
     "Programming Languages",
@@ -120,12 +120,12 @@
         "rapt.cliPath": {
           "type": "string",
           "default": "",
-          "markdownDescription": "Chemin du `cli.js` de rapt, ou du dossier du clone rap-transpiler. Vide : le clone ou le `node_modules` d'un dossier de l'espace de travail, sinon la commande `rapt` du PATH."
+          "markdownDescription": "Chemin du `cli.js` de rapt, ou du dossier d'un clone rap-transpiler. Vide : la version de rapt intégrée à l'extension."
         },
         "rapt.nodePath": {
           "type": "string",
-          "default": "node",
-          "description": "Exécutable Node.js (22 ou plus) qui lance rapt."
+          "default": "",
+          "markdownDescription": "Exécutable Node.js (22 ou plus) qui lance rapt. Vide : le Node.js intégré à VS Code."
         },
         "rapt.checkOnSave": {
           "type": "boolean",
@@ -147,11 +147,12 @@
   },
   "scripts": {
     "build": "tsc -p tsconfig.build.json --noEmit && esbuild src/extension.ts --bundle --platform=node --target=node20 --format=cjs --external:vscode --sourcemap --outfile=dist/extension.cjs",
-    "package": "vsce package --no-dependencies --out rap-transpiler-vscode.vsix"
+    "package": "pnpm run build && node scripts/stage-rapt.mjs && vsce package --no-dependencies --out rap-transpiler-vscode.vsix",
+    "stage": "node scripts/stage-rapt.mjs"
   },
   "devDependencies": {
     "@types/node": "22.20.5",
-    "@types/vscode": "1.95.0",
+    "@types/vscode": "1.101.0",
     "@vscode/vsce": "3.9.2",
     "esbuild": "0.28.2"
   }

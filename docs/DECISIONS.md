@@ -677,8 +677,26 @@ et la conséquence. Les numéros D1 à D13 correspondent aux points 1 à 13 du �
     l'application*, *Lancer / Arrêter rapt dev*, *Ouvrir l'application*, état dans la barre
     d'état, menus de l'explorateur et de la barre de titre. Un projet est le dossier de
     `.abapgit.xml` (à défaut, le parent de `src`).
-  - **CLI trouvée** : réglage `rapt.cliPath`, sinon un clone rap-transpiler ou un `node_modules`
-    de l'espace de travail, sinon `rapt` du PATH ; Node.js par `rapt.nodePath`.
+  - **Extension autonome** : le `.vsix` (~31 Mo, ~9 100 fichiers) contient `rapt/` : les paquets
+    du dépôt (`pnpm pack`) installés par npm, à plat, avec leurs dépendances de production et ce
+    que `rapt dev` sert (OpenUI5, `less-openui5`, PGlite, aux versions du runtime), sans cartes
+    de sources, types, documentation, tests des paquets, design time OpenUI5 ni extensions
+    PGlite (`scripts/stage-rapt.mjs`). Un téléchargement au premier lancement aurait allégé le
+    `.vsix`, mais demandé l'accès au registre npm (souvent filtré en entreprise) et du code de
+    cache ; le `.vsix` passe par VS Code, hors ligne une fois installé, et rapt y a toujours la
+    version de l'extension.
+  - **Node.js de VS Code** : rapt tourne sur l'exécutable de VS Code avec
+    `ELECTRON_RUN_AS_NODE=1` (Node.js 22 depuis VS Code 1.101, version minimale de
+    l'extension) ; le serveur de `rapt dev` hérite de la variable. Vérifié avec Electron 37 :
+    `check`, `dev`, PGlite, behavior pool, arrêt du serveur quand `rapt dev` est tué.
+  - **`rapt dev` installé à plat** : le `node_modules` lié dans `.rapt/dev` est le premier
+    dossier, du runtime vers la racine, qui contient `@abaplint/runtime` (celui du runtime dans
+    le dépôt pnpm, celui de `rapt/` dans l'extension).
+  - **CLI trouvée** : réglage `rapt.cliPath`, sinon le rapt intégré, sinon un clone
+    rap-transpiler ou un `node_modules` de l'espace de travail, sinon `rapt` du PATH ; Node.js
+    par `rapt.nodePath`, sinon celui de VS Code.
+  - **CI** : le job `test` construit le `.vsix`, vérifie la fixture avec le rapt intégré et
+    publie le `.vsix` en artefact (`rap-transpiler-vscode`).
   - **Arrêt de `rapt dev`** : SIGINT. Sous Windows, où ce signal termine le processus, le
     serveur s'arrête quand son canal IPC avec `rapt dev` se ferme (D38).
   - **Construction** : sources ESM vérifiées par `tsc`, livrées en un fichier CommonJS par

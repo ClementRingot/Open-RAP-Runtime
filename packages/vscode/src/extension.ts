@@ -14,6 +14,7 @@ const SEVERITY: Record<RaptDiagnostic["severity"], vscode.DiagnosticSeverity> = 
   info: vscode.DiagnosticSeverity.Information,
 };
 
+let extensionPath = "";
 let output: vscode.OutputChannel;
 let diagnostics: vscode.DiagnosticCollection;
 let status: vscode.StatusBarItem;
@@ -32,7 +33,9 @@ function cli(): Cli {
   return resolveCli({
     ...(cliPath === undefined ? {} : { cliPath }),
     ...(nodePath === undefined ? {} : { nodePath }),
+    bundledCli: path.join(extensionPath, "rapt", "node_modules", "@rap-transpiler", "compiler", "dist", "cli.js"),
     workspaceFolders: (vscode.workspace.workspaceFolders ?? []).map((f) => f.uri.fsPath),
+    execPath: process.execPath,
   });
 }
 
@@ -235,6 +238,7 @@ async function devStop(): Promise<void> {
 }
 
 export function activate(context: vscode.ExtensionContext): void {
+  extensionPath = context.extensionPath;
   output = vscode.window.createOutputChannel("RAP Transpiler");
   diagnostics = vscode.languages.createDiagnosticCollection("rapt");
   status = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Left, 50);
