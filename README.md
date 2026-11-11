@@ -56,6 +56,18 @@ est 8080 (`--port`). Les variables de l'application s'appliquent (`AUTH_MODE`, `
 `DATABASE_URL` pour un PostgreSQL…) ; par défaut, `AUTH_MODE=none` et écoute sur 127.0.0.1
 ([D38](docs/DECISIONS.md)).
 
+### Extension VS Code
+
+[packages/vscode](packages/vscode) ajoute à VS Code les diagnostics de `rapt check` dans l'onglet
+Problèmes à chaque enregistrement, les commandes *RAP : Lancer rapt dev*, *Vérifier le BO* et
+*Générer l'application*, et l'état de `rapt dev` dans la barre d'état. Elle appelle la CLI avec
+`--json` (une sortie JSON pour `check` et `build`, un événement JSON par ligne pour `dev`) et ne
+compile rien elle-même ([D39](docs/DECISIONS.md)).
+
+```sh
+cd packages/vscode && pnpm run package && code --install-extension rap-transpiler-vscode.vsix
+```
+
 ## Lancer l'application générée
 
 ```sh
@@ -126,5 +138,6 @@ handlers, EML abaissé vers la classe noyau `ZRAP_EML` (décision D2). Les diagn
 packages/model/      types de l'IR (model.json), conventions de nommage partagées
 packages/compiler/   CLI rapt, parsers, construction de l'IR, générateurs
 packages/runtime/    runtime des applications générées (OData V4, RAP managed)
+packages/vscode/     extension VS Code (appelle la CLI rapt)
 fixtures/travel/     BO de référence Travel / Booking (format abapGit)
 ```

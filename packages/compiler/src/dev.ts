@@ -13,7 +13,7 @@ import { existsSync, lstatSync, mkdirSync, readdirSync, readFileSync, readlinkSy
 import path from "node:path";
 import { pathToFileURL } from "node:url";
 import { generateApplication, writeFiles, type GenerateOptions } from "./build.js";
-import { formatDiagnostic, type Diagnostics } from "./diagnostics.js";
+import { countDiagnostics, formatDiagnostic, type Diagnostic, type Diagnostics } from "./diagnostics.js";
 import { packageDir } from "./gen/vendor.js";
 import { loadProject } from "./input/project.js";
 
@@ -27,6 +27,49 @@ export interface DevOptions extends Omit<GenerateOptions, "scaffold" | "transpil
   /** Output of the session (default: stdout and stderr). */
   out?: (line: string) => void;
   err?: (line: string) => void;
+  /** Events of the session (`rapt dev --json`); replaces the text output. */
+  events?: (event: DevEvent) => void;
+}
+
+export type DiagnosticCounts = Record<Diagnostic["severity"], number>;
+
+/** What happens in a session, for tools (`rapt dev --json`, the VS Code extension). */
+export type DevEvent =
+  | { type: "building"; root: string }
+  | { type: "changed"; file: string }
+  | { type: "diagnostics"; diagnostics: Diagnostic[]; counts: DiagnosticCounts }
+  | { type: "error"; message: string }
+  | { type: "failed"; running: boolean }
+  | { type: "database-reset" }
+  | { type: "ready"; url: string }
+  | { type: "server-failed" }
+  | { type: "server-stopped"; code: number }
+  | { type: "log"; stream: "stdout" | "stderr"; line: string };
+
+/** The text of an event (`rapt dev` without --json); undefined for no output. */
+export function formatDevEvent(event: DevEvent): { line: string; error: boolean } | undefined {
+  switch (event.type) {
+    case "building":
+      return { line: `rapt dev: building ${event.root}`, error: false };
+    case "changed":
+      return { line: `rapt dev: ${event.file} changed`, error: false };
+    case "diagnostics":
+      return undefined; // one line per diagnostic, see DevSession.emit
+    case "error":
+      return { line: `rapt dev: ${event.message}`, error: true };
+    case "failed":
+      return { line: event.running ? "rapt dev: build failed, the previous build keeps running" : "rapt dev: build failed, waiting for changes", error: false };
+    case "database-reset":
+      return { line: "rapt dev: the database schema changed, the development database is reset", error: false };
+    case "ready":
+      return { line: `rapt dev: ready at ${event.url}`, error: false };
+    case "server-failed":
+      return { line: "rapt dev: server failed, waiting for changes", error: false };
+    case "server-stopped":
+      return { line: `rapt dev: the server stopped (exit code ${event.code})`, error: true };
+    case "log":
+      return { line: event.line, error: event.stream === "stderr" };
+  }
 }
 
 export interface RebuildResult {
@@ -75,27 +118,23 @@ export class DevSession {
 
   /** Builds the application; on success, (re)starts the server. A failed build keeps the running server. */
   public async rebuild(): Promise<RebuildResult> {
-    this.out(`rapt dev: building ${this.root}`);
+    this.emit({ type: "building", root: this.root });
     const runtimeNodeModules = this.runtimeDir === undefined ? undefined : path.join(this.runtimeDir, "node_modules");
     if (runtimeNodeModules === undefined || !existsSync(runtimeNodeModules)) {
-      this.err("rapt dev: the @rap-transpiler/runtime package (built, with its node_modules) is needed: run pnpm install and pnpm build, or give --runtime <dir>");
+      this.emit({ type: "error", message: "the @rap-transpiler/runtime package (built, with its node_modules) is needed: run pnpm install and pnpm build, or give --runtime <dir>" });
       return this.failed();
     }
     let result: Awaited<ReturnType<typeof generateApplication>>;
     try {
-      const { outDir: _out, port: _port, env: _env, out: _o, err: _e, ...generate } = this.options;
+      const { outDir: _out, port: _port, env: _env, out: _o, err: _e, events: _ev, ...generate } = this.options;
       result = await generateApplication(loadProject(this.root), { ...generate, scaffold: false });
     } catch (e) {
-      this.err(`rapt dev: ${(e as Error).message}`);
+      this.emit({ type: "error", message: (e as Error).message });
       return this.failed();
     }
     const { diagnostics, files } = result;
-    const counts = { error: 0, warning: 0, info: 0 };
-    for (const d of diagnostics.sorted()) {
-      counts[d.severity]++;
-      (d.severity === "error" ? this.err : this.out)(formatDiagnostic(d));
-    }
-    this.out(`rapt dev: ${counts.error} error(s), ${counts.warning} warning(s), ${counts.info} info`);
+    const sorted = diagnostics.sorted();
+    this.emit({ type: "diagnostics", diagnostics: sorted, counts: countDiagnostics(sorted) });
     if (files.length === 0) {
       return this.failed(diagnostics);
     }
@@ -108,10 +147,10 @@ export class DevSession {
     writeFileSync(path.join(this.outDir, "dev-server.mjs"), devServer(pathToFileURL(path.join(this.runtimeDir!, "dist", "index.js")).href));
     this.resetDatabaseOnSchemaChange();
     if (!(await this.startServer())) {
-      this.out("rapt dev: server failed, waiting for changes");
+      this.emit({ type: "server-failed" });
       return { ok: false, diagnostics };
     }
-    this.out(`rapt dev: ready at ${this.uiUrl}`);
+    this.emit({ type: "ready", url: this.uiUrl });
     return { ok: true, diagnostics };
   }
 
@@ -134,6 +173,24 @@ export class DevSession {
     this.watchers.clear();
     await this.running;
     await this.stopServer();
+  }
+
+  private emit(event: DevEvent): void {
+    if (this.options.events !== undefined) {
+      this.options.events(event);
+      return;
+    }
+    if (event.type === "diagnostics") {
+      for (const d of event.diagnostics) {
+        (d.severity === "error" ? this.err : this.out)(formatDiagnostic(d));
+      }
+      this.out(`rapt dev: ${event.counts.error} error(s), ${event.counts.warning} warning(s), ${event.counts.info} info`);
+      return;
+    }
+    const text = formatDevEvent(event);
+    if (text !== undefined) {
+      (text.error ? this.err : this.out)(text.line);
+    }
   }
 
   /** Watches the folders of the project; called again on each change for new or removed folders. */
@@ -179,7 +236,7 @@ export class DevSession {
     clearTimeout(this.timer);
     this.timer = setTimeout(() => {
       this.watchFolders();
-      this.out(`rapt dev: ${relative.split(path.sep).join("/")} changed`);
+      this.emit({ type: "changed", file: relative.split(path.sep).join("/") });
       void this.schedule();
     }, 150);
   }
@@ -212,7 +269,7 @@ export class DevSession {
   }
 
   private failed(diagnostics?: Diagnostics): RebuildResult {
-    this.out(this.server === undefined ? "rapt dev: build failed, waiting for changes" : "rapt dev: build failed, the previous build keeps running");
+    this.emit({ type: "failed", running: this.server !== undefined });
     return diagnostics === undefined ? { ok: false } : { ok: false, diagnostics };
   }
 
@@ -246,7 +303,7 @@ export class DevSession {
     const stamp = path.join(this.outDir, SCHEMA_STAMP);
     const previous = existsSync(stamp) ? readFileSync(stamp, "utf8") : undefined;
     if (existsSync(dir) && previous !== schema) {
-      this.out("rapt dev: the database schema changed, the development database is reset");
+      this.emit({ type: "database-reset" });
       rmSync(dir, { recursive: true, force: true });
     }
     writeFileSync(stamp, schema);
@@ -267,7 +324,7 @@ export class DevSession {
     this.server = child;
     return new Promise((resolve) => {
       let ready = false;
-      const forward = (stream: NodeJS.ReadableStream | null, write: (line: string) => void): void => {
+      const forward = (stream: NodeJS.ReadableStream | null, name: "stdout" | "stderr"): void => {
         let buffer = "";
         stream?.setEncoding("utf8");
         stream?.on("data", (chunk: string) => {
@@ -279,13 +336,13 @@ export class DevSession {
               ready = true;
               resolve(true);
             } else if (line !== "") {
-              write(line);
+              this.emit({ type: "log", stream: name, line });
             }
           }
         });
       };
-      forward(child.stdout, this.out);
-      forward(child.stderr, this.err);
+      forward(child.stdout, "stdout");
+      forward(child.stderr, "stderr");
       child.once("exit", (code) => {
         if (this.server === child) {
           this.server = undefined;
@@ -293,7 +350,7 @@ export class DevSession {
         if (!ready) {
           resolve(false);
         } else if (code !== 0 && code !== null) {
-          this.err(`rapt dev: the server stopped (exit code ${code})`);
+          this.emit({ type: "server-stopped", code });
         }
       });
     });

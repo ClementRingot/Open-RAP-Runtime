@@ -37,6 +37,21 @@ describe("rapt CLI", () => {
     }
   });
 
+  it("check --json: diagnostics with absolute paths", async () => {
+    const variant = fixtureVariant({ "zrt_r_travel.bdef.asbdef": (c) => c.replace("lock master", "lock mastr") });
+    try {
+      expect(await main(["check", variant.dir, "--json"])).toBe(1);
+      const result = JSON.parse(out.join("")) as { command: string; ok: boolean; counts: { error: number }; diagnostics: Array<{ code: string; file: string; path: string; line: number }> };
+      expect(result).toMatchObject({ command: "check", ok: false });
+      expect(result.counts.error).toBeGreaterThan(0);
+      const bdef = result.diagnostics.find((d) => d.code.startsWith("BDEF") && d.file === "src/zrt_r_travel.bdef.asbdef");
+      expect(bdef?.path).toBe(path.join(variant.dir, "src", "zrt_r_travel.bdef.asbdef"));
+      expect(err.join("")).toBe("");
+    } finally {
+      variant.cleanup();
+    }
+  });
+
   it("ir: writes the model", async () => {
     const dir = mkdtempSync(path.join(tmpdir(), "rapt-cli-"));
     try {

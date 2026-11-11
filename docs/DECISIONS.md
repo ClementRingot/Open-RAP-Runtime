@@ -659,3 +659,32 @@ et la conséquence. Les numéros D1 à D13 correspondent aux points 1 à 13 du �
 - **Tests** : `compiler/test/dev.test.ts` couvre la construction, le behavior pool exécuté, la
   conservation des données, la construction en erreur, la réinitialisation sur changement de
   schéma et la surveillance d'un fichier remplacé par un renommage.
+
+## D39 — Sortie JSON de la CLI et extension VS Code
+
+- **Contexte** : tout doit pouvoir se faire en ligne de commande, ou visuellement dans VS Code.
+  Deux implémentations du compilateur divergeraient.
+- **Décision** : la CLI reste le seul moteur ; l'extension VS Code ([packages/vscode](../packages/vscode))
+  l'appelle et affiche ses résultats.
+  - **`--json`** : `rapt check` et `rapt build` écrivent un objet JSON (`command`, `ok`, `root`,
+    `counts`, `diagnostics` avec, en plus de `file`, le chemin absolu `path`) ; `rapt build`
+    ajoute `out` et `files`. `rapt dev` écrit un événement JSON par ligne (`building`,
+    `changed`, `diagnostics`, `ready`, `failed`, `database-reset`, `server-failed`,
+    `server-stopped`, `error`, `log` pour les journaux du serveur). Le texte de `rapt dev` est
+    dérivé des mêmes événements (`formatDevEvent`).
+  - **Extension** : diagnostics dans l'onglet Problèmes (à chaque enregistrement, ou par
+    `rapt dev` quand il tourne sur le projet), commandes *Vérifier le BO*, *Générer
+    l'application*, *Lancer / Arrêter rapt dev*, *Ouvrir l'application*, état dans la barre
+    d'état, menus de l'explorateur et de la barre de titre. Un projet est le dossier de
+    `.abapgit.xml` (à défaut, le parent de `src`).
+  - **CLI trouvée** : réglage `rapt.cliPath`, sinon un clone rap-transpiler ou un `node_modules`
+    de l'espace de travail, sinon `rapt` du PATH ; Node.js par `rapt.nodePath`.
+  - **Arrêt de `rapt dev`** : SIGINT. Sous Windows, où ce signal termine le processus, le
+    serveur s'arrête quand son canal IPC avec `rapt dev` se ferme (D38).
+  - **Construction** : sources ESM vérifiées par `tsc`, livrées en un fichier CommonJS par
+    esbuild (`dist/extension.cjs`, `vscode` externe), sans dépendance à l'exécution ; `.vsix`
+    par `vsce package`.
+- **Tests** : `vscode/test/rapt.test.ts` couvre la recherche du projet et de la CLI, la lecture
+  des lignes JSON, `rapt check --json` et `rapt dev --json` lancés réellement.
+  `compiler/test/cli.test.ts` et `dev.test.ts` couvrent la sortie JSON et les événements.
+  L'interface de l'extension (commandes, barre d'état) n'est pas testée dans VS Code.
