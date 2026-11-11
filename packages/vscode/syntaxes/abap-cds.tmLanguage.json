@@ -1,0 +1,146 @@
+{
+  "$schema": "https://raw.githubusercontent.com/martinring/tmlanguage/master/tmlanguage.json",
+  "name": "ABAP CDS",
+  "scopeName": "source.abapcds",
+  "fileTypes": [
+    "asddls",
+    "asddlxs",
+    "asdcls",
+    "srvdsrv",
+    "astabl"
+  ],
+  "patterns": [
+    {
+      "include": "#comments"
+    },
+    {
+      "include": "#annotation"
+    },
+    {
+      "include": "#strings"
+    },
+    {
+      "include": "#builtin-types"
+    },
+    {
+      "include": "#enum"
+    },
+    {
+      "include": "#variables"
+    },
+    {
+      "include": "#keywords"
+    },
+    {
+      "include": "#numbers"
+    },
+    {
+      "include": "#operators"
+    },
+    {
+      "include": "#association-name"
+    }
+  ],
+  "repository": {
+    "comments": {
+      "patterns": [
+        {
+          "name": "comment.line.double-slash.abapcds",
+          "match": "//.*$"
+        },
+        {
+          "name": "comment.line.double-dash.abapcds",
+          "match": "--.*$"
+        },
+        {
+          "name": "comment.block.abapcds",
+          "begin": "/\\*",
+          "end": "\\*/"
+        }
+      ]
+    },
+    "annotation": {
+      "patterns": [
+        {
+          "name": "storage.type.annotation.abapcds",
+          "match": "@<?[A-Za-z_][\\w.]*"
+        }
+      ]
+    },
+    "strings": {
+      "patterns": [
+        {
+          "name": "string.quoted.single.abapcds",
+          "begin": "'",
+          "end": "'(?!')",
+          "patterns": [
+            {
+              "name": "constant.character.escape.abapcds",
+              "match": "''"
+            }
+          ]
+        }
+      ]
+    },
+    "builtin-types": {
+      "patterns": [
+        {
+          "name": "support.type.builtin.abapcds",
+          "match": "(?i)\\babap\\.[a-z0-9_]+\\b"
+        }
+      ]
+    },
+    "enum": {
+      "patterns": [
+        {
+          "name": "constant.other.enum.abapcds",
+          "match": "#[A-Za-z_][\\w]*"
+        }
+      ]
+    },
+    "variables": {
+      "patterns": [
+        {
+          "name": "variable.language.abapcds",
+          "match": "\\$(?:projection|parameters|session|node|self|extension)\\b"
+        }
+      ]
+    },
+    "keywords": {
+      "patterns": [
+        {
+          "name": "constant.language.abapcds",
+          "match": "(?i)\\b(initial|false|true)\\b"
+        },
+        {
+          "name": "keyword.other.abapcds",
+          "match": "(?i)(?<![\\w$/.])(transactional_interface|transactional_query|analytical_query|hierarchy_node|association|cardinality|composition|implemented|conditions|entity_set|inheriting|parameters|projection|redirected|directory|extension|hierarchy|intersect|like_from|replacing|structure|abstract|annotate|coalesce|contract|distinct|elements|function|generate|multiple|nodetype|provider|redefine|siblings|spantree|between|default|foreign|include|orphans|returns|service|virtual|aspect|custom|define|entity|escape|except|expose|extend|filter|having|ignore|method|offset|parent|period|select|source|suffix|array|child|cross|cycle|depth|error|exact|grant|group|inner|limit|order|outer|right|start|table|union|using|where|case|cast|desc|else|from|join|left|like|many|null|role|root|then|type|view|when|with|all|and|asc|end|for|key|not|one|as|by|is|of|on|or|to)(?![\\w/])"
+        }
+      ]
+    },
+    "numbers": {
+      "patterns": [
+        {
+          "name": "constant.numeric.abapcds",
+          "match": "\\b\\d+(?:\\.\\d+)?\\b"
+        }
+      ]
+    },
+    "operators": {
+      "patterns": [
+        {
+          "name": "keyword.operator.abapcds",
+          "match": "<>|<=|>=|=|<|>|\\*|\\+|-|/|\\|\\|"
+        }
+      ]
+    },
+    "association-name": {
+      "patterns": [
+        {
+          "name": "variable.other.association.abapcds",
+          "match": "\\b_[A-Za-z][\\w]*"
+        }
+      ]
+    }
+  }
+}

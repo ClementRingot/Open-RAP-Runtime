@@ -105,3 +105,15 @@ construction seulement, non redistribués :
 | `esbuild` | 0.28.2 | MIT | Fichier unique CommonJS de l'extension |
 | `@vscode/vsce` | 3.9.2 | MIT | Construction du `.vsix` |
 | `@types/vscode` | 1.101.0 | MIT | Types de l'API VS Code |
+| `vscode-textmate`, `vscode-oniguruma` | 9.3.2, 2.0.1 | MIT | Tests des grammaires (le moteur de coloration de VS Code) |
+
+Coloration syntaxique (`packages/vscode/syntaxes`) :
+
+| Fichier | Origine | Licence | Vérifié le |
+|---|---|---|---|
+| `abap.tmLanguage`, `abap.language-configuration.json` | [larshp/vscode-abap](https://github.com/larshp/vscode-abap) (commit `3ff1891`), copiés tels quels | MIT (© 2016 Lars Hvam, `LICENSE-vscode-abap.txt`) | 2026-11-11 |
+| `abap-cds.tmLanguage.json`, `abap-bdef.tmLanguage.json`, `cds.language-configuration.json` | écrits pour le projet (CDS, metadata extensions, DCL, SRVD, tables en source ; BDEF) | MIT du dépôt | 2026-11-11 |
+
+Les grammaires CDS existantes n'ont pas été reprises : celle de SAP-samples/vscode-abap-cds est
+sous Apache-2.0 et sa copie FreHu/abap-cds-grammar se déclare « Unlicense » sans que l'origine
+le permette clairement.
