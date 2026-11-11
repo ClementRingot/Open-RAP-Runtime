@@ -2,7 +2,7 @@ import { existsSync, lstatSync, mkdirSync, mkdtempSync, readFileSync, renameSync
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
-import { DevSession, runtimeDependencies, type DevEvent } from "../src/dev.js";
+import { DevSession, linkFolder, runtimeDependencies, type DevEvent } from "../src/dev.js";
 import { fixtureVariant } from "./helpers.js";
 
 const SERVICE = "sap/opu/odata4/sap/zrt_ui_travel_o4/srvd/sap/zrt_ui_travel/0001";
@@ -124,4 +124,34 @@ describe("rapt dev", () => {
     expect(runtimeDependencies(path.join(root, "rapt", "node_modules", "@rap-transpiler", "runtime"))).toBe(path.join(root, "rapt", "node_modules"));
     expect(runtimeDependencies(path.join(root, "nothing"))).toBeUndefined();
   });
+
+  it("links node_modules again, replacing a link to another folder and keeping a real folder", () => {
+    const root = mkdtempSync(path.join(tmpdir(), "rapt-link-"));
+    cleanups.push(() => rmSync(root, { recursive: true, force: true }));
+    const first = path.join(root, "first");
+    const second = path.join(root, "second");
+    mkdirSync(path.join(first, "a"), { recursive: true });
+    mkdirSync(path.join(second, "b"), { recursive: true });
+    const link = path.join(root, "out", "node_modules");
+    mkdirSync(path.dirname(link));
+    linkFolder(link, first);
+    expect(existsSync(path.join(link, "a"))).toBe(true);
+    // the same folder, written differently (drive letter case on Windows): kept
+    linkFolder(link, process.platform === "win32" ? swapDriveCase(first) : first);
+    expect(existsSync(path.join(link, "a"))).toBe(true);
+    // another folder: the link is replaced (a junction on Windows), its target untouched
+    linkFolder(link, second);
+    expect(existsSync(path.join(link, "b"))).toBe(true);
+    expect(existsSync(path.join(first, "a"))).toBe(true);
+    // a real folder: kept
+    const real = path.join(root, "real");
+    mkdirSync(real);
+    linkFolder(real, first);
+    expect(lstatSync(real).isSymbolicLink()).toBe(false);
+  });
 });
+
+function swapDriveCase(file: string): string {
+  const drive = file.charAt(0);
+  return (drive === drive.toLowerCase() ? drive.toUpperCase() : drive.toLowerCase()) + file.slice(1);
+}
