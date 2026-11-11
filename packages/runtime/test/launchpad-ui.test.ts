@@ -17,6 +17,8 @@ const RUNTIME_DIR = fileURLToPath(new URL("..", import.meta.url));
 
 let t: TestApp;
 let launchpad: FastifyInstance;
+let spaced: FastifyInstance;
+let spacedBase: string;
 let browser: Browser;
 let base: string;
 
@@ -32,12 +34,23 @@ beforeAll(async () => {
   launchpad = await createLaunchpad({ config, auth: { mode: "none", user: "VICTOR", roles: ["travel_viewer"] }, ui: { dir: uiDir, resourcesFrom: RUNTIME_DIR } });
   await launchpad.listen({ port: 0, host: "127.0.0.1" });
   base = `http://127.0.0.1:${(launchpad.server.address() as { port: number }).port}`;
+  // the same content in spaces and pages (D48); the space of the managers is hidden from the viewer
+  const [work, help] = config.groups;
+  const spaces = [
+    { id: "work", title: "Work", roles: [], pages: [{ id: "daily", title: "Daily", sections: [work!] }, { id: "help", title: "Help", sections: [help!] }] },
+    { id: "admin", title: "Admin", roles: ["travel_manager"], pages: [{ id: "admin", title: "Admin", sections: [help!] }] },
+    { id: "more", title: "More", roles: [], pages: [{ id: "more", title: "More", sections: [help!] }] },
+  ];
+  spaced = await createLaunchpad({ config: { ...config, spaces }, auth: { mode: "none", user: "VICTOR", roles: ["travel_viewer"] }, ui: { dir: uiDir, resourcesFrom: RUNTIME_DIR } });
+  await spaced.listen({ port: 0, host: "127.0.0.1" });
+  spacedBase = `http://127.0.0.1:${(spaced.server.address() as { port: number }).port}`;
   browser = await browserType.launch();
 }, 180_000);
 
 afterAll(async () => {
   await browser?.close();
   await launchpad?.close();
+  await spaced?.close();
   await t?.close();
 });
 
@@ -83,5 +96,26 @@ describe.skipIf(browserType === undefined)("the launchpad in a browser", () => {
     await page.goto(`${base}/#Travel-manage`);
     await page.locator(ROWS).first().waitFor({ timeout: 60_000 });
     expect(await page.evaluate("location.pathname")).toBe("/apps/travel/ui/index.html");
+  }, 120_000);
+
+  it("shows the spaces of the user as tabs, and the pages of a space (D48)", async () => {
+    const page = await browser.newPage({ viewport: { width: 1280, height: 800 } });
+    await page.goto(`${spacedBase}/`);
+    await page.locator(tile("travel-manage")).waitFor({ timeout: 60_000 });
+    const tabs = "#container-launchpad---home--spaces-head [role=tab]";
+    await page.waitForFunction(`document.querySelectorAll('${tabs}').length === 2`, undefined, { timeout: 30_000 });
+    expect(await page.locator("#container-launchpad---home--spaces").textContent()).not.toContain("Admin");
+    if (process.env["RAPT_SCREENSHOTS"] !== undefined) await page.screenshot({ path: path.join(process.env["RAPT_SCREENSHOTS"], "launchpad-spaces.png") });
+    // the second page of the space
+    await page.locator("#container-launchpad---home--pages").click();
+    await page.locator(".sapMSelectList li", { hasText: "Help" }).first().click();
+    await page.waitForFunction(`document.querySelectorAll('.sapMGT').length === 1 && document.querySelector('.sapMGT').textContent.includes('Documentation')`, undefined, { timeout: 30_000 });
+    // the other space
+    await page.locator(tabs, { hasText: "More" }).first().click();
+    await page.waitForFunction(`document.querySelectorAll('.sapMGT').length === 1 && (document.querySelector('#container-launchpad---home--pageBar')?.offsetParent ?? null) === null`, undefined, { timeout: 30_000 });
+    // the space is remembered
+    await page.goto(`${spacedBase}/`);
+    await page.locator(".sapMGT").first().waitFor({ timeout: 60_000 });
+    await page.waitForFunction(`document.querySelectorAll('.sapMGT').length === 1`, undefined, { timeout: 30_000 });
   }, 120_000);
 });

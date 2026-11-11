@@ -79,6 +79,32 @@ describe("launchpad.json", () => {
     expect(model.roles.map((r) => r.name)).toEqual(["travel_manager", "travel_agent", "travel_viewer"]);
   });
 
+  it("resolves spaces and pages (D48)", () => {
+    const { diagnostics, result } = resolve({
+      title: "Travel Agency",
+      apps: [TRAVEL],
+      spaces: [
+        {
+          title: "Travels",
+          pages: [
+            { title: "Daily work", sections: [{ title: "Manage", tiles: [{ app: "travel", intent: "Travel-manage" }] }] },
+            { title: "Analysis", sections: [{ title: "Open", tiles: [{ title: "Open", app: "travel", count: { entitySet: "Travel", filter: "OverallStatus eq 'O'" } }] }] },
+          ],
+        },
+        { title: "Administration", roles: ["travel_manager"], pages: [{ title: "Help", sections: [{ title: "Links", tiles: [{ title: "Help", url: "https://example.org" }] }] }] },
+      ],
+    });
+    expect(diagnostics.items).toEqual([]);
+    const model = result!.model;
+    expect(model.spaces?.map((s) => [s.id, s.title, s.roles, s.pages.map((p) => p.id)])).toEqual([
+      ["travels", "Travels", [], ["travels-daily-work", "travels-analysis"]],
+      ["administration", "Administration", ["travel_manager"], ["administration-help"]],
+    ]);
+    // every section is also a group (intents, search)
+    expect(model.groups.map((g) => g.title)).toEqual(["Manage", "Open", "Links"]);
+    expect(codes(resolve({ apps: [TRAVEL], spaces: [{ title: "Bad" }] }).diagnostics)).toEqual(["error LPD008"]);
+  });
+
   it("reports the errors of the content", () => {
     const { diagnostics } = resolve({
       apps: [TRAVEL, { ...TRAVEL }, { id: "Bad id", url: "http://x" }, { id: "nourl" }, { id: "missing", build: "build/none", url: "http://localhost:8081" }],

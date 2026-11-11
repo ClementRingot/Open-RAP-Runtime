@@ -46,8 +46,12 @@ export interface LaunchpadView {
   user: { id: string; name: string; initials: string };
   /** The logout of the launchpad (OIDC sessions). */
   logout?: string;
-  groups: Array<{ title: string; tiles: Array<Omit<LaunchpadTile, "roles" | "app">> }>;
+  groups: ViewGroup[];
+  /** The spaces and pages of the user (D48): one space of one page when launchpad.json has groups only. */
+  spaces: Array<{ id: string; title: string; pages: Array<{ id: string; title: string; groups: ViewGroup[] }> }>;
 }
+
+type ViewGroup = { title: string; tiles: Array<Omit<LaunchpadTile, "roles" | "app">> };
 
 function initials(name: string): string {
   const words = name.split(/[\s._@-]+/).filter((w) => w !== "");
@@ -58,14 +62,23 @@ function initials(name: string): string {
 /** The tiles a user sees; the groups without such a tile are left out. */
 export function launchpadView(config: LaunchpadModel, user: User, logout: string | undefined): LaunchpadView {
   const name = user.name ?? user.id;
-  const view: LaunchpadView = { title: config.title, home: "/", logo: "/ui/logo.svg", user: { id: user.id, name, initials: initials(name) }, groups: [] };
+  const view: LaunchpadView = { title: config.title, home: "/", logo: "/ui/logo.svg", user: { id: user.id, name, initials: initials(name) }, groups: [], spaces: [] };
   if (logout !== undefined) {
     view.logout = logout;
   }
-  for (const group of config.groups) {
-    const tiles = group.tiles.filter((t) => tileVisible(t, user.roles)).map(({ roles: _roles, app: _app, ...tile }) => tile);
-    if (tiles.length > 0) {
-      view.groups.push({ title: group.title, tiles });
+  const visibleGroups = (groups: LaunchpadModel["groups"]): ViewGroup[] =>
+    groups
+      .map((group) => ({ title: group.title, tiles: group.tiles.filter((t) => tileVisible(t, user.roles)).map(({ roles: _roles, app: _app, ...tile }) => tile) }))
+      .filter((group) => group.tiles.length > 0);
+  const spaces = config.spaces ?? [{ id: "home", title: config.title, roles: [], pages: [{ id: "home", title: config.title, sections: config.groups }] }];
+  for (const space of spaces) {
+    if (!tileVisible(space, user.roles)) {
+      continue;
+    }
+    const pages = space.pages.map((page) => ({ id: page.id, title: page.title, groups: visibleGroups(page.sections) })).filter((page) => page.groups.length > 0);
+    if (pages.length > 0) {
+      view.spaces.push({ id: space.id, title: space.title, pages });
+      view.groups.push(...pages.flatMap((page) => page.groups));
     }
   }
   return view;

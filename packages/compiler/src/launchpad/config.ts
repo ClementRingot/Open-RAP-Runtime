@@ -19,7 +19,7 @@
 
 import { existsSync, readFileSync } from "node:fs";
 import path from "node:path";
-import { authorizationClaims, LAUNCHPAD_RESERVED_PATHS, type LaunchpadApp, type LaunchpadGroup, type LaunchpadModel, type LaunchpadTile, type Model } from "@rap-transpiler/model";
+import { authorizationClaims, LAUNCHPAD_RESERVED_PATHS, type LaunchpadApp, type LaunchpadGroup, type LaunchpadModel, type LaunchpadPage, type LaunchpadSpace, type LaunchpadTile, type Model } from "@rap-transpiler/model";
 import type { Diagnostics, Location } from "../diagnostics.js";
 
 interface AppSource {
@@ -147,15 +147,15 @@ function countPath(tile: TileSource, app: ResolvedApp | undefined, name: string,
 
 export function resolveLaunchpad(file: string, diagnostics: Diagnostics): LaunchpadResolution | undefined {
   const at: Location = { file };
-  let source: { title?: unknown; apps?: unknown; groups?: unknown; claims?: unknown };
+  let source: { title?: unknown; apps?: unknown; groups?: unknown; spaces?: unknown; claims?: unknown };
   try {
     source = JSON.parse(readFileSync(file, "utf8")) as typeof source;
   } catch (error) {
     diagnostics.error("LPD001", `launchpad.json cannot be read: ${(error as Error).message}`, at);
     return undefined;
   }
-  if (source === null || typeof source !== "object" || !Array.isArray(source.groups)) {
-    diagnostics.error("LPD001", "launchpad.json needs groups: a list of { title, tiles }", at);
+  if (source === null || typeof source !== "object" || (!Array.isArray(source.groups) && !Array.isArray(source.spaces))) {
+    diagnostics.error("LPD001", "launchpad.json needs groups (a list of { title, tiles }) or spaces (a list of { title, pages })", at);
     return undefined;
   }
   const base = path.dirname(path.resolve(file));
@@ -197,12 +197,11 @@ export function resolveLaunchpad(file: string, diagnostics: Diagnostics): Launch
   const checkRoles = roles.size > 0;
 
   const ids = new Set<string>();
-  const groups: LaunchpadGroup[] = [];
-  for (const [g, group] of (source.groups as Array<{ title?: unknown; tiles?: unknown }>).entries()) {
+  const resolveGroup = (group: { title?: unknown; tiles?: unknown } | undefined, where: string): LaunchpadGroup | undefined => {
     const title = text(group?.title);
-    if (title === undefined || !Array.isArray(group.tiles)) {
-      diagnostics.error("LPD001", `group ${g + 1} needs a title and tiles (a list)`, at);
-      continue;
+    if (group === undefined || title === undefined || !Array.isArray(group.tiles)) {
+      diagnostics.error("LPD001", `${where} needs a title and tiles (a list)`, at);
+      return undefined;
     }
     const tiles: LaunchpadTile[] = [];
     for (const [t, tile] of (group.tiles as TileSource[]).entries()) {
@@ -265,7 +264,55 @@ export function resolveLaunchpad(file: string, diagnostics: Diagnostics): Launch
       if (count !== undefined) resolved.count = count;
       tiles.push(resolved);
     }
-    groups.push({ title, tiles });
+    return { title, tiles };
+  };
+  const slugged = new Set<string>();
+  const uniqueSlug = (base: string): string => {
+    let id = slug(base);
+    for (let n = 2; slugged.has(id); n++) {
+      id = `${slug(base)}-${n}`;
+    }
+    slugged.add(id);
+    return id;
+  };
+  const groups: LaunchpadGroup[] = [];
+  let spaces: LaunchpadSpace[] | undefined;
+  if (Array.isArray(source.spaces)) {
+    spaces = [];
+    for (const [s, space] of (source.spaces as Array<{ id?: unknown; title?: unknown; roles?: unknown; pages?: unknown }>).entries()) {
+      const spaceTitle = text(space?.title);
+      if (spaceTitle === undefined || !Array.isArray(space?.pages)) {
+        diagnostics.error("LPD008", `space ${s + 1} needs a title and pages (a list of { title, sections })`, at);
+        continue;
+      }
+      if (space.roles !== undefined && (!Array.isArray(space.roles) || space.roles.some((r) => typeof r !== "string" || r === ""))) {
+        diagnostics.error("LPD008", `space ${spaceTitle}: roles is a list of role names`, at);
+        continue;
+      }
+      const spaceRoles = (space.roles as string[] | undefined) ?? [];
+      for (const role of spaceRoles) {
+        if (!roles.has(role)) roles.set(role, { name: role });
+      }
+      const pages: LaunchpadPage[] = [];
+      for (const [p, page] of (space.pages as Array<{ id?: unknown; title?: unknown; sections?: unknown }>).entries()) {
+        const pageTitle = text(page?.title) ?? spaceTitle;
+        if (!Array.isArray(page?.sections)) {
+          diagnostics.error("LPD008", `page ${p + 1} of the space ${spaceTitle} needs sections (a list of { title, tiles })`, at);
+          continue;
+        }
+        const sections = (page.sections as Array<{ title?: unknown; tiles?: unknown }>)
+          .map((section, i) => resolveGroup(section, `section ${i + 1} of the page ${pageTitle}`))
+          .filter((g): g is LaunchpadGroup => g !== undefined);
+        groups.push(...sections);
+        pages.push({ id: uniqueSlug(text(page.id) ?? `${spaceTitle}-${pageTitle}`), title: pageTitle, sections });
+      }
+      spaces.push({ id: uniqueSlug(text(space.id) ?? spaceTitle), title: spaceTitle, roles: spaceRoles, pages });
+    }
+  } else {
+    for (const [g, group] of (source.groups as Array<{ title?: unknown; tiles?: unknown }>).entries()) {
+      const resolved = resolveGroup(group, `group ${g + 1}`);
+      if (resolved !== undefined) groups.push(resolved);
+    }
   }
 
   const extra = Array.isArray(source.claims) ? source.claims.filter((c): c is string => typeof c === "string" && c !== "") : [];
@@ -274,6 +321,7 @@ export function resolveLaunchpad(file: string, diagnostics: Diagnostics): Launch
     title: text(source.title) ?? "Launchpad",
     apps: apps.map((a) => ({ id: a.id, title: a.title, url: a.url, servicePaths: a.servicePaths })),
     groups,
+    ...(spaces === undefined ? {} : { spaces }),
     claims,
     roles: [...roles.values()],
   };

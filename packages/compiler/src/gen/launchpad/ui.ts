@@ -59,13 +59,13 @@ export const LAUNCHPAD_COMPONENT = `sap.ui.define([
 
     init: function () {
       UIComponent.prototype.init.apply(this, arguments);
-      this.setModel(new JSONModel({ title: "", user: {}, logout: "", groups: [], counts: {}, loaded: false, error: "", emptyText: "" }));
+      this.setModel(new JSONModel({ title: "", user: {}, logout: "", groups: [], spaces: [], space: "", page: "", pages: [], counts: {}, loaded: false, error: "", emptyText: "" }));
     }
   });
 });
 `;
 
-export const LAUNCHPAD_VIEW = `<mvc:View controllerName="rapt.launchpad.controller.Launchpad" xmlns:mvc="sap.ui.core.mvc" xmlns="sap.m" xmlns:f="sap.f" displayBlock="true" height="100%">
+export const LAUNCHPAD_VIEW = `<mvc:View controllerName="rapt.launchpad.controller.Launchpad" xmlns:mvc="sap.ui.core.mvc" xmlns="sap.m" xmlns:f="sap.f" xmlns:core="sap.ui.core" displayBlock="true" height="100%">
   <Page id="page" enableScrolling="true" class="raptLaunchpad">
     <customHeader>
       <f:ShellBar id="shellBar" title="{/title}" homeIcon="logo.svg" homeIconTooltip="Home" homeIconPressed=".onHome" avatarPressed=".onAvatarPressed">
@@ -79,6 +79,16 @@ export const LAUNCHPAD_VIEW = `<mvc:View controllerName="rapt.launchpad.controll
     </customHeader>
     <content>
       <MessageStrip id="message" visible="{= \${/error} !== '' }" text="{/error}" type="Error" showIcon="true" class="sapUiSmallMargin"/>
+      <IconTabHeader id="spaces" visible="{= \${/spaces}.length > 1 }" selectedKey="{/space}" select=".onSpaceSelect" mode="Inline"
+        items="{path: '/spaces', templateShareable: false}">
+        <items><IconTabFilter key="{id}" text="{title}"/></items>
+      </IconTabHeader>
+      <HBox id="pageBar" visible="{= \${/pages}.length > 1 }" alignItems="Center" class="raptLaunchpadPages">
+        <Label text="Page" labelFor="pages" class="sapUiTinyMarginEnd"/>
+        <Select id="pages" selectedKey="{/page}" change=".onPageSelect" items="{path: '/pages', templateShareable: false}">
+          <items><core:Item key="{id}" text="{title}"/></items>
+        </Select>
+      </HBox>
       <VBox id="groups" class="raptLaunchpadGroups"/>
       <Text id="empty" visible="{= \${/emptyText} !== '' }" text="{/emptyText}" class="raptLaunchpadEmpty"/>
     </content>
@@ -145,6 +155,8 @@ export const LAUNCHPAD_CONTROLLER = `sap.ui.define([
           oModel.setProperty("/user", oConfig.user);
           oModel.setProperty("/logout", oConfig.logout || "");
           oModel.setProperty("/groups", oConfig.groups);
+          oModel.setProperty("/spaces", oConfig.spaces || [{ id: "home", title: oConfig.title, pages: [{ id: "home", title: oConfig.title, groups: oConfig.groups }] }]);
+          that._selectSpace(that._rememberedSpace());
           document.title = oConfig.title;
           // #SemanticObject-action: straight to the application of the intent
           if (that._navigateToIntent()) {
@@ -167,6 +179,53 @@ export const LAUNCHPAD_CONTROLLER = `sap.ui.define([
       return this._model().getProperty("/groups").reduce(function (aAll, oGroup) {
         return aAll.concat(oGroup.tiles);
       }, []);
+    },
+
+    /** The space shown last (local storage), else the first one. */
+    _rememberedSpace: function () {
+      try {
+        return window.localStorage.getItem("rapt.launchpad.space") || "";
+      } catch (e) {
+        return "";
+      }
+    },
+
+    _selectSpace: function (sId, sPage) {
+      var oModel = this._model();
+      var aSpaces = oModel.getProperty("/spaces");
+      var oSpace = aSpaces.find(function (s) { return s.id === sId; }) || aSpaces[0];
+      if (!oSpace) {
+        return;
+      }
+      oModel.setProperty("/space", oSpace.id);
+      oModel.setProperty("/pages", oSpace.pages);
+      var oPage = oSpace.pages.find(function (p) { return p.id === sPage; }) || oSpace.pages[0];
+      oModel.setProperty("/page", oPage ? oPage.id : "");
+      try {
+        window.localStorage.setItem("rapt.launchpad.space", oSpace.id);
+      } catch (e) {
+        // the space is not remembered
+      }
+    },
+
+    onSpaceSelect: function (oEvent) {
+      this._selectSpace(oEvent.getParameter("key"));
+      this._render();
+    },
+
+    onPageSelect: function (oEvent) {
+      this._model().setProperty("/page", oEvent.getParameter("selectedItem").getKey());
+      this._render();
+    },
+
+    /** The sections shown: those of the current page; while searching, every section of every space. */
+    _shownGroups: function () {
+      var oModel = this._model();
+      if (this._sQuery) {
+        return oModel.getProperty("/groups");
+      }
+      var oPage = (oModel.getProperty("/pages") || []).find(function (p) { return p.id === oModel.getProperty("/page"); });
+      return oPage ? oPage.groups : oModel.getProperty("/groups");
     },
 
     _navigateToIntent: function () {
@@ -198,7 +257,7 @@ export const LAUNCHPAD_CONTROLLER = `sap.ui.define([
       var sQuery = this._sQuery.toLowerCase();
       var iVisible = 0;
       oBox.destroyItems();
-      this._model().getProperty("/groups").forEach(function (oGroup) {
+      this._shownGroups().forEach(function (oGroup) {
         var aTiles = oGroup.tiles.filter(function (t) {
           return !sQuery || [t.title, t.subtitle, t.info].some(function (s) {
             return !!s && s.toLowerCase().indexOf(sQuery) >= 0;
@@ -281,6 +340,7 @@ export const LAUNCHPAD_CONTROLLER = `sap.ui.define([
 `;
 
 export const LAUNCHPAD_CSS = `.raptLaunchpadGroups { padding: 1rem 2rem 0 2rem; }
+.raptLaunchpadPages { padding: 0.75rem 2rem 0 2rem; }
 .raptLaunchpadGroup { margin-bottom: 1.5rem; }
 .raptLaunchpadGroupTitle { margin: 0 0 0.75rem 0; }
 .raptLaunchpadTile { margin: 0 1rem 1rem 0; }

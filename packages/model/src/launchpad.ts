@@ -43,10 +43,31 @@ export interface LaunchpadGroup {
   tiles: LaunchpadTile[];
 }
 
+/** A page of a space: sections of tiles (D48). */
+export interface LaunchpadPage {
+  id: string;
+  title: string;
+  sections: LaunchpadGroup[];
+}
+
+/**
+ * A space (D48), as in the SAP Fiori launchpad: a tab of the shell with its pages, assigned to
+ * roles (none: every user). A launchpad.json with groups only has one space of one page.
+ */
+export interface LaunchpadSpace {
+  id: string;
+  title: string;
+  roles: string[];
+  pages: LaunchpadPage[];
+}
+
 export interface LaunchpadModel {
   title: string;
   apps: LaunchpadApp[];
+  /** Every section of every page (the groups of a launchpad.json without spaces). */
   groups: LaunchpadGroup[];
+  /** The spaces and pages (D48); absent: one space with the groups. */
+  spaces?: LaunchpadSpace[];
   /** Claims kept in the sessions: those the authorizations of the applications read (`{claim:x}`). */
   claims: string[];
   /** The roles of the applications (rapt/authorizations.json) and of the tiles. */
