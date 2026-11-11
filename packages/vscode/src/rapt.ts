@@ -36,6 +36,30 @@ export interface RaptResult {
   diagnostics: RaptDiagnostic[];
 }
 
+/** Result of `rapt new --json`. */
+export interface NewResult {
+  command: "new";
+  ok: boolean;
+  root: string;
+  written: string[];
+  error?: string;
+}
+
+/** Result of `rapt abapgit --json`. */
+export interface AbapGitResult {
+  command: "abapgit";
+  ok: boolean;
+  root: string;
+  written: string[];
+  skipped: { file: string; reason: string }[];
+  issues: { severity: Severity; code: string; message: string; file: string; line: number; column: number }[];
+}
+
+/** The entity name of `rapt new`: letters and digits, starting with a letter. */
+export function validEntityName(name: string): boolean {
+  return /^[A-Za-z][A-Za-z0-9]*$/.test(name);
+}
+
 /** An event of `rapt dev --json`. */
 export type DevEvent =
   | { type: "building"; root: string }
@@ -164,7 +188,7 @@ function spawnCli(cli: Cli, args: string[], cwd: string): ChildProcess {
 }
 
 /** Runs `rapt <command> … --json` and returns its result. */
-export function runJson(cli: Cli, args: string[], cwd: string): Promise<RaptResult> {
+export function runJson<T = RaptResult>(cli: Cli, args: string[], cwd: string): Promise<T> {
   return new Promise((resolve, reject) => {
     const child = spawnCli(cli, [...args, "--json"], cwd);
     let stdout = "";
@@ -175,7 +199,7 @@ export function runJson(cli: Cli, args: string[], cwd: string): Promise<RaptResu
     child.on("close", (code) => {
       const line = stdout.trim().split(/\r?\n/).pop() ?? "";
       try {
-        resolve(JSON.parse(line) as RaptResult);
+        resolve(JSON.parse(line) as T);
       } catch {
         reject(new Error(`rapt ${args[0] ?? ""} failed (exit code ${code ?? "?"}): ${(stderr || stdout).trim() || "no output"}`));
       }

@@ -34,6 +34,9 @@ export interface BuildResult {
 
 export function buildModel(project: Project, options: BuildOptions = {}): BuildResult {
   const diagnostics = new Diagnostics();
+  for (const issue of project.issues) {
+    diagnostics.add(issue.severity, issue.code, issue.message, { file: issue.file, line: issue.line, column: issue.column });
+  }
   const dictionary = new Dictionary(project, diagnostics);
   const entities = new EntityResolver(project, dictionary, diagnostics);
 

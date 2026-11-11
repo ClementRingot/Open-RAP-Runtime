@@ -308,6 +308,8 @@ export class DevSession {
       HOST: this.env["HOST"] ?? "127.0.0.1",
       LOG_LEVEL: this.env["LOG_LEVEL"] ?? "warn",
       AUTH_MODE: this.env["AUTH_MODE"] ?? "none",
+      // seed data of rapt/seed.json, rapt/seed.sql at the first start (D42)
+      SEED: this.env["SEED"] ?? "auto",
       ...(dir === undefined ? {} : { PGLITE_DIR: dir }),
     };
     const child = spawn(process.execPath, [path.join(this.outDir, "dev-server.mjs")], { cwd: this.outDir, env, stdio: ["ignore", "pipe", "pipe", "ipc"] });

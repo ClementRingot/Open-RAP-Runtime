@@ -37,7 +37,20 @@ node packages/compiler/dist/cli.js launchpad launchpad.json --out out/launchpad 
 ```
 
 Le dossier source est un export abapGit (`.abapgit.xml` et `src/`) ; la fixture de référence est
-[fixtures/travel](fixtures/travel). Les codes de diagnostic sont décrits dans
+[fixtures/travel](fixtures/travel).
+
+### Écrire seulement de l'ABAP
+
+```sh
+rapt new mon-projet Travel --prefix ZRT    # un BO managed complet, avec données initiales
+rapt dev mon-projet                         # l'application tourne, rechargée à chaque modification
+rapt abapgit mon-projet                     # les XML abapGit qui manquent, pour l'import dans SAP
+```
+
+Les tables s'écrivent en source (`zrt_travel.tabl.astabl`, syntaxe `define table` des ABAP
+Development Tools) ; les fichiers XML d'abapGit sont générés par `rapt abapgit`, qui ne touche
+pas aux XML existants. `rapt/seed.json` (ou `rapt/seed.sql`) donne les données chargées au
+premier démarrage de `rapt dev` ([D42](docs/DECISIONS.md)). Les codes de diagnostic sont décrits dans
 [docs/DIAGNOSTICS.md](docs/DIAGNOSTICS.md).
 
 ## Boucle de développement (`rapt dev`)
@@ -59,8 +72,8 @@ est 8080 (`--port`). Les variables de l'application s'appliquent (`AUTH_MODE`, `
 ### Extension VS Code
 
 [packages/vscode](packages/vscode) ajoute à VS Code les diagnostics de `rapt check` dans l'onglet
-Problèmes à chaque enregistrement, les commandes *RAP : Lancer rapt dev*, *Vérifier le BO* et
-*Générer l'application*, et l'état de `rapt dev` dans la barre d'état. Elle appelle la CLI avec
+Problèmes à chaque enregistrement, les commandes *RAP : Lancer rapt dev*, *Vérifier le BO*,
+*Générer l'application*, *Nouveau business object* et *Générer les fichiers abapGit*, et l'état de `rapt dev` dans la barre d'état. Elle appelle la CLI avec
 `--json` (une sortie JSON pour `check` et `build`, un événement JSON par ligne pour `dev`) et ne
 compile rien elle-même ([D39](docs/DECISIONS.md)).
 

@@ -11,6 +11,7 @@ import { generateSql } from "./gen/sql.js";
 import { generateUi } from "./gen/ui/index.js";
 import type { Project } from "./input/project.js";
 import { buildModel, type BuildOptions } from "./ir/builder.js";
+import { loadSeed } from "./ir/seed.js";
 
 export interface GeneratedFile {
   /** Path relative to the output folder, with forward slashes. */
@@ -39,6 +40,10 @@ export async function generateApplication(project: Project, options: GenerateOpt
   if (model === undefined || diagnostics.hasErrors()) {
     return model === undefined ? { diagnostics, files: [] } : { diagnostics, model, files: [] };
   }
+  const seed = loadSeed(project, model, diagnostics);
+  if (diagnostics.hasErrors()) {
+    return { diagnostics, model, files: [] };
+  }
   const abap = await generateAbap(project, model, diagnostics, options.transpile === false ? { transpile: false } : {});
   if (abap === undefined || diagnostics.hasErrors()) {
     return { diagnostics, model, files: [] };
@@ -51,6 +56,12 @@ export async function generateApplication(project: Project, options: GenerateOpt
     ...abap.sources.map((s) => ({ path: `abap/src/${s.fileName}`, content: s.content })),
     ...generateUi(model).map((f) => ({ path: `ui/${f.path}`, content: f.content })),
   ];
+  if (seed.json !== undefined) {
+    files.push({ path: "db/seed.json", content: `${JSON.stringify(seed.json, null, 2)}\n` });
+  }
+  if (seed.sql !== undefined) {
+    files.push({ path: "db/seed.sql", content: seed.sql });
+  }
   if (options.scaffold !== false) {
     const destinations = findDestinations(abap.sources.filter((source) => source.original !== undefined));
     files.push(...generateScaffold(model, diagnostics, { destinations, ...(options.runtimeDir === undefined ? {} : { runtimeDir: options.runtimeDir }) }));

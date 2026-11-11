@@ -40,6 +40,8 @@ jobs:
       - run: pnpm test
       - name: Check the reference fixture
         run: node packages/compiler/dist/cli.js check fixtures/travel --warnings-as-errors
+      - name: abapGit files of the fixture complete
+        run: node packages/compiler/dist/cli.js abapgit fixtures/travel --check
       # the VS Code extension with rapt, OpenUI5 and PGlite inside (D39), on the Node.js it embeds
       - name: VS Code extension (.vsix)
         run: pnpm --filter rap-transpiler-vscode run package

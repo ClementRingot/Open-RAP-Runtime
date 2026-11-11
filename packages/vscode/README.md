@@ -12,6 +12,12 @@ et en affiche les résultats.
   chaque enregistrement. La barre d'état indique l'état (construction, prête, erreurs) et ouvre
   l'application d'un clic.
 - **RAP : Générer l'application** : `rapt build` dans le dossier de son choix.
+- **RAP : Nouveau business object** : `rapt new` demande le nom de l'entité, le préfixe et la
+  description, écrit un BO managed complet (table en source `.tabl.astabl`, CDS, BDEF, behavior
+  pool, service, données initiales `rapt/seed.json`) avec ses fichiers abapGit, puis propose de
+  lancer `rapt dev`.
+- **RAP : Générer les fichiers abapGit** : `rapt abapgit` écrit les XML qui manquent (dont ceux
+  des tables écrites en source) pour importer le dépôt dans un système SAP avec abapGit.
 - Menus contextuels de l'explorateur (dossier du projet, `.abapgit.xml`) et boutons dans la
   barre de titre des sources RAP.
 
@@ -43,6 +49,7 @@ travail, puis la commande `rapt` du PATH.
 | `rapt.checkOnSave` | `true` | vérifier à chaque enregistrement |
 | `rapt.dev.port` | `8080` | port de l'application |
 | `rapt.dev.openUi` | `true` | ouvrir le navigateur au démarrage de rapt dev |
+| `rapt.new.prefix` | `Z` | préfixe proposé pour un nouveau business object |
 
 ## Construire l'extension
 

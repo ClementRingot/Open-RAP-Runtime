@@ -2,6 +2,7 @@
 
 import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
 import path from "node:path";
+import { parseTableSource, tableSourceToXml } from "../ddic/table-source.js";
 
 export interface SourceFile {
   /** Path relative to the project root, with forward slashes (used in diagnostics). */
@@ -16,12 +17,30 @@ export interface SourceFile {
   /** The abapGit file name, as abaplint expects it. */
   fileName: string;
   content: string;
+  /**
+   * The file is generated from another one: the abapGit XML of a table written as source
+   * (`.tabl.astabl`). `path` and `absolute` then designate the source.
+   */
+  generatedFrom?: "astabl";
+  /** Lines of the fields in the source, for the diagnostics of a generated file. */
+  fieldLines?: Record<string, number>;
+}
+
+/** Problems found while reading the project (sources of tables). */
+export interface ProjectIssue {
+  severity: "error" | "warning";
+  code: string;
+  message: string;
+  file: string;
+  line: number;
+  column: number;
 }
 
 export interface Project {
   root: string;
   sourceRoot: string;
   files: SourceFile[];
+  issues: ProjectIssue[];
 }
 
 const ABAPGIT_FILE = /^([^.]+)\.([a-z0-9]{4})(?:\.(.+))?$/i;
@@ -82,7 +101,42 @@ export function loadProject(dir: string): Project {
       content: readFileSync(absolute, "utf8"),
     });
   }
-  return { root, sourceRoot, files };
+  const issues: ProjectIssue[] = [];
+  return { root, sourceRoot, files: withTableSources(files, issues), issues };
+}
+
+/**
+ * Tables written as source (`name.tabl.astabl`) get their abapGit XML (`name.tabl.xml`) here:
+ * the rest of the compiler only reads the XML. The source wins over an XML file present beside it.
+ */
+function withTableSources(files: SourceFile[], issues: ProjectIssue[]): SourceFile[] {
+  const sources = files.filter((f) => f.type === "TABL" && f.extension === "astabl");
+  if (sources.length === 0) {
+    return files;
+  }
+  const generated = new Map<string, SourceFile>();
+  for (const source of sources) {
+    const parsed = parseTableSource(source.content);
+    for (const issue of parsed.issues) {
+      issues.push({ ...issue, code: issue.severity === "error" ? "TABL001" : "TABL002", file: source.path });
+    }
+    if (parsed.table === undefined) {
+      continue;
+    }
+    if (parsed.table.name !== source.name) {
+      issues.push({ severity: "error", code: "TABL001", message: `the file defines ${parsed.table.name}, its name says ${source.name}`, file: source.path, line: 1, column: 1 });
+    }
+    generated.set(source.name, {
+      ...source,
+      extension: "xml",
+      fileName: source.fileName.replace(/\.astabl$/i, ".xml"),
+      content: tableSourceToXml(parsed.table),
+      generatedFrom: "astabl",
+      fieldLines: Object.fromEntries(parsed.table.fields.map((f) => [f.name, f.line])),
+    });
+  }
+  const result = files.filter((f) => !(f.type === "TABL" && f.extension === "xml" && generated.has(f.name)));
+  return [...result, ...generated.values()];
 }
 
 export function filesOfType(project: Project, type: string): SourceFile[] {

@@ -28,7 +28,8 @@
   ],
   "main": "./dist/extension.cjs",
   "activationEvents": [
-    "workspaceContains:**/.abapgit.xml"
+    "workspaceContains:**/.abapgit.xml",
+    "workspaceContains:**/*.tabl.astabl"
   ],
   "contributes": {
     "commands": [
@@ -66,6 +67,18 @@
         "command": "rapt.showLog",
         "title": "Afficher le journal",
         "category": "RAP"
+      },
+      {
+        "command": "rapt.newBo",
+        "title": "Nouveau business object",
+        "category": "RAP",
+        "icon": "$(add)"
+      },
+      {
+        "command": "rapt.abapgit",
+        "title": "Générer les fichiers abapGit",
+        "category": "RAP",
+        "icon": "$(repo)"
       }
     ],
     "menus": {
@@ -94,12 +107,22 @@
           "command": "rapt.build",
           "when": "resourceFilename == .abapgit.xml || explorerResourceIsFolder",
           "group": "rapt@3"
+        },
+        {
+          "command": "rapt.newBo",
+          "when": "explorerResourceIsFolder || resourceFilename == .abapgit.xml",
+          "group": "rapt@0"
+        },
+        {
+          "command": "rapt.abapgit",
+          "when": "resourceFilename == .abapgit.xml || explorerResourceIsFolder",
+          "group": "rapt@4"
         }
       ],
       "editor/title": [
         {
           "command": "rapt.devStart",
-          "when": "!rapt.devRunning && resourceExtname =~ /^\\.(asbdef|asddls|asddlxs|asdcls|srvdsrv|abap|xml)$/",
+          "when": "!rapt.devRunning && resourceExtname =~ /^\\.(asbdef|asddls|asddlxs|asdcls|srvdsrv|astabl|abap|xml)$/",
           "group": "navigation@90"
         },
         {
@@ -141,6 +164,11 @@
           "type": "boolean",
           "default": true,
           "description": "Ouvrir l'application dans le navigateur au premier démarrage de rapt dev."
+        },
+        "rapt.new.prefix": {
+          "type": "string",
+          "default": "Z",
+          "description": "Préfixe proposé pour les objets d'un nouveau business object (Z ou Y…)."
         }
       }
     }

@@ -6,7 +6,21 @@
 
 import path from "node:path";
 import * as vscode from "vscode";
-import { diagnosticPath, DevProcess, findProjectRoot, position, resolveCli, runJson, summary, type Cli, type DevEvent, type RaptDiagnostic } from "./rapt.js";
+import {
+  diagnosticPath,
+  DevProcess,
+  findProjectRoot,
+  position,
+  resolveCli,
+  runJson,
+  summary,
+  validEntityName,
+  type AbapGitResult,
+  type Cli,
+  type DevEvent,
+  type NewResult,
+  type RaptDiagnostic,
+} from "./rapt.js";
 
 const SEVERITY: Record<RaptDiagnostic["severity"], vscode.DiagnosticSeverity> = {
   error: vscode.DiagnosticSeverity.Error,
@@ -153,6 +167,97 @@ async function build(root: string): Promise<void> {
   });
 }
 
+/** The folder of a new business object: the folder clicked, else the project, else the workspace. */
+async function newBoFolder(uri?: vscode.Uri): Promise<string | undefined> {
+  if (uri?.scheme === "file") {
+    const isFolder = await vscode.workspace.fs.stat(uri).then((s) => s.type === vscode.FileType.Directory, () => false);
+    const start = isFolder ? path.join(uri.fsPath, ".abapgit.xml") : uri.fsPath;
+    return findProjectRoot(start, vscode.workspace.getWorkspaceFolder(uri)?.uri.fsPath) ?? (isFolder ? uri.fsPath : path.dirname(uri.fsPath));
+  }
+  const found = await vscode.workspace.findFiles("**/.abapgit.xml", "{**/node_modules/**,**/.rapt/**}", 2);
+  if (found.length > 0) {
+    return project();
+  }
+  const folders = vscode.workspace.workspaceFolders ?? [];
+  if (folders.length === 1) {
+    return folders[0]?.uri.fsPath;
+  }
+  const picked = await vscode.window.showOpenDialog({ canSelectFolders: true, canSelectFiles: false, openLabel: "Créer le BO ici" });
+  return picked?.[0]?.fsPath;
+}
+
+async function newBo(uri?: vscode.Uri): Promise<void> {
+  const root = await newBoFolder(uri);
+  if (root === undefined) {
+    return;
+  }
+  const entity = await vscode.window.showInputBox({
+    title: "RAP : nouveau business object",
+    prompt: "Nom de l'entité (ex. Travel, SalesOrder)",
+    ignoreFocusOut: true,
+    validateInput: (value) => (validEntityName(value) ? undefined : "Lettres et chiffres, en commençant par une lettre"),
+  });
+  if (entity === undefined) {
+    return;
+  }
+  const prefix = await vscode.window.showInputBox({
+    title: "RAP : nouveau business object",
+    prompt: "Préfixe des objets (Z ou Y…) : ZRT donne zrt_travel, ZRT_R_Travel, ZBP_RT_R_TRAVEL…",
+    value: config().get<string>("new.prefix") || "Z",
+    ignoreFocusOut: true,
+    validateInput: (value) => (/^[ZYzy][A-Za-z0-9_]*$/.test(value) ? undefined : "Commence par Z ou Y"),
+  });
+  if (prefix === undefined) {
+    return;
+  }
+  const description = await vscode.window.showInputBox({ title: "RAP : nouveau business object", prompt: "Description", value: entity, ignoreFocusOut: true });
+  if (description === undefined) {
+    return;
+  }
+  try {
+    const result = await runJson<NewResult>(cli(), ["new", root, entity, "--prefix", prefix, "--description", description], root);
+    if (!result.ok) {
+      void vscode.window.showErrorMessage(`RAP : ${result.error ?? "création impossible"}`);
+      return;
+    }
+    output.appendLine(`rapt new ${entity}: ${result.written.join(", ")}`);
+    const behavior = result.written.find((f) => f.endsWith(".bdef.asbdef") && f.includes("_r_"));
+    if (behavior !== undefined) {
+      await vscode.window.showTextDocument(vscode.Uri.file(path.join(root, behavior)));
+    }
+    const action = await vscode.window.showInformationMessage(`RAP : ${entity} créé (${result.written.length} fichiers).`, "Lancer rapt dev");
+    if (action !== undefined) {
+      await devStart(root);
+    }
+  } catch (e) {
+    cliFailed(e as Error);
+  }
+}
+
+async function abapGit(root: string): Promise<void> {
+  try {
+    const result = await runJson<AbapGitResult>(cli(), ["abapgit", root], root);
+    for (const skipped of result.skipped) {
+      output.appendLine(`${skipped.file}: ${skipped.reason}`);
+    }
+    for (const file of result.written) {
+      output.appendLine(`écrit : ${file}`);
+    }
+    if (result.issues.length > 0) {
+      publish(
+        root,
+        result.issues.map((i) => ({ severity: i.severity, code: i.code, message: i.message, file: i.file, line: i.line, column: i.column, path: path.join(root, i.file) })),
+      );
+    }
+    const message =
+      result.written.length === 0 ? "RAP : les fichiers abapGit sont à jour." : `RAP : ${result.written.length} fichier(s) abapGit écrit(s).`;
+    const extra = result.skipped.length > 0 ? ` ${result.skipped.length} objet(s) à compléter (voir le journal).` : "";
+    void (result.ok ? vscode.window.showInformationMessage(message + extra) : vscode.window.showErrorMessage(`${message}${extra} Erreurs dans les sources de tables.`, "Problèmes").then((a) => a && vscode.commands.executeCommand("workbench.actions.view.problems")));
+  } catch (e) {
+    cliFailed(e as Error);
+  }
+}
+
 function showStatus(icon: string, text: string, command?: string, tooltip?: string): void {
   status.text = `${icon} ${text}`;
   status.command = command;
@@ -266,6 +371,8 @@ export function activate(context: vscode.ExtensionContext): void {
       await vscode.env.openExternal(vscode.Uri.parse(dev.url));
     }),
     vscode.commands.registerCommand("rapt.showLog", () => output.show()),
+    vscode.commands.registerCommand("rapt.newBo", newBo),
+    vscode.commands.registerCommand("rapt.abapgit", withProject(abapGit)),
     // check on save, unless rapt dev already rebuilds this project
     vscode.workspace.onDidSaveTextDocument((document) => {
       if (document.uri.scheme !== "file" || config().get<boolean>("checkOnSave") === false) {

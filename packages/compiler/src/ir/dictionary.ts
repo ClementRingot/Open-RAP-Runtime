@@ -120,7 +120,7 @@ export class Dictionary {
     const { xml, file } = entry;
     const columns: ColumnModel[] = [];
     xml.fields.forEach((field, index) => {
-      const location = { file: file.path, line: lineOf(file.content, field.fieldName, index) };
+      const location = { file: file.path, line: file.fieldLines?.[field.fieldName] ?? lineOf(file.content, field.fieldName, index) };
       if (field.include !== undefined || field.fieldName.startsWith(".")) {
         sink.error("DDIC003", `${xml.name}: include structures (${field.fieldName} ${field.include ?? ""}) are not supported`, location);
         return;

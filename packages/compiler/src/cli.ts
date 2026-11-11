@@ -3,6 +3,8 @@
 
 import { writeFileSync } from "node:fs";
 import path from "node:path";
+import { generateAbapGitFiles, type AbapGitResult } from "./authoring/abapgit.js";
+import { newBusinessObject } from "./authoring/new.js";
 import { generateApplication, writeFiles, type GenerateOptions } from "./build.js";
 import { parseArgs } from "node:util";
 import { DevSession, type DevOptions } from "./dev.js";
@@ -20,6 +22,8 @@ Usage:
   rapt build <src> --out <dir> [--service <SRVD>] generate the application into <dir>
   rapt launchpad <launchpad.json> --out <dir>    generate the launchpad of applications into <dir>
   rapt dev   <src> [--port <n>] [--out <dir>]    build, run with an embedded database, rebuild on change
+  rapt new   <src> <Entity> [--prefix Z…]        write the sources of a new business object (and their XML)
+  rapt abapgit <src> [--check]                   write the abapGit XML files the sources lack
 
 Options:
   --service <name>   service definition to build (required when the sources have several)
@@ -30,6 +34,9 @@ Options:
   --port <n>         port of the application (rapt dev, default: PORT, else 8080)
   --json             machine-readable output (rapt check, rapt build: one JSON object;
                      rapt dev: one JSON event per line)
+  --prefix <Z…>      prefix of the object names (rapt new, default Z): ZRT → zrt_travel, ZRT_R_Travel…
+  --description <t>  description of the business object (rapt new)
+  --check            report the missing XML files without writing them, exit code 1 if any (rapt abapgit)
   --warnings-as-errors
   -h, --help
 `;
@@ -59,6 +66,9 @@ export async function main(argv: string[]): Promise<number> {
         runtime: { type: "string" },
         port: { type: "string" },
         json: { type: "boolean" },
+        prefix: { type: "string" },
+        description: { type: "string" },
+        check: { type: "boolean" },
         "warnings-as-errors": { type: "boolean" },
         help: { type: "boolean", short: "h" },
       },
@@ -75,6 +85,12 @@ export async function main(argv: string[]): Promise<number> {
   if (source === undefined) {
     process.stderr.write(`missing <src>\n\n${USAGE}`);
     return 2;
+  }
+  if (command === "new") {
+    return newCommand(source, parsed.positionals[2], parsed.values, parsed.values["json"] === true);
+  }
+  if (command === "abapgit") {
+    return abapGitCommand(source, parsed.values["check"] === true, parsed.values["json"] === true);
   }
   if (command === "launchpad") {
     const out = parsed.values["out"];
@@ -160,6 +176,58 @@ export async function main(argv: string[]): Promise<number> {
       process.stderr.write(`unknown command ${command}\n\n${USAGE}`);
       return 2;
   }
+}
+
+function abapGitCommand(source: string, check: boolean, json: boolean): number {
+  let result: AbapGitResult;
+  try {
+    result = generateAbapGitFiles(source, { check });
+  } catch (error) {
+    process.stderr.write(`${(error as Error).message}\n`);
+    return 2;
+  }
+  const errors = result.issues.filter((i) => i.severity === "error");
+  const failed = errors.length > 0 || (check && result.written.length > 0);
+  if (json) {
+    process.stdout.write(`${JSON.stringify({ command: "abapgit", ok: !failed, root: path.resolve(source), check, ...result })}\n`);
+    return failed ? 1 : 0;
+  }
+  for (const issue of result.issues) {
+    const line = `${issue.file}:${issue.line}:${issue.column}: ${issue.severity} ${issue.code} ${issue.message}`;
+    (issue.severity === "error" ? process.stderr : process.stdout).write(`${line}\n`);
+  }
+  for (const skipped of result.skipped) {
+    process.stdout.write(`${skipped.file}: skipped, ${skipped.reason}\n`);
+  }
+  for (const file of result.written) {
+    process.stdout.write(`${check ? "missing or outdated" : "written"}: ${file}\n`);
+  }
+  process.stdout.write(result.written.length === 0 ? "abapGit files up to date\n" : `${result.written.length} file(s) ${check ? "to write (run rapt abapgit)" : "written"}\n`);
+  return failed ? 1 : 0;
+}
+
+function newCommand(source: string, entity: string | undefined, values: Record<string, unknown>, json: boolean): number {
+  if (entity === undefined) {
+    process.stderr.write(`rapt new needs the name of the entity, e.g. rapt new . Travel --prefix ZRT\n`);
+    return 2;
+  }
+  const result = newBusinessObject(source, entity, {
+    ...(typeof values["prefix"] === "string" ? { prefix: values["prefix"] } : {}),
+    ...(typeof values["description"] === "string" ? { description: values["description"] } : {}),
+  });
+  if (json) {
+    process.stdout.write(`${JSON.stringify({ command: "new", ok: result.error === undefined, root: path.resolve(source), ...result })}\n`);
+    return result.error === undefined ? 0 : 1;
+  }
+  if (result.error !== undefined) {
+    process.stderr.write(`${result.error}\n`);
+    return 1;
+  }
+  for (const file of result.written) {
+    process.stdout.write(`written: ${file}\n`);
+  }
+  process.stdout.write(`next: rapt dev ${source}\n`);
+  return 0;
 }
 
 /** `rapt check --json`, `rapt build --json`: diagnostics with absolute paths, for tools. */
