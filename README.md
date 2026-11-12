@@ -100,6 +100,9 @@ rapt dev mon-projet                         # http://localhost:8080/ — recharg
 
 La même documentation s'ouvre depuis le launchpad de `rapt dev` (tuile *Documentation*).
 
+Le site du projet (`site/`, publié sur GitHub Pages par le workflow `site.yml`) présente
+rap-transpiler et sert le `.vsix` de la dernière version.
+
 ## Contribuer
 
 ```sh

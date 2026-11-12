@@ -1,0 +1,56 @@
+name: Site
+
+# The website of the project (site/) on GitHub Pages, with the VS Code extension built from the
+# same commit: the "Télécharger" button serves rap-transpiler-vscode.vsix from the site itself.
+# Enable it once in the repository: Settings → Pages → Source: GitHub Actions.
+on:
+  push:
+    branches: [main]
+    paths: ["site/**", "packages/**", "docs/images/**", ".github/workflows/site.yml"]
+  release:
+    types: [published]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm build
+      - name: VS Code extension (.vsix)
+        run: pnpm --filter rap-transpiler-vscode run package
+      - name: Site with the extension and the screenshots
+        run: |
+          mkdir -p _site/images
+          cp -r site/. _site/
+          cp docs/images/*.png _site/images/
+          cp packages/vscode/rap-transpiler-vscode.vsix _site/
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: _site
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4

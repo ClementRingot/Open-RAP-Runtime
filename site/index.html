@@ -1,0 +1,157 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>rap-transpiler — vos BO RAP, sans système SAP</title>
+  <meta name="description" content="Développez, testez et déployez vos business objects RAP (ABAP RESTful Application Programming Model) sans système SAP : OData V4, runtime RAP managed, ABAP transpilé, UI OpenUI5. Extension VS Code gratuite et open source.">
+  <meta property="og:title" content="rap-transpiler">
+  <meta property="og:description" content="Vos business objects RAP tournent partout : OData V4, runtime RAP managed, votre ABAP, PostgreSQL et une UI Fiori, sans système SAP.">
+  <meta property="og:image" content="images/list-report.png">
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%230a6ed1'/%3E%3Cpath d='M9 22V10h7a4 4 0 0 1 0 8h-7m7 0 5 4' stroke='white' stroke-width='3' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header class="top">
+    <div class="wrap nav">
+      <a class="brand" href="#"><span class="logo" aria-hidden="true">R</span>rap-transpiler</a>
+      <nav aria-label="Navigation principale">
+        <a href="#fonctionnalites">Fonctionnalités</a>
+        <a href="#comment">Comment ça marche</a>
+        <a href="#demarrer">Démarrer</a>
+        <a class="button small" href="#telecharger">Télécharger</a>
+      </nav>
+    </div>
+  </header>
+
+  <main>
+    <section class="hero">
+      <div class="wrap">
+        <p class="eyebrow">ABAP RESTful Application Programming Model · open source · MIT</p>
+        <h1>Vos business objects RAP,<br>sans système SAP.</h1>
+        <p class="lead">Écrivez votre BO comme dans ADT — tables, vues CDS, annotations, behavior definition,
+          behavior pool en ABAP. rap-transpiler en fait une application qui tourne partout :
+          un service OData V4, le runtime RAP managed avec <strong>votre code ABAP</strong>, PostgreSQL et une
+          interface Fiori. Les mêmes sources s'importent ensuite dans SAP avec abapGit.</p>
+        <div class="actions">
+          <a class="button" href="#telecharger">Télécharger l'extension VS Code</a>
+          <a class="button ghost" href="https://github.com/ClementRingot/RAP-Transpiler">Voir le code sur GitHub</a>
+        </div>
+        <figure class="shot hero-shot">
+          <img src="images/list-report.png" alt="List Report généré : liste de voyages avec filtres, colonnes et actions" width="1280" height="640">
+        </figure>
+      </div>
+    </section>
+
+    <section class="band">
+      <div class="wrap uses">
+        <div><h3>Apprendre et enseigner RAP</h3><p>Le cycle complet BDEF → behavior pool → OData → Fiori, en local, en quelques secondes, sans licence.</p></div>
+        <div><h3>Prototyper</h3><p>Montrer un BO qui marche à un métier ou un client avant d'ouvrir un système.</p></div>
+        <div><h3>Tester en CI</h3><p>Déterminations, validations, actions et autorisations testées à chaque commit.</p></div>
+        <div><h3>Livrer petit</h3><p>Une application autonome sur Docker, SAP BTP Cloud Foundry ou un serveur interne.</p></div>
+      </div>
+    </section>
+
+    <section id="comment">
+      <div class="wrap">
+        <h2>Comment ça marche</h2>
+        <p class="section-lead">Un compilateur lit vos sources abapGit et génère une application Node.js. Rien de propriétaire : ni SAPUI5, ni CAP.</p>
+        <div class="pipeline" role="img" aria-label="Sources abapGit, compilées par rapt, donnent une application Node.js : OData V4, runtime RAP, ABAP transpilé, PostgreSQL, UI OpenUI5">
+          <div class="stage">
+            <h3>Vos sources (abapGit)</h3>
+            <ul><li>Tables, table entities</li><li>Vues CDS, projections, types</li><li>Metadata extensions <code>@UI</code></li><li>Behavior definitions</li><li>Behavior pools ABAP</li><li>Service definition et binding</li></ul>
+          </div>
+          <div class="arrow" aria-hidden="true">→</div>
+          <div class="stage accent">
+            <h3><code>rapt</code></h3>
+            <ul><li>Diagnostics positionnés</li><li>ABAP transpilé (abaplint)</li><li><code>$metadata</code> OData V4</li><li>Schéma SQL</li><li>UI OpenUI5</li></ul>
+          </div>
+          <div class="arrow" aria-hidden="true">→</div>
+          <div class="stage">
+            <h3>Votre application</h3>
+            <ul><li>Service OData V4 aux chemins SAP</li><li>Runtime RAP managed</li><li>PostgreSQL</li><li>Launchpad Fiori</li><li>Serveur MCP pour les agents IA</li></ul>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section id="fonctionnalites" class="band">
+      <div class="wrap">
+        <h2>Tout un BO RAP</h2>
+        <div class="features">
+          <article><h3>Runtime RAP managed</h3><p>Verrous, ETags, numérotation, autorisations globales et d'instance, feature control, déterminations, validations, actions, savers.</p></article>
+          <article><h3>Draft comme Fiori Elements</h3><p><code>with draft</code> et <code>with collaborative draft</code> : brouillons, Edit / Activate / Discard, état d'édition, invitation d'autres utilisateurs.</p></article>
+          <article><h3>Votre ABAP, exécuté</h3><p>EML complet, messages, ABAP SQL, <code>AUTHORITY-CHECK</code>, classes libérées : JSON, HTTP, bgPF, e-mail, numérotation.</p></article>
+          <article><h3>UI Fiori générée</h3><p>List Report, Object Page, Worklist, Analytical List Page, Overview Page, Form Entry ; filtres, variantes, value helps.</p></article>
+          <article><h3>CDS récents</h3><p>Table entities, types simples et énumérés, vues standards (<code>I_Currency</code>, <code>I_Country</code>…) avec leurs données.</p></article>
+          <article><h3>API Web et OAuth 2.0</h3><p>Binding Web API, jetons OIDC (client credentials, PKCE), serveur OAuth de développement intégré.</p></article>
+          <article><h3>Agents IA (MCP)</h3><p>Le service devient un serveur MCP : chaque outil applique les contrôles du BO.</p></article>
+          <article><h3>Fidèle à SAP</h3><p>Mode <code>standard</code> : ce qui se construit s'active sur SAP. Mode <code>enhanced</code> pour les extensions.</p></article>
+          <article><h3>Déploiement</h3><p>Docker, <code>docker compose</code>, SAP BTP Cloud Foundry (<code>cf push</code>), n'importe quel serveur Node.js.</p></article>
+        </div>
+        <div class="gallery">
+          <figure class="shot"><img src="images/object-page.png" alt="Object Page en édition" width="1280" height="640" loading="lazy"><figcaption>Object Page en édition</figcaption></figure>
+          <figure class="shot"><img src="images/dev-launchpad.png" alt="Launchpad de développement de rapt dev" width="1280" height="560" loading="lazy"><figcaption>Le launchpad de <code>rapt dev</code></figcaption></figure>
+        </div>
+      </div>
+    </section>
+
+    <section id="demarrer">
+      <div class="wrap two">
+        <div>
+          <h2>Démarrer en deux minutes</h2>
+          <ol class="steps">
+            <li>Installez l'extension (elle contient tout : rapt, OpenUI5, une base embarquée).</li>
+            <li><em>RAP : Nouveau business object</em> crée un BO managed complet, avec des données.</li>
+            <li><em>RAP : Lancer rapt dev</em> ouvre l'application ; elle se reconstruit à chaque enregistrement.</li>
+            <li><em>RAP : Nouvel objet RAP (assistant)</em> ajoute vues, BDEF, services… comme dans ADT.</li>
+          </ol>
+        </div>
+        <div>
+          <h2>Ou en ligne de commande</h2>
+<pre><code>rapt new mon-projet Travel --prefix ZRT
+rapt dev mon-projet
+# http://localhost:8080/
+
+rapt check mon-projet       # diagnostics
+rapt build mon-projet --out dist
+rapt abapgit mon-projet     # XML pour SAP</code></pre>
+        </div>
+      </div>
+    </section>
+
+    <section id="telecharger" class="download">
+      <div class="wrap">
+        <h2>Télécharger</h2>
+        <p class="section-lead">Extension VS Code, gratuite et open source (MIT). Node.js n'est pas nécessaire : l'extension utilise celui de VS Code.</p>
+        <div class="actions center">
+          <a class="button big" href="rap-transpiler-vscode.vsix" download>Télécharger rap-transpiler-vscode.vsix</a>
+          <a class="button ghost" href="https://github.com/ClementRingot/RAP-Transpiler/releases">Toutes les versions</a>
+        </div>
+        <div class="install">
+          <h3>Installer le .vsix</h3>
+          <p>Dans VS Code : <em>Extensions</em> → <em>…</em> → <em>Install from VSIX…</em>, ou :</p>
+          <pre><code>code --install-extension rap-transpiler-vscode.vsix</code></pre>
+        </div>
+      </div>
+    </section>
+
+    <section class="band">
+      <div class="wrap faq">
+        <h2>Questions fréquentes</h2>
+        <details><summary>Faut-il une licence SAP ?</summary><p>Non. rap-transpiler n'utilise aucune bibliothèque SAP propriétaire : OpenUI5 (Apache 2.0), abaplint (MIT), PostgreSQL. Les sources restent les vôtres et s'importent dans un système SAP avec abapGit.</p></details>
+        <details><summary>Mon BO se comportera-t-il comme sur SAP ?</summary><p>C'est la règle du projet : en mode <code>standard</code>, une source se comporte comme sur SAP, et ce qui ne s'y activerait pas est refusé avec un diagnostic. Les écarts connus sont documentés.</p></details>
+        <details><summary>Et en production ?</summary><p>L'application générée est une application Node.js ordinaire : Docker, Kubernetes, SAP BTP Cloud Foundry, avec PostgreSQL et l'authentification OIDC de votre fournisseur d'identité (Keycloak, SAP Cloud Identity Services, Entra ID…).</p></details>
+        <details><summary>Où est la documentation ?</summary><p>Dans le <a href="https://github.com/ClementRingot/RAP-Transpiler/blob/HEAD/docs/GUIDE.md">guide</a>, et dans le launchpad de <code>rapt dev</code> (tuile <em>Documentation</em>).</p></details>
+      </div>
+    </section>
+  </main>
+
+  <footer>
+    <div class="wrap foot">
+      <span>rap-transpiler · MIT · non affilié à SAP SE. SAP, ABAP, Fiori et SAP BTP sont des marques de SAP SE.</span>
+      <a href="https://github.com/ClementRingot/RAP-Transpiler">GitHub</a>
+    </div>
+  </footer>
+</body>
+</html>

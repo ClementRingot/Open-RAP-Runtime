@@ -1238,3 +1238,13 @@ et la conséquence. Les numéros D1 à D13 correspondent aux points 1 à 13 du �
   explicite et documenté au moment de le faire.
 - **Tests** : `vscode/test/rapt.test.ts` (catalogue, arguments de l'assistant, `rapt floorplan`,
   groupes), assistant vérifié dans Chromium.
+
+## D62 — Site du projet et téléchargement de l'extension
+
+- **Décision** : `site/` (HTML et CSS statiques, sans dépendance ni outil de construction) présente
+  le projet ; le workflow `site.yml` le publie sur GitHub Pages avec les captures de `docs/images`
+  et le `.vsix` construit depuis le même commit (bouton *Télécharger*). Les versions taguées
+  restent publiées par `release.yml` (GitHub Release, Marketplace et Open VSX si leurs jetons sont
+  configurés). À activer une fois : *Settings → Pages → Source : GitHub Actions*.
+- **Pourquoi** : une adresse à partager, toujours à jour, sans serveur à maintenir.
+- **Tests** : rendu vérifié dans Chromium (bureau, mobile sans défilement horizontal, mode sombre).
