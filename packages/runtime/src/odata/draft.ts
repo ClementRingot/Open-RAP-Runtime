@@ -18,7 +18,7 @@
 
 import { randomUUID } from "node:crypto";
 import { sql, type Kysely } from "kysely";
-import type { FieldModel } from "@rap-transpiler/model";
+import type { FieldModel } from "@open-rap/model";
 import type { BoAssociation, BoEntity } from "../rap/bo.js";
 import { operationId, type Transaction } from "../rap/transaction.js";
 import { Responses, type AccessMode, type Row } from "../rap/types.js";

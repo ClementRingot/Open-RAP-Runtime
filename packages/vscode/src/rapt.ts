@@ -279,11 +279,11 @@ export interface Cli {
 }
 
 export interface CliOptions {
-  /** Setting rapt.cliPath: a cli.js, or a folder of rap-transpiler. */
+  /** Setting rapt.cliPath: a cli.js, or a folder of Open RAP Runtime. */
   cliPath?: string;
   /** Setting rapt.nodePath: a Node.js 22+; empty for the Node.js of VS Code. */
   nodePath?: string;
-  /** The rapt embedded in the extension (rapt/node_modules/@rap-transpiler/compiler/dist/cli.js). */
+  /** The rapt embedded in the extension (rapt/node_modules/@open-rap/compiler/dist/cli.js). */
   bundledCli?: string;
   workspaceFolders: string[];
   /** The executable of VS Code (process.execPath of the extension host). */
@@ -354,8 +354,8 @@ export function unchosenFloorplans(sets: Array<{ set: string; chosen?: boolean }
 }
 
 /**
- * The CLI: the configured path (a cli.js, or a folder of rap-transpiler), else the rapt embedded
- * in the extension, else the compiler of a rap-transpiler clone or of node_modules in a
+ * The CLI: the configured path (a cli.js, or a folder of Open RAP Runtime), else the rapt embedded
+ * in the extension, else the compiler of an Open RAP Runtime clone or of node_modules in a
  * workspace folder, else `rapt` on the PATH. It runs on the configured Node.js, else on the
  * Node.js of VS Code (ELECTRON_RUN_AS_NODE, Node.js 22 since VS Code 1.101).
  */
@@ -373,7 +373,7 @@ export function resolveCli(options: CliOptions, exists: (p: string) => boolean =
   }
   for (const folder of options.workspaceFolders) {
     candidates.push(path.join(folder, "packages", "compiler", "dist", "cli.js"));
-    candidates.push(path.join(folder, "node_modules", "@rap-transpiler", "compiler", "dist", "cli.js"));
+    candidates.push(path.join(folder, "node_modules", "@open-rap", "compiler", "dist", "cli.js"));
   }
   const found = candidates.find((candidate) => exists(candidate));
   if (found === undefined) {
@@ -514,8 +514,8 @@ export function terminalShims(cli: Cli): Array<{ name: string; content: string; 
   }
   const env = Object.entries(cli.env ?? {});
   const quoteSh = (s: string): string => `'${s.replace(/'/g, `'\\''`)}'`;
-  const sh = `#!/bin/sh\n# rapt of the RAP Transpiler extension for VS Code\n${env.map(([k, v]) => `${k}=${quoteSh(v)} `).join("")}exec ${[cli.command, ...cli.args].map(quoteSh).join(" ")} "$@"\n`;
-  const cmd = `@echo off\r\nrem rapt of the RAP Transpiler extension for VS Code\r\n${env.map(([k, v]) => `set "${k}=${v}"\r\n`).join("")}${[cli.command, ...cli.args].map((a) => `"${a}"`).join(" ")} %*\r\n`;
+  const sh = `#!/bin/sh\n# rapt of the Open RAP Runtime extension for VS Code\n${env.map(([k, v]) => `${k}=${quoteSh(v)} `).join("")}exec ${[cli.command, ...cli.args].map(quoteSh).join(" ")} "$@"\n`;
+  const cmd = `@echo off\r\nrem rapt of the Open RAP Runtime extension for VS Code\r\n${env.map(([k, v]) => `set "${k}=${v}"\r\n`).join("")}${[cli.command, ...cli.args].map((a) => `"${a}"`).join(" ")} %*\r\n`;
   return [
     { name: "rapt", content: sh, executable: true },
     { name: "rapt.cmd", content: cmd, executable: false },
@@ -525,7 +525,7 @@ export function terminalShims(cli: Cli): Array<{ name: string; content: string; 
 /** The MCP server of rapt for the agent mode of VS Code (D64): `rapt agent <workspace folder>`. */
 export function agentServers(cli: Cli, folders: Array<{ name: string; path: string }>): Array<{ label: string; command: string; args: string[]; env: Record<string, string>; cwd: string }> {
   return folders.map((folder) => ({
-    label: folders.length === 1 ? "rapt (rap-transpiler)" : `rapt (rap-transpiler): ${folder.name}`,
+    label: folders.length === 1 ? "rapt (Open RAP Runtime)" : `rapt (Open RAP Runtime): ${folder.name}`,
     command: cli.command,
     args: [...cli.args, "agent", folder.path],
     env: { ...(cli.env ?? {}) },

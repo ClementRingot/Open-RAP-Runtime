@@ -1,10 +1,10 @@
-# @rap-transpiler/model
+# @open-rap/model
 
 The types of the intermediate representation (`model.json`) of
-[rap-transpiler](https://clementringot.github.io/RAP-Transpiler/), shared by the compiler
-(`@rap-transpiler/compiler`) and the runtime (`@rap-transpiler/runtime`), and the common
+[Open RAP Runtime](https://clementringot.github.io/RAP-Transpiler/), shared by the compiler
+(`@open-rap/compiler`) and the runtime (`@open-rap/runtime`), and the common
 derivations (OData, value helps, MCP).
 
-For the `rapt` command: `npm install -g rap-transpiler`.
+For the `rapt` command: `npm install -g open-rap-runtime`.
 
 MIT license.

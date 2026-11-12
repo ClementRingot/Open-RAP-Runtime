@@ -9,7 +9,7 @@
 
 import { AsyncLocalStorage } from "node:async_hooks";
 import type { Kysely } from "kysely";
-import { ABAP_SQL_SCHEMA, type Model } from "@rap-transpiler/model";
+import { ABAP_SQL_SCHEMA, type Model } from "@open-rap/model";
 import { AbapBridge, loadAbap, setSystemFields } from "../abap/bridge.js";
 import { abapGlobal } from "../abap/convert.js";
 import { AbapSqlClient } from "../abap/sql.js";
@@ -153,7 +153,7 @@ export class RapRuntime {
     const promise: Promise<void> = new Promise<void>((resolve) => setImmediate(resolve))
       .then(work)
       .catch((error: unknown) => {
-        process.stderr.write(`rap-transpiler: background work failed: ${(error as Error).stack ?? String(error)}\n`);
+        process.stderr.write(`open-rap-runtime: background work failed: ${(error as Error).stack ?? String(error)}\n`);
       })
       .finally(() => this.pending.delete(promise));
     this.pending.add(promise);

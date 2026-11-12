@@ -1,5 +1,5 @@
 /**
- * RAP Transpiler for VS Code: a thin layer over the rapt command line (`--json`). The commands,
+ * Open RAP Runtime for VS Code: a thin layer over the rapt command line (`--json`). The commands,
  * the Problems panel, the status bar and the UI preview all come from `rapt check`, `rapt build`
  * and `rapt dev`; the extension compiles nothing itself.
  */
@@ -93,7 +93,7 @@ function cli(): Cli {
   return resolveCli({
     ...(cliPath === undefined ? {} : { cliPath }),
     ...(nodePath === undefined ? {} : { nodePath }),
-    bundledCli: path.join(extensionPath, "rapt", "node_modules", "@rap-transpiler", "compiler", "dist", "cli.js"),
+    bundledCli: path.join(extensionPath, "rapt", "node_modules", "@open-rap", "compiler", "dist", "cli.js"),
     workspaceFolders: (vscode.workspace.workspaceFolders ?? []).map((f) => f.uri.fsPath),
     execPath: process.execPath,
   });
@@ -598,7 +598,7 @@ async function setMode(root: string): Promise<void> {
   const picked = await vscode.window.showQuickPick(
     [
       { label: "standard", description: "As on SAP: what would not activate on SAP is refused", picked: current["mode"] !== "enhanced" },
-      { label: "enhanced", description: "rap-transpiler extensions: managed + unmanaged save on a custom entity, mandatory fields checked, enumerations in OData", picked: current["mode"] === "enhanced" },
+      { label: "enhanced", description: "Open RAP Runtime extensions: managed + unmanaged save on a custom entity, mandatory fields checked, enumerations in OData", picked: current["mode"] === "enhanced" },
     ],
     { title: "RAP: mode of the project", placeHolder: `Current mode: ${current["mode"] === "enhanced" ? "enhanced" : "standard"}`, ignoreFocusOut: true },
   );
@@ -706,7 +706,7 @@ async function devStart(root: string): Promise<void> {
       void vscode.commands.executeCommand("setContext", "rapt.devRunning", false);
       showStatus("$(debug-start)", "RAP: dev stopped", "rapt.devStart");
       if (code !== 0 && code !== null) {
-        cliFailed(new Error(`rapt dev stopped (code ${code}), see the RAP Transpiler log`));
+        cliFailed(new Error(`rapt dev stopped (code ${code}), see the Open RAP Runtime log`));
       }
     }
   });
@@ -724,7 +724,7 @@ async function devStop(): Promise<void> {
 
 export function activate(context: vscode.ExtensionContext): void {
   extensionPath = context.extensionPath;
-  output = vscode.window.createOutputChannel("RAP Transpiler");
+  output = vscode.window.createOutputChannel("Open RAP Runtime");
   diagnostics = vscode.languages.createDiagnosticCollection("rapt");
   status = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Left, 50);
   showStatus("$(debug-start)", "RAP", "rapt.devStart", "Start rapt dev");
@@ -823,7 +823,7 @@ function installTerminalCommand(context: vscode.ExtensionContext): void {
       chmodSync(file, 0o755);
     }
   }
-  collection.description = "Adds the rapt command of the RAP Transpiler extension";
+  collection.description = "Adds the rapt command of the Open RAP Runtime extension";
   collection.prepend("PATH", `${bin}${path.delimiter}`);
 }
 

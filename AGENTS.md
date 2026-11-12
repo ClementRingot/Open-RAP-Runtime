@@ -1,7 +1,7 @@
-# AGENTS.md — working on rap-transpiler
+# AGENTS.md — working on Open RAP Runtime
 
 Instructions for the AI agents (and the humans) who change this repository. To **use**
-rap-transpiler in a RAP project, see section 13 of the [guide](docs/GUIDE.md); `rapt new` also
+Open RAP Runtime in a RAP project, see section 13 of the [guide](docs/GUIDE.md); `rapt new` also
 writes an `AGENTS.md` in the projects it creates.
 
 ## The project in short
@@ -9,7 +9,7 @@ writes an `AGENTS.md` in the projects it creates.
 A TypeScript compiler (pnpm monorepo) that turns the sources of a RAP BO (abapGit format) into a
 Node.js application: OData V4, RAP managed runtime, ABAP transpiled by abaplint, PostgreSQL,
 OpenUI5 UI. Read [README.md](README.md), [docs/GUIDE.md](docs/GUIDE.md) and the list of decisions
-[docs/DECISIONS.md](docs/DECISIONS.md) (D1 to D69) first.
+[docs/DECISIONS.md](docs/DECISIONS.md) (D1 to D70) first.
 
 ```
 packages/model/      types of the IR (model.json) and shared derivations (OData, value helps, MCP)
@@ -19,7 +19,7 @@ packages/compiler/   rapt CLI (src/cli.ts), parsers (bdef/, cds/, srvd/, dcl/, d
 packages/runtime/    Fastify server (app.ts, server.ts), OData (odata/), RAP (rap/), ABAP (abap/),
                      auth (auth/), launchpad (launchpad/), MCP (mcp/), UI (ui/), platform.ts
 packages/vscode/     VS Code extension: calls the CLI with --json, compiles nothing
-packages/cli/        npm package rap-transpiler: the rapt command with what rapt dev needs
+packages/cli/        npm package open-rap-runtime: the rapt command with what rapt dev needs
 fixtures/travel      reference BO (must stay importable and activatable on SAP)
 fixtures/custom-entity   custom entity, enhanced mode
 fixtures/table-entity    BO on a table entity, simple and enumerated types, enhanced mode
@@ -39,7 +39,7 @@ node packages/compiler/dist/cli.js dev fixtures/travel --port 8081
 node scripts/build-site.mjs _site                     # the website, with the documentation pages
 ```
 
-The runtime tests import the built `@rap-transpiler/compiler`: run `pnpm build` before running them
+The runtime tests import the built `@open-rap/compiler`: run `pnpm build` before running them
 after a change to the compiler.
 
 ## Rules

@@ -19,7 +19,7 @@ import {
   type FieldModel,
   type Model,
   type TableModel,
-} from "@rap-transpiler/model";
+} from "@open-rap/model";
 import type { Row } from "./types.js";
 
 export interface BoAssociation {

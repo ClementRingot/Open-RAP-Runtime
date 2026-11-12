@@ -9,7 +9,7 @@
  */
 
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
-import type { McpToolModel, McpToolsModel } from "@rap-transpiler/model";
+import type { McpToolModel, McpToolsModel } from "@open-rap/model";
 import { AuthenticationError, type Authenticator } from "../auth/auth.js";
 import type { User } from "../auth/user.js";
 import { withReader } from "../odata/access.js";
@@ -217,7 +217,7 @@ export function registerMcp(app: FastifyInstance, options: McpOptions): void {
       who = await user(request);
     } catch (error) {
       const status = error instanceof AuthenticationError ? error.status : 401;
-      return reply.status(status).header("WWW-Authenticate", 'Bearer realm="rap-transpiler"').send({ jsonrpc: "2.0", id: null, error: { code: -32001, message: (error as Error).message } });
+      return reply.status(status).header("WWW-Authenticate", 'Bearer realm="open-rap-runtime"').send({ jsonrpc: "2.0", id: null, error: { code: -32001, message: (error as Error).message } });
     }
     let payload: unknown;
     try {

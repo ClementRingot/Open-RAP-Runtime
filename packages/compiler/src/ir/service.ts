@@ -1,6 +1,6 @@
 /** Service definition (SRVD) and binding (SRVB) → IR service. */
 
-import { defaultServicePath, serviceNamespace, type ServiceModel } from "@rap-transpiler/model";
+import { defaultServicePath, serviceNamespace, type ServiceModel } from "@open-rap/model";
 import { readSrvbXml } from "../ddic/xml.js";
 import type { Diagnostics } from "../diagnostics.js";
 import { filesOfType, type Project, type SourceFile } from "../input/project.js";

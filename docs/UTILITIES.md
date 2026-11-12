@@ -2,7 +2,7 @@
 
 A behavior pool can use the released utility classes of ABAP Cloud with the usual code: JSON,
 encodings, numbering, dates, application log, hashing, random numbers, regular expressions,
-RTTS. rap-transpiler provides a "clean-room" implementation of them (written from the public
+RTTS. Open RAP Runtime provides a "clean-room" implementation of them (written from the public
 signatures documented by SAP, no SAP code); the kernel of the application does what ABAP cannot
 do alone (read and write JSON, convert a code page, hash, compress, write to the database,
 describe a data object) (decision D40).

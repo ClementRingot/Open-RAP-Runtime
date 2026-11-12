@@ -8,7 +8,7 @@
 
 import * as abaplint from "@abaplint/core";
 import { config as transpilerConfig, Transpiler, UnknownTypesEnum } from "@abaplint/transpiler";
-import { derivedTypesInterfaceName, type Model } from "@rap-transpiler/model";
+import { derivedTypesInterfaceName, type Model } from "@open-rap/model";
 import { Diagnostics } from "../../diagnostics.js";
 import { Dictionary } from "../../ir/dictionary.js";
 import type { Project, SourceFile } from "../../input/project.js";

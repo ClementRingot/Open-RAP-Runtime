@@ -3,7 +3,7 @@
  * value helps and associations: I_Currency, I_UnitOfMeasure, I_Country, I_Language and their
  * text views. On SAP they exist in every system; here they are added to a project that names
  * them and does not define them, with their tables (`rapt_*`) and their reference data (decision
- * D44). The element names are those of SAP, the tables are rap-transpiler's own.
+ * D44). The element names are those of SAP, the tables are Open RAP Runtime's own.
  */
 
 import { COUNTRIES, CURRENCIES, LANGUAGES, REGIONS, rows, TIMEZONES, UNITS } from "./data.js";

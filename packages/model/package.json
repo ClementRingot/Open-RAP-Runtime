@@ -1,7 +1,7 @@
 {
-  "name": "@rap-transpiler/model",
+  "name": "@open-rap/model",
   "version": "0.1.0",
-  "description": "Intermediate representation (IR) shared by the rap-transpiler compiler and runtime.",
+  "description": "Intermediate representation (IR) shared by the Open RAP Runtime compiler and runtime.",
   "type": "module",
   "license": "MIT",
   "homepage": "https://clementringot.github.io/RAP-Transpiler/",

@@ -5,7 +5,7 @@
  */
 
 import { randomUUID } from "node:crypto";
-import { same, type ActionModel } from "@rap-transpiler/model";
+import { same, type ActionModel } from "@open-rap/model";
 import { setSubrc } from "../abap/bridge.js";
 import { installHttp } from "../abap/http.js";
 import { installODataClient } from "../abap/odata-client.js";

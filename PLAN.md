@@ -78,7 +78,7 @@ Tested versions: `@abaplint/core` 2.120.98, `@abaplint/transpiler` and `@abaplin
    TABL .xml · DDLS .asddls · DDLX .asddlxs · BDEF .asbdef · SRVD .srvdsrv · CLAS .abap
    │
    ▼
-┌──────────────────────────── @rap-transpiler/compiler ────────────────────────────┐
+┌──────────────────────────── @open-rap/compiler ────────────────────────────┐
 │ 1. Parsing                                                                        │
 │    abaplint registry: CDS (DDLS, DDLX), DDIC (TABL, DTEL, DOMA) + std catalog     │
 │    Chevrotain       : BDEF (behavior + projection), SRVD                          │
@@ -92,7 +92,7 @@ Tested versions: `@abaplint/core` 2.120.98, `@abaplint/transpiler` and `@abaplin
 └───────────────────────────────────────────────────────────────────────────────────┘
    │
    ▼
- output folder (standalone application) + bundled @rap-transpiler/runtime (vendor/)
+ output folder (standalone application) + bundled @open-rap/runtime (vendor/)
 
    browser (OpenUI5, ODataModel V4)
         │  $batch, GET, POST, PATCH, DELETE
@@ -111,9 +111,9 @@ pnpm monorepo:
 
 ```
 packages/
-  model/      @rap-transpiler/model     types of the IR, (de)serialization, version of model.json
-  compiler/   @rap-transpiler/compiler  rapt CLI, parsers, IR construction, generators
-  runtime/    @rap-transpiler/runtime   OData V4, RAP managed runtime, EML kernel, auth, DB access
+  model/      @open-rap/model     types of the IR, (de)serialization, version of model.json
+  compiler/   @open-rap/compiler  rapt CLI, parsers, IR construction, generators
+  runtime/    @open-rap/runtime   OData V4, RAP managed runtime, EML kernel, auth, DB access
 fixtures/travel/                        reference BO (abapGit format)
 e2e/                                    end-to-end scenarios (HTTP + Playwright)
 ```
@@ -638,7 +638,7 @@ adjustments due to this requirement. The details are in [docs/DECISIONS.md](docs
 | 9 | Client removed (D9) | |
 | 10 | OpenUI5 1.136 LTS, `sap.m`, `sap.f`, `sap.uxap` (D10) | |
 | 11 | Serialized ABP execution (D11) | The lock is reentrant for the LUW that holds it. |
-| 12 | `@rap-transpiler/*`, `rapt` CLI, MIT license (D12) | |
+| 12 | `@open-rap/*`, `rapt` CLI, MIT license (D12) | |
 | 13 | Extract of the SAP-samples corpus to test the parsers (D13) | |
 
 Complementary decisions (D14 to D21): complete non-draft scope, runtime driven by the IR,

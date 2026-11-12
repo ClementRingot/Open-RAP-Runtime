@@ -3,10 +3,10 @@
   "compilerOptions": {
     "noEmit": true,
     "paths": {
-      "@rap-transpiler/model": ["./packages/model/src/index.ts"],
-      "@rap-transpiler/compiler": ["./packages/compiler/src/index.ts"],
-      "@rap-transpiler/compiler/cli": ["./packages/compiler/src/cli.ts"],
-      "@rap-transpiler/runtime": ["./packages/runtime/src/index.ts"]
+      "@open-rap/model": ["./packages/model/src/index.ts"],
+      "@open-rap/compiler": ["./packages/compiler/src/index.ts"],
+      "@open-rap/compiler/cli": ["./packages/compiler/src/cli.ts"],
+      "@open-rap/runtime": ["./packages/runtime/src/index.ts"]
     }
   },
   "include": ["packages/*/src/**/*.ts", "packages/*/test/**/*.ts", "e2e/**/*.ts", "vitest.config.ts"]

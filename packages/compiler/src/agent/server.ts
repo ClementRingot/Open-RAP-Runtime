@@ -3,7 +3,7 @@
  * rapt (GitHub Copilot, Claude Code, Cursor…). It speaks the Model Context Protocol over stdio
  * (newline-delimited JSON-RPC) and offers what an agent needs and cannot easily find alone:
  * the diagnostics of the project, the catalog of the object types and their creation, the
- * floorplans, the abapGit files, and the documentation of rap-transpiler (which is not in the
+ * floorplans, the abapGit files, and the documentation of Open RAP Runtime (which is not in the
  * project of the user). The VS Code extension registers it, so that the agent mode of VS Code
  * finds it without configuration; other clients start `rapt agent <workspace>`.
  *
@@ -258,7 +258,7 @@ export class AgentServer {
       {
         name: "rapt_docs_search",
         title: "Search the documentation",
-        description: "Searches the documentation of rap-transpiler (guide, features, annotations, diagnostic codes, known gaps and workarounds, decisions…) and returns the best sections, to read with rapt_docs_read.",
+        description: "Searches the documentation of Open RAP Runtime (guide, features, annotations, diagnostic codes, known gaps and workarounds, decisions…) and returns the best sections, to read with rapt_docs_read.",
         inputSchema: { type: "object", required: ["query"], properties: { query: { type: "string" }, limit: { type: "integer", minimum: 1, maximum: 20 } } },
         annotations: { readOnlyHint: true },
         run: (args) => {
@@ -294,7 +294,7 @@ export class AgentServer {
       {
         name: "rapt_docs_read",
         title: "Read the documentation",
-        description: "Returns a page of the documentation of rap-transpiler as Markdown (or one of its sections). Without page: the list of the pages.",
+        description: "Returns a page of the documentation of Open RAP Runtime as Markdown (or one of its sections). Without page: the list of the pages.",
         inputSchema: { type: "object", properties: { page: { type: "string", description: "e.g. guide, features, annotations, diagnostics, known_gaps, decisions, deployment, mcp." }, section: { type: "string", description: "A heading or section id of the page." } } },
         annotations: { readOnlyHint: true },
         run: (args) => {
@@ -332,7 +332,7 @@ export class AgentServer {
           result: {
             protocolVersion: asked !== undefined && PROTOCOL_VERSIONS.includes(asked) ? asked : PROTOCOL_VERSIONS[0],
             capabilities: { tools: { listChanged: false } },
-            serverInfo: { name: "rapt", title: "rap-transpiler", version: COMPILER_VERSION },
+            serverInfo: { name: "rapt", title: "open-rap-runtime", version: COMPILER_VERSION },
             instructions: INSTRUCTIONS,
           },
         });

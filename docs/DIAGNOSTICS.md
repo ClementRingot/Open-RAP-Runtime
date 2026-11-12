@@ -74,7 +74,7 @@ exit code is 1 as soon as there is an error (or a warning with `--warnings-as-er
 | BDEF024 | error | Composition child without behavior |
 | BDEF025 | error | Child entity without an association to parent |
 | BDEF026 | error | Projection BDEF on something other than a projection of a managed BO |
-| BDEF027 | error or info | Managed BO with unmanaged save on a custom entity: an extension of rap-transpiler, not activatable on SAP (D43). Error in `standard` mode, info in `enhanced` mode (D45) |
+| BDEF027 | error or info | Managed BO with unmanaged save on a custom entity: an extension of Open RAP Runtime, not activatable on SAP (D43). Error in `standard` mode, info in `enhanced` mode (D45) |
 | BDEF028 | error | Draft BO (`with draft`) with an entity without a `draft table` (D54) |
 | BDEF029 | error | `with collaborative draft` without `draft action Share` (D59) |
 | ABP001 | error | Behavior pool not found |

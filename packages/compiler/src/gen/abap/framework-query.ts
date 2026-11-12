@@ -10,7 +10,7 @@
 import type { FrameworkSource } from "./framework.js";
 
 const IF_RAP_QUERY_PROVIDER = `"! Implemented by the query class of a custom entity (@ObjectModel.query.implementedBy).
-"! rap-transpiler: the runtime calls select with zrap_cl_query_request and zrap_cl_query_response.
+"! Open RAP Runtime: the runtime calls select with zrap_cl_query_request and zrap_cl_query_response.
 INTERFACE if_rap_query_provider PUBLIC.
   METHODS select
     IMPORTING io_request  TYPE REF TO if_rap_query_request

@@ -7,7 +7,7 @@
 
 import { randomUUID } from "node:crypto";
 import { sql, type Kysely } from "kysely";
-import { abapName, derivedType, getAnnotation, same, type ActionModel, type DeterminationModel, type EntityModel, type FieldModel, type HandlerRef, type TriggerModel, type ValidationModel } from "@rap-transpiler/model";
+import { abapName, derivedType, getAnnotation, same, type ActionModel, type DeterminationModel, type EntityModel, type FieldModel, type HandlerRef, type TriggerModel, type ValidationModel } from "@open-rap/model";
 import type { AbapBridge } from "../abap/bridge.js";
 import { appendRow, component, isFlagOn, rowsOf, setFlag, type AbapData } from "../abap/convert.js";
 import type { User } from "../auth/user.js";

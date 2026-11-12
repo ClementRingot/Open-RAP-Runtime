@@ -166,10 +166,10 @@ describe("the generated launchpad", () => {
     const result = generateLaunchpad(file, { outDir: path.join(work, "out", "launchpad") });
     expect(result.diagnostics.items).toEqual([]);
     const content = (name: string): string => result.files.find((f) => f.path === name)?.content ?? "";
-    for (const name of ["package.json", "server.mjs", "launchpad/config.json", "ui/index.html", "ui/manifest.json", "ui/Component.js", "ui/view/Launchpad.view.xml", "ui/controller/Launchpad.controller.js", "ui/logo.svg", "Dockerfile", "manifest.yml", ".cfignore", "docker-compose.yml", "keycloak/rapt-realm.json", ".env.example", "README.md", "vendor/rap-transpiler-runtime/package.json"]) {
+    for (const name of ["package.json", "server.mjs", "launchpad/config.json", "ui/index.html", "ui/manifest.json", "ui/Component.js", "ui/view/Launchpad.view.xml", "ui/controller/Launchpad.controller.js", "ui/logo.svg", "Dockerfile", "manifest.yml", ".cfignore", "docker-compose.yml", "keycloak/rapt-realm.json", ".env.example", "README.md", "vendor/open-rap-runtime/package.json"]) {
       expect(content(name), name).not.toBe("");
     }
-    expect(JSON.parse(content("package.json"))).toMatchObject({ name: "travel-agency-launchpad", dependencies: { "@rap-transpiler/runtime": "file:vendor/rap-transpiler-runtime" } });
+    expect(JSON.parse(content("package.json"))).toMatchObject({ name: "travel-agency-launchpad", dependencies: { "@open-rap/runtime": "file:vendor/open-rap-runtime" } });
     expect(content("server.mjs")).toContain("startLaunchpad");
     // the application, built from its folder next to the launchpad, behind it with the same login
     const compose = content("docker-compose.yml");

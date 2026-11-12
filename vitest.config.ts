@@ -6,9 +6,9 @@ const src = (name: string): string => fileURLToPath(new URL(`./packages/${name}/
 export default defineConfig({
   resolve: {
     alias: {
-      "@rap-transpiler/model": src("model"),
-      "@rap-transpiler/compiler": src("compiler"),
-      "@rap-transpiler/runtime": src("runtime"),
+      "@open-rap/model": src("model"),
+      "@open-rap/compiler": src("compiler"),
+      "@open-rap/runtime": src("runtime"),
     },
   },
   test: {

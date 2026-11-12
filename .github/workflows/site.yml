@@ -2,7 +2,7 @@ name: Site
 
 # The website of the project (site/) on GitHub Pages, with the documentation rendered from docs/
 # (scripts/build-site.mjs, D63) and the VS Code extension built from the same commit: the
-# "Download" button serves rap-transpiler-vscode.vsix from the site itself.
+# "Download" button serves open-rap-runtime-vscode.vsix from the site itself.
 # Enable it once in the repository: Settings → Pages → Source: GitHub Actions.
 on:
   push:
@@ -34,11 +34,11 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: pnpm build
       - name: VS Code extension (.vsix)
-        run: pnpm --filter rap-transpiler-vscode run package
+        run: pnpm --filter open-rap-runtime-vscode run package
       - name: Site with the documentation, the screenshots and the extension
         run: |
           node scripts/build-site.mjs _site
-          cp packages/vscode/rap-transpiler-vscode.vsix _site/
+          cp packages/vscode/open-rap-runtime-vscode.vsix _site/
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
         with:

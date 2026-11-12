@@ -1,9 +1,9 @@
-# rap-transpiler
+# Open RAP Runtime
 
 **Develop, test and deploy your RAP business objects without an SAP system.**
 
 You write your RAP BO as in the ABAP Development Tools — tables, CDS views, UI annotations,
-behavior definition, behavior pool in ABAP, service — and rap-transpiler turns it into an
+behavior definition, behavior pool in ABAP, service — and Open RAP Runtime turns it into an
 application that runs anywhere: an OData V4 service, the RAP managed runtime with your ABAP code,
 a PostgreSQL database and a List Report / Object Page UI in OpenUI5. The same sources are then
 imported into SAP with abapGit.
@@ -26,11 +26,11 @@ library ([LICENSES.md](LICENSES.md)).
 
 ## Get started in two minutes
 
-**In VS Code**: install the `rap-transpiler-vscode.vsix` extension (it contains everything), then
+**In VS Code**: install the `open-rap-runtime-vscode.vsix` extension (it contains everything), then
 run *RAP: New complete business object…* and *RAP: Start rapt dev* (which asks for the floorplan).
 The browser opens on the development launchpad.
 
-**On the command line** (Node.js 22): `npm install -g rap-transpiler` (or `npx rap-transpiler`),
+**On the command line** (Node.js 22): `npm install -g open-rap-runtime` (or `npx open-rap-runtime`),
 or from a clone `pnpm install && pnpm build`, then `node packages/compiler/dist/cli.js` instead of
 `rapt`:
 
@@ -43,7 +43,7 @@ rapt dev my-project                         # http://localhost:8080/ — rebuilt
 
 ## What you get
 
-| You write (abapGit format) | rap-transpiler produces |
+| You write (abapGit format) | Open RAP Runtime produces |
 |---|---|
 | Tables (`define table`, as in ADT), CDS table entities | PostgreSQL tables, initial data |
 | CDS views, projections, CDS types (simple, enumerated), DCL | SQL views, OData V4 `$metadata`, per-user access controls |
@@ -93,7 +93,7 @@ rapt dev my-project                         # http://localhost:8080/ — rebuilt
 
 | Document | Content |
 |---|---|
-| [Guide](docs/GUIDE.md) | Everything rap-transpiler does and how to use it (humans and AI agents) |
+| [Guide](docs/GUIDE.md) | Everything Open RAP Runtime does and how to use it (humans and AI agents) |
 | [Features](docs/FEATURES.md) | RAP coverage, feature by feature |
 | [Annotations](docs/ANNOTATIONS.md) | Each CDS annotation: what the `$metadata` and the UI do with it |
 | [Diagnostics](docs/DIAGNOSTICS.md) | The codes of `rapt check` |
@@ -107,7 +107,7 @@ The same documentation opens from the launchpad of `rapt dev` (*Documentation* t
 project website.
 
 The project website (`site/`, published on GitHub Pages by the `site.yml` workflow) presents
-rap-transpiler, contains this documentation and serves the `.vsix` of the latest version.
+Open RAP Runtime, contains this documentation and serves the `.vsix` of the latest version.
 
 ## Contributing
 
@@ -122,7 +122,7 @@ packages/model/      types of the IR (model.json), shared naming conventions
 packages/compiler/   rapt CLI, parsers (BDEF, CDS, SRVD, DCL), IR, generators
 packages/runtime/    runtime of the generated applications (OData V4, RAP managed, launchpad, MCP)
 packages/vscode/     VS Code extension (calls the rapt CLI)
-packages/cli/        npm package rap-transpiler (the rapt command)
+packages/cli/        npm package open-rap-runtime (the rapt command)
 fixtures/            reference BOs: travel (Travel / Booking), custom-entity, table-entity
 site/                project website
 ```

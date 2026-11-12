@@ -18,7 +18,7 @@ import { platformEnvironment } from "../platform.js";
 import { readFileSync } from "node:fs";
 import path from "node:path";
 import Fastify, { type FastifyInstance, type FastifyReply, type FastifyRequest, type FastifyServerOptions } from "fastify";
-import { appUrlVariable, tileVisible, type LaunchpadApp, type LaunchpadModel, type LaunchpadTile } from "@rap-transpiler/model";
+import { appUrlVariable, tileVisible, type LaunchpadApp, type LaunchpadModel, type LaunchpadTile } from "@open-rap/model";
 import { AuthenticationError, Authenticator, type AuthOptions } from "../auth/auth.js";
 import { authFromEnvironment } from "../auth/environment.js";
 import { OidcSessions } from "../auth/session.js";
@@ -128,7 +128,7 @@ export async function createLaunchpad(options: LaunchpadOptions): Promise<Fastif
       const status = error instanceof AuthenticationError ? error.status : 401;
       const message = (error as Error).message;
       if (status === 401) {
-        reply.header("WWW-Authenticate", 'Bearer realm="rap-transpiler"');
+        reply.header("WWW-Authenticate", 'Bearer realm="open-rap-runtime"');
       }
       return api ? reply.status(status).type("application/json").send({ error: { code: status === 403 ? "FORBIDDEN" : "UNAUTHORIZED", message } }) : reply.status(status).type("text/plain").send(message);
     }

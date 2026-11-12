@@ -1,5 +1,5 @@
 {
-  "name": "rap-transpiler-monorepo",
+  "name": "open-rap-runtime-monorepo",
   "private": true,
   "type": "module",
   "description": "Compile SAP RAP sources (CDS, BDEF, behavior pool) into a standalone Node.js OData V4 application.",

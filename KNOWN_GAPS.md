@@ -70,7 +70,7 @@ Reference versions: `@abaplint/core` 2.120.98, `@abaplint/transpiler` 2.14.24,
 | Views with parameters, unions, hierarchies | Diagnostic CDS002 |
 | Custom entities (D43): parameters, aggregation (`get_aggregation`), nested `$expand`; DCL not applied (the query class filters itself) | Not handled |
 | Custom entities: a `$filter` outside ranges (OR between elements, functions other than `contains`/`startswith`/`endswith`, comparison between elements) | `get_as_ranges` raises `cx_rap_query_filter_no_range`, as in SAP; `get_as_sql_string` stays available. Functions and expressions that cannot be translated: 501. |
-| Managed BO with unmanaged save on a custom entity (D43) | Specific to rap-transpiler (BDEF027 warning); no database lock: the LUWs of the application are serialized, the target API keeps its own checks. |
+| Managed BO with unmanaged save on a custom entity (D43) | Specific to Open RAP Runtime (BDEF027 warning); no database lock: the LUWs of the application are serialized, the target API keeps its own checks. |
 | DCL access control: EML and ABAP SQL of the behavior pool | Not filtered (like `WITH PRIVILEGED ACCESS`); only the OData reads are (D35). As in RAP, changes go through the instance authorization, not through the DCL. |
 | DCL access control: other aspects (`bypass when`, user-defined aspects), paths of several associations, `$filter` on a navigation | A condition that is not evaluated grants no row (DCL002); the subquery of a `$filter` on `_Travel/…` reads the target without its DCL. |
 | `@AccessControl.authorizationCheck` | Informative: a role applies if it exists, whatever the value. |
@@ -138,7 +138,7 @@ Reference versions: `@abaplint/core` 2.120.98, `@abaplint/transpiler` 2.14.24,
 | RTTS | `describe_by_name` raises `cx_sy_rtti_type_not_released`; no creation of types (`cl_abap_structdescr=>create`, `CREATE DATA … TYPE HANDLE`), no attributes nor methods in `cl_abap_classdescr`. `absolute_name` comes from the qualified name of the transpiler. |
 | `cl_abap_random*` | Park-Miller generator (not cryptographic): the sequences differ from those of SAP for the same seed. No `cl_abap_random_packed*` nor `decfloat16`. |
 | `cl_abap_char_utilities=>minchar` | Missing (null character). |
-| Background processing (D41) | The operations stay in memory until they run: a process not yet run when the application stops never is (it stays `NEW`). No restart nor retry of an `ERRONEOUS` process, no queue by name (`set_name` is used for tracking), no check of the transactional phase of the call (on SAP, `save_for_execution` of a controlled operation happens in the save phase). `if_bgmc_process_monitor`: states `NEW`, `SUCCESSFUL`, `ERRONEOUS` (names specific to rap-transpiler). A single `COMMIT ENTITIES` per operation. |
+| Background processing (D41) | The operations stay in memory until they run: a process not yet run when the application stops never is (it stays `NEW`). No restart nor retry of an `ERRONEOUS` process, no queue by name (`set_name` is used for tracking), no check of the transactional phase of the call (on SAP, `save_for_execution` of a controlled operation happens in the save phase). `if_bgmc_process_monitor`: states `NEW`, `SUCCESSFUL`, `ERRONEOUS` (names specific to Open RAP Runtime). A single `COMMIT ENTITIES` per operation. |
 | E-mail (D41) | Sent after the commit of the LUW, without retry; `send( )` always returns the state `W` (waiting). No e-mail templates (`cl_bcs_mail_message=>create_instance_by_template`), nor signature, nor encryption. |
 
 ## Standard views and value helps (D44)

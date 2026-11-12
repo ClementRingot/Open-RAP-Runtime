@@ -16,7 +16,7 @@ import {
   type ServiceModel,
   type UiConfigModel,
   type TableModel,
-} from "@rap-transpiler/model";
+} from "@open-rap/model";
 import { parseBdef } from "../bdef/parser.js";
 import type { BdefAst } from "../bdef/ast.js";
 import { readMsagXml } from "../ddic/xml.js";
@@ -307,7 +307,7 @@ export function buildModel(project: Project, options: BuildOptions = {}): BuildR
   deriveCompositionConditions(sortedEntities, diagnostics);
   const model: Model = {
     formatVersion: MODEL_FORMAT_VERSION,
-    generator: { name: "rap-transpiler", version: COMPILER_VERSION },
+    generator: { name: "open-rap-runtime", version: COMPILER_VERSION },
     ...(config.mode === "enhanced" ? { mode: config.mode } : {}),
     ...(config.ui === undefined ? {} : { ui: checkUi(config.ui, service, diagnostics) }),
     service,

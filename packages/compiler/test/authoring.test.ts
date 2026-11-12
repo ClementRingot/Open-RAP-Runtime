@@ -13,7 +13,7 @@ import { loadProject } from "../src/input/project.js";
 import { buildModel } from "../src/ir/builder.js";
 import { FIXTURE_DIR, fixtureVariant, readFixture } from "./helpers.js";
 
-const BOOKING_SOURCE = `@EndUserText.label : 'Booking (rap-transpiler reference BO)'
+const BOOKING_SOURCE = `@EndUserText.label : 'Booking (Open RAP Runtime reference BO)'
 @AbapCatalog.enhancement.category : #NOT_EXTENSIBLE
 @AbapCatalog.tableCategory : #TRANSPARENT
 @AbapCatalog.deliveryClass : #A

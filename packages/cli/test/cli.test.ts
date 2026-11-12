@@ -1,4 +1,4 @@
-/** The rap-transpiler npm package (D65): its rapt command runs the CLI of the compiler. */
+/** The open-rap-runtime npm package (D65): its rapt command runs the CLI of the compiler. */
 
 import { execFileSync } from "node:child_process";
 import path from "node:path";
@@ -8,7 +8,7 @@ import { describe, expect, it } from "vitest";
 const BIN = fileURLToPath(new URL("../dist/rapt.js", import.meta.url));
 const FIXTURE = fileURLToPath(new URL("../../../fixtures/travel", import.meta.url));
 
-describe("rap-transpiler (npm)", () => {
+describe("open-rap-runtime (npm)", () => {
   it("rapt checks a project and prints its version once", () => {
     const out = execFileSync(process.execPath, [BIN, "check", FIXTURE, "--json"], { encoding: "utf8" });
     expect(JSON.parse(out)).toMatchObject({ command: "check", ok: true, root: path.resolve(FIXTURE) });

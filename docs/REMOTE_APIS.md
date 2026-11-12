@@ -7,7 +7,7 @@ destination is configured differently from SAP (decision D31).
 
 ## 1. What to export with abapGit
 
-| On SAP | In the abapGit repository | What rap-transpiler does with it |
+| On SAP | In the abapGit repository | What Open RAP Runtime does with it |
 |---|---|---|
 | Service consumption model 2 (OData V4) | the generated consumption model class (`INHERITING FROM /iwbep/cl_v4_abs_pm_model_prov`) | keeps its types (`tys_…`, `tyt_…`) and constants (`gcs_entity_set`…); the `define` method is removed |
 | Service consumption model (OData V2/V4, first generation) | the generated abstract entities and the service definition of the proxy | the abstract entities type the data; the service definition without a binding is not built (info SRVD007) |

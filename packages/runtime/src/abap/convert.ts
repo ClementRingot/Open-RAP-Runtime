@@ -4,7 +4,7 @@
  * they are reached through the global `abap` object set by the generated `init.mjs`.
  */
 
-import { isUuid, type AbapType } from "@rap-transpiler/model";
+import { isUuid, type AbapType } from "@open-rap/model";
 import type { CanonicalValue } from "../values.js";
 
 /** A data object of @abaplint/runtime (structure, table, elementary value). */

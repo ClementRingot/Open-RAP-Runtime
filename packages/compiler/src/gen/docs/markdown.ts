@@ -1,6 +1,6 @@
 /**
  * A small Markdown renderer for the documentation app of `rapt dev` (D49): the subset the
- * documentation of rap-transpiler uses — headings, paragraphs, lists (nested), code blocks and
+ * documentation of Open RAP Runtime uses — headings, paragraphs, lists (nested), code blocks and
  * inline code, tables, block quotes, links, emphasis. Text is escaped; links to other pages
  * (`FILE.md`, `FILE.md#anchor`) become routes of the app (`#/page/file`). The website renders the
  * same Markdown with its own links and images (`RenderOptions`, D63).

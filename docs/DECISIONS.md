@@ -126,8 +126,8 @@ correspond to points 1 to 13 of §11 of PLAN.md. The milestones M1 to M6 are tho
 
 ## D12 — Naming and license
 
-- **Decision**: packages `@rap-transpiler/model`, `@rap-transpiler/compiler`,
-  `@rap-transpiler/runtime`; `rapt` CLI; MIT license for this repository.
+- **Decision**: packages `@open-rap/model`, `@open-rap/compiler`,
+  `@open-rap/runtime`; `rapt` CLI; MIT license for this repository.
 
 ## D13 — Test corpus of the parsers
 
@@ -154,7 +154,7 @@ correspond to points 1 to 13 of §11 of PLAN.md. The milestones M1 to M6 are tho
 
 ## D15 — Generic runtime driven by the IR
 
-- **Decision**: the generated application contains a generic runtime (`@rap-transpiler/runtime`)
+- **Decision**: the generated application contains a generic runtime (`@open-rap/runtime`)
   that reads `model.json`. Only the SQL, the CSDL, the JavaScript of the ABP, the UI and the
   packaging are generated. The runtime is bundled as a tarball in `vendor/`.
 - **Why**: a single runtime tested for all BOs; a standalone output without a private registry.
@@ -639,7 +639,7 @@ correspond to points 1 to 13 of §11 of PLAN.md. The milestones M1 to M6 are tho
   `package.json`, no Docker) into `<src>/.rapt/dev`, starts it, watches the sources and starts
   again on each change (grouped over 150 ms, one build at a time).
   - **Dependencies**: the `node_modules` of the build is a link (a junction on Windows) to the one
-    of the `@rap-transpiler/runtime` package, which contains the abaplint runtime, PGlite and
+    of the `@open-rap/runtime` package, which contains the abaplint runtime, PGlite and
     OpenUI5. The transpiled ABAP module and the runtime thus load the same `@abaplint/runtime`. No
     npm installation.
   - **Child process**: the server runs in a separate process (`dev-server.mjs`), stopped by an
@@ -691,11 +691,11 @@ correspond to points 1 to 13 of §11 of PLAN.md. The milestones M1 to M6 are tho
   - **`rapt dev` installed flat**: the `node_modules` linked in `.rapt/dev` is the first folder,
     from the runtime to the root, that contains `@abaplint/runtime` (the one of the runtime in
     the pnpm repository, the one of `rapt/` in the extension).
-  - **CLI found**: `rapt.cliPath` setting, otherwise the bundled rapt, otherwise a rap-transpiler
+  - **CLI found**: `rapt.cliPath` setting, otherwise the bundled rapt, otherwise an Open RAP Runtime
     clone or a `node_modules` of the workspace, otherwise `rapt` from the PATH; Node.js from
     `rapt.nodePath`, otherwise the one of VS Code.
   - **CI**: the `test` job builds the `.vsix`, checks the fixture with the bundled rapt and
-    publishes the `.vsix` as an artifact (`rap-transpiler-vscode`).
+    publishes the `.vsix` as an artifact (`open-rap-runtime-vscode`).
   - **Stopping `rapt dev`**: SIGINT. On Windows, where this signal terminates the process, the
     server stops when its IPC channel with `rapt dev` closes (D38).
   - **Build**: ESM sources checked by `tsc`, delivered as one CommonJS file by esbuild
@@ -839,7 +839,7 @@ correspond to points 1 to 13 of §11 of PLAN.md. The milestones M1 to M6 are tho
     and the paging itself; the runtime only guarantees the keys and the navigation conditions
     (extra rows dropped) and cuts the page at `$top`. The interfaces and classes of the query are
     written from their public signatures (D24).
-  - **Managed BO with unmanaged save on a custom entity** (specific to rap-transpiler, warning
+  - **Managed BO with unmanaged save on a custom entity** (specific to Open RAP Runtime, warning
     BDEF027): the RAP runtime reads the instances (READ ENTITIES, existence check, ETag,
     associations) through the query class, with a filter on the keys, in the current LUW;
     `save_modified` writes the changes to the API. No database lock: the LUWs of the application
@@ -864,7 +864,7 @@ correspond to points 1 to 13 of §11 of PLAN.md. The milestones M1 to M6 are tho
     it receives it, with its text view (`_Text`, category `#TEXT`) and its tables
     (`rapt_currency`, `rapt_currencyt`, `rapt_uom`, `rapt_uomt`, `rapt_country`,
     `rapt_countryt`, `rapt_language`, `rapt_languaget`). The elements have the SAP names; the
-    tables are specific to rap-transpiler (ABAP Cloud code does not read the SAP tables). A view
+    tables are specific to Open RAP Runtime (ABAP Cloud code does not read the SAP tables). A view
     defined by the project wins. The files are virtual (`<standard>/…`): `rapt abapgit` never
     writes them.
   - **Reference data**: ISO 4217 currencies (with their decimals), ISO 3166 countries
@@ -879,7 +879,7 @@ correspond to points 1 to 13 of §11 of PLAN.md. The milestones M1 to M6 are tho
     Object Page and the filters of the List Report.
 - **Answer to the question "must the currencies be maintained as on BTP?"**: on BTP, the content
   of these views is delivered by SAP and is not to be entered; here it is delivered with
-  rap-transpiler the same way. The other released views useful next: `I_Region`,
+  Open RAP Runtime the same way. The other released views useful next: `I_Region`,
   `I_CalendarDate` (calendar), `I_Timezone`, `I_BusinessUserBasic` (users, to link to the IdP),
   `I_ExchangeRate` (exchange rates, to link to a source of rates).
 - **Views added afterwards**: `I_Region` and `I_RegionText` (regions of the United States,
@@ -897,7 +897,7 @@ correspond to points 1 to 13 of §11 of PLAN.md. The milestones M1 to M6 are tho
 - **Decision**: `rapt/config.json` (`{ "mode": "enhanced" }`) or `--mode` chooses the mode of
   the project. `standard` (default): the sources behave as on SAP and what SAP refuses is
   refused; a project that builds in this mode imports and activates on SAP. `enhanced`: the
-  extensions of rap-transpiler, which do not exist on SAP:
+  extensions of Open RAP Runtime, which do not exist on SAP:
   - managed BO with unmanaged save on a custom entity (D43): error BDEF027 in `standard`,
     information in `enhanced`;
   - `field ( mandatory )` checked on save without a validation: each created or changed instance
@@ -952,7 +952,7 @@ correspond to points 1 to 13 of §11 of PLAN.md. The milestones M1 to M6 are tho
 ## D49 — Development launchpad and documentation application
 
 - **Decision**: `rapt dev` serves at `/` a development launchpad: the application (with the
-  number of instances of its list), the documentation of rap-transpiler, the `$metadata` and,
+  number of instances of its list), the documentation of Open RAP Runtime, the `$metadata` and,
   with `rapt/mcp.json`, the MCP server. The application and the documentation show the shell bar
   there. The documentation is an OpenUI5 application (list of the pages, search, links between
   pages) whose pages are rendered from the Markdown of the repository at build time (our own
@@ -1060,7 +1060,7 @@ correspond to points 1 to 13 of §11 of PLAN.md. The milestones M1 to M6 are tho
   simple types and enumerated types (`enum`). SAP does not expose enumerated types in RAP OData
   services ("Development Constraints" of RAP).
 - **Decision**:
-  - **CDS types** (`<name>.drty.acds`, read by rap-transpiler: abaplint knows the object without
+  - **CDS types** (`<name>.drty.acds`, read by Open RAP Runtime: abaplint knows the object without
     parsing it): a simple type is worth its base type (built-in type, data element or another CDS
     type), with its label; an enumerated type has a base type (`abap.int1`, `int2`, `int4`,
     `char(1..8)`, `numc(1..8)`), exactly one `initial` constant, unique constants and values
@@ -1266,7 +1266,7 @@ correspond to points 1 to 13 of §11 of PLAN.md. The milestones M1 to M6 are tho
 
 - **Context**: AI agents (GitHub Copilot in agent mode, Claude Code, Cursor…) write more and more
   of the RAP sources. With a shell, they can run `rapt check --json`; but in VS Code `rapt` was
-  only inside the extension (not on the PATH), and the documentation of rap-transpiler (codes,
+  only inside the extension (not on the PATH), and the documentation of Open RAP Runtime (codes,
   annotations, known gaps and their workarounds) is not in the project of the user, so an agent
   could not find it. Also, the `.vsix` lost this documentation: the staging of the extension
   removed the `docs` folders and the `.md` files of the packages, and the documentation app of
@@ -1287,13 +1287,13 @@ correspond to points 1 to 13 of §11 of PLAN.md. The milestones M1 to M6 are tho
     `rapt.cmd` (Windows) in the storage of the extension start the CLI the extension uses, with
     the Node.js of VS Code (setting `rapt.terminal.addToPath`). An agent of the terminal (Claude
     Code) then runs `rapt` or `claude mcp add rapt -- rapt agent .` without installing anything.
-  - **Documentation in the `.vsix`**: the staging keeps `@rap-transpiler/compiler/docs` and fails
+  - **Documentation in the `.vsix`**: the staging keeps `@open-rap/compiler/docs` and fails
     when it is missing; the documentation app shows "Documentation not found" instead of an empty
     list if the documentation is ever missing.
 - **Why an MCP server and not only the CLI**: the CLI with `--json` and the AGENTS.md of the
   project are enough for an agent with a shell; the MCP server adds what the CLI does not give:
   discovery without configuration in VS Code, typed inputs (the catalog of the objects as enums),
-  and the documentation of rap-transpiler, searchable, wherever the extension or the npm package
+  and the documentation of Open RAP Runtime, searchable, wherever the extension or the npm package
   is installed. It reuses the functions of the CLI: one engine (D39).
 - **Tests**: `compiler/test/agent.test.ts` (protocol, business object created, checked, object
   generated, floorplan, abapGit, paths outside the workspace, several projects, documentation,
@@ -1301,28 +1301,28 @@ correspond to points 1 to 13 of §11 of PLAN.md. The milestones M1 to M6 are tho
   server definitions), `compiler/test/docs.test.ts` (empty documentation); `.vsix` built and its
   `rapt dev` checked to serve the 14 documentation pages.
 
-## D65 — npm package `rap-transpiler`
+## D65 — npm package `open-rap-runtime`
 
 - **Context**: outside VS Code (CI pipelines, a terminal agent, another editor), rapt needed a
   clone of the repository.
-- **Decision**: the package `rap-transpiler` (`packages/cli`) gives the `rapt` command
-  (`npm install -g rap-transpiler`, `npx rap-transpiler check .`, or a `devDependency` of the
-  project and `npx rapt …`). It depends on `@rap-transpiler/compiler` and
-  `@rap-transpiler/runtime` and on what `rapt dev` serves (OpenUI5, PGlite, less-openui5, at the
+- **Decision**: the package `open-rap-runtime` (`packages/cli`) gives the `rapt` command
+  (`npm install -g open-rap-runtime`, `npx open-rap-runtime check .`, or a `devDependency` of the
+  project and `npx rapt …`). It depends on `@open-rap/compiler` and
+  `@open-rap/runtime` and on what `rapt dev` serves (OpenUI5, PGlite, less-openui5, at the
   versions of the runtime, checked by a test), like the `rapt/` of the extension (D39). Its
-  `dist/rapt.js` calls `main` of `@rap-transpiler/compiler/cli` (new export); `cli.js` runs
+  `dist/rapt.js` calls `main` of `@open-rap/compiler/cli` (new export); `cli.js` runs
   itself only when it is the program (`isEntryPoint`: real paths compared, symbolic links and
   Windows paths included), so the command runs once. The compiler no longer declares a `bin`:
   one package gives `rapt`. `COMPILER_VERSION` is read from the `package.json` of the compiler.
-  Each package has a README for npm; `@rap-transpiler/model`, `compiler` and `runtime` are also
+  Each package has a README for npm; `@open-rap/model`, `compiler` and `runtime` are also
   usable as libraries.
 - **Release**: the `npm` job of `release.yml` sets the version of the tag on the four packages,
   builds them, packs them (`pnpm pack`), installs the archives with npm in an empty folder and
   runs `rapt --help`, `rapt check` and `rapt build` of the fixture; then, when the secret
   `NPM_TOKEN` is set, publishes them (`workspace:*` becomes the version of the tag). npm
-  provenance is added when the repository is public. Once: create the `rap-transpiler`
+  provenance is added when the repository is public. Once: create the `open-rap-runtime`
   organization on npmjs.com and the `NPM_TOKEN` secret ([DEPLOYMENT.md](DEPLOYMENT.md)). The name
-  `rapt` is taken on npm, hence `rap-transpiler`.
+  `rapt` is taken on npm, hence `open-rap-runtime`.
 - **Why**: the same CLI everywhere; CI can check RAP sources without VS Code; a terminal agent
   can install it in one command.
 - **Note**: publishing makes the compiled code public on npm, as the `.vsix` of the website
@@ -1485,3 +1485,20 @@ correspond to points 1 to 13 of §11 of PLAN.md. The milestones M1 to M6 are tho
   `--no-launchpad`, `--launchpad`, build of the applications with the launchpad, LPD009);
   `vscode/test/rapt.test.ts` (file of the workspace, `rapt floorplan` and `rapt launchpad add` in
   JSON).
+
+## D70 — Name: Open RAP Runtime
+
+- **Context**: "rap-transpiler" described one step of the tool (abaplint transpiles the ABAP);
+  the project is a runtime for RAP business objects outside SAP (OData V4, RAP managed runtime,
+  UI, launchpad, MCP), with a compiler and a VS Code extension around it.
+- **Decision**: the project is named **Open RAP Runtime**. The npm package of the command line is
+  `open-rap-runtime`, the libraries `@open-rap/model`, `@open-rap/compiler`, `@open-rap/runtime`
+  (npm organization `open-rap`), the VS Code extension `open-rap-runtime-vscode` ("Open RAP
+  Runtime"). Unchanged, so that existing projects keep working: the `rapt` command, the `rapt/`
+  folder of the projects, the `.rapt/` build folder, the `rapt_*` tables, the `ZRAP_*` ABAP
+  objects. The URL of the website follows the name of the GitHub repository
+  (`RAP-Transpiler`) until it is renamed.
+- **Why**: "Open" says open source and without proprietary SAP libraries; "RAP Runtime" says
+  what the application runs. The website states that the project is not affiliated with SAP SE.
+- **Tests**: the whole suite (package names, generated applications with `vendor/open-rap-*`,
+  extension), the `.vsix` built and its `rapt dev` checked.

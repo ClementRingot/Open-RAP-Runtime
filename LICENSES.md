@@ -9,7 +9,7 @@ Check command: `pnpm licenses list --prod` (and `--dev`).
 
 ## Distributed dependencies
 
-### `@rap-transpiler/compiler`
+### `@open-rap/compiler`
 
 | Package | Version | License | Use | Checked on |
 |---|---|---|---|---|
@@ -22,11 +22,11 @@ Transitive dependencies (production): `@chevrotain/*` (Apache-2.0), `source-map`
 (BSD-3-Clause), `json5`, `vscode-languageserver-types`, `fast-xml-builder`, `strnum`, `anynum`,
 `@nodable/entities`, `is-unsafe`, `path-expression-matcher`, `xml-naming` (MIT).
 
-### `@rap-transpiler/model`
+### `@open-rap/model`
 
 No external dependency.
 
-### `@rap-transpiler/runtime`
+### `@open-rap/runtime`
 
 | Package | Version | License | Use | Checked on |
 |---|---|---|---|---|
@@ -54,7 +54,7 @@ license of the repository.
 
 ### Generated UI (OpenUI5)
 
-Dependencies of the generated applications (M6); devDependencies of `@rap-transpiler/runtime`
+Dependencies of the generated applications (M6); devDependencies of `@open-rap/runtime`
 for its tests.
 
 | Package | Version | License | Use | Checked on |
@@ -118,7 +118,7 @@ The existing CDS grammars were not reused: the one of SAP-samples/vscode-abap-cd
 Apache-2.0 and its copy FreHu/abap-cds-grammar declares itself "Unlicense" without the origin
 clearly allowing it.
 
-### npm package `rap-transpiler` (`packages/cli`)
+### npm package `open-rap-runtime` (`packages/cli`)
 
 The `rapt` command (D65): it depends on the packages above and on what `rapt dev` serves
 (OpenUI5, `less-openui5`, PGlite, at the versions of the runtime, licenses listed above). No other

@@ -5,7 +5,7 @@
 
 import { pathToFileURL } from "node:url";
 import path from "node:path";
-import { abapName, type HandlerRef, type FieldModel } from "@rap-transpiler/model";
+import { abapName, type HandlerRef, type FieldModel } from "@open-rap/model";
 import type { User } from "../auth/user.js";
 import type { BoEntity, BoModel } from "../rap/bo.js";
 import { FAIL_CAUSES, Responses, type FailedOperation, type Message, type ReportedEntry, type Row, type Severity } from "../rap/types.js";

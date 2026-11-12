@@ -1,7 +1,7 @@
 /** The Fastify application of a generated service. */
 
 import Fastify, { type FastifyInstance, type FastifyReply, type FastifyRequest, type FastifyServerOptions } from "fastify";
-import type { McpToolsModel, Model } from "@rap-transpiler/model";
+import type { McpToolsModel, Model } from "@open-rap/model";
 import { registerMcp } from "./mcp/server.js";
 import { AuthenticationError, Authenticator, type AuthOptions } from "./auth/auth.js";
 import { DevOAuthServer, type DevOAuthClient } from "./auth/dev-oauth.js";
@@ -141,7 +141,7 @@ export async function createApp(options: AppOptions): Promise<FastifyInstance> {
       businessUsers?.record(user);
     } catch (error) {
       const status = error instanceof AuthenticationError ? error.status : 401;
-      const odata = new ODataError(status, status === 403 ? "FORBIDDEN" : "UNAUTHORIZED", (error as Error).message, undefined, [], status === 401 ? { "WWW-Authenticate": 'Bearer realm="rap-transpiler"' } : {});
+      const odata = new ODataError(status, status === 403 ? "FORBIDDEN" : "UNAUTHORIZED", (error as Error).message, undefined, [], status === 401 ? { "WWW-Authenticate": 'Bearer realm="open-rap-runtime"' } : {});
       await send(reply, errorResponse(odata, false));
     }
   });

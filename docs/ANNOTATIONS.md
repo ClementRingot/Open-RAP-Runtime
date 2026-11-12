@@ -1,6 +1,6 @@
 # Supported CDS annotations
 
-What rap-transpiler does with each annotation: ✅ `$metadata` and generated UI, 🟡 partial (see
+What Open RAP Runtime does with each annotation: ✅ `$metadata` and generated UI, 🟡 partial (see
 the note), 📄 `$metadata` only (Fiori Elements interprets it, the generated OpenUI5 UI does not),
 ❌ ignored. An ignored annotation does not cause an error: the source stays activatable on SAP.
 

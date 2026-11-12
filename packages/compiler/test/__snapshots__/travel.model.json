@@ -1,7 +1,7 @@
 {
   "formatVersion": 1,
   "generator": {
-    "name": "rap-transpiler",
+    "name": "open-rap-runtime",
     "version": "0.1.0"
   },
   "service": {
@@ -166,7 +166,7 @@
         "line": 1,
         "column": 1
       },
-      "description": "Booking (rap-transpiler reference BO)"
+      "description": "Booking (Open RAP Runtime reference BO)"
     },
     {
       "name": "zrt_travel",
@@ -367,7 +367,7 @@
         "line": 1,
         "column": 1
       },
-      "description": "Travel (rap-transpiler reference BO)"
+      "description": "Travel (Open RAP Runtime reference BO)"
     }
   ],
   "entities": [

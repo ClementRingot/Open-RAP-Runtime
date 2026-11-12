@@ -9,7 +9,7 @@
  */
 
 import { createToken, EmbeddedActionsParser, Lexer, type IToken } from "chevrotain";
-import { setAnnotation, type AnnotationObject, type AnnotationValue, type Annotations } from "@rap-transpiler/model";
+import { setAnnotation, type AnnotationObject, type AnnotationValue, type Annotations } from "@open-rap/model";
 
 const WhiteSpace = createToken({ name: "WhiteSpace", pattern: /\s+/, group: Lexer.SKIPPED });
 const LineComment = createToken({ name: "LineComment", pattern: /\/\/[^\r\n]*/, group: Lexer.SKIPPED });

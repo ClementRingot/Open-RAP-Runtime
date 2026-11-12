@@ -6,15 +6,15 @@ import { describe, expect, it } from "vitest";
 const manifest = (folder: string): { dependencies?: Record<string, string>; devDependencies?: Record<string, string> } =>
   JSON.parse(readFileSync(new URL(`../../${folder}/package.json`, import.meta.url), "utf8"));
 
-describe("rap-transpiler package (D65)", () => {
+describe("open-rap-runtime package (D65)", () => {
   it("depends on what rapt dev serves, at the versions of the runtime", () => {
     const runtime = manifest("runtime").devDependencies ?? {};
     const served = Object.entries(runtime).filter(([name]) => name.startsWith("@openui5/") || name === "@electric-sql/pglite" || name === "less-openui5");
     expect(served.length).toBeGreaterThan(0);
     expect(manifest("cli").dependencies).toEqual({
       ...Object.fromEntries(served),
-      "@rap-transpiler/compiler": "workspace:*",
-      "@rap-transpiler/runtime": "workspace:*",
+      "@open-rap/compiler": "workspace:*",
+      "@open-rap/runtime": "workspace:*",
     });
   });
 

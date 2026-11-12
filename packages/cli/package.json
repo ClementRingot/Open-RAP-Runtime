@@ -1,7 +1,7 @@
 {
-  "name": "rap-transpiler",
+  "name": "open-rap-runtime",
   "version": "0.1.0",
-  "description": "rapt, the command line of rap-transpiler: compiles SAP RAP sources (abapGit format) into a standalone Node.js OData V4 application, with what rapt dev serves (runtime, OpenUI5, PGlite).",
+  "description": "rapt, the command line of Open RAP Runtime: compiles SAP RAP sources (abapGit format) into a standalone Node.js OData V4 application, with what rapt dev serves (runtime, OpenUI5, PGlite).",
   "type": "module",
   "license": "MIT",
   "homepage": "https://clementringot.github.io/RAP-Transpiler/",
@@ -40,8 +40,8 @@
     "@openui5/sap.ui.unified": "1.136.22",
     "@openui5/sap.uxap": "1.136.22",
     "@openui5/themelib_sap_horizon": "1.136.22",
-    "@rap-transpiler/compiler": "workspace:*",
-    "@rap-transpiler/runtime": "workspace:*",
+    "@open-rap/compiler": "workspace:*",
+    "@open-rap/runtime": "workspace:*",
     "less-openui5": "0.12.0"
   }
 }

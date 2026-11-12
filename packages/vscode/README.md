@@ -1,7 +1,7 @@
-# RAP Transpiler for VS Code
+# Open RAP Runtime for VS Code
 
 Check, generate and run a RAP business object with
-[rap-transpiler](https://clementringot.github.io/RAP-Transpiler/), without an SAP system. The
+[Open RAP Runtime](https://clementringot.github.io/RAP-Transpiler/), without an SAP system. The
 extension compiles nothing itself: it calls the `rapt` CLI (`--json`) and shows its results.
 
 ## Features
@@ -45,7 +45,7 @@ extension compiles nothing itself: it calls the `rapt` CLI (`--json`) and shows 
 - **`rapt` in the terminal**: the integrated terminals have the `rapt` command of the extension
   (`rapt check .`, `rapt dev .`…), for you and for the AI agents that run commands.
 - **AI agents**: the agent mode of VS Code finds the MCP server of rapt (`rapt agent`): check the
-  project, create objects, set the floorplan, search the documentation of rap-transpiler. For
+  project, create objects, set the floorplan, search the documentation of Open RAP Runtime. For
   Claude Code in the terminal: `claude mcp add rapt -- rapt agent .`.
 - Context menus of the explorer (project folder, `.abapgit.xml`) in three groups (create,
   project, application), buttons in the title bar of the RAP sources. The commands that are not
@@ -61,16 +61,16 @@ Nothing else to install: the `.vsix` contains rapt (compiler and runtime), OpenU
 and rapt runs on the Node.js of VS Code (1.101 or later, Node.js 22).
 
 ```sh
-code --install-extension rap-transpiler-vscode.vsix
+code --install-extension open-rap-runtime-vscode.vsix
 ```
 
 The `.vsix` is downloaded from the [project website](https://clementringot.github.io/RAP-Transpiler/),
 attached to each GitHub release (tag `v*`) and produced by the CI on each commit (artifact
-`rap-transpiler-vscode`).
+`open-rap-runtime-vscode`).
 
 To use another version of rapt (a clone under development, for example): setting
 `rapt.cliPath`. Without a bundled version (extension built without `pnpm run stage`), the
-extension takes a rap-transpiler clone or the `node_modules` of a folder of the workspace, then
+extension takes an Open RAP Runtime clone or the `node_modules` of a folder of the workspace, then
 the `rapt` command of the PATH.
 
 ## Settings
@@ -92,7 +92,7 @@ Push a `v1.2.3` tag: the `release.yml` workflow builds the `.vsix` (version 1.2.
 it to the GitHub release of the tag. It also publishes it on the Visual Studio Marketplace when
 the `VSCE_PAT` secret is set (publisher `clementringot` to create on the Marketplace), and on
 Open VSX (VSCodium, Cursor…) when the `OVSX_PAT` secret is set. The same tag publishes the CLI
-on npm (`rap-transpiler`) when the `NPM_TOKEN` secret is set (see the deployment guide of the
+on npm (`open-rap-runtime`) when the `NPM_TOKEN` secret is set (see the deployment guide of the
 documentation).
 
 ```sh
@@ -103,7 +103,7 @@ git tag v0.1.0 && git push origin v0.1.0
 
 ```sh
 pnpm install && pnpm build
-cd packages/vscode && pnpm run package    # rap-transpiler-vscode.vsix (~31 MB)
+cd packages/vscode && pnpm run package    # open-rap-runtime-vscode.vsix (~31 MB)
 ```
 
 `pnpm run package` compiles the extension (esbuild), prepares `rapt/`

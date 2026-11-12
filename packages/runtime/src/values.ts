@@ -7,7 +7,7 @@
  * time stamps with microseconds, `null` when initial; lower-case UUIDs; upper-case hex binaries.
  */
 
-import { isUuid, type AbapType, type EdmType } from "@rap-transpiler/model";
+import { isUuid, type AbapType, type EdmType } from "@open-rap/model";
 import { ODataError } from "./odata/errors.js";
 
 export type CanonicalValue = string | number | boolean | null;

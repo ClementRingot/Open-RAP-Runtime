@@ -10,7 +10,7 @@ import path from "node:path";
 import { PGlite } from "@electric-sql/pglite";
 import { PGliteDialect } from "kysely";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { generateApplication, loadProject, writeFiles } from "@rap-transpiler/compiler";
+import { generateApplication, loadProject, writeFiles } from "@open-rap/compiler";
 import { createApp } from "../src/app.js";
 import { applySchema, createDatabase, PGLITE_PARSERS, type Database } from "../src/db/database.js";
 import { applySeed } from "../src/db/seed.js";
@@ -63,7 +63,7 @@ async function call(method: "POST" | "PATCH" | "DELETE", url: string, body?: unk
 const ids = (body: Record<string, unknown>): unknown[] => (body["value"] as Array<Record<string, unknown>>).map((r) => r["ProductID"]);
 
 describe("custom entities", () => {
-  it("are flagged when a managed BO is defined on them (enhanced mode, rap-transpiler only)", () => {
+  it("are flagged when a managed BO is defined on them (enhanced mode, Open RAP Runtime only)", () => {
     expect(rapt027).toBe("info");
   });
 

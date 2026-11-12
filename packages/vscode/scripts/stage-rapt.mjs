@@ -3,7 +3,7 @@
  * Prepares `rapt/` for the .vsix (decision D39): the compiler, the model and the runtime of this
  * repository, packed as npm packages, installed with their production dependencies and with what
  * `rapt dev` needs to serve an application (OpenUI5, PGlite, less-openui5). The extension runs
- * `rapt/node_modules/@rap-transpiler/compiler/dist/cli.js` with the Node.js of VS Code.
+ * `rapt/node_modules/@open-rap/compiler/dist/cli.js` with the Node.js of VS Code.
  *
  * Needs the packages built (pnpm build) and access to the npm registry.
  */
@@ -52,15 +52,15 @@ const served = Object.fromEntries(
 );
 writeFileSync(
   path.join(stage, "package.json"),
-  `${JSON.stringify({ name: "rapt-bundled", private: true, description: "rap-transpiler embedded in the VS Code extension", dependencies: { ...tarballs, ...served } }, null, 2)}\n`,
+  `${JSON.stringify({ name: "rapt-bundled", private: true, description: "Open RAP Runtime embedded in the VS Code extension", dependencies: { ...tarballs, ...served } }, null, 2)}\n`,
 );
 run("npm", ["install", "--omit=dev", "--ignore-scripts", "--no-audit", "--no-fund", "--install-links", "--no-package-lock"], stage);
 
 // files the CLI and the server never read: source maps, types, documentation, tests of the
 // packages, OpenUI5 design time (UI adaptation), PGlite extensions (not loaded by the runtime).
-// The documentation of rap-transpiler itself is kept: the documentation app of rapt dev and the
+// The documentation of Open RAP Runtime itself is kept: the documentation app of rapt dev and the
 // MCP server of the extension read it (D49, D64).
-const KEPT_FOLDER = new Set([path.join(stage, "node_modules", "@rap-transpiler", "compiler", "docs")]);
+const KEPT_FOLDER = new Set([path.join(stage, "node_modules", "@open-rap", "compiler", "docs")]);
 let removed = 0;
 const remove = (full) => {
   removed += statSync(full).isDirectory() ? readdirSync(full, { recursive: true }).length : 1;
@@ -91,10 +91,10 @@ prune(path.join(stage, "node_modules"));
 remove(path.join(stage, "node_modules", "@electric-sql", "pglite", "dist", "contrib"));
 rmSync(packs, { recursive: true, force: true });
 
-const cli = path.join(stage, "node_modules", "@rap-transpiler", "compiler", "dist", "cli.js");
+const cli = path.join(stage, "node_modules", "@open-rap", "compiler", "dist", "cli.js");
 statSync(cli);
 // the documentation must be there: without it the documentation app of rapt dev is empty
 for (const doc of ["README.md", "GUIDE.md", "DECISIONS.md"]) {
-  statSync(path.join(stage, "node_modules", "@rap-transpiler", "compiler", "docs", doc));
+  statSync(path.join(stage, "node_modules", "@open-rap", "compiler", "docs", doc));
 }
 process.stdout.write(`rapt staged in ${stage} (${removed} files pruned)\n`);

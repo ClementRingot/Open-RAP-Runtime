@@ -1,4 +1,4 @@
-# rap-transpiler
+# Open RAP Runtime
 
 **Develop, test and deploy your SAP RAP business objects without an SAP system.**
 
@@ -9,7 +9,7 @@ ABAP code, PostgreSQL and an OpenUI5 (Fiori-like) UI. The same sources are impor
 abapGit.
 
 ```sh
-npm install -g rap-transpiler        # or: npx rap-transpiler <command>
+npm install -g open-rap-runtime        # or: npx open-rap-runtime <command>
 rapt new my-project Travel --prefix ZRT
 rapt dev my-project                  # http://localhost:8080/, rebuilt on every save
 rapt check my-project                # diagnostics file:line:column (--json for tools)
@@ -19,12 +19,12 @@ rapt agent .                         # MCP server (stdio) of rapt for AI coding 
 
 Node.js 22 or later. The package contains everything `rapt dev` needs (OpenUI5, an embedded
 PostgreSQL); no SAP library, only permissive open source licenses. In a CI, without a global
-installation: `npx rap-transpiler check my-project`, or `rap-transpiler` as a `devDependency` of
+installation: `npx open-rap-runtime check my-project`, or `open-rap-runtime` as a `devDependency` of
 the project and `npx rapt …`.
 
 For AI agents (Claude Code, Cursor…): `claude mcp add rapt -- rapt agent .` gives the agent the
 tools `rapt_check`, `rapt_generate`, `rapt_new_business_object`, `rapt_floorplan`,
-`rapt_abapgit`, `rapt_docs_search` and `rapt_docs_read`. In VS Code, the RAP Transpiler extension
+`rapt_abapgit`, `rapt_docs_search` and `rapt_docs_read`. In VS Code, the Open RAP Runtime extension
 contains rapt and registers this server by itself.
 
 Documentation and VS Code extension: https://clementringot.github.io/RAP-Transpiler/

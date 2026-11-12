@@ -4,7 +4,7 @@
  */
 
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { buildMcpTools, Diagnostics } from "@rap-transpiler/compiler";
+import { buildMcpTools, Diagnostics } from "@open-rap/compiler";
 import { generatedFixture, T1, T2, writableApp, type TestApp } from "./helpers.js";
 
 let t: TestApp;

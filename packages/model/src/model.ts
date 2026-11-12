@@ -19,7 +19,7 @@ export interface SourceRef {
 }
 
 /**
- * `standard`: as on SAP. `enhanced`: rap-transpiler extensions (D45): managed BO with unmanaged
+ * `standard`: as on SAP. `enhanced`: Open RAP Runtime extensions (D45): managed BO with unmanaged
  * save on a custom entity, mandatory fields checked when saving.
  */
 export type ProjectMode = "standard" | "enhanced";

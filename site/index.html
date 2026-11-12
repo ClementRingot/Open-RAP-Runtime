@@ -3,9 +3,9 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>rap-transpiler — your RAP BOs, without an SAP system</title>
+  <title>Open RAP Runtime — your RAP BOs, without an SAP system</title>
   <meta name="description" content="Develop, test and deploy your RAP business objects (ABAP RESTful Application Programming Model) without an SAP system: OData V4, RAP managed runtime, transpiled ABAP, OpenUI5 UI. Free and open source VS Code extension.">
-  <meta property="og:title" content="rap-transpiler">
+  <meta property="og:title" content="open-rap-runtime">
   <meta property="og:description" content="Your RAP business objects run anywhere: OData V4, RAP managed runtime, your ABAP, PostgreSQL and a Fiori UI, without an SAP system.">
   <meta property="og:image" content="images/list-report.png">
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%230a6ed1'/%3E%3Cpath d='M9 22V10h7a4 4 0 0 1 0 8h-7m7 0 5 4' stroke='white' stroke-width='3' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
@@ -14,7 +14,7 @@
 <body>
   <header class="top">
     <div class="wrap nav">
-      <a class="brand" href="#"><span class="logo" aria-hidden="true">R</span>rap-transpiler</a>
+      <a class="brand" href="#"><span class="logo" aria-hidden="true">R</span>Open RAP Runtime</a>
       <nav aria-label="Main">
         <a href="#features">Features</a>
         <a href="#how">How it works</a>
@@ -31,7 +31,7 @@
         <p class="eyebrow">ABAP RESTful Application Programming Model · open source · MIT</p>
         <h1>Your RAP business objects,<br>without an SAP system.</h1>
         <p class="lead">Write your BO as in ADT — tables, CDS views, annotations, behavior definition,
-          behavior pool in ABAP. rap-transpiler turns it into an application that runs anywhere:
+          behavior pool in ABAP. Open RAP Runtime turns it into an application that runs anywhere:
           an OData V4 service, the RAP managed runtime with <strong>your ABAP code</strong>, PostgreSQL and a
           Fiori UI. The same sources are then imported into SAP with abapGit.</p>
         <div class="actions">
@@ -110,7 +110,7 @@
         </div>
         <div>
           <h2>Or on the command line</h2>
-<pre><code>npm install -g rap-transpiler
+<pre><code>npm install -g open-rap-runtime
 
 rapt new my-project Travel --prefix ZRT
 rapt dev my-project
@@ -128,7 +128,7 @@ rapt abapgit my-project     # XML for SAP</code></pre>
         <h2>Documentation</h2>
         <p class="section-lead">The same documentation as in the launchpad of <code>rapt dev</code>, for humans and AI agents.</p>
         <div class="docs-grid">
-          <a href="docs/guide.html"><h3>Guide</h3><p>Everything rap-transpiler does and how to use it.</p></a>
+          <a href="docs/guide.html"><h3>Guide</h3><p>Everything Open RAP Runtime does and how to use it.</p></a>
           <a href="docs/features.html"><h3>Features</h3><p>RAP coverage, feature by feature.</p></a>
           <a href="docs/annotations.html"><h3>Annotations</h3><p>What the <code>$metadata</code> and the UI do with each CDS annotation.</p></a>
           <a href="docs/diagnostics.html"><h3>Diagnostics</h3><p>The codes of <code>rapt check</code>.</p></a>
@@ -145,12 +145,12 @@ rapt abapgit my-project     # XML for SAP</code></pre>
         <h2>Download</h2>
         <p class="section-lead">VS Code extension, free and open source (MIT). Node.js is not needed: the extension uses the one of VS Code.</p>
         <div class="actions center">
-          <a class="button big" href="rap-transpiler-vscode.vsix" download>Download rap-transpiler-vscode.vsix</a>
+          <a class="button big" href="open-rap-runtime-vscode.vsix" download>Download open-rap-runtime-vscode.vsix</a>
         </div>
         <div class="install">
           <h3>Install the .vsix</h3>
           <p>In VS Code: <em>Extensions</em> → <em>…</em> → <em>Install from VSIX…</em>, or:</p>
-          <pre><code>code --install-extension rap-transpiler-vscode.vsix</code></pre>
+          <pre><code>code --install-extension open-rap-runtime-vscode.vsix</code></pre>
         </div>
       </div>
     </section>
@@ -158,7 +158,7 @@ rapt abapgit my-project     # XML for SAP</code></pre>
     <section class="band">
       <div class="wrap faq">
         <h2>Frequently asked questions</h2>
-        <details><summary>Do I need an SAP license?</summary><p>No. rap-transpiler uses no proprietary SAP library: OpenUI5 (Apache 2.0), abaplint (MIT), PostgreSQL. The sources stay yours and are imported into an SAP system with abapGit.</p></details>
+        <details><summary>Do I need an SAP license?</summary><p>No. Open RAP Runtime uses no proprietary SAP library: OpenUI5 (Apache 2.0), abaplint (MIT), PostgreSQL. The sources stay yours and are imported into an SAP system with abapGit.</p></details>
         <details><summary>Will my BO behave as on SAP?</summary><p>That is the rule of the project: in <code>standard</code> mode, a source behaves as on SAP, and what would not activate there is refused with a diagnostic. The known gaps are <a href="docs/known_gaps.html">documented</a>.</p></details>
         <details><summary>And in production?</summary><p>The generated application is an ordinary Node.js application: Docker, Kubernetes, SAP BTP Cloud Foundry, with PostgreSQL and the OIDC authentication of your identity provider (Keycloak, SAP Cloud Identity Services, Entra ID…). See the <a href="docs/deployment.html">deployment guide</a>.</p></details>
         <details><summary>Where is the documentation?</summary><p>On this website (<a href="docs/index.html">documentation</a>), and in the launchpad of <code>rapt dev</code> (<em>Documentation</em> tile).</p></details>
@@ -168,7 +168,7 @@ rapt abapgit my-project     # XML for SAP</code></pre>
 
   <footer>
     <div class="wrap foot">
-      <span>rap-transpiler · MIT · not affiliated with SAP SE. SAP, ABAP, Fiori and SAP BTP are trademarks of SAP SE.</span>
+      <span>Open RAP Runtime · MIT · not affiliated with SAP SE. SAP, ABAP, Fiori and SAP BTP are trademarks of SAP SE.</span>
       <a href="docs/index.html">Documentation</a>
     </div>
   </footer>

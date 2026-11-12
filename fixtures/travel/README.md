@@ -1,6 +1,6 @@
 # Fixture "Travel / Booking"
 
-The reference non-draft managed RAP BO of rap-transpiler, in abapGit format (`src/`). It is the
+The reference non-draft managed RAP BO of Open RAP Runtime, in abapGit format (`src/`). It is the
 main end-to-end test. The fixture must import and activate as is on an ABAP Cloud or recent
 S/4HANA system (decision D7).
 

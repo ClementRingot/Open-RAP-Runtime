@@ -1,6 +1,6 @@
 /** Generation of the OpenUI5 UI of the application (`ui/` folder, decision D10). */
 
-import type { Model } from "@rap-transpiler/model";
+import type { Model } from "@open-rap/model";
 import { buildUiLayout } from "./layout.js";
 import { APP_CONTROLLER, APP_VIEW, CHART, COMPONENT, CONDITIONS, FILTERS, indexHtml, LIST_CONTROLLER, manifest, OBJECT_CONTROLLER, OVERVIEW_CONTROLLER, STYLE, SUPPORT, VARIANTS } from "./static.js";
 import { views } from "./views.js";

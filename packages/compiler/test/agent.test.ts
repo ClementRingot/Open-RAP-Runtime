@@ -68,7 +68,7 @@ describe("rapt agent", () => {
     expect((await call(fixtures, "rapt_check", { project: "travel" }))?.structuredContent).toMatchObject({ ok: true });
   }, 120_000);
 
-  it("searches and reads the documentation of rap-transpiler", async () => {
+  it("searches and reads the documentation of Open RAP Runtime", async () => {
     const server = new AgentServer(workspace);
     const search = (await call(server, "rapt_docs_search", { query: "collaborative draft" }))?.structuredContent as { results: Array<{ page: string; section: string }> };
     expect(search.results.length).toBeGreaterThan(0);

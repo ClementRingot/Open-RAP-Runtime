@@ -8,7 +8,7 @@
 
 import { AsyncLocalStorage } from "node:async_hooks";
 import { sql, type RawBuilder } from "kysely";
-import type { AbapType, AccessCondition, AccessControlModel, AuthorizationValue } from "@rap-transpiler/model";
+import type { AbapType, AccessCondition, AccessControlModel, AuthorizationValue } from "@open-rap/model";
 import { valueMatches, type Authorizations } from "../auth/authorizations.js";
 import type { User } from "../auth/user.js";
 import { toSql, type CanonicalValue } from "../values.js";

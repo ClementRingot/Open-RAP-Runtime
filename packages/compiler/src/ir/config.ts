@@ -5,9 +5,9 @@
  * { "mode": "enhanced" }
  * ```
  *
- * - `standard` (default): the sources behave as on SAP; what SAP refuses, rap-transpiler refuses.
+ * - `standard` (default): the sources behave as on SAP; what SAP refuses, Open RAP Runtime refuses.
  *   A project that builds in this mode can be imported and activated on SAP.
- * - `enhanced`: rap-transpiler extensions that SAP does not have: a managed BO with unmanaged save
+ * - `enhanced`: Open RAP Runtime extensions that SAP does not have: a managed BO with unmanaged save
  *   on a custom entity (D43), `field ( mandatory )` checked when saving without a validation.
  *
  * `rapt … --mode standard|enhanced` overrides the file.
@@ -15,7 +15,7 @@
 
 import { existsSync, readFileSync } from "node:fs";
 import path from "node:path";
-import type { Floorplan, OverviewCardModel, ProjectMode, UiConfigModel } from "@rap-transpiler/model";
+import type { Floorplan, OverviewCardModel, ProjectMode, UiConfigModel } from "@open-rap/model";
 import type { Diagnostics } from "../diagnostics.js";
 import type { Project } from "../input/project.js";
 

@@ -73,10 +73,10 @@ export function installMail(kernel: AbapData, runtime: RapRuntime): void {
         } catch (e) {
           state = "ERROR";
           error = (e as Error).message;
-          process.stderr.write(`rap-transpiler: the mail "${subject}" was not sent: ${error}\n`);
+          process.stderr.write(`open-rap-runtime: the mail "${subject}" was not sent: ${error}\n`);
         }
       } else {
-        process.stdout.write(`rap-transpiler: mail "${subject}" to ${recipients.map((r) => r.address).join(", ")} kept in rapt_mail (MAIL_SMTP_URL is not set)\n`);
+        process.stdout.write(`open-rap-runtime: mail "${subject}" to ${recipients.map((r) => r.address).join(", ")} kept in rapt_mail (MAIL_SMTP_URL is not set)\n`);
       }
       await runtime.transaction(luw.db, luw.user, luw.language, async (tx) => {
         await sql`UPDATE rapt_mail SET state = ${state}, error_text = ${error}, sent_at = now() WHERE mail_id = ${id}`.execute(tx.db);

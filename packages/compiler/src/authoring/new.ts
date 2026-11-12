@@ -351,12 +351,12 @@ function seed(n: Names): string {
   return `${JSON.stringify({ [n.table]: rows }, null, 2)}\n`;
 }
 
-/** AGENTS.md of a new project: how an AI agent works on a RAP project with rap-transpiler. */
+/** AGENTS.md of a new project: how an AI agent works on a RAP project with Open RAP Runtime. */
 function agentsFile(n: Names): string {
   return `# AGENTS.md
 
 This project is a SAP RAP business object (${n.description}) in abapGit format, run without an SAP
-system by rap-transpiler (\`rapt\`). The same sources are imported into SAP with abapGit.
+system by Open RAP Runtime (\`rapt\`). The same sources are imported into SAP with abapGit.
 
 ## Commands
 
@@ -369,8 +369,8 @@ rapt mcp .              # rapt/mcp.json: the MCP tools of the service, to descri
 rapt agent .            # MCP server (stdio) of rapt for coding agents: check, objects, documentation
 \`\`\`
 
-\`rapt\` is on the PATH of the terminals of VS Code with the RAP Transpiler extension; elsewhere,
-\`npm install -g rap-transpiler\` (or \`npx rap-transpiler …\`). In VS Code, the agent mode also
+\`rapt\` is on the PATH of the terminals of VS Code with the Open RAP Runtime extension; elsewhere,
+\`npm install -g open-rap-runtime\` (or \`npx open-rap-runtime …\`). In VS Code, the agent mode also
 finds the MCP server of rapt (tools \`rapt_check\`, \`rapt_generate\`, \`rapt_docs_search\`…).
 
 ## Rules
@@ -380,11 +380,11 @@ finds the MCP server of rapt (tools \`rapt_check\`, \`rapt_generate\`, \`rapt_do
   the documentation (tile *Documentation* of \`rapt dev\`, the tool \`rapt_docs_read\` of
   \`rapt agent\`, or https://clementringot.github.io/RAP-Transpiler/docs/diagnostics.html).
 - Keep \`rapt/config.json\` in mode \`standard\` when the BO must activate on SAP; \`enhanced\`
-  allows rap-transpiler extensions (mandatory fields checked automatically, managed BO on a
+  allows Open RAP Runtime extensions (mandatory fields checked automatically, managed BO on a
   custom entity).
 - Objects: ${n.table} (table), ${n.root} (root view), ${n.projection} (projection and UI
   annotations), ${n.pool.toUpperCase()} (behavior pool), ${n.service} (service).
-- \`rapt/\` holds the configuration of rap-transpiler (seed data, roles, number ranges, MCP); it is
+- \`rapt/\` holds the configuration of Open RAP Runtime (seed data, roles, number ranges, MCP); it is
   not imported into SAP. Never edit \`.rapt/\` (build output).
 `;
 }

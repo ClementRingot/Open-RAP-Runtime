@@ -16,7 +16,7 @@ import {
   type SideEffectModel,
   type TriggerModel,
   type ValidationModel,
-} from "@rap-transpiler/model";
+} from "@open-rap/model";
 import type { BdefAst, BehaviorAst, BodyItemAst, Loc, OperationOptionAst, TriggerAst } from "../bdef/ast.js";
 import type { Diagnostics } from "../diagnostics.js";
 import type { SourceFile } from "../input/project.js";
@@ -39,7 +39,7 @@ export interface BehaviorContext {
   diagnostics: Diagnostics;
   dictionary: Dictionary;
   entity: (name: string) => EntityModel | undefined;
-  /** The mode of the project (D45): some constructions are rap-transpiler extensions. */
+  /** The mode of the project (D45): some constructions are Open RAP Runtime extensions. */
   mode?: ProjectMode;
 }
 
@@ -265,7 +265,7 @@ function buildEntityBehavior(
   if (!isProjection) {
     const unmanagedSave = (model.saving ?? behavior.saving)?.kind === "unmanaged";
     if (entity.kind === "custom" && unmanagedSave) {
-      // rap-transpiler only (D43): instances read by the query class, written by save_modified;
+      // Open RAP Runtime only (D43): instances read by the query class, written by save_modified;
       // an extension of the enhanced mode (D45)
       if (ctx.mode === "enhanced") {
         diagnostics.info(
@@ -276,7 +276,7 @@ function buildEntityBehavior(
       } else {
         diagnostics.error(
           "BDEF027",
-          `${entity.name}: a managed BO with unmanaged save on a custom entity is an extension of rap-transpiler: set "mode": "enhanced" in rapt/config.json (on SAP, an unmanaged BO)`,
+          `${entity.name}: a managed BO with unmanaged save on a custom entity is an extension of Open RAP Runtime: set "mode": "enhanced" in rapt/config.json (on SAP, an unmanaged BO)`,
           at(ast.entity.loc),
         );
       }

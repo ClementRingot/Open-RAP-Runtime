@@ -1,7 +1,7 @@
 # MCP server: the service for AI agents
 
 The Model Context Protocol (MCP) lets an AI agent (Claude, an IDE assistant, an in-house agent…)
-call "tools". rap-transpiler turns the OData service of a RAP BO into an MCP server: each
+call "tools". Open RAP Runtime turns the OData service of a RAP BO into an MCP server: each
 operation becomes a tool, run by the service itself, with the authorizations, the access
 controls, the validations and the messages of the BO ([D47](DECISIONS.md)).
 

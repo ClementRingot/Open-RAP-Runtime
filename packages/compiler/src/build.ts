@@ -2,7 +2,7 @@
 
 import { mkdirSync, writeFileSync } from "node:fs";
 import path from "node:path";
-import type { Model } from "@rap-transpiler/model";
+import type { Model } from "@open-rap/model";
 import type { Diagnostics } from "./diagnostics.js";
 import { generateAbap } from "./gen/abap/generate.js";
 import { findDestinations, generateScaffold } from "./gen/app/index.js";
@@ -31,7 +31,7 @@ export interface GenerateOptions extends BuildOptions {
   transpile?: boolean;
   /** Write package.json, server.mjs, Docker files and the embedded runtime (default true). */
   scaffold?: boolean;
-  /** Folder of the @rap-transpiler/runtime package to embed (default: next to the compiler). */
+  /** Folder of the @open-rap/runtime package to embed (default: next to the compiler). */
   runtimeDir?: string;
 }
 

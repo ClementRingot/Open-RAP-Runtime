@@ -1,4 +1,4 @@
-import { buildODataService, type Model } from "@rap-transpiler/model";
+import { buildODataService, type Model } from "@open-rap/model";
 import { XMLParser } from "fast-xml-parser";
 import { beforeAll, describe, expect, it } from "vitest";
 import { generateCsdl } from "../src/gen/csdl.js";

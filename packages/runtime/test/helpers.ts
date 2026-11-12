@@ -1,6 +1,6 @@
 import { PGlite } from "@electric-sql/pglite";
-import { buildModel, Diagnostics, generateApplication, generateCsdl, generateLaunchpadUi, generateSql, loadProject, resolveLaunchpad, writeFiles } from "@rap-transpiler/compiler";
-import type { LaunchpadModel, Model } from "@rap-transpiler/model";
+import { buildModel, Diagnostics, generateApplication, generateCsdl, generateLaunchpadUi, generateSql, loadProject, resolveLaunchpad, writeFiles } from "@open-rap/compiler";
+import type { LaunchpadModel, Model } from "@open-rap/model";
 import type { FastifyInstance } from "fastify";
 import { PGliteDialect } from "kysely";
 import pg from "pg";
@@ -322,7 +322,7 @@ export function testLaunchpad(appDir: string, appUrl: string): { config: Launchp
           { title: "Open Travels", icon: "sap-icon://pending", intent: "Travel-approve", app: "travel", count: { entitySet: "Travel", filter: "OverallStatus eq 'O'" }, roles: ["travel_manager"] },
         ],
       },
-      { title: "Help", tiles: [{ title: "Documentation", url: "https://github.com/clementringot/rap-transpiler", icon: "sap-icon://learning-assistant" }] },
+      { title: "Help", tiles: [{ title: "Documentation", url: "https://clementringot.github.io/RAP-Transpiler", icon: "sap-icon://learning-assistant" }] },
     ],
   };
   writeFileSync(path.join(work, "launchpad.json"), JSON.stringify(source, null, 2));

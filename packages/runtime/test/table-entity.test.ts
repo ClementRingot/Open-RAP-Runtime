@@ -9,7 +9,7 @@ import { mkdirSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { PGlite } from "@electric-sql/pglite";
-import { generateApplication, loadProject, writeFiles } from "@rap-transpiler/compiler";
+import { generateApplication, loadProject, writeFiles } from "@open-rap/compiler";
 import type { FastifyInstance } from "fastify";
 import { PGliteDialect } from "kysely";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";

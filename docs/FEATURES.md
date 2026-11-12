@@ -282,5 +282,5 @@ dependent ETag, remote APIs.
 | VS Code extension: commands of the CLI, Problems, wizard, *RAP Objects* view, floorplans | ✅ | D39, D61. |
 | `rapt` on the PATH of the terminals of VS Code | ✅ | Shims of the extension (D64). |
 | MCP server of rapt for AI coding agents (`rapt agent`), registered in the agent mode of VS Code | ✅ | Check, objects, floorplans, abapGit, documentation (D64). |
-| npm package `rap-transpiler` (`rapt`, `npx rap-transpiler`) | ✅ | D65; archives of `pnpm pack` checked on each tag before publication with `NPM_TOKEN`. |
+| npm package `open-rap-runtime` (`rapt`, `npx open-rap-runtime`) | ✅ | D65; archives of `pnpm pack` checked on each tag before publication with `NPM_TOKEN`. |
 | Website with the documentation | ✅ | D62, D63. |

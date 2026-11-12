@@ -3,7 +3,7 @@ name: Release
 # A tag v1.2.3 publishes the VS Code extension: the .vsix is attached to the GitHub release of
 # the tag, and published to the Visual Studio Marketplace and Open VSX when their tokens are set
 # (repository secrets VSCE_PAT and OVSX_PAT). It also publishes the rapt command line to npm
-# (rap-transpiler and @rap-transpiler/model, compiler, runtime, D65) when NPM_TOKEN is set.
+# (open-rap-runtime and @open-rap/model, compiler, runtime, D65) when NPM_TOKEN is set.
 on:
   push:
     tags: ["v*"]
@@ -30,28 +30,28 @@ jobs:
         working-directory: packages/vscode
         run: npm pkg set version="${GITHUB_REF_NAME#v}"
       - name: Package the extension (.vsix)
-        run: pnpm --filter rap-transpiler-vscode run package
+        run: pnpm --filter open-rap-runtime-vscode run package
       - name: Embedded rapt works
-        run: node packages/vscode/rapt/node_modules/@rap-transpiler/compiler/dist/cli.js check fixtures/travel --warnings-as-errors
+        run: node packages/vscode/rapt/node_modules/@open-rap/compiler/dist/cli.js check fixtures/travel --warnings-as-errors
       - name: GitHub release with the .vsix
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          cp packages/vscode/rap-transpiler-vscode.vsix "rap-transpiler-vscode-${GITHUB_REF_NAME#v}.vsix"
-          gh release create "$GITHUB_REF_NAME" "rap-transpiler-vscode-${GITHUB_REF_NAME#v}.vsix" --title "$GITHUB_REF_NAME" --generate-notes \
-            || gh release upload "$GITHUB_REF_NAME" "rap-transpiler-vscode-${GITHUB_REF_NAME#v}.vsix" --clobber
+          cp packages/vscode/open-rap-runtime-vscode.vsix "open-rap-runtime-vscode-${GITHUB_REF_NAME#v}.vsix"
+          gh release create "$GITHUB_REF_NAME" "open-rap-runtime-vscode-${GITHUB_REF_NAME#v}.vsix" --title "$GITHUB_REF_NAME" --generate-notes \
+            || gh release upload "$GITHUB_REF_NAME" "open-rap-runtime-vscode-${GITHUB_REF_NAME#v}.vsix" --clobber
       - name: Visual Studio Marketplace
         if: env.VSCE_PAT != ''
         working-directory: packages/vscode
-        run: pnpm exec vsce publish --packagePath rap-transpiler-vscode.vsix --pat "$VSCE_PAT"
+        run: pnpm exec vsce publish --packagePath open-rap-runtime-vscode.vsix --pat "$VSCE_PAT"
       - name: Open VSX
         if: env.OVSX_PAT != ''
         working-directory: packages/vscode
-        run: npx --yes ovsx@0.10 publish rap-transpiler-vscode.vsix --pat "$OVSX_PAT"
+        run: npx --yes ovsx@0.10 publish open-rap-runtime-vscode.vsix --pat "$OVSX_PAT"
 
   npm:
-    # rapt on npm (D65): npm install -g rap-transpiler. Skipped when the NPM_TOKEN secret is not set;
-    # the @rap-transpiler organization must exist on npmjs.com.
+    # rapt on npm (D65): npm install -g open-rap-runtime. Skipped when the NPM_TOKEN secret is not set;
+    # the @open-rap organization must exist on npmjs.com.
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -73,24 +73,26 @@ jobs:
             (cd "packages/$p" && npm pkg set version="${GITHUB_REF_NAME#v}")
           done
       - run: pnpm build
-      # the packages as published, installed by npm: rapt of rap-transpiler checks the fixture
+      # the packages as published, installed by npm: rapt of open-rap-runtime checks the fixture
       - name: Packed packages work
         run: |
           V="${GITHUB_REF_NAME#v}"
           P="$RUNNER_TEMP/packs"
           mkdir -p "$P" "$RUNNER_TEMP/check"
+          # the cli (open-rap-runtime) and @open-rap/runtime both pack as open-rap-runtime-<v>.tgz
           for p in model compiler runtime cli; do
-            (cd "packages/$p" && pnpm pack --pack-destination "$P")
+            mkdir -p "$P/$p"
+            (cd "packages/$p" && pnpm pack --pack-destination "$P/$p")
           done
           cd "$RUNNER_TEMP/check"
           cat > package.json <<JSON
           {
             "private": true,
-            "dependencies": { "rap-transpiler": "file:$P/rap-transpiler-$V.tgz" },
+            "dependencies": { "open-rap-runtime": "file:$P/cli/open-rap-runtime-$V.tgz" },
             "overrides": {
-              "@rap-transpiler/model": "file:$P/rap-transpiler-model-$V.tgz",
-              "@rap-transpiler/compiler": "file:$P/rap-transpiler-compiler-$V.tgz",
-              "@rap-transpiler/runtime": "file:$P/rap-transpiler-runtime-$V.tgz"
+              "@open-rap/model": "file:$P/model/open-rap-model-$V.tgz",
+              "@open-rap/compiler": "file:$P/compiler/open-rap-compiler-$V.tgz",
+              "@open-rap/runtime": "file:$P/runtime/open-rap-runtime-$V.tgz"
             }
           }
           JSON

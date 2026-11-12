@@ -44,13 +44,13 @@ jobs:
         run: node packages/compiler/dist/cli.js abapgit fixtures/travel --check
       # the VS Code extension with rapt, OpenUI5 and PGlite inside (D39), on the Node.js it embeds
       - name: VS Code extension (.vsix)
-        run: pnpm --filter rap-transpiler-vscode run package
+        run: pnpm --filter open-rap-runtime-vscode run package
       - name: Embedded rapt
-        run: node packages/vscode/rapt/node_modules/@rap-transpiler/compiler/dist/cli.js check fixtures/travel --warnings-as-errors
+        run: node packages/vscode/rapt/node_modules/@open-rap/compiler/dist/cli.js check fixtures/travel --warnings-as-errors
       - uses: actions/upload-artifact@v4
         with:
-          name: rap-transpiler-vscode
-          path: packages/vscode/rap-transpiler-vscode.vsix
+          name: open-rap-runtime-vscode
+          path: packages/vscode/open-rap-runtime-vscode.vsix
           if-no-files-found: error
 
   docker:

@@ -67,15 +67,15 @@ function pageHtml(pages: DocPage[], page: DocPage): string {
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>${escape(title(page))} — rap-transpiler documentation</title>
-  <meta name="description" content="rap-transpiler documentation: ${escape(title(page))}.">
+  <title>${escape(title(page))} — Open RAP Runtime documentation</title>
+  <meta name="description" content="Open RAP Runtime documentation: ${escape(title(page))}.">
   <link rel="icon" href="${ICON}">
   <link rel="stylesheet" href="../style.css">
 </head>
 <body class="docs-page">
   <header class="top">
     <div class="wrap nav">
-      <a class="brand" href="../index.html"><span class="logo" aria-hidden="true">R</span>rap-transpiler</a>
+      <a class="brand" href="../index.html"><span class="logo" aria-hidden="true">R</span>Open RAP Runtime</a>
       <nav aria-label="Main">
         <a href="../index.html#features">Features</a>
         <a href="index.html">Documentation</a>
@@ -97,7 +97,7 @@ ${page.html}
   </div>
   <footer>
     <div class="wrap foot">
-      <span>rap-transpiler · MIT · not affiliated with SAP SE. SAP, ABAP, Fiori and SAP BTP are trademarks of SAP SE.</span>
+      <span>Open RAP Runtime · MIT · not affiliated with SAP SE. SAP, ABAP, Fiori and SAP BTP are trademarks of SAP SE.</span>
       <a href="../index.html">Home</a>
     </div>
   </footer>

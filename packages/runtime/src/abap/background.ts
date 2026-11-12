@@ -12,7 +12,7 @@
 
 import { randomUUID } from "node:crypto";
 import { sql } from "kysely";
-import { same } from "@rap-transpiler/model";
+import { same } from "@open-rap/model";
 import type { AfterCommit, RapRuntime } from "../rap/runtime.js";
 import { RapRuntimeError } from "../rap/types.js";
 import { setSubrc } from "./bridge.js";
@@ -81,7 +81,7 @@ export function installBackground(kernel: AbapData, runtime: RapRuntime): void {
         if (!(e instanceof RolledBack)) {
           state = "ERRONEOUS";
           error = errorText(e);
-          process.stderr.write(`rap-transpiler: background process ${name || id} failed: ${error}\n`);
+          process.stderr.write(`open-rap-runtime: background process ${name || id} failed: ${error}\n`);
         }
       }
       await finish(luw, id, state, error);

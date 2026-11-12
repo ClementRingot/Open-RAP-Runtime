@@ -1,4 +1,4 @@
-/** Custom entities (D43): the model, the query class, the rap-transpiler-only managed BO. */
+/** Custom entities (D43): the model, the query class, the Open RAP Runtime-only managed BO. */
 
 import { cpSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";

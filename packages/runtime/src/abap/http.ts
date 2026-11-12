@@ -12,7 +12,7 @@
  * URL.
  */
 
-import { destinationKeys } from "@rap-transpiler/model";
+import { destinationKeys } from "@open-rap/model";
 import { abapGlobal, abapString, appendRow, component, rowsOf, type AbapData } from "./convert.js";
 
 export { destinationKeys };

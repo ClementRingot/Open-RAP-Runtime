@@ -36,7 +36,7 @@ describe("rapt from the extension", () => {
 
   it("resolves the CLI", () => {
     const repo = path.resolve("/repo/packages/compiler/dist/cli.js");
-    const bundled = path.resolve("/ext/rapt/node_modules/@rap-transpiler/compiler/dist/cli.js");
+    const bundled = path.resolve("/ext/rapt/node_modules/@open-rap/compiler/dist/cli.js");
     const vscodeNode = { command: "/vscode/code", env: { ELECTRON_RUN_AS_NODE: "1" } };
     const base = { workspaceFolders: ["/repo"], execPath: "/vscode/code" };
     // the rapt of the extension, on the Node.js of VS Code
@@ -207,8 +207,8 @@ describe("the creation wizard and the objects view (D61)", () => {
   it("offers rapt agent to the agent mode of VS Code, one server per workspace folder (D64)", () => {
     const cli = { command: "/vscode/code", args: ["/ext/cli.js"], env: { ELECTRON_RUN_AS_NODE: "1" } };
     expect(agentServers(cli, [{ name: "shop", path: "/w/shop" }])).toEqual([
-      { label: "rapt (rap-transpiler)", command: "/vscode/code", args: ["/ext/cli.js", "agent", "/w/shop"], env: { ELECTRON_RUN_AS_NODE: "1" }, cwd: "/w/shop" },
+      { label: "rapt (Open RAP Runtime)", command: "/vscode/code", args: ["/ext/cli.js", "agent", "/w/shop"], env: { ELECTRON_RUN_AS_NODE: "1" }, cwd: "/w/shop" },
     ]);
-    expect(agentServers(cli, [{ name: "a", path: "/a" }, { name: "b", path: "/b" }]).map((s) => s.label)).toEqual(["rapt (rap-transpiler): a", "rapt (rap-transpiler): b"]);
+    expect(agentServers(cli, [{ name: "a", path: "/a" }, { name: "b", path: "/b" }]).map((s) => s.label)).toEqual(["rapt (Open RAP Runtime): a", "rapt (Open RAP Runtime): b"]);
   });
 });

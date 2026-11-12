@@ -7,7 +7,7 @@
     <DDLANGUAGE>E</DDLANGUAGE>
     <TABCLASS>TRANSP</TABCLASS>
     <CLIDEP>X</CLIDEP>
-    <DDTEXT>Travel (rap-transpiler reference BO)</DDTEXT>
+    <DDTEXT>Travel (Open RAP Runtime reference BO)</DDTEXT>
     <MASTERLANG>E</MASTERLANG>
     <CONTFLAG>A</CONTFLAG>
     <EXCLASS>1</EXCLASS>

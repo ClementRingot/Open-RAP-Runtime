@@ -11,7 +11,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import Fastify, { type FastifyInstance } from "fastify";
 import { exportJWK, generateKeyPair, SignJWT, type CryptoKey } from "jose";
-import type { LaunchpadModel } from "@rap-transpiler/model";
+import type { LaunchpadModel } from "@open-rap/model";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import type { OidcAuthOptions } from "../src/auth/auth.js";
 import { signSession } from "../src/auth/session.js";
@@ -135,7 +135,7 @@ describe("tiles of the roles of the user", () => {
     expect(view.groups.map((g) => g.title)).toEqual(["Travel Management", "Help"]);
     expect(view.groups[0]?.tiles[0]).toEqual({ id: "travel-manage", title: "Manage Travels", subtitle: "Travels and bookings", icon: "sap-icon://flight", intent: "Travel-manage", target: "/apps/travel/ui/index.html", external: false, count: `${SERVICE}Travel/$count` });
     expect(view.groups[0]?.tiles[1]?.["count"]).toBe(`${SERVICE}Travel/$count?$filter=OverallStatus%20eq%20'O'`);
-    expect(view.groups[1]?.tiles[0]).toMatchObject({ target: "https://github.com/clementringot/rap-transpiler", external: true });
+    expect(view.groups[1]?.tiles[0]).toMatchObject({ target: "https://clementringot.github.io/RAP-Transpiler", external: true });
   });
 });
 

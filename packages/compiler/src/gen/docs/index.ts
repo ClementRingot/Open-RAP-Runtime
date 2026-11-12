@@ -1,5 +1,5 @@
 /**
- * The documentation app of `rapt dev` (decision D49): the documentation of rap-transpiler (README,
+ * The documentation app of `rapt dev` (decision D49): the documentation of Open RAP Runtime (README,
  * guide, features, diagnostics, decisions…) as an OpenUI5 application of the development
  * launchpad, with a search. The pages are rendered from Markdown when the app is built.
  */
@@ -60,7 +60,7 @@ export function documentationSources(dir = documentationDir()): Array<{ id: stri
     const markdown = readFileSync(file, "utf8");
     const name = path.basename(file);
     const first = /^#\s+(.+)$/m.exec(markdown)?.[1]?.replace(/`/g, "");
-    return { id: pageId(name), file: name, title: name === "README.md" ? "rap-transpiler" : (first ?? name), markdown };
+    return { id: pageId(name), file: name, title: name === "README.md" ? "open-rap-runtime" : (first ?? name), markdown };
   });
 }
 
@@ -74,7 +74,7 @@ export function documentationPages(dir = documentationDir(), options: RenderOpti
     const name = path.basename(file);
     return {
       id: pageId(name),
-      title: name === "README.md" ? "rap-transpiler" : (headings[0]?.title ?? name),
+      title: name === "README.md" ? "open-rap-runtime" : (headings[0]?.title ?? name),
       file: name,
       html: renderMarkdown(markdown, options),
       text: markdown.replace(/[#*`|>[\]()_-]+/g, " ").replace(/\s+/g, " "),
@@ -88,7 +88,7 @@ const INDEX = `<!DOCTYPE html>
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Documentation – rap-transpiler</title>
+  <title>Documentation – Open RAP Runtime</title>
   <script id="sap-ui-bootstrap" src="../resources/sap-ui-core.js"
     data-sap-ui-theme="sap_horizon"
     data-sap-ui-async="true"
@@ -279,7 +279,7 @@ const STYLE = `${SHELL_STYLE}.raptDoc { padding: 1rem 2rem 3rem 2rem; max-width:
 export function generateDocsApp(pages: DocPage[] = documentationPages()): Array<{ path: string; content: string }> {
   if (pages.length === 0) {
     // never an empty app: say where the documentation should have been (a packaging problem)
-    const text = "The documentation of rap-transpiler was not found next to the compiler (packages/compiler/docs). Run pnpm build, or reinstall the VS Code extension.";
+    const text = "The documentation of Open RAP Runtime was not found next to the compiler (packages/compiler/docs). Run pnpm build, or reinstall the VS Code extension.";
     pages = [{ id: "readme", title: "Documentation not found", file: "README.md", html: `<h1 id="anchor-documentation-not-found">Documentation not found</h1><p>${text}</p>`, text, headings: [] }];
   }
   return [
