@@ -1360,3 +1360,41 @@ correspond to points 1 to 13 of §11 of PLAN.md. The milestones M1 to M6 are tho
 - **Tests**: `vscode/test/rapt.test.ts` (folders of the projects and of the applications,
   `chosen`, List Report kept).
 
+## D68 — Filter value help: *Search and Select* and *Define Conditions*
+
+- **Context**: the filter fields of the List Report (and of the ALP) accepted typed conditions
+  (D51) and opened, for a field with a value help, a list of values (D44); the dialog of SAP
+  Fiori elements where conditions are composed (operator, values, exclusions) next to the
+  selection in the value help was missing. The dialog of `sap.ui.comp` / `sap.ui.mdc` is SAPUI5
+  only.
+- **Decision**:
+  - the icon of each token filter field (all but booleans and enumerated types, which stay choice
+    lists) opens a dialog built with `sap.m` (`controller/conditions.js`): a *Search and Select*
+    tab (when the field has a value help: search, table with multiple or single selection,
+    descriptions of the text view), a *Define Conditions* tab (one row per condition: operator,
+    value(s), value help on the value, *Add*), and at the bottom the *Selected Items and
+    Conditions* tokens;
+  - operators as in Fiori elements: *equal to*, *contains*, *starts with*, *ends with*,
+    *between*, *less than*, *less than or equal to*, *greater than*, *greater than or equal to*,
+    *empty*, and their exclusions (*not equal to*, *does not contain*, *not between*, *not
+    empty*…), filtered by type: text all of them, numbers and NUMC comparisons, dates and times
+    comparisons and *empty* (date / time picker), UUID equal / not equal;
+  - `$filter`: included conditions of a field with `or`, exclusions with `and not`, fields with
+    `and`; *empty* of a text = `''` or `null`; date-time by whole days (UTC);
+  - tokens written as in Fiori elements: value alone (with its description: "Euro (EUR)"),
+    `!(=x)`, `*x*`, `a...b`, `<empty>`, `!(…)`; the key of the token is the condition (`=x`,
+    `!(*x*)`) read again for the search and kept in the variants (earlier variants are still
+    read, including the date ranges `{ from, to }`);
+  - direct input: `!(…)`, `<empty>` and `a - b` (dates) in addition to D51; a single value is
+    *contains* for a free text, *equal to* for a key or a field with a value help; dates are
+    entered in the format of the language or in ISO;
+  - `@Consumption.filter.selectionType` (`AllowedExpressions` already in the CSDL, D57):
+    `#SINGLE` equal only, `#INTERVAL` comparisons and ranges (without patterns), a single
+    condition when `multipleSelections: false` (without exclusions for `SingleRange`).
+- **Why**: it is the "match code" of the Fiori elements filters; keeping the selection in the
+  value help and the conditions in the same dialog avoids two different gestures for one field.
+- **Limits**: no relative date operators (*today*, *last week*…); booleans and enumerated types
+  keep their choice list; a value entered without a value help is shown without a description.
+- **Tests**: `compiler/test/ui.test.ts` (reading and writing of the conditions, operators by type
+  and `selectionType`, `$filter`), `runtime/test/table-entity.test.ts` (dialog in Chromium:
+  selection in the value help, exclusion, typed conditions, filtered rows).

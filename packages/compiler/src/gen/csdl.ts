@@ -41,6 +41,18 @@ const VOCABULARIES = [
 
 const isObject = (v: AnnotationValue | undefined): v is AnnotationObject => typeof v === "object" && v !== null && !Array.isArray(v);
 const str = (v: AnnotationValue | undefined): string | undefined => (typeof v === "string" ? v : typeof v === "number" ? String(v) : undefined);
+
+/**
+ * The AllowedExpressions of a filter field (FilterExpressionRestrictions) from
+ * `@Consumption.filter.selectionType` and `multipleSelections` (D57, D68); undefined: any condition.
+ */
+export function allowedFilterExpressions(annotations: AnnotationObject): "SingleValue" | "SingleRange" | "MultiRange" | undefined {
+  const selection = str(getAnnotation(annotations, "Consumption.filter.selectionType"))?.replace(/^#/, "").toUpperCase();
+  const single = getAnnotation(annotations, "Consumption.filter.multipleSelections") === false;
+  if (selection === "SINGLE" || (single && selection === undefined)) return "SingleValue";
+  if (selection === "INTERVAL") return single ? "SingleRange" : "MultiRange";
+  return selection === "RANGE" && single ? "SingleRange" : undefined;
+}
 const num = (v: AnnotationValue | undefined): number => (typeof v === "number" ? v : Number.POSITIVE_INFINITY);
 
 /** `#HIGH` → `High`, `#FOR_ACTION` → `ForAction`. */
@@ -651,9 +663,7 @@ class CsdlBuilder {
     const exposed = entity.fields.filter((f) => type.properties.some((p) => p.name === f.name));
     const required = exposed.filter((f) => getAnnotation(f.annotations, "Consumption.filter.mandatory") === true).map((f) => f.name);
     const expressions = exposed.flatMap((f) => {
-      const selection = str(getAnnotation(f.annotations, "Consumption.filter.selectionType"))?.replace(/^#/, "").toUpperCase();
-      const single = getAnnotation(f.annotations, "Consumption.filter.multipleSelections") === false;
-      const allowed = selection === "SINGLE" || (single && selection === undefined) ? "SingleValue" : selection === "INTERVAL" ? (single ? "SingleRange" : "MultiRange") : selection === "RANGE" && single ? "SingleRange" : undefined;
+      const allowed = allowedFilterExpressions(f.annotations);
       return allowed === undefined ? [] : [{ property: f.name, allowed }];
     });
     if (required.length === 0 && expressions.length === 0) return undefined;

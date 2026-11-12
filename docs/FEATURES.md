@@ -220,10 +220,10 @@ dependent ETag, remote APIs.
 | Feature | Status | Note |
 |---|---|---|
 | List Report: columns (`UI.lineItem`), sorting (`UI.presentationVariant`), growing | ✅ | `sap.f.DynamicPage`, `sap.m.Table`. |
-| Filter fields (`UI.selectionField`), search (`@Search.searchable`) | ✅ | Conditions as in SAP Fiori (`=`, `!=`, `>`, `>=`, `<`, `<=`, `a...b`, `*x*`), several values per field, NUMC without leading zeros, date ranges; *Clear*, *Adapt Filters* (columns added as filters), "Filtered By" summary (D51). |
+| Filter fields (`UI.selectionField`), search (`@Search.searchable`) | ✅ | Conditions as in SAP Fiori (`=`, `!=`, `>`, `>=`, `<`, `<=`, `a...b`, `*x*`, `<empty>`, exclusions `!(…)`), several values per field, NUMC without leading zeros, dates in the format of the language; *Search and Select* / *Define Conditions* dialog as in Fiori elements, operators according to the type and `selectionType` (D68); *Clear*, *Adapt Filters* (columns added as filters), "Filtered By" summary (D51). |
 | User variants (`sap.m.VariantManagement`) | ✅ | Filters, filters and visible columns, sorting; saved per user by the service (`$variants`); default variant, favorites (D51). |
 | Table settings: visible columns, sorting | ✅ | `sap.m.p13n.Popup`; number of rows in the title of the table. |
-| Value help (`@Consumption.valueHelpDefinition`) | ✅ | Entity exposed implicitly, `Common.ValueList`, dialog with the descriptions of the text view, in the filters and the Object Page (D44). |
+| Value help (`@Consumption.valueHelpDefinition`) | ✅ | Entity exposed implicitly, `Common.ValueList`, dialog with the descriptions of the text view, in the Object Page (D44) and in the filter dialog with the conditions (D68). |
 | Refresh of the list after a change on the Object Page, breadcrumbs | ✅ | D51. |
 | Non-draft creation from the List Report | ✅ | Object Page in create mode, `POST` on save. |
 | Delete, table actions (`#FOR_ACTION` in `UI.lineItem`) | ✅ | On the selected row. |

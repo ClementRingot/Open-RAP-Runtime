@@ -45,16 +45,16 @@ Decisions: [D10](DECISIONS.md) (UI), [D44](DECISIONS.md), [D56](DECISIONS.md) (v
 | `@UI.facet` purpose `#HEADER`: `#DATAPOINT_REFERENCE`, `#FIELDGROUP_REFERENCE`, `#IDENTIFICATION_REFERENCE` | ✅ | Header of the Object Page (D57) |
 | `@UI.facet`: `#PRESENTATIONVARIANT_REFERENCE`, `#CHART_REFERENCE`, `#ADDRESS_REFERENCE`, `#CONTACT_REFERENCE`, purpose `#QUICK_VIEW` | ❌ | |
 | `@UI.dataPoint` (`title`, `description`, `targetValue`, `criticality`, `visualization: #PROGRESS / #RATING`) | ✅ | `UI.DataPoint`, progress bar, rating, number (D57) |
-| `@UI.selectionField` | ✅ | Filter bar |
+| `@UI.selectionField` | ✅ | Filter bar, conditions and *Search and Select* / *Define Conditions* dialog (D51, D68) |
 | `@UI.hidden` | ✅ | `UI.Hidden`, absent from the UI |
 | `@UI.multiLineText` | ✅ | `UI.MultiLineText`, text area (D57) |
 | `@UI.textArrangement` + `@ObjectModel.text.element` | ✅ | `Common.Text`, "Text (ID)", "ID (Text)", text only (D57) |
 | `@UI.masked`, `@UI.placeholder`, `@UI.inputMask` | ❌ | |
-| `@Consumption.valueHelpDefinition` (`entity`, `additionalBinding`, `useForValidation`) | ✅ | `Common.ValueList`, dialog or drop-down list (D44, D56) |
+| `@Consumption.valueHelpDefinition` (`entity`, `additionalBinding`, `useForValidation`) | ✅ | `Common.ValueList`, dialog or drop-down list (D44, D56); *Search and Select* tab of the filter dialog (D68) |
 | `@Consumption.valueHelpDefinition` (`qualifier`, `distinctValues`, `presentationVariantQualifier`) | ❌ | One value help per element |
 | `@Consumption.filter.defaultValue` | ✅ | `Common.FilterDefaultValue`, initial filter of the List Report (D57) |
 | `@Consumption.filter.mandatory` | ✅ | `Capabilities.FilterRestrictions/RequiredProperties`, mandatory filter (D57) |
-| `@Consumption.filter.selectionType`, `multipleSelections` | 🟡 | `FilterExpressionRestrictions`; the UI limits to one value (`#SINGLE`, `multipleSelections: false`) |
+| `@Consumption.filter.selectionType`, `multipleSelections` | ✅ | `FilterExpressionRestrictions`; operators of the filter dialog: `#SINGLE` equal, `#INTERVAL` comparisons and ranges, one condition if `multipleSelections: false` (D57, D68) |
 | `@Consumption.hidden` | ✅ | Element not exposed (except a key or an element of an association) (D57) |
 | `@Semantics.amount.currencyCode`, `@Semantics.quantity.unitOfMeasure` | ✅ | `Measures.ISOCurrency` / `Measures.Unit`, amount and currency |
 | `@Semantics.currencyCode`, `@Semantics.unitOfMeasure` | 📄 | `Common.IsCurrency`, `Common.IsUnit` (derived from the type) |

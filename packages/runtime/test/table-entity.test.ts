@@ -165,4 +165,50 @@ describe.skipIf(browserType === undefined)("enumerated types in the UI", () => {
     await expect.poll(async () => (await get("Orders('00000002')")).body["Priority"], { timeout: 15_000 }).toBe("HIGH");
     expect((await get("Orders('00000002')")).body).toMatchObject({ Category: "US", Currency: "USD" });
   }, 120_000);
+
+  it("filters with the value help dialog: Search and Select, Define Conditions (D68)", async () => {
+    const page = await (browser as Browser).newPage({ viewport: { width: 1400, height: 900 } });
+    const errors: string[] = [];
+    page.on("pageerror", (e) => errors.push(String(e)));
+    await page.goto(`${base}/`);
+    await page.locator(ROWS).first().waitFor({ timeout: 60_000 });
+    const dialog = id("OrdersList", "conditions");
+    const tokens = (control: string): Promise<string[]> => page.locator(`${id("OrdersList", control)} .sapMToken`).allTextContents();
+    // the default value (=EUR) with the description of the value help
+    await expect.poll(async () => tokens("filter_Currency"), { timeout: 15_000 }).toEqual(["Euro (EUR)"]);
+    await page.locator(`${id("OrdersList", "filter_Currency")}-vhi`).click();
+    await page.locator(`${id("OrdersList", "conditionsTable")} ${ROWS}`).first().waitFor({ timeout: 30_000 });
+    // Search and Select: one more currency
+    await page.locator(`${id("OrdersList", "conditionsSearch")} input`).fill("US Dollar");
+    await page.locator(`${id("OrdersList", "conditionsSearch")} input`).press("Enter");
+    await page.locator(`${id("OrdersList", "conditionsTable")} ${ROWS}`, { hasText: "USD" }).first().click();
+    // Define Conditions: an exclusion
+    await page.locator(`${id("OrdersList", "conditionsTabs")} .sapMITBFilter`, { hasText: "Define Conditions" }).click();
+    const row = page.locator(`${dialog} .raptConditionRow`).first();
+    await row.locator(".raptConditionOperator").click();
+    await page.locator(".sapMSelectList li", { hasText: "not equal to" }).first().click();
+    await row.locator(".raptConditionValue input").first().fill("AUD");
+    await row.locator(".raptConditionValue input").first().press("Tab");
+    await expect.poll(async () => tokens("conditionsTokens"), { timeout: 10_000 }).toEqual(["Euro (EUR)", "US Dollar (USD)", "!(=AUD)"]);
+    await page.locator(id("OrdersList", "conditionsOk")).click();
+    await page.locator(dialog).waitFor({ state: "detached", timeout: 10_000 });
+    expect(await tokens("filter_Currency")).toEqual(["Euro (EUR)", "US Dollar (USD)", "!(=AUD)"]);
+    // a typed range and a typed exclusion on the order ID (the conditions dialog without value help)
+    const order = page.locator(`${id("OrdersList", "filter_OrderId")}-inner`);
+    await order.fill("1...3");
+    await order.press("Enter");
+    await order.fill("!(=3)");
+    await order.press("Enter");
+    expect(await tokens("filter_OrderId")).toEqual(["1...3", "!(=3)"]);
+    await page.locator(`${id("OrdersList", "filter_OrderId")}-vhi`).click();
+    await expect.poll(async () => page.locator(`${dialog} .raptConditionRow`).count(), { timeout: 10_000 }).toBe(2);
+    expect(await page.locator(`${id("OrdersList", "conditionsTabs")}`).count()).toBe(0);
+    await page.locator(id("OrdersList", "conditionsCancel")).click();
+    await page.locator(dialog).waitFor({ state: "detached", timeout: 10_000 });
+    await page.locator(id("OrdersList", "go")).click();
+    const expected = values((await get(`Orders?$select=OrderId&$filter=${encodeURIComponent("(Currency eq 'EUR' or Currency eq 'USD') and Currency ne 'AUD' and (OrderId ge '00000001' and OrderId le '00000003') and OrderId ne '00000003'")}`)).body);
+    expect(expected.length).toBeGreaterThan(0);
+    await expect.poll(async () => page.locator(ROWS).count(), { timeout: 15_000 }).toBe(expected.length);
+    expect(errors).toEqual([]);
+  }, 120_000);
 });

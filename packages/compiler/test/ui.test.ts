@@ -88,12 +88,18 @@ describe("filter conditions of the list report (controller/filters.js)", () => {
       if (typeof spec === "string") this.spec = { path: spec, operator, value1 };
     }
   }
-  const FilterOperator = { EQ: "EQ", NE: "NE", GT: "GT", GE: "GE", LT: "LT", LE: "LE", BT: "BT", Contains: "Contains", StartsWith: "StartsWith", EndsWith: "EndsWith" };
+  const FilterOperator = Object.fromEntries(
+    ["EQ", "NE", "GT", "GE", "LT", "LE", "BT", "NB", "Contains", "StartsWith", "EndsWith", "NotContains", "NotStartsWith", "NotEndsWith"].map((o) => [o, o]),
+  );
   let filters: {
     parse(field: object, text: string): { op: string; values: string[] } | null;
     text(condition: object): string;
+    display(field: object, condition: object, description?: string): string;
+    operators(field: object): string[];
+    condition(field: object, op: string, values: string[]): { op: string; values: string[] } | null;
+    filter(field: object, condition: object): Filter;
     fieldFilter(field: object, conditions: object[]): Filter | null;
-    dateFilter(field: object, from: string, to: string): Filter | null;
+    toOData(filter: Filter, fields: object): string;
   } = undefined as never;
   const source = generateUi(fixture()).find((f) => f.path === "controller/filters.js")?.content ?? "";
   new Function("sap", source)({ ui: { define: (_deps: string[], factory: (...args: unknown[]) => typeof filters) => (filters = factory(Filter, FilterOperator)) } });
@@ -133,14 +139,48 @@ describe("filter conditions of the list report (controller/filters.js)", () => {
     expect(parts[1]?.spec).toMatchObject({ operator: "NE", value1: "500" });
   });
 
-  it("filters dates by range, and date-times by whole days", () => {
-    expect(filters.dateFilter({ property: "BeginDate", kind: "date" }, "2026-06-01", "2026-06-30")?.spec).toMatchObject({ operator: "BT", value1: "2026-06-01", value2: "2026-06-30" });
-    expect(filters.dateFilter({ property: "BeginDate", kind: "date" }, "2026-06-01", "")?.spec).toMatchObject({ operator: "EQ", value1: "2026-06-01" });
-    const day = filters.dateFilter({ property: "CreatedAt", kind: "datetime" }, "2026-12-31", "")?.spec as { filters: Filter[] };
+  it("reads the exclusions and the empty values, and writes the tokens as SAP Fiori elements (D68)", () => {
+    const code = { property: "AgencyID", kind: "digits", maxLength: 6, valueHelp: {} };
+    expect(filters.parse(code, "70002")).toEqual({ op: "EQ", values: ["70002"] });
+    expect(filters.parse(text, "!(*Rome*)")).toEqual({ op: "NotContains", values: ["Rome"] });
+    expect(filters.parse(digits, "!(2...5)")).toEqual({ op: "NB", values: ["2", "5"] });
+    expect(filters.parse(amount, "!(<10)")).toEqual({ op: "NOTLT", values: ["10"] });
+    expect(filters.parse(text, "<empty>")).toEqual({ op: "Empty", values: [] });
+    expect(filters.parse(text, "!(<empty>)")).toEqual({ op: "NotEmpty", values: [] });
+    expect(filters.parse(amount, "*5*")).toBeNull();
+    for (const t of ["!(*Rome*)", "!(Ro*)", "<empty>", "!(<empty>)"]) expect(filters.text(filters.parse(text, t) as object)).toBe(t);
+    expect(filters.display(code, { op: "EQ", values: ["70002"] }, "Sunshine Travel")).toBe("Sunshine Travel (70002)");
+    expect(filters.display(text, { op: "NE", values: ["Rome"] })).toBe("!(=Rome)");
+    expect(filters.display(text, { op: "Contains", values: ["Rome"] })).toBe("*Rome*");
+  });
+
+  it("offers the operators of the type and of @Consumption.filter.selectionType", () => {
+    expect(filters.operators(text)).toEqual(expect.arrayContaining(["Contains", "NotContains", "Empty", "NotEmpty", "BT", "NB"]));
+    expect(filters.operators(amount)).not.toContain("Contains");
+    expect(filters.operators({ kind: "boolean" })).toEqual(["EQ"]);
+    expect(filters.operators({ ...text, filter: { expressions: "SingleValue" } })).toEqual(["EQ"]);
+    expect(filters.operators({ ...text, filter: { expressions: "SingleRange" } })).toEqual(["EQ", "BT", "LT", "LE", "GT", "GE"]);
+    expect(filters.condition(amount, "Contains", ["5"])).toBeNull();
+    expect(filters.condition(amount, "BT", ["1", ""])).toBeNull();
+    expect(filters.condition({ property: "BeginDate", kind: "date" }, "BT", ["2026-06-01", "2026-02-30"])).toBeNull();
+    expect(filters.condition({ property: "BeginDate", kind: "date" }, "BT", ["2026-06-01", "2026-06-30"])).toEqual({ op: "BT", values: ["2026-06-01", "2026-06-30"] });
+  });
+
+  it("filters dates by range, date-times by whole days, and empty values", () => {
+    const date = { property: "BeginDate", kind: "date", edm: "Edm.Date" };
+    expect(filters.filter(date, filters.parse(date, "2026-06-01...2026-06-30") as object).spec).toMatchObject({ operator: "BT", value1: "2026-06-01", value2: "2026-06-30" });
+    const day = filters.filter({ property: "CreatedAt", kind: "datetime" }, { op: "EQ", values: ["2026-12-31"] }).spec as { filters: Filter[] };
     expect(day.filters.map((f) => f.spec)).toEqual([
       { path: "CreatedAt", operator: "GE", value1: "2026-12-31T00:00:00Z" },
       { path: "CreatedAt", operator: "LT", value1: "2027-01-01T00:00:00Z" },
     ]);
+    // not less than 10: 10 or more
+    expect(filters.filter(amount, { op: "NOTLT", values: ["10"] }).spec).toMatchObject({ operator: "GE", value1: "10" });
+    const fields = { Description: { edm: "Edm.String" }, TotalPrice: { edm: "Edm.Decimal" } };
+    const odata = (field: object, t: string): string => filters.toOData(filters.fieldFilter(field, [filters.parse(field, t) as object]) as Filter, fields);
+    expect(odata({ ...text, edm: "Edm.String" }, "<empty>")).toBe("(Description eq '' or Description eq null)");
+    expect(odata({ ...text, edm: "Edm.String" }, "!(*Ro*)")).toBe("not contains(tolower(Description),tolower('Ro'))");
+    expect(odata(amount, "!(1...5)")).toBe("(TotalPrice lt 1 or TotalPrice gt 5)");
   });
 });
 

@@ -278,9 +278,18 @@ The List Report and the Object Page follow the `@UI` annotations: `headerInfo`, 
   | `>100`, `>=100`, `<100`, `<=100` | comparisons |
   | `1...5` | range (bounds included) |
   | `Ro*`, `*me`, `*om*` | starts with, ends with, contains |
+  | `<empty>` | empty (text: `''` or `null`) |
+  | `!(*om*)`, `!(1...5)`, `!(<empty>)` | exclusions: does not contain, outside the range, not empty… |
 
-  A string of digits (NUMC) is entered without its leading zeros (`3` finds `00000003`); dates are
-  filtered by range. *Adapt Filters* adds the columns as filters; *Clear* empties everything.
+  A string of digits (NUMC) is entered without its leading zeros (`3` finds `00000003`); a single
+  value looks for equality for a key or a field with a value help. Dates are entered in the
+  format of the language or in ISO (`Jun 1, 2026 - Jul 31, 2026`, `2026-06-01...2026-07-31`).
+  The icon of the field opens the dialog of SAP Fiori elements ([D68](DECISIONS.md)): *Search
+  and Select* (values of the value help, when the field has one) and *Define Conditions*
+  (operator and values per row: *equal to*, *contains*, *between*, *greater than*, *empty*, their
+  exclusions…, according to the type of the field and `@Consumption.filter.selectionType`); the
+  included conditions of a field are combined with "or", the exclusions with "and not". *Adapt
+  Filters* adds the columns as filters; *Clear* empties everything.
 - **User views** (variants): the title of the List Report opens the view management: save the
   filters, the visible columns and the sorting under a name, choose the default view. They are
   saved per user in the database of the application ([D51](DECISIONS.md)).
