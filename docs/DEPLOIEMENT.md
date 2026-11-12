@@ -4,6 +4,25 @@ Une application générée par `rapt build` (ou un launchpad par `rapt launchpad
 autonome : Node.js 22, un `package.json`, un `Dockerfile`, un `manifest.yml` Cloud Foundry. Elle
 se déploie partout où Node.js ou un conteneur tourne ([D50](DECISIONS.md)).
 
+## Deux modes : le launchpad complet, ou une application seule
+
+L'espace de travail a un launchpad (`launchpad.json`, titré « Launchpad ») auquel chaque
+application est ajoutée à sa création ([D67](DECISIONS.md)). Au moment de livrer :
+
+| Mode | Commande | Résultat |
+|---|---|---|
+| **Launchpad (toutes les applications)** | `rapt launchpad launchpad.json --out out/launchpad` | le launchpad et, dans `apps/<id>`, chaque application construite depuis ses sources ; `docker compose up` lance le tout (une PostgreSQL par application) derrière une seule origine et une seule connexion |
+| **Application seule (standalone)** | `rapt build mon-projet --out out/travel` | l'application sans launchpad : elle n'en dépend pas (la barre de shell n'apparaît que derrière un launchpad) |
+
+Dans VS Code, *RAP : Générer l'application…* demande le mode ; *RAP : Générer le launchpad…*
+construit directement le launchpad de l'espace de travail.
+
+```sh
+rapt launchpad launchpad.json --out out/launchpad
+cd out/launchpad
+docker compose up --build          # http://localhost:8090/ : le launchpad, les applications sous /apps/<id>/
+```
+
 ## Ce qu'il faut régler hors de `localhost`
 
 | Variable | Pourquoi |
@@ -45,7 +64,8 @@ Le runtime lit `VCAP_APPLICATION` (route → `PUBLIC_URL`) et `VCAP_SERVICES` (P
 `DATABASE_URL`, `DATABASE_CA`). Le buildpack Node.js installe les dépendances (`vendor/` contient
 le runtime de rap-transpiler). Contrôle de santé : `/health`.
 
-Pour un launchpad : pousser chaque application, puis donner leurs routes au launchpad
+Pour un launchpad : pousser chaque application (dossiers `apps/<id>` de `rapt launchpad`, ou
+`rapt build` de chacune), puis donner leurs routes au launchpad
 (`cf set-env launchpad APP_TRAVEL_URL https://travel.cfapps…`) ; le launchpad et ses
 applications partagent `SESSION_SECRET` et le même client OIDC.
 

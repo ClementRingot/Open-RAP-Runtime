@@ -14,9 +14,16 @@ et en affiche les résultats.
 - **RAP : Lancer rapt dev** : l'application tourne avec une base PGlite et se reconstruit à
   chaque enregistrement. La barre d'état indique l'état (construction, prête, erreurs) et ouvre
   l'application d'un clic.
-- **RAP : Générer l'application…** : `rapt build` dans le dossier de son choix, après avoir
-  choisi le floorplan de chaque entité racine (List Report, Worklist, Analytical List Page, Form
-  Entry) s'il ne l'a pas encore été ; *RAP : Lancer rapt dev* le demande aussi.
+- **RAP : Générer l'application…** : au choix, le **launchpad avec toutes les applications** de
+  l'espace de travail (`rapt launchpad`) ou l'**application seule** (`rapt build`, standalone),
+  dans le dossier de son choix, après avoir choisi le floorplan de chaque entité racine (List
+  Report, Worklist, Analytical List Page, Form Entry) s'il ne l'a pas encore été ; *RAP : Lancer
+  rapt dev* le demande aussi.
+- **Un launchpad par espace de travail** : `launchpad.json` (titré « Launchpad »), à côté du
+  `.code-workspace` ou dans le premier dossier de l'espace de travail, est créé avec la première
+  application ; chaque BO complet et chaque choix de floorplan y ajoutent l'application et sa
+  tuile, sans toucher à ce qui y est déjà. **RAP : Générer le launchpad (toutes les
+  applications)…** le construit avec ses applications (actif quand il existe).
 - **RAP : Nouveau business object complet…** : `rapt new` demande le nom de l'entité, le préfixe et la
   description, écrit un BO managed complet (table en source `.tabl.astabl`, CDS, BDEF, behavior
   pool, service, données initiales `rapt/seed.json`) avec ses fichiers abapGit, puis propose de

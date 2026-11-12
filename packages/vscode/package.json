@@ -184,8 +184,10 @@
       },
       {
         "command": "rapt.launchpad",
-        "title": "Générer un launchpad (rapt launchpad)",
-        "category": "RAP"
+        "title": "Générer le launchpad (toutes les applications)…",
+        "category": "RAP",
+        "icon": "$(layout)",
+        "enablement": "rapt.hasLaunchpad"
       },
       {
         "command": "rapt.refreshObjects",
@@ -288,6 +290,11 @@
           "command": "rapt.newBo",
           "when": "view == raptObjects",
           "group": "1_create@1"
+        },
+        {
+          "command": "rapt.launchpad",
+          "when": "view == raptObjects && rapt.hasLaunchpad",
+          "group": "2_launchpad@1"
         }
       ],
       "view/item/context": [

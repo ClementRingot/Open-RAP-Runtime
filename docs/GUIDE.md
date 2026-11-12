@@ -39,10 +39,10 @@ d'autre à installer), puis dans la palette de commandes (`Ctrl+Shift+P`) :
 | *RAP : Nouvel objet RAP…* | créer objet par objet avec l'assistant, comme *New ABAP Repository Object* d'ADT : les types par catégorie (Dictionary, Core Data Services, Behavior, Business Services, Source Code Library), un filtre, une description, les champs du type (objet source, entités exposées, type de binding…) |
 | *RAP : Choisir le floorplan de l'application…* | `rapt floorplan` : List Report, Worklist, Analytical List Page ou Form Entry, avec ce que chacun demande ; demandé de toute façon avant la première génération |
 | *RAP : Afficher la représentation intermédiaire* | `rapt ir` : le modèle (`model.json`) dans un éditeur |
-| *RAP : Générer un launchpad* | `rapt launchpad` : le launchpad de plusieurs applications |
+| *RAP : Générer le launchpad (toutes les applications)…* | `rapt launchpad` : le launchpad de l'espace de travail et toutes ses applications ([D67](DECISIONS.md)) |
 | *RAP : Lancer rapt dev* | construit, lance et ouvre le launchpad de développement ; relance à chaque enregistrement |
 | *RAP : Vérifier le BO* | `rapt check` : diagnostics dans l'onglet Problèmes (aussi à chaque enregistrement) |
-| *RAP : Générer l'application…* | `rapt build` : l'application déployable |
+| *RAP : Générer l'application…* | au choix : le **launchpad avec toutes les applications** (`rapt launchpad`) ou l'**application seule** (`rapt build`, standalone) |
 | *RAP : Générer les fichiers abapGit* | `rapt abapgit` : les XML qui manquent pour l'import dans SAP |
 | *RAP : Générer le serveur MCP du service* | `rapt mcp` : les outils pour les agents IA |
 | *RAP : Choisir le mode du projet* | `standard` ou `enhanced` (`rapt/config.json`) |
@@ -338,8 +338,41 @@ Guide : [MCP.md](MCP.md).
 
 `rapt launchpad launchpad.json --out out/launchpad` construit un launchpad OpenUI5 devant
 plusieurs applications : une seule origine, une seule connexion OIDC, tuiles par rôle, compteurs,
-navigation par intent ([D37](DECISIONS.md)). Contenu en groupes, ou en **spaces et pages**
-([D48](DECISIONS.md)) :
+navigation par intent ([D37](DECISIONS.md)).
+
+**Un launchpad par espace de travail** ([D67](DECISIONS.md)) : `launchpad.json`, titré
+« Launchpad », est créé à côté des projets avec la première application, puis chaque application
+y est ajoutée à sa création — `rapt new` (BO complet) et le choix du floorplan
+(`rapt floorplan <src> <Set> <floorplan>`), ou à la demande `rapt launchpad add <src>`. La CLI
+cherche le fichier dans le projet puis ses dossiers parents (jusqu'à la racine du dépôt git), et
+le crée sinon dans le dossier parent du projet ; `--launchpad <fichier>` en désigne un autre,
+`--no-launchpad` n'ajoute rien. L'extension VS Code le place à côté du `.code-workspace` (ou dans
+le premier dossier de l'espace de travail). Une application déjà présente n'est jamais modifiée :
+titres, tuiles et rôles s'éditent à la main.
+
+```
+rap-apps/
+  launchpad.json          le launchpad de l'espace de travail
+  helpdesk-tickets/       un projet abapGit
+  project-tracker/
+```
+
+```json
+{
+  "title": "Launchpad",
+  "apps": [
+    { "id": "helpdesk-tickets", "source": "helpdesk-tickets", "url": "http://localhost:8081/" },
+    { "id": "project-tracker", "source": "project-tracker", "url": "http://localhost:8082/" }
+  ],
+  "groups": [{ "title": "Applications", "tiles": [
+    { "title": "Tickets", "app": "helpdesk-tickets", "intent": "Ticket-manage", "icon": "sap-icon://list", "count": "Ticket" }
+  ] }]
+}
+```
+
+Une application référencée par ses sources (`source`) est construite avec le launchpad, dans
+`out/launchpad/apps/<id>` ; `build` désigne plutôt le dossier d'un `rapt build` fait à part. Le
+contenu s'organise en groupes, ou en **spaces et pages** ([D48](DECISIONS.md)) :
 
 ```json
 {
@@ -358,7 +391,16 @@ navigation par intent ([D37](DECISIONS.md)). Contenu en groupes, ou en **spaces 
 
 ## 10. Livrer
 
-- `rapt build mon-projet --out out/travel` : l'application (Node.js, Docker, Cloud Foundry).
+Deux façons de déployer ([D67](DECISIONS.md)) :
+
+- **le launchpad avec toutes ses applications** : `rapt launchpad launchpad.json --out
+  out/launchpad` ; `docker compose up` dans ce dossier lance le launchpad, chaque application et
+  leurs bases ;
+- **une application seule** (standalone, sans launchpad) : `rapt build mon-projet --out
+  out/travel` (Node.js, Docker, Cloud Foundry).
+
+Dans VS Code, *Générer l'application…* demande lequel des deux.
+
 - `rapt abapgit mon-projet` : les XML pour importer le dépôt dans SAP avec abapGit
   (`--check` en CI).
 - Déploiement (Docker, SAP BTP Cloud Foundry, réseau local, HTTPS) : [DEPLOIEMENT.md](DEPLOIEMENT.md).
@@ -383,16 +425,19 @@ Dockerfile, docker-compose.yml, keycloak/, manifest.yml   conteneur, PostgreSQL,
 | `rapt check <src>` | diagnostics (`fichier:ligne:colonne: sévérité CODE message`), code retour 1 en cas d'erreur |
 | `rapt build <src> --out <dir>` | application générée |
 | `rapt dev <src>` | boucle de développement |
-| `rapt new <src> <Entité> [--prefix ZRT] [--description …]` | BO complet |
+| `rapt new <src> <Entité> [--prefix ZRT] [--description …]` | BO complet, ajouté au launchpad de l'espace de travail |
 | `rapt generate <src> <type> <nom> [--from X] [--for Y] [--expose A,B] [--root]` | un objet |
+| `rapt floorplan <src> [<Set> <floorplan>]` | floorplan d'un entity set racine ; l'application est ajoutée au launchpad |
 | `rapt abapgit <src> [--check]` | XML abapGit manquants |
 | `rapt mcp <src>` | outils MCP (`rapt/mcp.json`) |
-| `rapt launchpad <launchpad.json> --out <dir>` | launchpad |
+| `rapt launchpad <launchpad.json> --out <dir>` | launchpad, et les applications de leurs sources (`source`) |
+| `rapt launchpad add <src> [--launchpad f]` | ajoute l'application au launchpad de l'espace de travail (créé s'il manque) |
 | `rapt ir <src> [--out f]` | représentation intermédiaire (JSON) |
 
 Options communes : `--service <SRVD>` (plusieurs définitions de service), `--mode`, `--json`
 (sortie pour les outils : un objet JSON ; un événement par ligne pour `rapt dev`),
-`--warnings-as-errors`.
+`--warnings-as-errors`. `rapt new` et `rapt floorplan` : `--launchpad <fichier>` (un autre
+launchpad) et `--no-launchpad` (ne rien ajouter).
 
 ## 12. Variables d'environnement de l'application
 

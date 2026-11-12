@@ -256,6 +256,8 @@ ajoutent ce que la fixture n'utilise pas : numérotation, feature control global
 | Docker : launchpad, applications et leurs bases, Keycloak (profil `oidc`) | ✅ | `docker-compose.yml` généré. |
 | Spaces et pages (`spaces` → `pages` → `sections`), affectés à des rôles | ✅ | Onglets des spaces, liste des pages, dernier space mémorisé (D48). |
 | Launchpad de développement (`rapt dev`) : application, documentation, `$metadata`, MCP | ✅ | D49. |
+| Un launchpad « Launchpad » par espace de travail, applications ajoutées à leur création (`rapt new`, `rapt floorplan`, `rapt launchpad add`) | ✅ | D67 ; idempotent, `--launchpad`, `--no-launchpad`. |
+| Applications construites avec le launchpad depuis leurs sources (`source`) ; déploiement du launchpad complet ou d'une application seule | ✅ | D67 ; `out/launchpad/apps/<id>`, LPD009. |
 | Personnalisation par l'utilisateur, notifications, navigation entre applications depuis une application | ❌ | Voir KNOWN_GAPS. |
 
 ## Application générée et exploitation

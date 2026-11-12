@@ -1,9 +1,9 @@
-import { cpSync, mkdtempSync, rmSync } from "node:fs";
+import { cpSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { afterEach, describe, expect, it } from "vitest";
-import { DevProcess, GENERATE_KINDS, groupObjects, menuContext, projectObjects, unchosenFloorplans, wizardArgs, type CatalogEntry, diagnosticPath, findProjectRoot, LineSplitter, parseDevEvent, position, resolveCli, runJson, summary, type DevEvent } from "../src/rapt.js";
+import { DevProcess, GENERATE_KINDS, groupObjects, launchpadNotice, launchpadSources, menuContext, projectObjects, unchosenFloorplans, wizardArgs, workspaceLaunchpad, type CatalogEntry, type LaunchpadAddResult, diagnosticPath, findProjectRoot, LineSplitter, parseDevEvent, position, resolveCli, runJson, summary, type DevEvent } from "../src/rapt.js";
 
 const REPO = fileURLToPath(new URL("../../../", import.meta.url));
 const FIXTURE = path.join(REPO, "fixtures", "travel");
@@ -146,6 +146,24 @@ describe("the creation wizard and the objects view (D61)", () => {
     expect(unchosenFloorplans(answer.sets)).toEqual([]);
     expect(unchosenFloorplans([{ set: "Travel", chosen: true }, { set: "Agency", chosen: false }])).toEqual(["Agency"]);
     expect(await runJson(cli, ["floorplan", dir, "Nope", "worklist"], dir)).toMatchObject({ ok: false });
+  });
+
+  it("adds the applications to the single launchpad of the workspace (D67)", async () => {
+    // a saved .code-workspace keeps it next to itself, else the first folder has it
+    expect(workspaceLaunchpad([path.resolve("/w/a"), path.resolve("/w/b")], path.resolve("/w/apps.code-workspace"))).toBe(path.resolve("/w/launchpad.json"));
+    expect(workspaceLaunchpad([path.resolve("/w/a"), path.resolve("/w/b")])).toBe(path.resolve("/w/a/launchpad.json"));
+    expect(workspaceLaunchpad([])).toBeUndefined();
+
+    const dir = copy();
+    const file = path.join(dir, "launchpad.json");
+    const result = await runJson<{ ok: boolean; launchpad: LaunchpadAddResult }>(cli, ["floorplan", dir, "Travel", "worklist", "--launchpad", file], dir);
+    expect(result.launchpad).toMatchObject({ file, created: true, added: true, app: { id: path.basename(dir).toLowerCase().replace(/[^a-z0-9]+/g, "-"), source: "." } });
+    expect(launchpadNotice(result.launchpad)).toContain("ajoutée au launchpad (créé)");
+    const again = await runJson<LaunchpadAddResult>(cli, ["launchpad", "add", dir, "--launchpad", file], dir);
+    expect(again).toMatchObject({ added: false });
+    expect(launchpadNotice(again)).toBeUndefined();
+    expect(launchpadSources(file, readFileSync(file, "utf8"))).toEqual([path.resolve(dir)]);
+    expect(launchpadSources(file, "{")).toEqual([]);
   });
 
   it("enables the commands of the folders of a project, and of an application once a service is defined (D63)", () => {

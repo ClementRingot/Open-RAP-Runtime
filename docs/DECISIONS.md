@@ -1278,3 +1278,49 @@ et la conséquence. Les numéros D1 à D13 correspondent aux points 1 à 13 du �
   et le floorplan est un choix de conception de l'application, pas un défaut subi.
 - **Tests** : `vscode/test/rapt.test.ts` (dossiers des projets et des applications,
   `chosen`, List Report conservé).
+
+## D67 — Un launchpad par espace de travail, les applications y sont ajoutées à leur création
+
+- **Contexte** : `launchpad.json` s'écrivait à la main (D37) et ne référençait que des
+  applications déjà construites (`build`). Dans un espace de travail de plusieurs applications
+  (`rap-apps/helpdesk-tickets`, `rap-apps/project-tracker`…), il fallait l'écrire, construire
+  chaque application puis le launchpad, et rien ne disait qu'il n'en fallait qu'un.
+- **Décision** :
+  - **Un launchpad par espace de travail**, titré « Launchpad ». La CLI cherche `launchpad.json`
+    dans le dossier du projet puis ses parents (4 niveaux, arrêt après un dossier qui contient
+    `.git`, jamais dans la racine du disque, le dossier personnel ou le dossier temporaire) ; sans
+    lui, elle le crée dans le **dossier parent du projet** (l'espace de travail), ou dans le projet
+    s'il est la racine d'un dépôt git ou si son parent est un de ces dossiers système.
+    `--launchpad <fichier>` désigne un autre fichier. L'extension passe toujours
+    `--launchpad` : à côté du `.code-workspace` enregistré, sinon dans le **premier dossier** de
+    l'espace de travail — un seul launchpad, même pour un espace multi-racine.
+  - **Ajout à la création** : `rapt new` (BO complet) et `rapt floorplan <src> <Set> <floorplan>`
+    (le choix du floorplan crée l'application Fiori) ajoutent l'application ; `--no-launchpad`
+    s'en abstient ; `rapt launchpad add <src>` l'ajoute à la demande (`--json`). L'entrée
+    `apps` référence les **sources** (`"source": "helpdesk-tickets"`, relatif au launchpad.json),
+    son `id` vient du nom du dossier, son `url` (lancement local) prend le premier port libre à
+    partir de 8081. La tuile va dans le groupe « Applications » (ou la section « Applications »
+    de la première page du premier space) : titre de l'application, intent
+    `<EntitySet>-manage` (`process` en Worklist, `analyze` en Analytical List Page, `create` en
+    Form Entry), icône et compteur de l'entity set de départ. **Idempotent** : une application
+    déjà présente (mêmes sources, ou même id sans sources) n'est pas modifiée, rien de ce que
+    l'utilisateur a écrit n'est réécrit ; un fichier illisible n'est pas écrasé.
+  - **Construction** : `rapt launchpad launchpad.json --out out/launchpad` construit aussi chaque
+    application référencée par `source` dans `out/launchpad/apps/<id>` ; `docker-compose.yml` les
+    construit depuis ce dossier (une PostgreSQL chacune) et l'image du launchpad l'ignore.
+    `source` et `build` ensemble sont refusés (LPD009) ; `build` reste possible pour une
+    application construite à part.
+  - **Deux modes de déploiement** : le **launchpad avec toutes ses applications** (`rapt
+    launchpad`), ou **une application seule** (`rapt build`), qui ne dépend pas du launchpad : sa
+    barre de shell n'apparaît que si `/launchpad/config` répond. L'extension demande le mode dans
+    *Générer l'application…* (« Launchpad (toutes les applications) » / « Application seule
+    (standalone) ») ; *Générer le launchpad…* construit celui de l'espace de travail
+    (`rapt.hasLaunchpad`). `rapt dev` garde son launchpad de développement (D49).
+- **Pourquoi** : l'utilisateur crée des applications, pas des fichiers de configuration ; un seul
+  point d'entrée par espace de travail, comme le Fiori Launchpad d'un système, et le choix de
+  livrer une application seule reste ouvert.
+- **Tests** : `compiler/test/launchpad.test.ts` (création titrée « Launchpad », ajout idempotent
+  sans réécrire une tuile modifiée, deux projets d'un même dossier dans le même launchpad,
+  `rapt new`, `--no-launchpad`, `--launchpad`, construction des applications avec le launchpad,
+  LPD009) ; `vscode/test/rapt.test.ts` (fichier de l'espace de travail, `rapt floorplan` et
+  `rapt launchpad add` en JSON).

@@ -52,7 +52,7 @@ rapt dev mon-projet                         # http://localhost:8080/ — recharg
 | Behavior pool (ABAP Cloud) | Le même code, transpilé et exécuté : EML, messages, ABAP SQL, classes libérées (JSON, HTTP, bgPF, e-mail…) |
 | Définition de service | Service OData V4 aux chemins de SAP, `$batch`, CSRF, OIDC |
 | `rapt/mcp.json` | Serveur MCP pour les agents IA |
-| `launchpad.json` | Launchpad OpenUI5 : spaces, pages, tuiles par rôle, connexion unique |
+| `launchpad.json` | Launchpad OpenUI5 : spaces, pages, tuiles par rôle, connexion unique ; un par espace de travail, créé et complété à la création de chaque application |
 
 ![Object Page en édition](docs/images/object-page.png)
 
@@ -64,6 +64,9 @@ rapt dev mon-projet                         # http://localhost:8080/ — recharg
 - **Boucle de développement** `rapt dev` : base embarquée, reconstruction à chaque enregistrement,
   diagnostics positionnés (`fichier:ligne:colonne`), launchpad de développement avec la
   documentation intégrée.
+- **Un launchpad par espace de travail** : chaque application y est ajoutée à sa création ; on
+  livre au choix le launchpad avec toutes ses applications (`rapt launchpad`) ou une application
+  seule (`rapt build`).
 - **Modes** : `standard` (strictement comme SAP, activable sur SAP) ou `enhanced` (extensions :
   champs obligatoires contrôlés automatiquement, BO managed sur entité custom, types énumérés CDS
   exposés en `EnumType` OData).

@@ -43,6 +43,56 @@ export interface NewResult {
   root: string;
   written: string[];
   error?: string;
+  /** The application added to the launchpad of the workspace (D67). */
+  launchpad?: LaunchpadAddResult;
+}
+
+/** Result of `rapt launchpad add --json`, and the `launchpad` of `rapt new` and `rapt floorplan` (D67). */
+export interface LaunchpadAddResult {
+  file: string;
+  created: boolean;
+  added: boolean;
+  app?: { id: string; source: string; url: string };
+  error?: string;
+}
+
+/** Result of `rapt launchpad --json`: the launchpad and the applications built with it. */
+export interface LaunchpadResult extends RaptResult {
+  file: string;
+  apps: Array<{ id: string; source: string; out: string }>;
+}
+
+export const LAUNCHPAD_FILE = "launchpad.json";
+
+/**
+ * The launchpad of the VS Code workspace, a single one for all its applications (D67): next to
+ * the saved .code-workspace file, else in the first workspace folder.
+ */
+export function workspaceLaunchpad(folders: string[], workspaceFile?: string): string | undefined {
+  if (workspaceFile !== undefined) return path.join(path.dirname(workspaceFile), LAUNCHPAD_FILE);
+  return folders[0] === undefined ? undefined : path.join(folders[0], LAUNCHPAD_FILE);
+}
+
+/** The project folders of the applications of a launchpad.json built from their sources (`source`). */
+export function launchpadSources(file: string, text: string): string[] {
+  try {
+    const parsed = JSON.parse(text) as { apps?: unknown };
+    if (!Array.isArray(parsed.apps)) return [];
+    return parsed.apps.flatMap((a: unknown) =>
+      typeof a === "object" && a !== null && typeof (a as { source?: unknown }).source === "string" && (a as { build?: unknown }).build === undefined
+        ? [path.resolve(path.dirname(file), (a as { source: string }).source)]
+        : [],
+    );
+  } catch {
+    return [];
+  }
+}
+
+/** The message of an application added to the launchpad; undefined when nothing changed. */
+export function launchpadNotice(result: LaunchpadAddResult | undefined): string | undefined {
+  if (result === undefined || (result.error === undefined && !result.added)) return undefined;
+  if (result.error !== undefined) return `pas ajoutée au launchpad (${result.error})`;
+  return `${result.app?.id ?? "application"} ajoutée au launchpad${result.created ? " (créé)" : ""} : ${result.file}`;
 }
 
 /** Result of `rapt abapgit --json`. */

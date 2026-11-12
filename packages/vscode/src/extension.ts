@@ -17,18 +17,23 @@ import {
   summary,
   validEntityName,
   GENERATE_KINDS,
+  LAUNCHPAD_FILE,
+  launchpadNotice,
+  launchpadSources,
   menuContext,
   projectObjects,
   unchosenFloorplans,
   wizardArgs,
+  workspaceLaunchpad,
   type CatalogEntry,
   type AbapGitResult,
   type GenerateResult,
   type Cli,
   type DevEvent,
+  type LaunchpadAddResult,
+  type LaunchpadResult,
   type NewResult,
   type RaptDiagnostic,
-  type RaptResult,
 } from "./rapt.js";
 import { RapObjectsProvider } from "./tree.js";
 import { openWizard } from "./wizard.js";
@@ -50,6 +55,34 @@ const checkTimers = new Map<string, NodeJS.Timeout>();
 
 function config(): vscode.WorkspaceConfiguration {
   return vscode.workspace.getConfiguration("rapt");
+}
+
+/** Not searched for projects: dependencies, the work folder of rapt dev, the generated applications. */
+const EXCLUDE = "{**/node_modules/**,**/.rapt/**,**/out/**}";
+
+/** The launchpad.json of the workspace, one for all its applications (D67). */
+function launchpadFile(): string | undefined {
+  const workspaceFile = vscode.workspace.workspaceFile;
+  return workspaceLaunchpad(
+    (vscode.workspace.workspaceFolders ?? []).map((f) => f.uri.fsPath),
+    workspaceFile?.scheme === "file" ? workspaceFile.fsPath : undefined,
+  );
+}
+
+/** `--launchpad <file>`: rapt new and rapt floorplan add the application to the launchpad of the workspace. */
+function launchpadArgs(): string[] {
+  const file = launchpadFile();
+  return file === undefined ? [] : ["--launchpad", file];
+}
+
+function notifyLaunchpad(result: LaunchpadAddResult | undefined): void {
+  const notice = launchpadNotice(result);
+  if (notice === undefined) return;
+  output.appendLine(`launchpad : ${notice}`);
+  if (result?.error !== undefined) {
+    void vscode.window.showWarningMessage(`RAP : application ${notice}`);
+  }
+  scheduleMenuContext();
 }
 
 function cli(): Cli {
@@ -76,7 +109,7 @@ async function project(uri?: vscode.Uri): Promise<string | undefined> {
       return root;
     }
   }
-  const found = await vscode.workspace.findFiles("**/.abapgit.xml", "{**/node_modules/**,**/.rapt/**}", 50);
+  const found = await vscode.workspace.findFiles("**/.abapgit.xml", EXCLUDE, 50);
   const roots = [...new Set(found.map((f) => path.dirname(f.fsPath)))].sort();
   if (roots.length <= 1) {
     if (roots.length === 0) {
@@ -154,7 +187,34 @@ function cliFailed(error: Error): void {
   });
 }
 
+/** "Générer l'application…": the launchpad with every application, or this application alone (D67). */
 async function build(root: string): Promise<void> {
+  const file = launchpadFile();
+  if (file !== undefined) {
+    const mode = await vscode.window.showQuickPick(
+      [
+        { label: "Launchpad (toutes les applications)", description: path.basename(path.dirname(file)), detail: `rapt launchpad ${file} : le launchpad et chaque application de l'espace de travail, une seule origine (SSO)`, launchpad: true },
+        { label: "Application seule (standalone)", description: path.basename(root), detail: `rapt build : ${path.basename(root)} sans launchpad`, launchpad: false },
+      ],
+      { title: "RAP : générer pour le déploiement", placeHolder: "Que déployer ?", ignoreFocusOut: true },
+    );
+    if (mode === undefined) {
+      return;
+    }
+    if (mode.launchpad) {
+      if (!(await ensureFloorplans(root))) {
+        return;
+      }
+      try {
+        notifyLaunchpad(await runJson<LaunchpadAddResult>(cli(), ["launchpad", "add", root, "--launchpad", file], root));
+      } catch (e) {
+        cliFailed(e as Error);
+        return;
+      }
+      await buildLaunchpad(file);
+      return;
+    }
+  }
   if (!(await ensureFloorplans(root))) {
     return;
   }
@@ -188,7 +248,7 @@ async function newBoFolder(uri?: vscode.Uri): Promise<string | undefined> {
     const start = isFolder ? path.join(uri.fsPath, ".abapgit.xml") : uri.fsPath;
     return findProjectRoot(start, vscode.workspace.getWorkspaceFolder(uri)?.uri.fsPath) ?? (isFolder ? uri.fsPath : path.dirname(uri.fsPath));
   }
-  const found = await vscode.workspace.findFiles("**/.abapgit.xml", "{**/node_modules/**,**/.rapt/**}", 2);
+  const found = await vscode.workspace.findFiles("**/.abapgit.xml", EXCLUDE, 2);
   if (found.length > 0) {
     return project();
   }
@@ -229,12 +289,13 @@ async function newBo(uri?: vscode.Uri): Promise<void> {
     return;
   }
   try {
-    const result = await runJson<NewResult>(cli(), ["new", root, entity, "--prefix", prefix, "--description", description], root);
+    const result = await runJson<NewResult>(cli(), ["new", root, entity, "--prefix", prefix, "--description", description, ...launchpadArgs()], root);
     if (!result.ok) {
       void vscode.window.showErrorMessage(`RAP : ${result.error ?? "création impossible"}`);
       return;
     }
     output.appendLine(`rapt new ${entity}: ${result.written.join(", ")}`);
+    notifyLaunchpad(result.launchpad);
     const behavior = result.written.find((f) => f.endsWith(".bdef.asbdef") && f.includes("_r_"));
     if (behavior !== undefined) {
       await vscode.window.showTextDocument(vscode.Uri.file(path.join(root, behavior)));
@@ -262,7 +323,7 @@ async function generate(root: string): Promise<void> {
   const args = ["generate", root, kind.kind];
   let source: string | undefined;
   if (kind.source !== undefined) {
-    const files = await vscode.workspace.findFiles(new vscode.RelativePattern(root, "**/*.{astabl,xml,asddls,asbdef,srvdsrv}"), "{**/node_modules/**,**/.rapt/**}");
+    const files = await vscode.workspace.findFiles(new vscode.RelativePattern(root, "**/*.{astabl,xml,asddls,asbdef,srvdsrv}"), EXCLUDE);
     const candidates = projectObjects(files.map((f) => f.fsPath))[kind.source.of];
     source = await vscode.window.showQuickPick(candidates, { title, placeHolder: kind.source.prompt, ignoreFocusOut: true });
     if (source === undefined) {
@@ -310,7 +371,7 @@ async function generate(root: string): Promise<void> {
 
 /** The objects of a project, by kind, to derive the new objects from. */
 async function objectsOf(root: string): Promise<Record<string, string[]>> {
-  const files = await vscode.workspace.findFiles(new vscode.RelativePattern(root, "**/*.{astabl,xml,asddls,asbdef,srvdsrv}"), "{**/node_modules/**,**/.rapt/**}");
+  const files = await vscode.workspace.findFiles(new vscode.RelativePattern(root, "**/*.{astabl,xml,asddls,asbdef,srvdsrv}"), EXCLUDE);
   return projectObjects(files.map((f) => f.fsPath));
 }
 
@@ -319,12 +380,15 @@ let contextTimer: NodeJS.Timeout | undefined;
 
 /** The context keys that grey out the commands not yet possible: no project, no service (D63). */
 async function updateMenuContext(): Promise<void> {
-  const files = await vscode.workspace.findFiles(SOURCE_FILES, "{**/node_modules/**,**/.rapt/**}");
+  const files = await vscode.workspace.findFiles(SOURCE_FILES, EXCLUDE);
   const { projects, apps } = menuContext(files.map((f) => f.fsPath));
   await vscode.commands.executeCommand("setContext", "rapt.projects", projects);
   await vscode.commands.executeCommand("setContext", "rapt.apps", apps);
   await vscode.commands.executeCommand("setContext", "rapt.hasProject", Object.keys(projects).length > 0);
   await vscode.commands.executeCommand("setContext", "rapt.hasApp", Object.keys(apps).length > 0);
+  const own = launchpadFile();
+  const hasLaunchpad = (own !== undefined && existsSync(own)) || (await vscode.workspace.findFiles(`**/${LAUNCHPAD_FILE}`, EXCLUDE, 1)).length > 0;
+  await vscode.commands.executeCommand("setContext", "rapt.hasLaunchpad", hasLaunchpad);
 }
 
 function scheduleMenuContext(): void {
@@ -353,10 +417,12 @@ async function newObject(root: string, kind?: string): Promise<void> {
       if (entry === undefined) return "Type d'objet inconnu";
       const args = wizardArgs(root, entry, answer.name, answer.description, answer.values);
       if (typeof args === "string") return args;
+      if (args[0] === "new") args.push(...launchpadArgs());
       try {
-        const result = await runJson<GenerateResult>(cli(), args, root);
+        const result = await runJson<GenerateResult & { launchpad?: LaunchpadAddResult }>(cli(), args, root);
         if (!result.ok) return result.error ?? "création impossible";
         output.appendLine(`rapt ${args[0]} ${answer.kind} ${answer.name}: ${result.written.join(", ")}`);
+        notifyLaunchpad(result.launchpad);
         objectsView?.refresh();
         const main = result.written.find((f) => !f.endsWith(".xml") && !f.endsWith(".json") && f !== ".abapgit.xml") ?? result.written[0];
         if (main !== undefined) {
@@ -410,12 +476,13 @@ async function pickFloorplan(root: string, answer: FloorplanAnswer, set: Floorpl
   );
   if (picked === undefined) return false;
   try {
-    const result = await runJson<{ ok: boolean; error?: string; file: string }>(cli(), ["floorplan", root, set.set, picked.f.floorplan], root);
+    const result = await runJson<{ ok: boolean; error?: string; file: string; launchpad?: LaunchpadAddResult }>(cli(), ["floorplan", root, set.set, picked.f.floorplan, ...launchpadArgs()], root);
     if (!result.ok) {
       void vscode.window.showErrorMessage(`RAP : ${result.error ?? "impossible"}`);
       return false;
     }
     output.appendLine(`rapt floorplan ${set.set}: ${picked.f.floorplan} (${result.file})`);
+    notifyLaunchpad(result.launchpad);
     return true;
   } catch (e) {
     cliFailed(e as Error);
@@ -452,28 +519,50 @@ async function showIr(root: string): Promise<void> {
   }
 }
 
-/** "Générer le launchpad": rapt launchpad <launchpad.json> --out <dossier>. */
+/** "Générer le launchpad": the launchpad of the workspace (D67), else a launchpad.json of the workspace. */
 async function launchpad(): Promise<void> {
-  const files = await vscode.workspace.findFiles("**/launchpad.json", "{**/node_modules/**,**/.rapt/**}", 20);
-  const file = files.length === 1 ? files[0] : (await vscode.window.showQuickPick(files.map((f) => ({ label: vscode.workspace.asRelativePath(f), f })), { placeHolder: "launchpad.json" }))?.f;
+  const own = launchpadFile();
+  let file = own !== undefined && existsSync(own) ? own : undefined;
   if (file === undefined) {
-    void vscode.window.showWarningMessage("RAP : aucun launchpad.json dans l'espace de travail.");
+    const files = await vscode.workspace.findFiles(`**/${LAUNCHPAD_FILE}`, EXCLUDE, 20);
+    file = files.length <= 1 ? files[0]?.fsPath : (await vscode.window.showQuickPick(files.map((f) => ({ label: vscode.workspace.asRelativePath(f), f })), { placeHolder: LAUNCHPAD_FILE }))?.f.fsPath;
+  }
+  if (file === undefined) {
+    void vscode.window.showWarningMessage("RAP : pas encore de launchpad. Il est créé avec la première application (« Nouveau business object complet », « Choisir le floorplan de l'application »).");
     return;
   }
-  const out = await vscode.window.showOpenDialog({ canSelectFolders: true, canSelectFiles: false, canSelectMany: false, openLabel: "Générer le launchpad ici" });
-  const target = out?.[0];
-  if (target === undefined) return;
-  try {
-    const result = await runJson<RaptResult>(cli(), ["launchpad", file.fsPath, "--out", target.fsPath], path.dirname(file.fsPath));
-    if (result.ok) {
-      void vscode.window.showInformationMessage(`RAP : launchpad généré dans ${target.fsPath}.`);
-    } else {
-      publish(path.dirname(file.fsPath), result.diagnostics);
-      void vscode.window.showErrorMessage("RAP : launchpad.json a des erreurs (onglet Problèmes).");
+  await buildLaunchpad(file);
+}
+
+/** rapt launchpad <launchpad.json> --out <dossier>: the launchpad and the applications of its sources. */
+async function buildLaunchpad(file: string): Promise<void> {
+  for (const source of launchpadSources(file, readFileSync(file, "utf8"))) {
+    if (existsSync(source) && !(await ensureFloorplans(source))) {
+      return;
     }
-  } catch (e) {
-    cliFailed(e as Error);
   }
+  const base = path.dirname(file);
+  const target = await vscode.window.showInputBox({ prompt: "Dossier du launchpad généré (avec ses applications)", value: path.join(base, "out", "launchpad"), ignoreFocusOut: true });
+  if (target === undefined) return;
+  await vscode.window.withProgress({ location: vscode.ProgressLocation.Notification, title: "RAP : génération du launchpad et de ses applications" }, async () => {
+    try {
+      const result = await runJson<LaunchpadResult>(cli(), ["launchpad", file, "--out", target], base);
+      publish(base, result.diagnostics.map((d) => (d.path === undefined && d.file === undefined ? { ...d, path: file } : d)));
+      if (result.ok) {
+        const action = await vscode.window.showInformationMessage(
+          `RAP : launchpad et ${result.apps.length} application(s) générés dans ${result.out ?? target} (docker compose up).`,
+          "Ouvrir le dossier",
+        );
+        if (action !== undefined) {
+          void vscode.commands.executeCommand("revealFileInOS", vscode.Uri.file(path.join(result.out ?? target, "docker-compose.yml")));
+        }
+      } else {
+        void vscode.window.showErrorMessage(`RAP : launchpad non généré, ${summary(result.counts)} (onglet Problèmes).`);
+      }
+    } catch (e) {
+      cliFailed(e as Error);
+    }
+  });
 }
 
 /** "Générer le serveur MCP du service": rapt/mcp.json, opened to describe each tool (D47). */
@@ -646,6 +735,7 @@ export function activate(context: vscode.ExtensionContext): void {
     }
   };
   const watcher = vscode.workspace.createFileSystemWatcher(SOURCE_FILES, false, true, false);
+  const launchpadWatcher = vscode.workspace.createFileSystemWatcher(`**/${LAUNCHPAD_FILE}`, false, true, false);
   context.subscriptions.push(
     output,
     diagnostics,
@@ -653,6 +743,9 @@ export function activate(context: vscode.ExtensionContext): void {
     watcher,
     watcher.onDidCreate(scheduleMenuContext),
     watcher.onDidDelete(scheduleMenuContext),
+    launchpadWatcher,
+    launchpadWatcher.onDidCreate(scheduleMenuContext),
+    launchpadWatcher.onDidDelete(scheduleMenuContext),
     vscode.workspace.onDidChangeWorkspaceFolders(scheduleMenuContext),
     vscode.workspace.onDidRenameFiles(scheduleMenuContext),
     vscode.commands.registerCommand("rapt.check", withProject((root) => check(root))),

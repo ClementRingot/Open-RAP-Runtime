@@ -97,12 +97,13 @@ Le code de retour est 1 dès qu'il y a une erreur (ou un avertissement avec
 | AUTH004 | avertissement | Rôle accordant une activité (`ACTVT`) que l'objet d'autorisation ne permet pas |
 | LPD001 | erreur | `launchpad.json` illisible ou mal formé : groupes, titres, id ou URL d'une application, rôles d'une tuile |
 | LPD002 | erreur | Tuile sans cible, avec deux cibles (`app` et `url`), ou d'une application inconnue |
-| LPD003 | erreur ou avertissement | Dossier d'application qui n'a pas été généré par `rapt build` (erreur) ; application dont les services ne sont pas connus, ni `build` ni `servicePaths` (avertissement) |
+| LPD003 | erreur ou avertissement | Dossier d'application qui n'a pas été généré par `rapt build` (erreur) ; application dont les services ne sont pas connus, ni `build` ni `servicePaths` ni `source` construite (avertissement) |
 | LPD004 | erreur | Intent qui n'est pas de la forme `ObjetSemantique-action` |
 | LPD005 | erreur | Chemin de service sous un chemin du launchpad (`/ui`, `/apps`, `/auth`…), ou servi par deux applications |
 | LPD006 | erreur | Compteur sur un entity set inconnu du service, ou sur une tuile sans application |
 | LPD007 | avertissement | Rôle d'une tuile absent des `rapt/authorizations.json` des applications (l'IdP doit tout de même le donner) |
 | LPD008 | erreur | Space ou page mal formé dans `launchpad.json` (titre, pages, sections, rôles) (D48) |
+| LPD009 | erreur | Application `source` mal formée (pas un chemin, ou avec `build`), dossier introuvable, ou application qui ne se construit pas avec le launchpad (D67) |
 | SEED001 | erreur | `rapt/seed.json` illisible ou mal formé (objet table → tableau de lignes attendu) |
 | SEED002 | erreur | `rapt/seed.json` : table ou champ inconnu de l'application |
 | NR001 | erreur | `rapt/number-ranges.json` illisible ou mal formé : objet de plus de 10 caractères, intervalle de plus de 2 caractères, bornes non numériques ou inversées |
