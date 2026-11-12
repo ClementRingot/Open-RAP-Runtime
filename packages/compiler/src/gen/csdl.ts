@@ -53,6 +53,21 @@ function enumName(value: string | undefined): string {
     .join("");
 }
 
+/** Terms a Web API binding leaves out (D60): UI information, value helps, side effects. */
+const UI_ONLY = /^(UI\.|Common\.ValueList|Common\.SideEffects|Common\.FilterDefaultValue)/;
+
+/** An annotation of a Web API: without the UI information, nested annotations included. */
+function webApiAnnotation(element: XmlElement): XmlElement | undefined {
+  const term = element.attributes?.["Term"];
+  if (element.name === "Annotation" && typeof term === "string" && UI_ONLY.test(term)) {
+    return undefined;
+  }
+  return {
+    ...element,
+    children: (element.children ?? []).map((c) => (typeof c === "object" && c !== null ? webApiAnnotation(c) : c)),
+  };
+}
+
 function edmAttributes(edm: EdmType): Record<string, string | number | undefined> {
   if (edm.enum !== undefined) {
     // an OData enumeration type of the enhanced mode (D55)
@@ -253,7 +268,7 @@ class CsdlBuilder {
   // annotations
 
   private annotations(target: string, children: Array<XmlElement | undefined>): void {
-    const list = children.filter((c): c is XmlElement => c !== undefined);
+    const list = children.filter((c): c is XmlElement => c !== undefined).map((c) => (this.model.service.webApi === true ? webApiAnnotation(c) : c)).filter((c): c is XmlElement => c !== undefined);
     if (list.length > 0) {
       this.annotationBlocks.push(el("Annotations", { Target: target }, ...list));
     }

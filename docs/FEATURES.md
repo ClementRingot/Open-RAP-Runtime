@@ -210,7 +210,8 @@ ajoutent ce que la fixture n'utilise pas : numérotation, feature control global
 | Jeton CSRF (`X-CSRF-Token: Fetch`) | ✅ | Exigé pour les sessions par cookie (J6). |
 | Erreurs au format OData V4 (`@Common.numericSeverity`, `details`, `target`) | ✅ | Statut selon la cause d'échec (D22). |
 | Paramètres `sap-*` | ✅ | Ignorés. |
-| Authentification : mode dev, Bearer JWT (OIDC, JWKS) | ✅ | Sessions navigateur : J6. |
+| Authentification : mode dev, Bearer JWT (OIDC, JWKS) | ✅ | Sessions navigateur (PKCE) : J6 ; jetons *client credentials* (utilisateur technique) ; serveur OAuth 2.0 de développement (`/oauth`, client credentials et PKCE) dans `rapt dev` (D60). |
+| Binding *OData V4 - Web API* | ✅ | Sans annotations d'UI, value helps, side effects, feature control ; instances actives d'un BO draft (D60). |
 | `$apply` : `filter`, `groupby`, `aggregate` (`sum`, `min`, `max`, `average`, `countdistinct`, `$count`) | ✅ | Avec le DCL de l'utilisateur ; autres transformations : 501 (D52). |
 | Types énumération (`EnumType`) : JSON par nom de membre, littéraux `Ns.Type'M'` | ✅ | Mode `enhanced`, types énumérés CDS (D55). |
 | JSON batch, `$value`, propriétés seules | ❌ | Hors MVP. |

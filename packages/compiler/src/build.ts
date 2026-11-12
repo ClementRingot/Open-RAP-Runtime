@@ -55,7 +55,8 @@ export async function generateApplication(project: Project, options: GenerateOpt
     { path: "odata/metadata.xml", content: generateCsdl(model) },
     ...abap.modules.map((m) => ({ path: `abap/${m.path}`, content: m.content })),
     ...abap.sources.map((s) => ({ path: `abap/src/${s.fileName}`, content: s.content })),
-    ...generateUi(model).map((f) => ({ path: `ui/${f.path}`, content: f.content })),
+    // a Web API (D60) has no UI
+    ...(model.service.webApi === true ? [] : generateUi(model).map((f) => ({ path: `ui/${f.path}`, content: f.content }))),
   ];
   // the MCP server of the service (D47), when rapt/mcp.json asks for it
   const mcp = loadMcpConfig(project, diagnostics);

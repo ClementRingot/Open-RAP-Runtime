@@ -4,6 +4,7 @@ import Fastify, { type FastifyInstance, type FastifyReply, type FastifyRequest, 
 import type { McpToolsModel, Model } from "@rap-transpiler/model";
 import { registerMcp } from "./mcp/server.js";
 import { AuthenticationError, Authenticator, type AuthOptions } from "./auth/auth.js";
+import { DevOAuthServer, type DevOAuthClient } from "./auth/dev-oauth.js";
 import { OidcSessions } from "./auth/session.js";
 import type { User } from "./auth/user.js";
 import type { Database } from "./db/database.js";
@@ -41,6 +42,11 @@ export interface AppOptions {
   ui?: UiOptions;
   /** The MCP tools of the service (D47), served at /mcp. */
   mcp?: McpToolsModel;
+  /**
+   * Development mode only: the development OAuth 2.0 authorization server under /oauth (D60), its
+   * tokens accepted as bearer tokens; `true` for the default clients.
+   */
+  devOAuth?: boolean | DevOAuthClient[];
   /** Extra plugins (UI, login routes), registered after the service. */
   extend?: (app: FastifyInstance, services: AppServices) => Promise<void> | void;
 }
@@ -90,6 +96,11 @@ export async function createApp(options: AppOptions): Promise<FastifyInstance> {
   const servicePath = options.model.service.path;
   handler.setServicePath(servicePath);
   const authenticator = new Authenticator(options.auth ?? { mode: "none" });
+  if (options.devOAuth !== undefined && options.devOAuth !== false && (options.auth === undefined || options.auth.mode === "none")) {
+    const server = await DevOAuthServer.create(Array.isArray(options.devOAuth) ? options.devOAuth : undefined);
+    server.register(app);
+    authenticator.devOAuth = server;
+  }
   const csrf = new CsrfTokens(options.csrfSecret);
   const auth = options.auth;
   const variants = new UiVariants(() => options.db);

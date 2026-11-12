@@ -9,7 +9,9 @@
  *   and claims `DEV_ATTRIBUTES`) or `oidc`: `OIDC_ISSUER`, `OIDC_DISCOVERY_URL`, `OIDC_AUDIENCE`,
  *   `OIDC_CLIENT_ID`, `OIDC_CLIENT_SECRET`, `OIDC_REQUIRED_ROLE`, `OIDC_ROLES_CLAIM`,
  *   `OIDC_USER_CLAIM`, `SESSION_SECRET`;
- * - `AUTHORIZATIONS_FILE`: roles replacing those of rapt/authorizations.json (D34).
+ * - `AUTHORIZATIONS_FILE`: roles replacing those of rapt/authorizations.json (D34);
+ * - `DEV_OAUTH=on` (development mode only): the development OAuth 2.0 server under /oauth,
+ *   clients `DEV_OAUTH_CLIENTS` (JSON, default rapt-client / rapt-secret and rapt-pkce) (D60).
  */
 
 import { existsSync, readFileSync } from "node:fs";
@@ -20,6 +22,7 @@ import type { LaunchpadModel, McpToolsModel, Model } from "@rap-transpiler/model
 import { registerDevLaunchpad } from "./launchpad/dev.js";
 import { platformEnvironment } from "./platform.js";
 import { createApp } from "./app.js";
+import type { DevOAuthClient } from "./auth/dev-oauth.js";
 import { authFromEnvironment } from "./auth/environment.js";
 import { Authorizations, rolesFromJson } from "./auth/authorizations.js";
 import { applySchema, createDatabase, createPostgresDatabase, PGLITE_PARSERS, type Database } from "./db/database.js";
@@ -98,11 +101,14 @@ export async function start(options: StartOptions): Promise<RunningServer> {
   const devLaunchpad = existsSync(devFile) && env["DEV_LAUNCHPAD"] !== "off" ? (JSON.parse(readFileSync(devFile, "utf8")) as LaunchpadModel) : undefined;
   const mcpFile = path.join(dir, "mcp", "tools.json");
   const mcp = existsSync(mcpFile) && env["MCP"] !== "off" ? (JSON.parse(readFileSync(mcpFile, "utf8")) as McpToolsModel) : undefined;
+  const devClients = env["DEV_OAUTH_CLIENTS"];
+  const devOAuth = env["DEV_OAUTH"] === "on" && auth.mode === "none" ? (devClients === undefined || devClients === "" ? true : (JSON.parse(devClients) as DevOAuthClient[])) : undefined;
   const app = await createApp({
     model,
     metadata,
     db,
     auth,
+    ...(devOAuth === undefined ? {} : { devOAuth }),
     logger: { level: env["LOG_LEVEL"] ?? "info" },
     ...(rap === undefined ? {} : { rap }),
     authorizations,

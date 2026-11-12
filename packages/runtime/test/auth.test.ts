@@ -1,6 +1,7 @@
 import { createLocalJWKSet, exportJWK, generateKeyPair, SignJWT, type JWK } from "jose";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { fixtureApp, SERVICE, type TestApp } from "./helpers.js";
+import { Authenticator } from "../src/auth/auth.js";
 
 const ISSUER = "https://idp.example.test/realms/rap";
 let t: TestApp;
@@ -65,5 +66,13 @@ describe("OIDC bearer tokens", () => {
 
   it("does not protect the health check", async () => {
     expect((await t.app.inject({ method: "GET", url: "/health" })).statusCode).toBe(200);
+  });
+});
+
+describe("client credentials tokens (D60)", () => {
+  it("name the client as the technical user, with the roles of a scope claim", () => {
+    const authenticator = new Authenticator({ mode: "oidc", issuer: "https://idp.example.com", rolesClaim: "scope" });
+    const user = authenticator.userFromClaims({ sub: "6f1c0a52", client_id: "billing-batch", scope: "travel_manager reporting" }, "bearer");
+    expect(user).toMatchObject({ id: "billing-batch", abapName: "BILLING-BATC", roles: ["travel_manager", "reporting"] });
   });
 });

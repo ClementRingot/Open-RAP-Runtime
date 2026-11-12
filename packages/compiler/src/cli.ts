@@ -36,6 +36,7 @@ Options:
   --mode <mode>      standard (as on SAP, the default) or enhanced (rap-transpiler extensions);
                      overrides "mode" of rapt/config.json
   --binding <name>   service binding name (default: the SRVB of the service, else <SRVD>_O4)
+  --binding-type <t> ui or webapi (OData V4 - Web API: no UI information, no draft; default: the SRVB)
   --path <path>      service root path (default: /sap/opu/odata4/sap/<binding>/srvd/sap/<srvd>/0001/)
   --runtime <dir>    @rap-transpiler/runtime package to embed in the application (default: next to rapt)
   --out <path>       output file (rapt ir) or folder (rapt build, rapt launchpad, rapt dev: <src>/.rapt/dev)
@@ -76,6 +77,7 @@ export async function main(argv: string[]): Promise<number> {
         service: { type: "string" },
         mode: { type: "string" },
         binding: { type: "string" },
+        "binding-type": { type: "string" },
         path: { type: "string" },
         out: { type: "string" },
         runtime: { type: "string" },
@@ -151,6 +153,7 @@ export async function main(argv: string[]): Promise<number> {
   const options: GenerateOptions = {};
   if (typeof parsed.values["service"] === "string") options.service = parsed.values["service"];
   if (typeof parsed.values["binding"] === "string") options.binding = parsed.values["binding"];
+  if (typeof parsed.values["binding-type"] === "string") options.bindingType = parsed.values["binding-type"];
   if (typeof parsed.values["mode"] === "string") options.mode = parsed.values["mode"];
   if (typeof parsed.values["path"] === "string") options.path = parsed.values["path"];
   if (typeof parsed.values["runtime"] === "string") options.runtimeDir = parsed.values["runtime"];
@@ -261,6 +264,7 @@ function generateCommand(source: string, kind: string | undefined, name: string 
     ...(str("for") === undefined ? {} : { for: str("for") as string }),
     ...(expose === undefined ? {} : { expose: expose.split(",").map((e) => e.trim()).filter((e) => e !== "") }),
     ...(values["root"] === true ? { root: true } : {}),
+    ...(str("binding-type") === undefined ? {} : { bindingType: str("binding-type") as string }),
     ...(str("description") === undefined ? {} : { description: str("description") as string }),
   });
   if (json) {

@@ -320,6 +320,8 @@ export class DevSession {
       HOST: this.options.host ?? this.env["HOST"] ?? "127.0.0.1",
       LOG_LEVEL: this.env["LOG_LEVEL"] ?? "warn",
       AUTH_MODE: this.env["AUTH_MODE"] ?? "none",
+      // the development OAuth 2.0 server: Web API calls with client credentials or PKCE (D60)
+      DEV_OAUTH: this.env["DEV_OAUTH"] ?? "on",
       // seed data of rapt/seed.json, rapt/seed.sql at the first start (D42)
       SEED: this.env["SEED"] ?? "auto",
       ...(dir === undefined ? {} : { PGLITE_DIR: dir }),
@@ -388,17 +390,21 @@ export class DevSession {
 export function devLaunchpadModel(model: Model, mcp: boolean): LaunchpadModel {
   const layout = buildUiLayout(model);
   const tile = (t: Omit<LaunchpadTile, "external" | "roles"> & { external?: boolean }): LaunchpadTile => ({ external: false, roles: [], ...t });
+  // a Web API (D60) has no UI: its service document
+  const webApi = model.service.webApi === true;
   const application = tile({
     id: "app",
-    title: layout.title,
-    subtitle: model.service.name,
-    icon: "sap-icon://product",
-    target: "/ui/index.html",
+    title: webApi ? model.service.name : layout.title,
+    subtitle: webApi ? "OData V4 - Web API" : model.service.name,
+    icon: webApi ? "sap-icon://chain-link" : "sap-icon://product",
+    target: webApi ? model.service.path : "/ui/index.html",
+    ...(webApi ? { external: true } : {}),
     ...(layout.start === "" ? {} : { count: `${model.service.path}${layout.start}/$count` }),
   });
   const tools = [
     tile({ id: "docs", title: "Documentation", subtitle: "rap-transpiler", icon: "sap-icon://learning-assistant", target: "/docs/index.html" }),
     tile({ id: "metadata", title: "Service metadata", subtitle: "OData V4 $metadata", icon: "sap-icon://source-code", target: `${model.service.path}$metadata`, external: true }),
+    tile({ id: "oauth", title: "OAuth 2.0 (development)", subtitle: "Client credentials, PKCE", info: "/oauth", icon: "sap-icon://locked", target: "/oauth/.well-known/openid-configuration", external: true }),
     ...(mcp ? [tile({ id: "mcp", title: "MCP server", subtitle: "Tools for AI agents", info: "/mcp", icon: "sap-icon://da", target: "/docs/index.html#/page/mcp" })] : []),
   ];
   const sections = [

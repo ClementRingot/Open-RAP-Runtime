@@ -6,6 +6,7 @@
 
 import { createRemoteJWKSet, jwtVerify, type JWTPayload, type JWTVerifyGetKey } from "jose";
 import { abapUserName, developmentUser, type User } from "./user.js";
+import type { DevOAuthServer } from "./dev-oauth.js";
 
 export interface DevelopmentAuthOptions {
   mode: "none";
@@ -64,6 +65,8 @@ export class AuthenticationError extends Error {
 
 export class Authenticator {
   private jwks: JWTVerifyGetKey | undefined;
+  /** Development mode: the tokens of the development authorization server (D60). */
+  public devOAuth: DevOAuthServer | undefined;
 
   public constructor(public readonly options: AuthOptions) {
     if (options.mode === "oidc" && options.jwks !== undefined) {
@@ -90,7 +93,8 @@ export class Authenticator {
   public userFromClaims(payload: JWTPayload, authenticatedBy: User["authenticatedBy"]): User {
     const options = this.options as OidcAuthOptions;
     const claim = options.userClaim ?? "preferred_username";
-    const id = String(payload[claim] ?? payload.sub ?? "");
+    // a token of the client credentials flow names the client (technical user, D60)
+    const id = String(payload[claim] ?? payload["client_id"] ?? payload.sub ?? "");
     if (id === "") {
       throw new AuthenticationError(`the token has no ${claim} or sub claim`);
     }
@@ -133,6 +137,20 @@ export class Authenticator {
   /** The user of a request from its Authorization header; undefined when there is none. */
   public async fromAuthorization(header: string | undefined): Promise<User | undefined> {
     if (this.options.mode === "none") {
+      const bearer = header === undefined ? null : /^Bearer\s+(.+)$/i.exec(header);
+      if (bearer !== null && this.devOAuth !== undefined) {
+        // a token of the development authorization server (D60)
+        let payload: JWTPayload;
+        try {
+          payload = await this.devOAuth.verify((bearer[1] as string).trim());
+        } catch (error) {
+          throw new AuthenticationError(`invalid token: ${(error as Error).message}`);
+        }
+        const id = String(payload["preferred_username"] ?? payload["client_id"] ?? payload.sub ?? "DEVELOPER");
+        const roles = Array.isArray(payload["roles"]) ? (payload["roles"] as unknown[]).map(String) : ["*"];
+        // a development user: with the roles of the token (`*`: every authorization, like DEV_ROLES)
+        return developmentUser(id, roles, this.options.attributes);
+      }
       return developmentUser(this.options.user, this.options.roles, this.options.attributes);
     }
     if (header === undefined) {

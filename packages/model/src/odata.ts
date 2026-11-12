@@ -327,7 +327,7 @@ export function buildODataService(model: Model): ODataService {
         computed: field.draft === true || characteristics.includes("readonly") || characteristics.includes("numberingManaged"),
         immutable: characteristics.includes("readonlyUpdate"),
         mandatory: characteristics.includes("mandatory") || characteristics.includes("mandatoryCreate"),
-        dynamic: characteristics.includes("featuresInstance"),
+        dynamic: model.service.webApi !== true && characteristics.includes("featuresInstance"),
       });
     }
     const entityType: ODataEntityType = {
@@ -338,7 +338,8 @@ export function buildODataService(model: Model): ODataService {
       properties,
       navigations: [],
       operationControl: [],
-      fieldControl: properties.filter((p) => p.dynamic).map((p) => p.name),
+      // a Web API (D60) does not expose the feature control
+      fieldControl: model.service.webApi === true ? [] : properties.filter((p) => p.dynamic).map((p) => p.name),
     };
     const etag = behavior.base?.etag;
     const etagAllowed = behavior.projection === undefined || behavior.projection.useEtag;
@@ -358,7 +359,7 @@ export function buildODataService(model: Model): ODataService {
     const authorized = authorizationControlled(model, behavior);
     const updateDynamic = (behavior.base?.operations.some((o) => o.kind === "update" && o.features !== undefined) ?? false) || (authorized && publicOperation(behavior, "update"));
     const deleteDynamic = (behavior.base?.operations.some((o) => o.kind === "delete" && o.features !== undefined) ?? false) || (authorized && publicOperation(behavior, "delete"));
-    if (updateDynamic || deleteDynamic) {
+    if ((updateDynamic || deleteDynamic) && model.service.webApi !== true) {
       entityType.entityControl = { updatable: updateDynamic, deletable: deleteDynamic };
     }
     for (const association of entity.associations) {
@@ -392,13 +393,13 @@ export function buildODataService(model: Model): ODataService {
         constraints: association.kind === "toParent" ? association.on.map((p) => ({ property: p.source, referencedProperty: p.target })) : [],
         on: association.on,
         insertable,
-        insertableDynamic: insertable && (baseAssociation?.createFeatures === "instance" || authorized),
+        insertableDynamic: model.service.webApi !== true && insertable && (baseAssociation?.createFeatures === "instance" || authorized),
       };
       if (partner !== undefined) {
         navigation.partner = partner.name;
       }
       entityType.navigations.push(navigation);
-      if (navigation.insertableDynamic) {
+      if (navigation.insertableDynamic && model.service.webApi !== true) {
         entityType.operationControl.push(navigation.name);
       }
     }
@@ -412,7 +413,7 @@ export function buildODataService(model: Model): ODataService {
         behaviorEntity: behavior.baseEntity.name,
         action: action.name,
         factory: action.factory,
-        dynamic: action.features === "instance" || (action.features === "global" && !action.static) || (authorized && !action.static),
+        dynamic: model.service.webApi !== true && (action.features === "instance" || (action.features === "global" && !action.static) || (authorized && !action.static)),
       };
       if (action.parameter !== undefined && action.parameter.toLowerCase() !== "$self") {
         const parameterEntity = findEntity(model, action.parameter);
@@ -438,7 +439,7 @@ export function buildODataService(model: Model): ODataService {
           }
         }
       }
-      if (operation.dynamic) {
+      if (operation.dynamic && model.service.webApi !== true) {
         entityType.operationControl.push(action.name);
       }
       service.operations.push(operation);

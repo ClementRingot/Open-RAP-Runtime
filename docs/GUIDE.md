@@ -385,6 +385,7 @@ Options communes : `--service <SRVD>` (plusieurs définitions de service), `--mo
 | `SEED` | — | `auto` : données initiales au premier démarrage |
 | `AUTH_MODE` | `none` | `oidc` : jetons porteurs et sessions navigateur |
 | `DEV_USER`, `DEV_ROLES`, `DEV_ATTRIBUTES` | — | utilisateur de développement |
+| `DEV_OAUTH`, `DEV_OAUTH_CLIENTS` | `on` dans `rapt dev` | serveur OAuth 2.0 de développement sous `/oauth` (D60) |
 | `OIDC_ISSUER`, `OIDC_CLIENT_ID`, `OIDC_CLIENT_SECRET`, `OIDC_AUDIENCE`, `OIDC_REQUIRED_ROLE` | — | fournisseur d'identité |
 | `SESSION_SECRET` | — | signature des sessions (partagé avec le launchpad) |
 | `AUTHORIZATIONS_FILE` | — | rôles remplaçant `rapt/authorizations.json` |
@@ -393,6 +394,28 @@ Options communes : `--service <SRVD>` (plusieurs définitions de service), `--mo
 | `MCP` | — | `off` : pas de serveur MCP |
 | `UI` | — | `off` : pas d'UI |
 | `LOG_LEVEL` | `info` | journal |
+
+## 12 bis. API Web et OAuth 2.0
+
+Un service lié en *OData V4 - Web API* (`BINDING_TYPE_CATEGORY` 1 dans le SRVB, ou
+`rapt generate . binding ZAPI_TRAVEL_O4 --for ZUI_TRAVEL --binding-type webapi`) n'a ni UI ni
+annotations d'UI ; un BO draft n'y expose que ses instances actives ([D60](DECISIONS.md)).
+
+En développement, `rapt dev` sert un serveur OAuth 2.0 sous `/oauth` :
+
+```sh
+# client credentials (machine à machine)
+curl -u rapt-client:rapt-secret -d grant_type=client_credentials http://localhost:8080/oauth/token
+curl -H "Authorization: Bearer <access_token>" http://localhost:8080/sap/opu/odata4/…/Travel
+
+# authorization code + PKCE (Postman, Bruno…) : client rapt-pkce, sans secret
+#   Auth URL  http://localhost:8080/oauth/authorize   Token URL  http://localhost:8080/oauth/token
+#   Code challenge method SHA-256 ; la page de connexion demande l'utilisateur et ses rôles
+```
+
+En production (`AUTH_MODE=oidc`), les jetons viennent de l'IdP, par l'un ou l'autre flux ; un
+jeton *client credentials* agit au nom de son client (utilisateur technique), avec les rôles du
+jeton (`OIDC_ROLES_CLAIM=scope` pour lire les scopes).
 
 ## 13. Pour un agent IA qui écrit un BO
 

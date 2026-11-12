@@ -108,6 +108,7 @@ Le code de retour est 1 dès qu'il y a une erreur (ou un avertissement avec
 | NR001 | erreur | `rapt/number-ranges.json` illisible ou mal formé : objet de plus de 10 caractères, intervalle de plus de 2 caractères, bornes non numériques ou inversées |
 | CFG001 | erreur | `rapt/config.json` illisible, ou mode inconnu (`standard` ou `enhanced`), dans le fichier ou `--mode` (D45) |
 | CFG002 | avertissement | Réglage inconnu dans `rapt/config.json`, ignoré |
+| SRVD008 | erreur | `--binding-type` autre que `ui` ou `webapi` (D60) |
 | CFG003 | erreur | `ui` de `rapt/config.json` mal formé : floorplan inconnu, carte de l'Overview Page incomplète, entity set absent du service (D53) |
 | MCP001 | erreur | `rapt/mcp.json` illisible ou mal formé (D47) |
 | MCP002 | avertissement | `rapt/mcp.json` décrit un outil que le service n'a plus : relancer `rapt mcp` |

@@ -13,6 +13,8 @@ export interface ServiceOptions {
   binding?: string;
   /** Service root path; default: the RAP OData V4 path of the binding (decision D6). */
   path?: string;
+  /** Binding type: ui or webapi, overriding the BINDING_TYPE_CATEGORY of the SRVB (D60). */
+  bindingType?: string;
 }
 
 export interface ServiceSelection {
@@ -80,6 +82,13 @@ export function selectService(project: Project, options: ServiceOptions, diagnos
     entitySets: chosen.ast.exposes.map((e) => ({ name: e.alias ?? e.entity, entity: e.entity })),
     annotations: chosen.ast.annotations,
   };
+  // OData V4 - Web API (D60): no UI information in the service
+  const bindingType = options.bindingType?.toLowerCase();
+  if (bindingType !== undefined && bindingType !== "ui" && bindingType !== "webapi") {
+    diagnostics.error("SRVD008", `--binding-type ${options.bindingType ?? ""}: ui or webapi`);
+  } else if (bindingType === "webapi" || (bindingType === undefined && binding?.xml.bindingCategory === "1")) {
+    service.webApi = true;
+  }
   const names = new Set<string>();
   for (const set of service.entitySets) {
     if (names.has(set.name.toUpperCase())) {

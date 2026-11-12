@@ -1187,3 +1187,30 @@ et la conséquence. Les numéros D1 à D13 correspondent aux points 1 à 13 du �
   les clients OData s'y retrouvent ; le rafraîchissement périodique remplace les WebSockets
   (ABAP Channels) de SAP.
 - **Tests** : `runtime/test/draft-collaborative.test.ts` (OData, navigateur, BDEF029).
+
+## D60 — API Web : binding OData V4 - Web API, OAuth 2.0 (client credentials, PKCE)
+
+- **Contexte** : un service RAP s'expose aussi en API pour d'autres systèmes (binding *OData V4 -
+  Web API*). Les appelants s'authentifient par OAuth 2.0 : *client credentials* (machine à
+  machine) ou *authorization code* avec PKCE (application au nom d'un utilisateur).
+- **Décision** :
+  - **Binding** : `BINDING_TYPE_CATEGORY` 1 du SRVB, ou `--binding-type webapi`, ou
+    `rapt generate binding … --binding-type webapi`. Comme SAP : pas d'annotation `UI.*`, ni value
+    help, ni side effects, ni feature control (`__EntityControl`…) dans le service (les contrôles
+    restent appliqués par le runtime) ; pas d'UI générée ; un BO draft n'expose que ses instances
+    actives (écritures directes, sans `IsActiveEntity`).
+  - **Production** (`AUTH_MODE=oidc`) : le service accepte les jetons de l'IdP (Keycloak, SAP Cloud
+    Identity Services, Entra ID…) obtenus par l'un ou l'autre flux ; un jeton *client credentials*
+    sans `preferred_username` désigne son client (`client_id`) comme utilisateur technique ; ses
+    rôles peuvent venir de `scope` (`OIDC_ROLES_CLAIM=scope`). Les sessions du navigateur
+    utilisaient déjà le flux PKCE.
+  - **Développement** : `rapt dev` (et une application démarrée avec `AUTH_MODE=none` et
+    `DEV_OAUTH=on`) sert un serveur d'autorisation de développement sous `/oauth` : découverte
+    OIDC, JWKS, `/oauth/token` (`client_credentials` avec `rapt-client` / `rapt-secret`,
+    `authorization_code` avec vérification PKCE S256), `/oauth/authorize` (page de choix de
+    l'utilisateur et de ses rôles) ; clients configurables (`DEV_OAUTH_CLIENTS`). Ses jetons
+    (RS256, clé générée au démarrage) donnent un utilisateur de développement.
+- **Pourquoi** : tester une API exactement comme ses clients l'appelleront (Postman, Bruno, un
+  autre système) sans installer d'IdP ; en production, l'IdP reste la seule source de jetons.
+- **Tests** : `runtime/test/web-api.test.ts` (binding, client credentials, PKCE),
+  `runtime/test/auth.test.ts` (jeton de client).

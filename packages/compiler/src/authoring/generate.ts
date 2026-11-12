@@ -48,6 +48,8 @@ export interface GenerateObjectOptions {
   expose?: string[];
   /** View entity: `define root view entity`. */
   root?: boolean;
+  /** Binding: ui (default) or webapi (D60). */
+  bindingType?: string;
   description?: string;
 }
 
@@ -469,7 +471,7 @@ ${exposed.map((e) => `  expose ${e} as ${aliasOf(e)};`).join("\n")}
 `;
 }
 
-function bindingSource(name: string, service: string, description: string): string {
+function bindingSource(name: string, service: string, description: string, webApi = false): string {
   const services = `    <SERVICES>
      <item>
       <NAME>${name.toUpperCase()}</NAME>
@@ -490,7 +492,7 @@ function bindingSource(name: string, service: string, description: string): stri
       ["LANGUAGE", "EN"],
       ["BINDING_TYPE", "ODATA"],
       ["BINDING_TYPE_VERSION", "V4"],
-      ["BINDING_TYPE_CATEGORY", "0"],
+      ["BINDING_TYPE_CATEGORY", webApi ? "1" : "0"],
     ],
     3,
   );
@@ -614,7 +616,9 @@ export function generateObject(dir: string, kind: string, name: string, options:
       if (service === undefined) {
         return { written: [], error: "rapt generate binding needs the service definition: --for <SRVD>" };
       }
-      files.push([`${lower}.srvb.xml`, bindingSource(name, service, `${description} (OData V4, UI)`)]);
+      // --binding-type webapi: OData V4 - Web API (D60)
+      const webApi = options.bindingType?.toLowerCase() === "webapi";
+      files.push([`${lower}.srvb.xml`, bindingSource(name, service, `${description} (OData V4, ${webApi ? "Web API" : "UI"})`, webApi)]);
       break;
     }
   }

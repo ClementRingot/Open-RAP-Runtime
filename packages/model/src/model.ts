@@ -165,6 +165,8 @@ export interface ServiceModel {
   namespace: string;
   /** Path of the service root, with a trailing slash. */
   path: string;
+  /** OData V4 - Web API binding (D60): no UI annotations, value helps, side effects nor feature control in the service; no draft. */
+  webApi?: true;
   entitySets: EntitySetModel[];
   annotations: Annotations;
 }

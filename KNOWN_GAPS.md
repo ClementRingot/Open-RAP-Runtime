@@ -172,6 +172,14 @@ Versions de référence : `@abaplint/core` 2.120.98, `@abaplint/transpiler` 2.14
 | Overview Page | Cartes `kpi`, `list`, `table`, `chart` décrites dans `rapt/config.json` (pas d'annotations `@UI.dataPoint` / `@UI.kpi`), sans filtre global. |
 | Graphiques | Contrôle SVG propre : colonnes, barres, lignes, secteurs, anneau ; pas de zoom, d'infobulle riche ni d'export. |
 
+## API Web et OAuth 2.0 (D60)
+
+| Écart | Statut |
+|---|---|
+| Serveur OAuth de développement | Développement seulement : pas de refresh token, ni de consentement, ni de révocation ; clé de signature régénérée à chaque démarrage. |
+| Web API d'un BO draft | Instances actives seulement (le draft n'est pas exposé). |
+| OData V2 | Non pris en charge : le service généré est toujours OData V4 (SRVD003). |
+
 ## Mode enhanced (D45)
 
 | Écart | Statut |

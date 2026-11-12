@@ -117,7 +117,9 @@ export function buildModel(project: Project, options: BuildOptions = {}): BuildR
   // ----------------------------------------------------------------- entities, from the service
   const required = new Map<string, EntityModel>();
   const queue: string[] = [];
-  addValueHelps(service, entities, diagnostics);
+  if (service.webApi !== true) {
+    addValueHelps(service, entities, diagnostics); // a Web API has no value helps (D60)
+  }
   const exposed = new Set(service.entitySets.map((s) => s.entity.toUpperCase()));
   for (const set of service.entitySets) {
     const expose = selection.ast.exposes.find((e) => same(e.entity, set.entity));
@@ -322,7 +324,9 @@ export function buildModel(project: Project, options: BuildOptions = {}): BuildR
     model.enumTypes = enumTypes.sort((a, b) => a.name.localeCompare(b.name));
   }
   checkExposedTypes(model, diagnostics);
-  applyDraft(model, diagnostics);
+  if (model.service.webApi !== true) {
+    applyDraft(model, diagnostics); // a Web API exposes the active instances only (D60)
+  }
   // access controls (DCL) of the exposed entities (D35)
   const accessControls = loadAccessControls(project, model, authorizations, diagnostics);
   if (accessControls.length > 0) {

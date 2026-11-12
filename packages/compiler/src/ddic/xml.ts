@@ -198,6 +198,8 @@ export interface SrvbXml {
   version?: string;
   bindingType?: string;
   bindingVersion?: string;
+  /** BINDING_TYPE_CATEGORY: 0 UI, 1 Web API (D60). */
+  bindingCategory?: string;
 }
 
 /** Tolerant reader: looks for the binding facts wherever the serialization puts them. */
@@ -231,6 +233,8 @@ export function readSrvbXml(xml: string): SrvbXml {
   if (bindingType !== undefined) result.bindingType = bindingType;
   const bindingVersion = find(doc, "BINDING_TYPE_VERSION");
   if (bindingVersion !== undefined) result.bindingVersion = bindingVersion;
+  const bindingCategory = find(doc, "BINDING_TYPE_CATEGORY");
+  if (bindingCategory !== undefined) result.bindingCategory = bindingCategory;
   // ADT serializations: srvb:version="0001", adtcore:name="ZUI_X" in the service definition reference
   if (result.version === undefined) {
     const m = /srvb:version="(\d{1,4})"/.exec(xml);
