@@ -14,15 +14,21 @@ et en affiche les résultats.
 - **RAP : Lancer rapt dev** : l'application tourne avec une base PGlite et se reconstruit à
   chaque enregistrement. La barre d'état indique l'état (construction, prête, erreurs) et ouvre
   l'application d'un clic.
-- **RAP : Générer l'application** : `rapt build` dans le dossier de son choix.
-- **RAP : Nouveau business object** : `rapt new` demande le nom de l'entité, le préfixe et la
+- **RAP : Générer l'application…** : `rapt build` dans le dossier de son choix, après avoir
+  choisi le floorplan de chaque entité racine (List Report, Worklist, Analytical List Page, Form
+  Entry) s'il ne l'a pas encore été ; *RAP : Lancer rapt dev* le demande aussi.
+- **RAP : Nouveau business object complet…** : `rapt new` demande le nom de l'entité, le préfixe et la
   description, écrit un BO managed complet (table en source `.tabl.astabl`, CDS, BDEF, behavior
   pool, service, données initiales `rapt/seed.json`) avec ses fichiers abapGit, puis propose de
-  lancer `rapt dev`.
+  lancer `rapt dev`. Possible dans un dossier vide.
+- **RAP : Nouvel objet RAP…** : créer objet par objet (table, vue, projection, BDEF, behavior
+  pool, service, binding…) avec l'assistant, comme *New ABAP Repository Object* d'ADT.
 - **RAP : Générer les fichiers abapGit** : `rapt abapgit` écrit les XML qui manquent (dont ceux
   des tables écrites en source) pour importer le dépôt dans un système SAP avec abapGit.
-- Menus contextuels de l'explorateur (dossier du projet, `.abapgit.xml`) et boutons dans la
-  barre de titre des sources RAP.
+- Menus contextuels de l'explorateur (dossier du projet, `.abapgit.xml`) en trois groupes
+  (créer, projet, application), boutons dans la barre de titre des sources RAP. Les commandes
+  pas encore possibles sont grisées : hors d'un projet, seul *Nouveau business object complet…*
+  est actif ; *Floorplan*, *rapt dev* et *Générer l'application* attendent une service definition.
 
 Un projet est un dossier abapGit : le dossier qui contient `.abapgit.xml` (à défaut, le parent
 d'un dossier `src`).

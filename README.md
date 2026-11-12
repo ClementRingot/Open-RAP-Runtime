@@ -27,7 +27,8 @@ propriétaire ([LICENSES.md](LICENSES.md)).
 ## Démarrer en deux minutes
 
 **Dans VS Code** : installer l'extension `rap-transpiler-vscode.vsix` (elle contient tout), puis
-*RAP : Nouveau business object* et *RAP : Lancer rapt dev*. Le navigateur s'ouvre sur le
+*RAP : Nouveau business object complet…* et *RAP : Lancer rapt dev* (qui demande le floorplan).
+Le navigateur s'ouvre sur le
 launchpad de développement.
 
 **En ligne de commande** (Node.js 22, depuis un clone : `pnpm install && pnpm build`, puis

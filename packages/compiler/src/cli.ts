@@ -284,11 +284,12 @@ function floorplanCommand(source: string, set: string | undefined, floorplan: st
     return 0;
   }
   const current = readFloorplans(root);
-  const result = { command: "floorplan", ok: true, root, sets: sets.map((s) => ({ set: s, floorplan: current[s] ?? "listReport" })), floorplans: FLOORPLAN_CATALOG };
+  // chosen: written in rapt/config.json, else the default (the extension asks before building, D63)
+  const result = { command: "floorplan", ok: true, root, sets: sets.map((s) => ({ set: s, floorplan: current[s] ?? "listReport", chosen: current[s] !== undefined })), floorplans: FLOORPLAN_CATALOG };
   if (json) {
     process.stdout.write(`${JSON.stringify(result)}\n`);
   } else {
-    for (const s of result.sets) process.stdout.write(`${s.set.padEnd(24)}${s.floorplan}\n`);
+    for (const s of result.sets) process.stdout.write(`${s.set.padEnd(24)}${s.floorplan}${s.chosen ? "" : " (default, not chosen)"}\n`);
     process.stdout.write(`\nFloorplans:\n${FLOORPLAN_CATALOG.map((f) => `  ${f.floorplan.padEnd(20)}${f.label}: ${f.description}`).join("\n")}\n`);
   }
   return 0;

@@ -133,27 +133,18 @@ export function readFloorplans(dir: string): Record<string, string> {
   return { ...(config.ui?.floorplans ?? {}) };
 }
 
-/** Sets the floorplan of an entity set in rapt/config.json, keeping the rest of the file. */
+/**
+ * Sets the floorplan of an entity set in rapt/config.json, keeping the rest of the file. The
+ * default (listReport) is written too: it records that the floorplan was chosen (D63).
+ */
 export function writeFloorplan(dir: string, set: string, floorplan: FloorplanName): string {
   const file = path.join(dir, "rapt", "config.json");
   const config = existsSync(file) ? (JSON.parse(readFileSync(file, "utf8")) as Record<string, unknown>) : {};
   const ui = typeof config["ui"] === "object" && config["ui"] !== null ? (config["ui"] as Record<string, unknown>) : {};
   const floorplans = typeof ui["floorplans"] === "object" && ui["floorplans"] !== null ? (ui["floorplans"] as Record<string, string>) : {};
-  if (floorplan === "listReport") {
-    delete floorplans[set];
-  } else {
-    floorplans[set] = floorplan;
-  }
-  if (Object.keys(floorplans).length > 0) {
-    ui["floorplans"] = floorplans;
-  } else {
-    delete ui["floorplans"];
-  }
-  if (Object.keys(ui).length > 0) {
-    config["ui"] = ui;
-  } else {
-    delete config["ui"];
-  }
+  floorplans[set] = floorplan;
+  ui["floorplans"] = floorplans;
+  config["ui"] = ui;
   mkdirSync(path.dirname(file), { recursive: true });
   writeFileSync(file, `${JSON.stringify(config, null, 2)}\n`);
   return path.relative(dir, file).split(path.sep).join("/");

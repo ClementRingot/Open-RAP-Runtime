@@ -236,7 +236,7 @@ ajoutent ce que la fixture n'utilise pas : numérotation, feature control global
 | Champs en lecture seule, obligatoires, modifiables à la création seulement | ✅ | Depuis les caractéristiques de champ de la BDEF. |
 | Messages (erreurs, succès) | ✅ | `MessageBox`, `MessageToast`, `MessagePopover`. |
 | Boutons selon les autorisations de l'utilisateur | ✅ | Create masqué sans autorisation globale de création (`$permissions`) ; Edit, Delete, actions et création d'enfants désactivés par instance (`__EntityControl`, `__OperationControl`, D36). Test `ui-authorizations.test.ts`. |
-| Floorplans Worklist, Analytical List Page, Overview Page, Form entry | ✅ | `ui` de `rapt/config.json`, écrit par `rapt floorplan` ou la commande VS Code (D61) ; graphiques `@UI.chart` en SVG, onglets `@UI.selectionVariant` (D53). |
+| Floorplans Worklist, Analytical List Page, Overview Page, Form entry | ✅ | `ui` de `rapt/config.json`, écrit par `rapt floorplan` ou la commande VS Code (D61), qui le demande avant de générer l'application (D63) ; graphiques `@UI.chart` en SVG, onglets `@UI.selectionVariant` (D53). |
 | Draft dans l'UI : création et édition en brouillon, enregistrement des champs, Save / Discard, état d'édition dans la liste | ✅ | D54 ; comme Fiori Elements : filtre *Editing Status*, brouillon de l'utilisateur à la place de l'instance active, *Locked by X*, `DraftIndicator`, *Keep Draft* / *Discard Draft* (D58). |
 | Collaborative draft (`with collaborative draft`, `draft action Share`) | ✅ | Utilisateurs du brouillon, invitation, rejoindre par Edit, rafraîchissement toutes les 5 s (D59). |
 | Valeurs d'un type énuméré : libellés, liste de choix en édition et en filtre | ✅ | Mode `enhanced` (D55). |

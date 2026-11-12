@@ -263,6 +263,46 @@ export function findProjectRoot(file: string, stop?: string, exists: (p: string)
   }
 }
 
+export interface MenuContext {
+  /** The roots of the RAP projects, their folders and their .abapgit.xml: the project commands apply. */
+  projects: Record<string, true>;
+  /** The same for the projects with a service definition: the application commands apply. */
+  apps: Record<string, true>;
+}
+
+/**
+ * The context keys that enable the commands of the explorer menu (`resourcePath in rapt.projects`),
+ * from the .abapgit.xml and ABAP source files of the workspace: a folder gets the project commands
+ * once it is in a project, the application ones (floorplan, build, dev) once a service is defined.
+ */
+export function menuContext(files: string[]): MenuContext {
+  const descriptors = new Set(files.filter((f) => path.basename(f) === ".abapgit.xml").map((f) => path.resolve(f)));
+  const projects: Record<string, true> = {};
+  const apps: Record<string, true> = {};
+  const folders = new Map<string, Set<string>>();
+  for (const file of files) {
+    const resolved = path.resolve(file);
+    const root = descriptors.has(resolved) ? path.dirname(resolved) : findProjectRoot(resolved, undefined, (p) => descriptors.has(p));
+    if (root === undefined) continue;
+    const own = folders.get(root) ?? new Set([root, path.join(root, ".abapgit.xml")]);
+    folders.set(root, own);
+    for (let dir = path.dirname(resolved); dir.startsWith(root) && dir !== root; dir = path.dirname(dir)) own.add(dir);
+    if (resolved.endsWith(".srvd.srvdsrv")) apps[root] = true;
+  }
+  for (const [root, own] of folders) {
+    for (const folder of own) {
+      projects[folder] = true;
+      if (apps[root] === true) apps[folder] = true;
+    }
+  }
+  return { projects, apps };
+}
+
+/** The root entity sets whose floorplan was never chosen (`rapt floorplan --json`). */
+export function unchosenFloorplans(sets: Array<{ set: string; chosen?: boolean }>): string[] {
+  return sets.filter((s) => s.chosen !== true).map((s) => s.set);
+}
+
 /**
  * The CLI: the configured path (a cli.js, or a folder of rap-transpiler), else the rapt embedded
  * in the extension, else the compiler of a rap-transpiler clone or of node_modules in a

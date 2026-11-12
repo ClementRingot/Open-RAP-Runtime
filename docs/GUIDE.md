@@ -35,18 +35,24 @@ d'autre à installer), puis dans la palette de commandes (`Ctrl+Shift+P`) :
 
 | Commande | Effet |
 |---|---|
-| *RAP : Nouveau business object* | `rapt new` : un BO managed complet, avec données initiales |
-| *RAP : Nouvel objet RAP (assistant)…* | l'assistant de création, comme *New ABAP Repository Object* d'ADT : les types par catégorie (Dictionary, Core Data Services, Behavior, Business Services, Source Code Library), un filtre, une description, les champs du type (objet source, entités exposées, type de binding…) |
-| *RAP : Nouvel objet RAP…* | `rapt generate` en listes rapides : une table, une vue, une BDEF, un behavior pool… |
-| *RAP : Choisir le floorplan de l'application* | `rapt floorplan` : List Report, Worklist, Analytical List Page ou Form Entry, avec ce que chacun demande |
+| *RAP : Nouveau business object complet…* | `rapt new` : un BO managed complet (table, CDS, BDEF, behavior pool, service, binding), avec données initiales ; possible dans un dossier vide |
+| *RAP : Nouvel objet RAP…* | créer objet par objet avec l'assistant, comme *New ABAP Repository Object* d'ADT : les types par catégorie (Dictionary, Core Data Services, Behavior, Business Services, Source Code Library), un filtre, une description, les champs du type (objet source, entités exposées, type de binding…) |
+| *RAP : Choisir le floorplan de l'application…* | `rapt floorplan` : List Report, Worklist, Analytical List Page ou Form Entry, avec ce que chacun demande ; demandé de toute façon avant la première génération |
 | *RAP : Afficher la représentation intermédiaire* | `rapt ir` : le modèle (`model.json`) dans un éditeur |
 | *RAP : Générer un launchpad* | `rapt launchpad` : le launchpad de plusieurs applications |
 | *RAP : Lancer rapt dev* | construit, lance et ouvre le launchpad de développement ; relance à chaque enregistrement |
 | *RAP : Vérifier le BO* | `rapt check` : diagnostics dans l'onglet Problèmes (aussi à chaque enregistrement) |
-| *RAP : Générer l'application* | `rapt build` : l'application déployable |
+| *RAP : Générer l'application…* | `rapt build` : l'application déployable |
 | *RAP : Générer les fichiers abapGit* | `rapt abapgit` : les XML qui manquent pour l'import dans SAP |
 | *RAP : Générer le serveur MCP du service* | `rapt mcp` : les outils pour les agents IA |
 | *RAP : Choisir le mode du projet* | `standard` ou `enhanced` (`rapt/config.json`) |
+
+Le clic droit sur un dossier de l'explorateur range ces commandes en trois groupes : **créer**
+(BO complet, objet par objet), **projet** (vérifier, abapGit), **application** (floorplan, rapt
+dev, générer). Une commande est grisée tant qu'elle n'est pas possible : les commandes du projet
+hors d'un projet abapGit, celles de l'application tant que le projet n'a pas de service
+definition. Avant de générer ou de lancer l'application, le floorplan de chaque entité racine
+doit avoir été choisi : l'extension le demande s'il ne l'a pas été ([D63](DECISIONS.md)).
 
 La vue **Objets RAP** de l'explorateur range les objets du projet comme l'explorateur de projet
 d'ADT (dictionnaire, data definitions, metadata extensions, access controls, behavior
@@ -276,10 +282,12 @@ complète, annotation par annotation : [ANNOTATIONS.md](ANNOTATIONS.md).
 - **Draft** : Create et Edit ouvrent un brouillon, chaque champ y est enregistré, Save active,
   Cancel abandonne ; la liste montre les instances en cours d'édition.
 
-**Floorplans** ([D53](DECISIONS.md)) : le List Report est le défaut. Pour en choisir un autre :
-*RAP : Choisir le floorplan de l'application* dans VS Code (chaque floorplan est décrit avec les
-annotations qu'il lit), ou `rapt floorplan . Travel worklist` ; sans arguments, `rapt floorplan .`
-liste les entity sets et leur floorplan. Les deux écrivent `rapt/config.json` :
+**Floorplans** ([D53](DECISIONS.md)) : le List Report est le défaut en ligne de commande. Pour
+en choisir un : *RAP : Choisir le floorplan de l'application…* dans VS Code (chaque floorplan est
+décrit avec les annotations qu'il lit ; l'extension le demande aussi avant de générer ou de
+lancer une application dont le floorplan n'a pas été choisi), ou `rapt floorplan . Travel worklist` ;
+sans arguments, `rapt floorplan .` liste les entity sets, leur floorplan et s'il a été choisi.
+Les deux écrivent `rapt/config.json` (le List Report aussi, une fois choisi) :
 
 ```json
 {

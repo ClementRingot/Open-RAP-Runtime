@@ -1248,3 +1248,33 @@ et la conséquence. Les numéros D1 à D13 correspondent aux points 1 à 13 du �
   configurés). À activer une fois : *Settings → Pages → Source : GitHub Actions*.
 - **Pourquoi** : une adresse à partager, toujours à jour, sans serveur à maintenir.
 - **Tests** : rendu vérifié dans Chromium (bureau, mobile sans défilement horizontal, mode sombre).
+
+## D63 — Menus de l'extension : deux façons de créer, commandes grisées, floorplan obligatoire
+
+- **Contexte** : le clic droit de l'explorateur montrait trois entrées de création (*Nouveau
+  business object*, *Nouvel objet RAP (assistant)…*, *Nouvel objet RAP… (table, vue…)*), toutes
+  les commandes étaient actives même hors d'un projet, et l'application se générait en List
+  Report sans que le floorplan ait été choisi.
+- **Décision** :
+  - **Créer** : deux entrées. *Nouveau business object complet…* (`rapt new`, possible dans un
+    dossier vide) construit tout le BO ; *Nouvel objet RAP…* (l'assistant, D61) crée objet par
+    objet. Les listes rapides de D46 (`rapt.generate`) restent une commande, hors des menus et
+    de la palette.
+  - **Groupes** du menu : créer, projet (vérifier, abapGit), application (floorplan, rapt dev,
+    générer) ; la vue *Objets RAP* propose les mêmes sur un projet, et un bouton *Nouveau
+    business object complet* quand l'espace de travail n'a pas de projet.
+  - **Grisé** : l'extension calcule les dossiers des projets (`rapt.projects`) et ceux des
+    projets qui ont une service definition (`rapt.apps`) à partir des sources de l'espace de
+    travail, mis à jour quand un fichier est créé ou supprimé. Les commandes ont un
+    `enablement` : `resourcePath in rapt.projects` (ou `rapt.apps`) dans l'explorateur, un
+    projet (ou un service) dans l'espace de travail ailleurs ; *Arrêter* et *Ouvrir l'application*
+    quand rapt dev tourne.
+  - **Floorplan obligatoire** : *Générer l'application…* et *Lancer rapt dev* demandent le
+    floorplan de chaque entity set racine qui n'en a pas ; annuler n'écrit rien et ne génère pas.
+    `rapt floorplan --json` indique `chosen` par entity set, et `rapt floorplan . Set listReport`
+    écrit le List Report dans `rapt/config.json` (au lieu de l'effacer) pour garder le choix. La
+    CLI garde le List Report par défaut.
+- **Pourquoi** : une seule façon de faire chaque geste, une commande impossible ne s'offre pas,
+  et le floorplan est un choix de conception de l'application, pas un défaut subi.
+- **Tests** : `vscode/test/rapt.test.ts` (dossiers des projets et des applications,
+  `chosen`, List Report conservé).
