@@ -73,8 +73,8 @@ Options:
   --warnings-as-errors
   -h, --help
 
-Documentation: https://clementringot.github.io/RAP-Transpiler/docs/
-Report a bug or request a feature: https://clementringot.github.io/RAP-Transpiler/feedback.html
+Documentation: https://clementringot.github.io/Open-Rap-Runtime/docs/
+Report a bug or request a feature: https://clementringot.github.io/Open-Rap-Runtime/feedback.html
 `;
 
 function report(diagnostics: Diagnostics): void {

@@ -135,7 +135,7 @@ describe("tiles of the roles of the user", () => {
     expect(view.groups.map((g) => g.title)).toEqual(["Travel Management", "Help"]);
     expect(view.groups[0]?.tiles[0]).toEqual({ id: "travel-manage", title: "Manage Travels", subtitle: "Travels and bookings", icon: "sap-icon://flight", intent: "Travel-manage", target: "/apps/travel/ui/index.html", external: false, count: `${SERVICE}Travel/$count` });
     expect(view.groups[0]?.tiles[1]?.["count"]).toBe(`${SERVICE}Travel/$count?$filter=OverallStatus%20eq%20'O'`);
-    expect(view.groups[1]?.tiles[0]).toMatchObject({ target: "https://clementringot.github.io/RAP-Transpiler", external: true });
+    expect(view.groups[1]?.tiles[0]).toMatchObject({ target: "https://clementringot.github.io/Open-Rap-Runtime", external: true });
   });
 });
 

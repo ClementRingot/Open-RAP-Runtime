@@ -1,8 +1,11 @@
 name: Site
 
 # The website of the project (site/) on GitHub Pages, with the documentation rendered from docs/
-# (scripts/build-site.mjs, D63) and the VS Code extension built from the same commit: the
-# "Download" button serves open-rap-runtime-vscode.vsix from the site itself.
+# (scripts/build-site.mjs, D63) and the VS Code extension of the latest GitHub release: the
+# "Download" button serves open-rap-runtime-vscode.vsix from the site itself, with its version on
+# the page. The Release workflow runs this one once the release exists (a release created by the
+# GITHUB_TOKEN does not trigger the release event); without a release, the .vsix is built from
+# the commit.
 # Enable it once in the repository: Settings → Pages → Source: GitHub Actions.
 on:
   push:
@@ -33,12 +36,28 @@ jobs:
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - run: pnpm build
-      - name: VS Code extension (.vsix)
-        run: pnpm --filter open-rap-runtime-vscode run package
+      - name: VS Code extension (.vsix) of the latest release
+        id: vsix
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          mkdir -p vsix
+          tag=$(gh release view --repo "$GITHUB_REPOSITORY" --json tagName --jq .tagName 2>/dev/null || true)
+          if [ -n "$tag" ] && gh release download "$tag" --repo "$GITHUB_REPOSITORY" --pattern '*.vsix' --dir vsix; then
+            cp vsix/*.vsix vsix/open-rap-runtime-vscode.vsix.tmp
+            echo "version=${tag#v}" >> "$GITHUB_OUTPUT"
+          else
+            echo "no release with a .vsix: built from the commit"
+            pnpm --filter open-rap-runtime-vscode run package
+            cp packages/vscode/open-rap-runtime-vscode.vsix vsix/open-rap-runtime-vscode.vsix.tmp
+            echo "version=$(node -p "require('./packages/vscode/package.json').version")" >> "$GITHUB_OUTPUT"
+          fi
       - name: Site with the documentation, the screenshots and the extension
+        env:
+          VSIX_VERSION: ${{ steps.vsix.outputs.version }}
         run: |
           node scripts/build-site.mjs _site
-          cp packages/vscode/open-rap-runtime-vscode.vsix _site/
+          cp vsix/open-rap-runtime-vscode.vsix.tmp _site/open-rap-runtime-vscode.vsix
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
         with:

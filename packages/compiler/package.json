@@ -1,10 +1,10 @@
 {
   "name": "@open-rap/compiler",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Compiles SAP RAP sources (abapGit format) into a standalone Node.js OData V4 application.",
   "type": "module",
   "license": "MIT",
-  "homepage": "https://clementringot.github.io/RAP-Transpiler/",
+  "homepage": "https://clementringot.github.io/Open-Rap-Runtime/",
   "keywords": [
     "sap",
     "rap",

@@ -93,6 +93,7 @@ pre { background: var(--code-bg); color: var(--code-text); padding: 16px 18px; b
 
 .download { text-align: center; }
 .download .section-lead { margin-left: auto; margin-right: auto; }
+.download .version-note { text-align: center; color: var(--muted); margin: 0.75rem 0 0; font-size: 0.95rem; }
 .install { max-width: 36rem; margin: 24px auto 0; text-align: left; background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 18px 22px; }
 .install h3 { margin-top: 0; }
 

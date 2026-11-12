@@ -27,6 +27,6 @@ tools `rapt_check`, `rapt_generate`, `rapt_new_business_object`, `rapt_floorplan
 `rapt_abapgit`, `rapt_docs_search` and `rapt_docs_read`. In VS Code, the Open RAP Runtime extension
 contains rapt and registers this server by itself.
 
-Documentation and VS Code extension: https://clementringot.github.io/RAP-Transpiler/
+Documentation and VS Code extension: https://clementringot.github.io/Open-Rap-Runtime/
 
 MIT license. Not affiliated with SAP SE; SAP, ABAP and Fiori are trademarks of SAP SE.

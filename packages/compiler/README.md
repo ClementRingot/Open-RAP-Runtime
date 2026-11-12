@@ -1,6 +1,6 @@
 # @open-rap/compiler
 
-The compiler of [Open RAP Runtime](https://clementringot.github.io/RAP-Transpiler/): CDS, BDEF,
+The compiler of [Open RAP Runtime](https://clementringot.github.io/Open-Rap-Runtime/): CDS, BDEF,
 SRVD and DCL parsers, intermediate representation, generators (SQL, OData V4 `$metadata`,
 transpiled ABAP, OpenUI5 UI) and the command line.
 

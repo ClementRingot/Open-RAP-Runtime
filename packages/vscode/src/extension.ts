@@ -8,6 +8,8 @@ import { chmodSync, existsSync, mkdirSync, readFileSync, writeFileSync } from "n
 import path from "node:path";
 import * as vscode from "vscode";
 import {
+  appLabel,
+  appRoots,
   diagnosticPath,
   DevProcess,
   findProjectRoot,
@@ -179,6 +181,17 @@ async function check(root: string, quiet = false): Promise<void> {
   }
 }
 
+/** The applications of the workspace (projects with a service definition), the current one included. */
+async function workspaceApps(current?: string): Promise<string[]> {
+  const files = await vscode.workspace.findFiles(SOURCE_FILES, EXCLUDE);
+  const roots = appRoots(files.map((f) => f.fsPath));
+  return current === undefined || roots.some((r) => path.resolve(r) === path.resolve(current)) ? roots : [current, ...roots];
+}
+
+function appName(root: string): string {
+  return appLabel(root, (vscode.workspace.workspaceFolders ?? []).map((f) => ({ name: f.name, path: f.uri.fsPath })));
+}
+
 function cliFailed(error: Error): void {
   output.appendLine(error.message);
   void vscode.window.showErrorMessage(`RAP: ${error.message.split("\n")[0]}`, "Settings", "Log").then((action) => {
@@ -194,10 +207,18 @@ function cliFailed(error: Error): void {
 async function build(root: string): Promise<void> {
   const file = launchpadFile();
   if (file !== undefined) {
+    // the launchpad gathers every application of the workspace; only a standalone build leaves it out (D72)
+    const apps = await workspaceApps(root);
+    const names = apps.map(appName);
     const mode = await vscode.window.showQuickPick(
       [
-        { label: "Launchpad (all the applications)", description: path.basename(path.dirname(file)), detail: `rapt launchpad ${file}: the launchpad and each application of the workspace, a single origin (SSO)`, launchpad: true },
-        { label: "Application alone (standalone)", description: path.basename(root), detail: `rapt build: ${path.basename(root)} without a launchpad`, launchpad: false },
+        {
+          label: `Launchpad of the workspace (${apps.length} application${apps.length === 1 ? "" : "s"})`,
+          description: names.join(", "),
+          detail: `rapt launchpad ${file}: the launchpad and each application of the workspace, a single origin (SSO)`,
+          launchpad: true,
+        },
+        { label: `${appName(root)} alone (standalone)`, description: "without a launchpad", detail: `rapt build ${root}`, launchpad: false },
       ],
       { title: "RAP: build for deployment", placeHolder: "What to deploy?", ignoreFocusOut: true },
     );
@@ -205,16 +226,9 @@ async function build(root: string): Promise<void> {
       return;
     }
     if (mode.launchpad) {
-      if (!(await ensureFloorplans(root))) {
-        return;
+      if (await gatherApps(file, apps)) {
+        await buildLaunchpad(file, apps);
       }
-      try {
-        notifyLaunchpad(await runJson<LaunchpadAddResult>(cli(), ["launchpad", "add", root, "--launchpad", file], root));
-      } catch (e) {
-        cliFailed(e as Error);
-        return;
-      }
-      await buildLaunchpad(file);
       return;
     }
   }
@@ -226,22 +240,27 @@ async function build(root: string): Promise<void> {
   if (chosen === undefined) {
     return;
   }
-  await vscode.window.withProgress({ location: vscode.ProgressLocation.Notification, title: "RAP: generating the application" }, async () => {
+  // the progress ends with the command: the message of the result is shown after it, not awaited inside it
+  // (an unanswered message would keep the progress spinning)
+  const result = await vscode.window.withProgress({ location: vscode.ProgressLocation.Notification, title: `RAP: generating ${appName(root)}` }, async () => {
     try {
-      const result = await runJson(cli(), ["build", root, "--out", chosen], root);
-      publish(root, result.diagnostics);
-      if (result.ok) {
-        const action = await vscode.window.showInformationMessage(`RAP: ${result.files ?? 0} files written to ${result.out ?? chosen}`, "Open folder");
-        if (action !== undefined) {
-          void vscode.commands.executeCommand("revealFileInOS", vscode.Uri.file(path.join(result.out ?? chosen, "package.json")));
-        }
-      } else {
-        void vscode.window.showErrorMessage(`RAP: generation failed, ${summary(result.counts)}`);
-      }
+      return await runJson(cli(), ["build", root, "--out", chosen], root);
     } catch (e) {
       cliFailed(e as Error);
+      return undefined;
     }
   });
+  if (result === undefined) return;
+  publish(root, result.diagnostics);
+  if (result.ok) {
+    void vscode.window.showInformationMessage(`RAP: ${result.files ?? 0} files written to ${result.out ?? chosen}`, "Open folder").then((action) => {
+      if (action !== undefined) {
+        void vscode.commands.executeCommand("revealFileInOS", vscode.Uri.file(path.join(result.out ?? chosen, "package.json")));
+      }
+    });
+  } else {
+    void vscode.window.showErrorMessage(`RAP: generation failed, ${summary(result.counts)}`);
+  }
 }
 
 /** The folder of a new business object: the folder clicked, else the project, else the workspace. */
@@ -471,8 +490,8 @@ async function pickFloorplan(root: string, answer: FloorplanAnswer, set: Floorpl
   const picked = await vscode.window.showQuickPick(
     answer.floorplans.map((f) => ({ label: `${set.chosen === true && f.floorplan === set.floorplan ? "$(check) " : ""}${f.label}`, description: f.floorplan, detail: `${f.description} Annotations: ${f.needs}`, f })),
     {
-      title: `RAP: floorplan of the application — ${set.set}${required ? " (required before generating the application)" : ""}`,
-      placeHolder: "How do users work on these objects?",
+      title: `RAP: floorplan of ${appName(root)} — ${set.set}${required ? " (required before generating the application)" : ""}`,
+      placeHolder: `${appName(root)}: how do users work on ${set.set}?`,
       matchOnDetail: true,
       ignoreFocusOut: required,
     },
@@ -534,38 +553,66 @@ async function launchpad(): Promise<void> {
     void vscode.window.showWarningMessage("RAP: no launchpad yet. It is created with the first application (\"New complete business object\", \"Choose the floorplan of the application\").");
     return;
   }
+  if (file === own) {
+    const apps = await workspaceApps();
+    if (!(await gatherApps(file, apps))) return;
+    await buildLaunchpad(file, apps);
+    return;
+  }
   await buildLaunchpad(file);
 }
 
+/**
+ * The applications of the workspace in its launchpad (D72): the floorplan of each one is asked when
+ * missing, application by application, then the application is added (what is there is kept).
+ */
+async function gatherApps(file: string, apps: string[]): Promise<boolean> {
+  for (const app of apps) {
+    if (!(await ensureFloorplans(app))) {
+      return false;
+    }
+    try {
+      notifyLaunchpad(await runJson<LaunchpadAddResult>(cli(), ["launchpad", "add", app, "--launchpad", file], app));
+    } catch (e) {
+      cliFailed(e as Error);
+      return false;
+    }
+  }
+  return true;
+}
+
 /** rapt launchpad <launchpad.json> --out <folder>: the launchpad and the applications of its sources. */
-async function buildLaunchpad(file: string): Promise<void> {
+async function buildLaunchpad(file: string, checked: string[] = []): Promise<void> {
+  const done = new Set(checked.map((c) => path.resolve(c)));
   for (const source of launchpadSources(file, readFileSync(file, "utf8"))) {
-    if (existsSync(source) && !(await ensureFloorplans(source))) {
+    if (!done.has(path.resolve(source)) && existsSync(source) && !(await ensureFloorplans(source))) {
       return;
     }
   }
   const base = path.dirname(file);
   const target = await vscode.window.showInputBox({ prompt: "Folder of the generated launchpad (with its applications)", value: path.join(base, "out", "launchpad"), ignoreFocusOut: true });
   if (target === undefined) return;
-  await vscode.window.withProgress({ location: vscode.ProgressLocation.Notification, title: "RAP: building the launchpad and its applications" }, async () => {
+  const result = await vscode.window.withProgress({ location: vscode.ProgressLocation.Notification, title: "RAP: building the launchpad and its applications" }, async () => {
     try {
-      const result = await runJson<LaunchpadResult>(cli(), ["launchpad", file, "--out", target], base);
-      publish(base, result.diagnostics.map((d) => (d.path === undefined && d.file === undefined ? { ...d, path: file } : d)));
-      if (result.ok) {
-        const action = await vscode.window.showInformationMessage(
-          `RAP: launchpad and ${result.apps.length} application(s) built in ${result.out ?? target} (docker compose up).`,
-          "Open folder",
-        );
+      return await runJson<LaunchpadResult>(cli(), ["launchpad", file, "--out", target], base);
+    } catch (e) {
+      cliFailed(e as Error);
+      return undefined;
+    }
+  });
+  if (result === undefined) return;
+  publish(base, result.diagnostics.map((d) => (d.path === undefined && d.file === undefined ? { ...d, path: file } : d)));
+  if (result.ok) {
+    void vscode.window
+      .showInformationMessage(`RAP: launchpad and ${result.apps.length} application(s) built in ${result.out ?? target} (docker compose up).`, "Open folder")
+      .then((action) => {
         if (action !== undefined) {
           void vscode.commands.executeCommand("revealFileInOS", vscode.Uri.file(path.join(result.out ?? target, "docker-compose.yml")));
         }
-      } else {
-        void vscode.window.showErrorMessage(`RAP: launchpad not built, ${summary(result.counts)} (Problems panel).`);
-      }
-    } catch (e) {
-      cliFailed(e as Error);
-    }
-  });
+      });
+  } else {
+    void vscode.window.showErrorMessage(`RAP: launchpad not built, ${summary(result.counts)} (Problems panel).`);
+  }
 }
 
 /** "Generate the MCP server of the service": rapt/mcp.json, opened to describe each tool (D47). */

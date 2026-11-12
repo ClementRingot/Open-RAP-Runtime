@@ -378,7 +378,7 @@ finds the MCP server of rapt (tools \`rapt_check\`, \`rapt_generate\`, \`rapt_do
 - Write ABAP Cloud and CDS as in the ABAP Development Tools; RAP managed, with or without draft.
 - Run \`rapt check .\` after every change until there is no error; the codes are explained in
   the documentation (tile *Documentation* of \`rapt dev\`, the tool \`rapt_docs_read\` of
-  \`rapt agent\`, or https://clementringot.github.io/RAP-Transpiler/docs/diagnostics.html).
+  \`rapt agent\`, or https://clementringot.github.io/Open-Rap-Runtime/docs/diagnostics.html).
 - Keep \`rapt/config.json\` in mode \`standard\` when the BO must activate on SAP; \`enhanced\`
   allows Open RAP Runtime extensions (mandatory fields checked automatically, managed BO on a
   custom entity).

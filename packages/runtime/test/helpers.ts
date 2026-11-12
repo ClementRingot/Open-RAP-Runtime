@@ -322,7 +322,7 @@ export function testLaunchpad(appDir: string, appUrl: string): { config: Launchp
           { title: "Open Travels", icon: "sap-icon://pending", intent: "Travel-approve", app: "travel", count: { entitySet: "Travel", filter: "OverallStatus eq 'O'" }, roles: ["travel_manager"] },
         ],
       },
-      { title: "Help", tiles: [{ title: "Documentation", url: "https://clementringot.github.io/RAP-Transpiler", icon: "sap-icon://learning-assistant" }] },
+      { title: "Help", tiles: [{ title: "Documentation", url: "https://clementringot.github.io/Open-Rap-Runtime", icon: "sap-icon://learning-assistant" }] },
     ],
   };
   writeFileSync(path.join(work, "launchpad.json"), JSON.stringify(source, null, 2));

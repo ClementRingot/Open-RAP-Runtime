@@ -4,7 +4,7 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { afterEach, describe, expect, it } from "vitest";
-import { agentServers, feedbackUrl, terminalShims, DevProcess, GENERATE_KINDS, groupObjects, launchpadNotice, launchpadSources, menuContext, projectObjects, unchosenFloorplans, wizardArgs, workspaceLaunchpad, type CatalogEntry, type LaunchpadAddResult, diagnosticPath, findProjectRoot, LineSplitter, parseDevEvent, position, resolveCli, runJson, summary, type DevEvent } from "../src/rapt.js";
+import { agentServers, appLabel, appRoots, feedbackUrl, terminalShims, DevProcess, GENERATE_KINDS, groupObjects, launchpadNotice, launchpadSources, menuContext, projectObjects, unchosenFloorplans, wizardArgs, workspaceLaunchpad, type CatalogEntry, type LaunchpadAddResult, diagnosticPath, findProjectRoot, LineSplitter, parseDevEvent, position, resolveCli, runJson, summary, type DevEvent } from "../src/rapt.js";
 
 const REPO = fileURLToPath(new URL("../../../", import.meta.url));
 const FIXTURE = path.join(REPO, "fixtures", "travel");
@@ -83,7 +83,7 @@ describe("rapt from the extension", () => {
     await dev.stop();
     expect(dev.running).toBe(false);
     await expect(fetch(`http://localhost:${port}/ui/index.html`)).rejects.toThrow();
-  });
+  }, 90_000); // the poll waits up to 60 s for the first build (a loaded machine)
 });
 
 describe("rapt generate in VS Code", () => {
@@ -214,7 +214,23 @@ describe("the creation wizard and the objects view (D61)", () => {
 
   it("opens the feedback form of the website with the version and the environment (D71)", () => {
     const url = new URL(feedbackUrl("bug", "0.1.0", "VS Code 1.105.0 on linux (x64)"));
-    expect(url.origin + url.pathname).toBe("https://clementringot.github.io/RAP-Transpiler/feedback.html");
+    expect(url.origin + url.pathname).toBe("https://clementringot.github.io/Open-Rap-Runtime/feedback.html");
     expect(Object.fromEntries(url.searchParams)).toEqual({ kind: "bug", version: "0.1.0", environment: "VS Code 1.105.0 on linux (x64)" });
+  });
+  it("names a project by its workspace folder in the messages", () => {
+    const root = path.resolve("/w/rap-apps/helpdesk");
+    expect(appLabel(root, [{ name: "Helpdesk (Worklist)", path: root }])).toBe("Helpdesk (Worklist) (helpdesk)");
+    expect(appLabel(root, [{ name: "helpdesk", path: root }])).toBe("helpdesk");
+    expect(appLabel(root, [])).toBe("helpdesk");
+  });
+  it("finds the applications of the workspace for its launchpad (D72)", () => {
+    const w = path.resolve("/w/rap-apps");
+    const files = [
+      path.join(w, "expense-analytics", ".abapgit.xml"),
+      path.join(w, "expense-analytics", "src", "zex_ui_expense.srvd.srvdsrv"),
+      path.join(w, "helpdesk", "src", "zhd_ui_ticket.srvd.srvdsrv"),
+      path.join(w, "projects", "src", "zpr_r_project.ddls.asddls"),
+    ];
+    expect(appRoots(files)).toEqual([path.join(w, "expense-analytics"), path.join(w, "helpdesk")]);
   });
 });

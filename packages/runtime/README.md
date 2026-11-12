@@ -1,7 +1,7 @@
 # @open-rap/runtime
 
 The generic runtime of the applications produced by
-[Open RAP Runtime](https://clementringot.github.io/RAP-Transpiler/): Fastify server, OData V4
+[Open RAP Runtime](https://clementringot.github.io/Open-Rap-Runtime/): Fastify server, OData V4
 (`$batch`, draft, ETags), RAP managed runtime, execution of the transpiled behavior pool, OIDC
 authentication, launchpad and MCP server.
 

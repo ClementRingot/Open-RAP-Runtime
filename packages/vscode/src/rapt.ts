@@ -74,6 +74,13 @@ export function workspaceLaunchpad(folders: string[], workspaceFile?: string): s
 }
 
 /** The project folders of the applications of a launchpad.json built from their sources (`source`). */
+/** The name of a project in the messages: the name of its workspace folder, with the folder when they differ. */
+export function appLabel(root: string, folders: Array<{ name: string; path: string }>): string {
+  const base = path.basename(root);
+  const same = (a: string, b: string): boolean => (process.platform === "win32" ? path.resolve(a).toLowerCase() === path.resolve(b).toLowerCase() : path.resolve(a) === path.resolve(b));
+  const name = folders.find((f) => same(f.path, root))?.name;
+  return name === undefined || name === base ? base : `${name} (${base})`;
+}
 export function launchpadSources(file: string, text: string): string[] {
   try {
     const parsed = JSON.parse(text) as { apps?: unknown };
@@ -348,6 +355,21 @@ export function menuContext(files: string[]): MenuContext {
   return { projects, apps };
 }
 
+/**
+ * The roots of the projects that define a service (the applications), from the files of the
+ * workspace: building the launchpad gathers all of them (D72).
+ */
+export function appRoots(files: string[]): string[] {
+  const descriptors = new Set(files.filter((f) => path.basename(f) === ".abapgit.xml").map((f) => path.resolve(f)));
+  const roots = new Set<string>();
+  for (const file of files) {
+    if (!file.endsWith(".srvd.srvdsrv")) continue;
+    const root = findProjectRoot(path.resolve(file), undefined, (p) => descriptors.has(p));
+    if (root !== undefined) roots.add(root);
+  }
+  return [...roots].sort((a, b) => a.localeCompare(b));
+}
+
 /** The root entity sets whose floorplan was never chosen (`rapt floorplan --json`). */
 export function unchosenFloorplans(sets: Array<{ set: string; chosen?: boolean }>): string[] {
   return sets.filter((s) => s.chosen !== true).map((s) => s.set);
@@ -534,7 +556,7 @@ export function agentServers(cli: Cli, folders: Array<{ name: string; path: stri
 }
 
 /** The feedback form of the website (D71). */
-export const FEEDBACK_URL = "https://clementringot.github.io/RAP-Transpiler/feedback.html";
+export const FEEDBACK_URL = "https://clementringot.github.io/Open-Rap-Runtime/feedback.html";
 
 /** The feedback form with the version and the environment filled in (D71). */
 export function feedbackUrl(kind: "bug" | "feature", version: string, environment: string): string {

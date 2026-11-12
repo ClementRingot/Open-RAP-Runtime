@@ -1,7 +1,7 @@
 # Open RAP Runtime for VS Code
 
 Check, generate and run a RAP business object with
-[Open RAP Runtime](https://clementringot.github.io/RAP-Transpiler/), without an SAP system. The
+[Open RAP Runtime](https://clementringot.github.io/Open-Rap-Runtime/), without an SAP system. The
 extension compiles nothing itself: it calls the `rapt` CLI (`--json`) and shows its results.
 
 ## Features
@@ -23,11 +23,12 @@ extension compiles nothing itself: it calls the `rapt` CLI (`--json`) and shows 
 - **RAP: Start rapt dev**: the application runs with a PGlite database and is rebuilt on each
   save. The status bar shows the state (building, ready, errors) and opens the application in one
   click.
-- **RAP: Build the application…**: either the **launchpad with all the applications** of the
-  workspace (`rapt launchpad`) or the **application alone** (`rapt build`, standalone), into the
-  folder of your choice, after choosing the floorplan of each root entity (List Report,
-  Worklist, Analytical List Page, Form Entry) when it was not chosen yet; *RAP: Start rapt dev*
-  asks for it too.
+- **RAP: Build the application…**: either the **launchpad of the workspace** with every
+  application of the workspace (`rapt launchpad`: each project with a service definition joins
+  the same launchpad) or the **application alone** (`rapt build`, standalone), into the folder of
+  your choice. The floorplan of each root entity (List Report, Worklist, Analytical List Page,
+  Form Entry) is asked first when it was not chosen yet, application by application, with the
+  name of the application in the prompt; *RAP: Start rapt dev* asks for it too.
 - **One launchpad per workspace**: `launchpad.json` (titled "Launchpad"), next to the
   `.code-workspace` or in the first folder of the workspace, is created with the first
   application; each complete BO and each choice of floorplan add the application and its tile,
@@ -67,7 +68,7 @@ and rapt runs on the Node.js of VS Code (1.101 or later, Node.js 22).
 code --install-extension open-rap-runtime-vscode.vsix
 ```
 
-The `.vsix` is downloaded from the [project website](https://clementringot.github.io/RAP-Transpiler/),
+The `.vsix` is downloaded from the [project website](https://clementringot.github.io/Open-Rap-Runtime/),
 attached to each GitHub release (tag `v*`) and produced by the CI on each commit (artifact
 `open-rap-runtime-vscode`).
 

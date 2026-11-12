@@ -1496,8 +1496,8 @@ correspond to points 1 to 13 of §11 of PLAN.md. The milestones M1 to M6 are tho
   (npm organization `open-rap`), the VS Code extension `open-rap-runtime-vscode` ("Open RAP
   Runtime"). Unchanged, so that existing projects keep working: the `rapt` command, the `rapt/`
   folder of the projects, the `.rapt/` build folder, the `rapt_*` tables, the `ZRAP_*` ABAP
-  objects. The URL of the website follows the name of the GitHub repository
-  (`RAP-Transpiler`) until it is renamed.
+  objects. The URL of the website follows the name of the GitHub repository, renamed
+  `Open-Rap-Runtime` (https://clementringot.github.io/Open-Rap-Runtime/).
 - **Why**: "Open" says open source and without proprietary SAP libraries; "RAP Runtime" says
   what the application runs. The website states that the project is not affiliated with SAP SE.
 - **Tests**: the whole suite (package names, generated applications with `vendor/open-rap-*`,
@@ -1524,3 +1524,31 @@ correspond to points 1 to 13 of §11 of PLAN.md. The milestones M1 to M6 are tho
   fields, prefill from the query string, URL of the issue with the fields of the bug form,
   fields of the feature form, mobile without horizontal scrolling).
 
+
+## D72 — Extension builds: progress, floorplan prompts; the website serves the released .vsix
+
+- **Context**: in VS Code, *Build the application* kept its progress notification spinning after
+  the build: the message of the result (with its *Open folder* button) was awaited inside the
+  progress, so the progress ended only once the message was answered; the user saw a build that
+  never ended. Building the launchpad asks the floorplan of each application that has none, but
+  the prompt named only the entity set, not the application. The website served a `.vsix` built
+  from `main`, whose version (that of `packages/vscode/package.json`) was not the released one.
+- **Decision**: the progress covers the call of `rapt` only; the result is shown after it, without
+  being awaited. Every application of the VS Code workspace (each project with a service
+  definition) goes into the one launchpad of the workspace when the launchpad is built: they are
+  added to `launchpad.json` (what is there is kept) before the build; only an application built
+  alone (standalone) stays out of it. The choice reads "Launchpad of the workspace (3
+  applications)" with the names of the applications, never the name of a folder that could be
+  taken for one of them, and "<application> alone (standalone)". The floorplan prompt names the
+  application: the name of its workspace folder,
+  with the folder when they differ ("Helpdesk (Worklist) (helpdesk) — Ticket"); building the
+  launchpad still asks, application by application, the floorplan of every root entity set
+  without one (all of them when no application has a floorplan). The website serves the `.vsix`
+  of the latest GitHub release under its stable name, with its version shown on the page
+  (`%VSIX_VERSION%` of `scripts/build-site.mjs`); the Release workflow runs the Site workflow once
+  the release exists (a release created with the `GITHUB_TOKEN` does not trigger the `release`
+  event). Without a release, the `.vsix` is built from the commit. The website and the links of
+  the project follow the name of the repository, `Open-Rap-Runtime`.
+- **Tests**: `vscode/test/rapt.test.ts` (name of a project in the prompts, applications of the
+  workspace, URL of the feedback form); a launchpad of three projects (one already built, two without floorplan) under a folder
+  with an accent built by `rapt launchpad` in 2 s.
