@@ -490,12 +490,53 @@ export const SUPPORT = `sap.ui.define([
       });
     },
 
-    _valueHelpDialog: function (oView, oHelp, bMulti, mTexts, oContext) {
-      var bTexts = Object.keys(mTexts).length > 0;
+    /** The columns of a value help: its elements, and the description of the text entity after the value. */
+    valueHelpColumns: function (oHelp, mTexts) {
       var aColumns = oHelp.columns.slice();
-      if (bTexts) {
+      if (Object.keys(mTexts).length > 0) {
         aColumns.splice(1, 0, { property: oHelp.element, label: oHelp.text.label, string: false, text: true });
       }
+      return aColumns;
+    },
+
+    /** The binding of the rows of a value help: the elements of the columns and of the additional bindings. */
+    valueHelpItems: function (oHelp, aColumns, mTexts, aBase) {
+      return {
+        path: "/" + oHelp.set,
+        parameters: { $count: true, $select: aColumns.filter(function (c) { return !c.text; }).map(function (c) { return c.property; }).concat((oHelp.bindings || []).map(function (b) { return b.element; })).filter(function (p, i, a) { return a.indexOf(p) === i; }).join(",") },
+        filters: aBase.length === 0 ? undefined : new Filter({ filters: aBase, and: true }),
+        template: new ColumnListItem({
+          cells: aColumns.map(function (c) {
+            return c.text
+              ? new Text({ text: { path: c.property, formatter: function (v) { return mTexts[v] || ""; } } })
+              : new Text({ text: "{" + c.property + "}" });
+          })
+        })
+      };
+    },
+
+    /** The filter of a search in a value help: a text column or a description contains the value. */
+    valueHelpSearch: function (oHelp, mTexts, sSearch, aBase) {
+      var sValue = (sSearch || "").trim();
+      var aFilters = oHelp.columns.filter(function (c) { return c.string; }).map(function (c) {
+        return new Filter({ path: c.property, operator: "Contains", value1: sValue, caseSensitive: false });
+      });
+      // values whose description matches
+      var sLower = sValue.toLowerCase();
+      Object.keys(mTexts).filter(function (k) {
+        return String(mTexts[k]).toLowerCase().indexOf(sLower) >= 0;
+      }).slice(0, 30).forEach(function (k) {
+        aFilters.push(new Filter(oHelp.element, "EQ", k));
+      });
+      var aAll = aBase.slice();
+      if (sValue !== "" && aFilters.length > 0) {
+        aAll.push(new Filter({ filters: aFilters, and: false }));
+      }
+      return aAll.length === 0 ? [] : new Filter({ filters: aAll, and: true });
+    },
+
+    _valueHelpDialog: function (oView, oHelp, bMulti, mTexts, oContext) {
+      var aColumns = support.valueHelpColumns(oHelp, mTexts);
       return new Promise(function (resolve) {
         var bDone = false;
         var aBase = support.valueHelpFilters(oHelp, oContext);
@@ -517,22 +558,7 @@ export const SUPPORT = `sap.ui.define([
             return new Column({ header: new Text({ text: c.label }) });
           }),
           search: function (oEvent) {
-            var sValue = (oEvent.getParameter("value") || "").trim();
-            var aFilters = oHelp.columns.filter(function (c) { return c.string; }).map(function (c) {
-              return new Filter({ path: c.property, operator: "Contains", value1: sValue, caseSensitive: false });
-            });
-            // values whose description matches
-            var sLower = sValue.toLowerCase();
-            Object.keys(mTexts).filter(function (k) {
-              return String(mTexts[k]).toLowerCase().indexOf(sLower) >= 0;
-            }).slice(0, 30).forEach(function (k) {
-              aFilters.push(new Filter(oHelp.element, "EQ", k));
-            });
-            var aAll = aBase.slice();
-            if (sValue !== "" && aFilters.length > 0) {
-              aAll.push(new Filter({ filters: aFilters, and: false }));
-            }
-            oEvent.getSource().getBinding("items").filter(aAll.length === 0 ? [] : new Filter({ filters: aAll, and: true }));
+            oEvent.getSource().getBinding("items").filter(support.valueHelpSearch(oHelp, mTexts, oEvent.getParameter("value"), aBase));
           },
           confirm: function (oEvent) {
             var aItems = oEvent.getParameter("selectedItems") || [];
@@ -550,19 +576,7 @@ export const SUPPORT = `sap.ui.define([
             oDialog.destroy();
           }
         });
-        oDialog.bindAggregation("items", {
-          path: "/" + oHelp.set,
-          // the elements of the columns and of the additional bindings
-          parameters: { $count: true, $select: aColumns.filter(function (c) { return !c.text; }).map(function (c) { return c.property; }).concat((oHelp.bindings || []).map(function (b) { return b.element; })).filter(function (p, i, a) { return a.indexOf(p) === i; }).join(",") },
-          filters: aBase.length === 0 ? undefined : new Filter({ filters: aBase, and: true }),
-          template: new ColumnListItem({
-            cells: aColumns.map(function (c) {
-              return c.text
-                ? new Text({ text: { path: c.property, formatter: function (v) { return mTexts[v] || ""; } } })
-                : new Text({ text: "{" + c.property + "}" });
-            })
-          })
-        });
+        oDialog.bindAggregation("items", support.valueHelpItems(oHelp, aColumns, mTexts, aBase));
         oView.addDependent(oDialog);
         oDialog.open();
       });
@@ -583,19 +597,88 @@ export const SUPPORT = `sap.ui.define([
 `;
 
 /**
- * The conditions of the filter fields, written as in SAP Fiori: `=x`, `!=x`, `>x`, `>=x`, `<x`,
- * `<=x`, `a...b`, `*x*`, `x*`, `*x`; a value alone is "contains" for a text, "equal" otherwise.
- * Pure functions (no control): unit tested in Node.js with a stub of `sap.ui.define`.
+ * The conditions of the filter fields (D51, D65), written as in SAP Fiori elements: `=x`, `!=x`,
+ * `>x`, `>=x`, `<x`, `<=x`, `a...b`, `*x*`, `x*`, `*x`, `<empty>`, and the exclusions `!(…)`; a
+ * value alone is "contains" for a free text, "equal" otherwise. The operators of a field depend on
+ * its type and on `@Consumption.filter.selectionType`. Pure functions (no control): unit tested in
+ * Node.js with a stub of `sap.ui.define`.
  */
 export const FILTERS = `sap.ui.define([
   "sap/ui/model/Filter",
-  "sap/ui/model/FilterOperator"
-], function (Filter, FilterOperator) {
+  "sap/ui/model/FilterOperator",
+  "sap/ui/core/format/DateFormat"
+], function (Filter, FilterOperator, DateFormat) {
   "use strict";
 
   var NUMERIC = { integer: true, decimal: true, amount: true };
+  var DAYS = { date: true, datetime: true };
   var PREFIXES = [["!=", "NE"], [">=", "GE"], ["<=", "LE"], [">", "GT"], ["<", "LT"], ["=", "EQ"]];
   var SIGNS = { EQ: "=", NE: "!=", GT: ">", GE: ">=", LT: "<", LE: "<=" };
+  var EMPTY = "<empty>";
+  /** The operators of "Define Conditions"; an exclusion names the operator it negates. */
+  var OPERATORS = {
+    EQ: { text: "equal to", values: 1 },
+    Contains: { text: "contains", values: 1 },
+    StartsWith: { text: "starts with", values: 1 },
+    EndsWith: { text: "ends with", values: 1 },
+    BT: { text: "between", values: 2 },
+    LT: { text: "less than", values: 1 },
+    LE: { text: "less than or equal to", values: 1 },
+    GT: { text: "greater than", values: 1 },
+    GE: { text: "greater than or equal to", values: 1 },
+    Empty: { text: "empty", values: 0 },
+    NE: { text: "not equal to", values: 1, exclude: "EQ" },
+    NotContains: { text: "does not contain", values: 1, exclude: "Contains" },
+    NotStartsWith: { text: "does not start with", values: 1, exclude: "StartsWith" },
+    NotEndsWith: { text: "does not end with", values: 1, exclude: "EndsWith" },
+    NB: { text: "not between", values: 2, exclude: "BT" },
+    NOTLT: { text: "not less than", values: 1, exclude: "LT" },
+    NOTLE: { text: "not less than or equal to", values: 1, exclude: "LE" },
+    NOTGT: { text: "not greater than", values: 1, exclude: "GT" },
+    NOTGE: { text: "not greater than or equal to", values: 1, exclude: "GE" },
+    NotEmpty: { text: "not empty", values: 0, exclude: "Empty" }
+  };
+  var COMPARISONS = ["EQ", "BT", "LT", "LE", "GT", "GE"];
+  var PATTERNS = { Contains: true, StartsWith: true, EndsWith: true, NotContains: true, NotStartsWith: true, NotEndsWith: true };
+  /** The exclusions of comparisons as the opposite comparison: not less than 5 is 5 or more. */
+  var OPPOSITE = { NOTLT: "GE", NOTLE: "GT", NOTGT: "LE", NOTGE: "LT" };
+
+  function negation(sOp) {
+    return Object.keys(OPERATORS).find(function (k) { return OPERATORS[k].exclude === sOp; });
+  }
+
+  function pad(n) {
+    return String(n).padStart(2, "0");
+  }
+
+  /** A date typed or picked: ISO (yyyy-MM-dd), or in the format of the locale. */
+  function day(sValue) {
+    var aIso = /^(\\d{4})-(\\d{2})-(\\d{2})$/.exec(sValue);
+    if (aIso) {
+      var oDate = new Date(Date.UTC(Number(aIso[1]), Number(aIso[2]) - 1, Number(aIso[3])));
+      return oDate.getUTCMonth() === Number(aIso[2]) - 1 && oDate.getUTCDate() === Number(aIso[3]) ? sValue : null;
+    }
+    if (!DateFormat) {
+      return null;
+    }
+    var oParsed = ["medium", "short", "long"].map(function (sStyle) {
+      return DateFormat.getDateInstance({ style: sStyle }).parse(sValue);
+    }).find(function (o) { return o && !isNaN(o.getTime()); });
+    return oParsed ? oParsed.getFullYear() + "-" + pad(oParsed.getMonth() + 1) + "-" + pad(oParsed.getDate()) : null;
+  }
+
+  /** The value of a condition as kept in the token key: dates in ISO, times as HH:mm:ss; null when invalid. */
+  function normalize(oField, sValue) {
+    var s = String(sValue === null || sValue === undefined ? "" : sValue).trim();
+    if (DAYS[oField.kind]) {
+      return s === "" ? null : day(s);
+    }
+    if (oField.kind === "time") {
+      var aTime = /^(\\d{1,2}):(\\d{2})(?::(\\d{2}))?$/.exec(s);
+      return aTime && Number(aTime[1]) < 24 && Number(aTime[2]) < 60 ? pad(aTime[1]) + ":" + aTime[2] + ":" + (aTime[3] || "00") : null;
+    }
+    return valid(oField, s) ? s : null;
+  }
 
   function valid(oField, sValue) {
     if (sValue === "") {
@@ -614,44 +697,144 @@ export const FILTERS = `sap.ui.define([
   }
 
   var filters = {
-    /** The condition of a text typed in a filter field; null when it is not valid for the field. */
+    /** The operators allowed for a field: its type, then \`@Consumption.filter.selectionType\` (FilterExpressionRestrictions). */
+    operators: function (oField) {
+      var aInclude;
+      if (oField.kind === "boolean" || oField.kind === "enum") {
+        return ["EQ"];
+      }
+      if (oField.kind === "uuid") {
+        aInclude = ["EQ"];
+      } else if (oField.kind === "text") {
+        aInclude = ["EQ", "Contains", "StartsWith", "EndsWith", "BT", "LT", "LE", "GT", "GE", "Empty"];
+      } else if (DAYS[oField.kind] || oField.kind === "time") {
+        aInclude = COMPARISONS.concat(["Empty"]);
+      } else {
+        aInclude = COMPARISONS.slice();
+      }
+      var sAllowed = oField.filter && oField.filter.expressions;
+      if (sAllowed === "SingleValue") {
+        return ["EQ"];
+      }
+      if (sAllowed === "SingleRange" || sAllowed === "MultiRange") {
+        aInclude = aInclude.filter(function (op) { return COMPARISONS.indexOf(op) >= 0; });
+      }
+      // one range: no exclusion
+      return sAllowed === "SingleRange" ? aInclude : aInclude.concat(aInclude.map(negation).filter(Boolean));
+    },
+
+    /** The label of an operator ("equal to"), and the number of its values (0, 1 or 2). */
+    label: function (sOp) {
+      return OPERATORS[sOp] ? OPERATORS[sOp].text : sOp;
+    },
+
+    valueCount: function (sOp) {
+      return OPERATORS[sOp] ? OPERATORS[sOp].values : 1;
+    },
+
+    /** An exclusion: and'ed with the other conditions of the field (the included ones are or'ed). */
+    isExclude: function (sOp) {
+      return !!(OPERATORS[sOp] && OPERATORS[sOp].exclude);
+    },
+
+    /** The operator of a value typed alone: "contains" for a free text, "equal to" for a key or a value help. */
+    defaultOperator: function (oField) {
+      return oField.kind === "text" && !oField.key && !oField.valueHelp && filters.operators(oField).indexOf("Contains") >= 0 ? "Contains" : "EQ";
+    },
+
+    /** The condition of an operator and its values (the rows of "Define Conditions"); null when not valid for the field. */
+    condition: function (oField, sOp, aValues) {
+      if (!OPERATORS[sOp] || filters.operators(oField).indexOf(sOp) < 0) {
+        return null;
+      }
+      var aNormalized = (aValues || []).slice(0, OPERATORS[sOp].values).map(function (v) { return normalize(oField, v); });
+      if (aNormalized.length < OPERATORS[sOp].values || aNormalized.some(function (v) { return v === null; })) {
+        return null;
+      }
+      return { op: sOp, values: aNormalized };
+    },
+
+    /** The condition of a text typed in a filter field (or of a token key); null when it is not valid for the field. */
     parse: function (oField, sText) {
-      var sValue = String(sText).trim();
+      var oRead = filters._read(oField, String(sText).trim());
+      return oRead ? filters.condition(oField, oRead.op, oRead.values) : null;
+    },
+
+    _read: function (oField, sValue) {
       if (sValue === "") {
         return null;
       }
-      var oCondition;
-      var iRange = sValue.indexOf("...");
-      if (iRange > 0 && !/^[!<>=]/.test(sValue)) {
-        oCondition = { op: "BT", values: [sValue.slice(0, iRange).trim(), sValue.slice(iRange + 3).trim()] };
-      } else {
-        var aPrefix = PREFIXES.find(function (p) { return sValue.indexOf(p[0]) === 0; });
-        if (aPrefix) {
-          oCondition = { op: aPrefix[1], values: [sValue.slice(aPrefix[0].length).trim()] };
-        } else if (oField.kind === "text" && sValue.length > 1 && sValue[0] === "*" && sValue[sValue.length - 1] === "*") {
-          oCondition = { op: "Contains", values: [sValue.slice(1, -1)] };
-        } else if (oField.kind === "text" && sValue.length > 1 && sValue[sValue.length - 1] === "*") {
-          oCondition = { op: "StartsWith", values: [sValue.slice(0, -1)] };
-        } else if (oField.kind === "text" && sValue.length > 1 && sValue[0] === "*") {
-          oCondition = { op: "EndsWith", values: [sValue.slice(1)] };
-        } else {
-          oCondition = { op: oField.kind === "text" ? "Contains" : "EQ", values: [sValue] };
-        }
+      if (sValue === EMPTY) {
+        return { op: "Empty", values: [] };
       }
-      var bValid = oCondition.values.every(function (v) { return valid(oField, v); });
-      return bValid ? oCondition : null;
+      if (sValue.indexOf("!(") === 0 && sValue[sValue.length - 1] === ")") {
+        var oInner = filters._read(oField, sValue.slice(2, -1).trim());
+        var sNot = oInner && negation(oInner.op);
+        return sNot ? { op: sNot, values: oInner.values } : null;
+      }
+      var iRange = sValue.indexOf("...");
+      var aDays = DAYS[oField.kind] && iRange < 0 ? sValue.split(" - ") : [];
+      if (iRange > 0 && !/^[!<>=]/.test(sValue)) {
+        return { op: "BT", values: [sValue.slice(0, iRange).trim(), sValue.slice(iRange + 3).trim()] };
+      }
+      if (aDays.length === 2) {
+        return { op: "BT", values: [aDays[0].trim(), aDays[1].trim()] };
+      }
+      var aPrefix = PREFIXES.find(function (p) { return sValue.indexOf(p[0]) === 0; });
+      if (aPrefix) {
+        return { op: aPrefix[1], values: [sValue.slice(aPrefix[0].length).trim()] };
+      }
+      if (oField.kind === "text" && sValue.length > 1 && sValue[0] === "*" && sValue[sValue.length - 1] === "*") {
+        return { op: "Contains", values: [sValue.slice(1, -1)] };
+      }
+      if (oField.kind === "text" && sValue.length > 1 && sValue[sValue.length - 1] === "*") {
+        return { op: "StartsWith", values: [sValue.slice(0, -1)] };
+      }
+      if (oField.kind === "text" && sValue.length > 1 && sValue[0] === "*") {
+        return { op: "EndsWith", values: [sValue.slice(1)] };
+      }
+      return { op: filters.defaultOperator(oField), values: [sValue] };
     },
 
-    /** The text of the token of a condition (parsed back by parse). */
+    /** The text of a condition, kept as the key of its token (parsed back by parse). */
     text: function (oCondition) {
       var v = oCondition.values;
       switch (oCondition.op) {
+        case "Empty": return EMPTY;
         case "BT": return v[0] + "..." + v[1];
         case "Contains": return "*" + v[0] + "*";
         case "StartsWith": return v[0] + "*";
         case "EndsWith": return "*" + v[0];
-        default: return SIGNS[oCondition.op] + v[0];
+        default:
+          if (SIGNS[oCondition.op]) {
+            return SIGNS[oCondition.op] + v[0];
+          }
+          return "!(" + filters.text({ op: OPERATORS[oCondition.op].exclude, values: v }) + ")";
       }
+    },
+
+    /**
+     * The text shown in the token, as SAP Fiori elements: "equal to" without its sign (with the
+     * description of a value help: "Euro (EUR)"), exclusions as \`!(…)\`, dates in the format of the locale.
+     */
+    display: function (oField, oCondition, sDescription) {
+      var aValues = oCondition.values.map(function (v) { return filters.format(oField, v); });
+      if (oCondition.op === "EQ") {
+        return sDescription ? sDescription + " (" + aValues[0] + ")" : aValues[0];
+      }
+      if (oCondition.op === "NE") {
+        return "!(=" + aValues[0] + ")";
+      }
+      return filters.text({ op: oCondition.op, values: aValues });
+    },
+
+    /** A value as shown to the user (a date in the medium format of the locale). */
+    format: function (oField, sValue) {
+      if (DAYS[oField.kind] && DateFormat && /^\\d{4}-\\d{2}-\\d{2}$/.test(sValue)) {
+        var a = sValue.split("-");
+        return DateFormat.getDateInstance({ style: "medium" }).format(new Date(Number(a[0]), Number(a[1]) - 1, Number(a[2])));
+      }
+      return sValue;
     },
 
     /** The value sent to the service: NUMC with its leading zeros, decimal point. */
@@ -671,14 +854,53 @@ export const FILTERS = `sap.ui.define([
     /** The filter of a condition. */
     filter: function (oField, oCondition) {
       var v = oCondition.values.map(function (s) { return filters.value(oField, s); });
-      var bText = oField.kind === "text";
-      if (oCondition.op === "BT") {
-        return new Filter({ path: oField.property, operator: FilterOperator.BT, value1: v[0], value2: v[1] });
+      var sPath = oField.property;
+      var sOp = OPPOSITE[oCondition.op] || oCondition.op;
+      if (sOp === "Empty" || sOp === "NotEmpty") {
+        // a text is empty when initial ('') or null; another type when null
+        var bNot = sOp === "NotEmpty";
+        var oNull = new Filter(sPath, bNot ? FilterOperator.NE : FilterOperator.EQ, null);
+        return oField.edm === "Edm.String" ? new Filter({ filters: [new Filter(sPath, bNot ? FilterOperator.NE : FilterOperator.EQ, ""), oNull], and: bNot }) : oNull;
       }
-      if (oCondition.op === "Contains" || oCondition.op === "StartsWith" || oCondition.op === "EndsWith") {
-        return new Filter({ path: oField.property, operator: FilterOperator[oCondition.op], value1: v[0], caseSensitive: false });
+      if (oField.kind === "datetime") {
+        return filters._days(sPath, sOp, v);
       }
-      return new Filter({ path: oField.property, operator: FilterOperator[oCondition.op], value1: v[0], caseSensitive: bText ? true : undefined });
+      if (sOp === "BT" || sOp === "NB") {
+        return new Filter({ path: sPath, operator: FilterOperator[sOp], value1: v[0], value2: v[1] });
+      }
+      if (PATTERNS[sOp]) {
+        return new Filter({ path: sPath, operator: FilterOperator[sOp], value1: v[0], caseSensitive: false });
+      }
+      return new Filter({ path: sPath, operator: FilterOperator[sOp], value1: v[0], caseSensitive: oField.kind === "text" ? true : undefined });
+    },
+
+    /** A condition on the days of a date-time (Edm.DateTimeOffset): whole days, UTC. */
+    _days: function (sPath, sOp, v) {
+      var start = function (s) { return s + "T00:00:00Z"; };
+      var next = function (s) {
+        var oNext = new Date(s + "T00:00:00Z");
+        oNext.setUTCDate(oNext.getUTCDate() + 1);
+        return oNext.toISOString().slice(0, 10) + "T00:00:00Z";
+      };
+      var range = function (sFrom, sTo, bNot) {
+        return new Filter({
+          filters: [
+            new Filter(sPath, bNot ? FilterOperator.LT : FilterOperator.GE, start(sFrom)),
+            new Filter(sPath, bNot ? FilterOperator.GE : FilterOperator.LT, next(sTo))
+          ],
+          and: !bNot
+        });
+      };
+      switch (sOp) {
+        case "EQ": return range(v[0], v[0], false);
+        case "NE": return range(v[0], v[0], true);
+        case "BT": return range(v[0], v[1], false);
+        case "NB": return range(v[0], v[1], true);
+        case "LT": return new Filter(sPath, FilterOperator.LT, start(v[0]));
+        case "LE": return new Filter(sPath, FilterOperator.LT, next(v[0]));
+        case "GT": return new Filter(sPath, FilterOperator.GE, next(v[0]));
+        default: return new Filter(sPath, FilterOperator.GE, start(v[0]));
+      }
     },
 
     /** The filter of the conditions of one field: included values or'ed, exclusions and'ed. */
@@ -686,7 +908,7 @@ export const FILTERS = `sap.ui.define([
       var aInclude = [];
       var aExclude = [];
       aConditions.forEach(function (c) {
-        (c.op === "NE" ? aExclude : aInclude).push(filters.filter(oField, c));
+        (filters.isExclude(c.op) ? aExclude : aInclude).push(filters.filter(oField, c));
       });
       var aParts = [];
       if (aInclude.length === 1) {
@@ -709,9 +931,9 @@ export const FILTERS = `sap.ui.define([
       if (!oFilter) {
         return "";
       }
-      var aInner = oFilter.aFilters || (oFilter.getFilters && oFilter.getFilters());
+      var aInner = oFilter.aFilters || (oFilter.getFilters && oFilter.getFilters()) || (oFilter.spec && oFilter.spec.filters);
       if (aInner && aInner.length) {
-        var bAnd = oFilter.bAnd !== undefined ? oFilter.bAnd : !!(oFilter.isAnd && oFilter.isAnd());
+        var bAnd = oFilter.bAnd !== undefined ? oFilter.bAnd : oFilter.spec ? !!oFilter.spec.and : !!(oFilter.isAnd && oFilter.isAnd());
         return "(" + aInner.map(function (f) { return filters.toOData(f, mFields); }).join(bAnd ? " and " : " or ") + ")";
       }
       var sPath = oFilter.sPath || (oFilter.spec && oFilter.spec.path);
@@ -729,34 +951,357 @@ export const FILTERS = `sap.ui.define([
       var lit = function (v) { return bCaseInsensitive ? "tolower(" + literal(v) + ")" : literal(v); };
       switch (sOp) {
         case "BT": return "(" + sPath + " ge " + literal(v1) + " and " + sPath + " le " + literal(v2) + ")";
+        case "NB": return "(" + sPath + " lt " + literal(v1) + " or " + sPath + " gt " + literal(v2) + ")";
         case "Contains": return "contains(" + sLeft + "," + lit(v1) + ")";
         case "StartsWith": return "startswith(" + sLeft + "," + lit(v1) + ")";
         case "EndsWith": return "endswith(" + sLeft + "," + lit(v1) + ")";
+        case "NotContains": return "not contains(" + sLeft + "," + lit(v1) + ")";
+        case "NotStartsWith": return "not startswith(" + sLeft + "," + lit(v1) + ")";
+        case "NotEndsWith": return "not endswith(" + sLeft + "," + lit(v1) + ")";
         default: return sPath + " " + String(sOp).toLowerCase() + " " + literal(v1);
       }
-    },
-
-    /** The filter of a date range (Edm.Date: inclusive bounds; Edm.DateTimeOffset: whole days, UTC). */
-    dateFilter: function (oField, sFrom, sTo) {
-      if (!sFrom) {
-        return null;
-      }
-      var sEnd = sTo || sFrom;
-      if (oField.kind === "datetime") {
-        var oNext = new Date(sEnd + "T00:00:00Z");
-        oNext.setUTCDate(oNext.getUTCDate() + 1);
-        return new Filter({
-          filters: [
-            new Filter(oField.property, FilterOperator.GE, sFrom + "T00:00:00Z"),
-            new Filter(oField.property, FilterOperator.LT, oNext.toISOString().slice(0, 10) + "T00:00:00Z")
-          ],
-          and: true
-        });
-      }
-      return sEnd === sFrom ? new Filter(oField.property, FilterOperator.EQ, sFrom) : new Filter({ path: oField.property, operator: FilterOperator.BT, value1: sFrom, value2: sEnd });
     }
   };
   return filters;
+});
+`;
+
+/**
+ * The value help of a filter field (D65), as in SAP Fiori elements, built from sap.m (the value
+ * help dialog of sap.ui.comp / sap.ui.mdc is SAPUI5 only): "Search and Select" lists the values of
+ * the value help, "Define Conditions" has one operator and its values per row, and the selected
+ * items and conditions are tokens below.
+ */
+export const CONDITIONS = `sap.ui.define([
+  "sap/m/Dialog",
+  "sap/m/Button",
+  "sap/m/IconTabBar",
+  "sap/m/IconTabFilter",
+  "sap/m/VBox",
+  "sap/m/HBox",
+  "sap/m/FlexItemData",
+  "sap/m/Select",
+  "sap/ui/core/Item",
+  "sap/m/Input",
+  "sap/m/DatePicker",
+  "sap/m/TimePicker",
+  "sap/m/SearchField",
+  "sap/m/Table",
+  "sap/m/Column",
+  "sap/m/Text",
+  "sap/m/Title",
+  "sap/m/Tokenizer",
+  "sap/m/Token",
+  "sap/m/ScrollContainer",
+  "sap/ui/model/json/JSONModel",
+  "rapt/app/controller/support",
+  "rapt/app/controller/filters"
+], function (Dialog, Button, IconTabBar, IconTabFilter, VBox, HBox, FlexItemData, Select, Item, Input, DatePicker, TimePicker, SearchField, Table, Column, Text, Title, Tokenizer, Token, ScrollContainer, JSONModel, support, filters) {
+  "use strict";
+
+  function blank(sOp) {
+    return { op: sOp, v1: "", v2: "", error: false };
+  }
+
+  function dialog(oView, oField, aInitial, mTexts) {
+    var oHelp = oField.valueHelp;
+    var aOperators = filters.operators(oField);
+    var bSingle = !!(oField.filter && oField.filter.single);
+    var bSelect = !!oHelp;
+    var bDefine = !(bSelect && aOperators.length === 1);
+    var sDefault = filters.defaultOperator(oField);
+    var oModel = new JSONModel({ items: [], rows: [] });
+    var aItems = [];
+    var aRows = [];
+    aInitial.forEach(function (c) {
+      if (bSelect && c.condition.op === "EQ") {
+        aItems.push({ value: c.condition.values[0], text: c.text });
+      } else if (bDefine) {
+        aRows.push({ op: c.condition.op, v1: c.condition.values[0] || "", v2: c.condition.values[1] || "", error: false });
+      }
+    });
+    if (bDefine && aRows.length === 0) {
+      aRows.push(blank(sDefault));
+    }
+    oModel.setData({ items: aItems, rows: aRows });
+
+    var isBlank = function (r) {
+      return filters.valueCount(r.op) > 0 && String(r.v1 || "").trim() === "" && String(r.v2 || "").trim() === "";
+    };
+    var rowCondition = function (r) {
+      return isBlank(r) ? null : filters.condition(oField, r.op, [r.v1, r.v2]);
+    };
+    var itemText = function (sValue) {
+      return filters.display(oField, { op: "EQ", values: [sValue] }, mTexts[sValue]);
+    };
+
+    return new Promise(function (resolve) {
+      var bDone = false;
+      var done = function (aResult) {
+        if (!bDone) {
+          bDone = true;
+          resolve(aResult);
+        }
+      };
+      var oTable;
+      var oTokenizer;
+      var oTitle;
+
+      /** Selects the rows of the table that are chosen items. */
+      var syncSelection = function () {
+        if (!oTable) {
+          return;
+        }
+        var aValues = oModel.getProperty("/items").map(function (it) { return filters.value(oField, String(it.value)); });
+        oTable.getItems().forEach(function (oItem) {
+          var oContext = oItem.getBindingContext();
+          if (oContext) {
+            oItem.setSelected(aValues.indexOf(filters.value(oField, String(oContext.getProperty(oHelp.element)))) >= 0);
+          }
+        });
+      };
+
+      /** The tokens of the chosen items and of the valid conditions. */
+      var refresh = function () {
+        var aCurrentRows = oModel.getProperty("/rows");
+        if (bSingle && aCurrentRows.some(rowCondition) && oModel.getProperty("/items").length > 0) {
+          oModel.setProperty("/items", []);
+          syncSelection();
+        }
+        oTokenizer.destroyTokens();
+        oModel.getProperty("/items").forEach(function (it, i) {
+          oTokenizer.addToken(new Token({ key: "i" + i, text: it.text }));
+        });
+        aCurrentRows.forEach(function (r, i) {
+          var oCondition = rowCondition(r);
+          if (oCondition || isBlank(r)) {
+            oModel.setProperty("/rows/" + i + "/error", false);
+          }
+          if (oCondition) {
+            oTokenizer.addToken(new Token({ key: "r" + i, text: filters.display(oField, oCondition) }));
+          }
+        });
+        oTitle.setText("Selected Items and Conditions (" + oTokenizer.getTokens().length + ")");
+      };
+
+      var removeRow = function (i) {
+        var aList = oModel.getProperty("/rows").slice();
+        aList.splice(i, 1);
+        if (aList.length === 0) {
+          aList.push(blank(sDefault));
+        }
+        oModel.setProperty("/rows", aList);
+      };
+
+      var valueControl = function (sProperty, bSecond, oContext) {
+        var oControl;
+        if (oField.kind === "date" || oField.kind === "datetime") {
+          oControl = new DatePicker({ valueFormat: "yyyy-MM-dd", value: "{cond>" + sProperty + "}" });
+        } else if (oField.kind === "time") {
+          oControl = new TimePicker({ valueFormat: "HH:mm:ss", value: "{cond>" + sProperty + "}" });
+        } else {
+          oControl = new Input({
+            value: "{cond>" + sProperty + "}",
+            showValueHelp: bSelect,
+            valueHelpRequest: function () {
+              support.valueHelp(oView, oHelp, false).then(function (aValues) {
+                if (aValues.length > 0) {
+                  oModel.setProperty(oContext.getPath() + "/" + sProperty, aValues[0]);
+                  refresh();
+                }
+              });
+            }
+          });
+        }
+        oControl.bindProperty("visible", { path: "cond>op", formatter: function (sOp) { return filters.valueCount(sOp) > (bSecond ? 1 : 0); } });
+        oControl.bindProperty("valueState", { path: "cond>error", formatter: function (bError) { return bError ? "Error" : "None"; } });
+        oControl.setValueStateText("Enter a valid value");
+        oControl.setLayoutData(new FlexItemData({ growFactor: 1, baseSize: "0" }));
+        return oControl.addStyleClass("raptConditionValue");
+      };
+
+      var oRows = new VBox(oView.createId("conditionsRows"), {
+        items: {
+          path: "cond>/rows",
+          factory: function (sId, oContext) {
+            return new HBox(sId, {
+              alignItems: "Center",
+              items: [
+                new Select({
+                  width: "15rem",
+                  selectedKey: "{cond>op}",
+                  items: aOperators.map(function (op) { return new Item({ key: op, text: filters.label(op) }); }),
+                  change: refresh
+                }).addStyleClass("raptConditionOperator"),
+                new HBox({
+                  layoutData: new FlexItemData({ growFactor: 1, baseSize: "0" }),
+                  items: [valueControl("v1", false, oContext), valueControl("v2", true, oContext)]
+                }),
+                new Button({
+                  icon: "sap-icon://decline",
+                  type: "Transparent",
+                  tooltip: "Remove Condition",
+                  press: function () {
+                    removeRow(Number(oContext.getPath().split("/").pop()));
+                    refresh();
+                  }
+                })
+              ]
+            }).addStyleClass("raptConditionRow");
+          }
+        }
+      });
+      var oAdd = new Button(oView.createId("conditionsAdd"), {
+        text: "Add",
+        icon: "sap-icon://add",
+        visible: !bSingle,
+        press: function () {
+          oModel.setProperty("/rows", oModel.getProperty("/rows").concat([blank(sDefault)]));
+        }
+      });
+      // with a value help, the tabs scroll and the tokens stay visible below them
+      var scroll = function (oContent) {
+        return bSelect ? new ScrollContainer({ height: "22rem", vertical: true, horizontal: false, content: [oContent] }) : oContent;
+      };
+      var oDefine = scroll(new VBox({ items: [oRows, new HBox({ justifyContent: "End", items: [oAdd] })] }).addStyleClass("sapUiTinyMarginTop"));
+      var oSearch;
+
+      var oSelect;
+      if (bSelect) {
+        var aColumns = support.valueHelpColumns(oHelp, mTexts);
+        oTable = new Table(oView.createId("conditionsTable"), {
+          mode: bSingle ? "SingleSelectLeft" : "MultiSelect",
+          includeItemInSelection: true,
+          growing: true,
+          growingThreshold: 20,
+          columns: aColumns.map(function (c) { return new Column({ header: new Text({ text: c.label }) }); }),
+          updateFinished: syncSelection,
+          selectionChange: function (oEvent) {
+            var bSelected = oEvent.getParameter("selected");
+            var aList = bSingle && bSelected ? [] : oModel.getProperty("/items").slice();
+            (oEvent.getParameter("listItems") || []).forEach(function (oItem) {
+              var sValue = String(oItem.getBindingContext().getProperty(oHelp.element));
+              var iIndex = aList.findIndex(function (it) { return filters.value(oField, String(it.value)) === filters.value(oField, sValue); });
+              if (bSelected && iIndex < 0) {
+                aList.push({ value: sValue, text: itemText(sValue) });
+              } else if (!bSelected && iIndex >= 0) {
+                aList.splice(iIndex, 1);
+              }
+            });
+            oModel.setProperty("/items", aList);
+            if (bSingle && bSelected && bDefine) {
+              oModel.setProperty("/rows", [blank(sDefault)]);
+            }
+            refresh();
+          }
+        });
+        oTable.bindAggregation("items", support.valueHelpItems(oHelp, aColumns, mTexts, []));
+        oSearch = new SearchField(oView.createId("conditionsSearch"), {
+          width: "100%",
+          search: function (oEvent) {
+            oTable.getBinding("items").filter(support.valueHelpSearch(oHelp, mTexts, oEvent.getParameter("query"), []));
+          }
+        });
+        oSelect = new VBox({ items: [oSearch.addStyleClass("sapUiTinyMarginTop"), scroll(oTable)] });
+      }
+
+      var oMain = oSelect && bDefine
+        ? new IconTabBar(oView.createId("conditionsTabs"), {
+          expandable: false,
+          selectedKey: aItems.length === 0 && aInitial.length > 0 ? "define" : "select",
+          items: [
+            new IconTabFilter({ key: "select", text: "Search and Select", content: [oSelect] }),
+            new IconTabFilter({ key: "define", text: "Define Conditions", content: [oDefine] })
+          ]
+        }).addStyleClass("sapUiNoContentPadding")
+        : oSelect || oDefine;
+      oTitle = new Title({ text: "", level: "H6" }).addStyleClass("sapUiSmallMarginTop sapUiTinyMarginBottom");
+      oTokenizer = new Tokenizer(oView.createId("conditionsTokens"), {
+        width: "100%",
+        renderMode: "Loose",
+        tokenDelete: function (oEvent) {
+          var aKeys = (oEvent.getParameter("tokens") || []).map(function (t) { return t.getKey(); });
+          var aRowIndexes = [];
+          oModel.setProperty("/items", oModel.getProperty("/items").filter(function (_it, i) { return aKeys.indexOf("i" + i) < 0; }));
+          aKeys.forEach(function (k) {
+            if (k[0] === "r") {
+              aRowIndexes.push(Number(k.slice(1)));
+            }
+          });
+          aRowIndexes.sort(function (a, b) { return b - a; }).forEach(removeRow);
+          syncSelection();
+          refresh();
+        }
+      });
+
+      var oDialog = new Dialog(oView.createId("conditions"), {
+        title: oField.label,
+        contentWidth: bSelect ? "60rem" : "46rem",
+        initialFocus: oSearch,
+        resizable: true,
+        draggable: true,
+        content: [new VBox({ items: [oMain, oTitle, oTokenizer] }).addStyleClass("sapUiSmallMargin")],
+        beginButton: new Button(oView.createId("conditionsOk"), {
+          text: "OK",
+          type: "Emphasized",
+          press: function () {
+            var bError = false;
+            var aConditions = [];
+            oModel.getProperty("/rows").forEach(function (r, i) {
+              var oCondition = rowCondition(r);
+              var bWrong = !oCondition && !isBlank(r);
+              oModel.setProperty("/rows/" + i + "/error", bWrong);
+              bError = bError || bWrong;
+              if (oCondition) {
+                aConditions.push({ condition: oCondition, text: filters.display(oField, oCondition) });
+              }
+            });
+            if (bError) {
+              if (oMain.setSelectedKey) {
+                oMain.setSelectedKey("define");
+              }
+              return;
+            }
+            var aResult = oModel.getProperty("/items").map(function (it) {
+              return { condition: { op: "EQ", values: [it.value] }, text: it.text };
+            }).concat(aConditions).filter(function (c, i, a) {
+              return a.findIndex(function (o) { return filters.text(o.condition) === filters.text(c.condition); }) === i;
+            });
+            done(bSingle ? aResult.slice(-1) : aResult);
+            oDialog.close();
+          }
+        }),
+        endButton: new Button(oView.createId("conditionsCancel"), {
+          text: "Cancel",
+          press: function () {
+            oDialog.close();
+          }
+        }),
+        afterClose: function () {
+          done(null);
+          oDialog.destroy();
+        }
+      });
+      oDialog.setModel(oModel, "cond");
+      oModel.attachPropertyChange(refresh);
+      oView.addDependent(oDialog);
+      refresh();
+      oDialog.open();
+    });
+  }
+
+  return {
+    /**
+     * Opens the value help of a filter field. aConditions: the current conditions, [{ condition,
+     * text }]; resolves the new ones, or null when cancelled.
+     */
+    open: function (oView, oField, aConditions) {
+      var oTexts = oField.valueHelp ? support.valueHelpTexts(oView, oField.valueHelp) : Promise.resolve({});
+      return oTexts.then(function (mTexts) {
+        return dialog(oView, oField, aConditions, mTexts);
+      });
+    }
+  };
 });
 `;
 
@@ -1058,8 +1603,9 @@ export const LIST_CONTROLLER = `sap.ui.define([
   "sap/m/p13n/SortPanel",
   "rapt/app/controller/support",
   "rapt/app/controller/filters",
+  "rapt/app/controller/conditions",
   "rapt/app/controller/variants"
-], function (Controller, Filter, Sorter, JSONModel, MessageBox, MessageToast, Token, SelectDialog, StandardListItem, P13nPopup, SelectionPanel, SortPanel, support, filters, variants) {
+], function (Controller, Filter, Sorter, JSONModel, MessageBox, MessageToast, Token, SelectDialog, StandardListItem, P13nPopup, SelectionPanel, SortPanel, support, filters, conditions, variants) {
   "use strict";
 
   function id(sName) {
@@ -1162,16 +1708,13 @@ export const LIST_CONTROLLER = `sap.ui.define([
         if (!oControl) {
           return;
         }
-        if (oField.kind === "date" || oField.kind === "datetime") {
-          if (oControl.getDateValue()) {
-            oState.filters[oField.property] = { from: support.dateText(oControl.getDateValue()), to: oControl.getSecondDateValue() ? support.dateText(oControl.getSecondDateValue()) : "" };
-          }
-        } else if (oField.kind === "boolean" || oField.kind === "enum") {
+        if (oField.kind === "boolean" || oField.kind === "enum") {
           if (oControl.getSelectedKey() !== "") {
             oState.filters[oField.property] = oControl.getSelectedKey();
           }
         } else if (oControl.getTokens().length > 0) {
-          oState.filters[oField.property] = oControl.getTokens().map(function (t) { return t.getText(); });
+          // the conditions as texts (=x, *x*, a...b, !(…)): the keys of the tokens (D65)
+          oState.filters[oField.property] = oControl.getTokens().map(function (t) { return t.getKey(); });
         }
       }, this);
       Object.keys(oColumns).forEach(function (sProperty) {
@@ -1195,15 +1738,20 @@ export const LIST_CONTROLLER = `sap.ui.define([
         if (!oControl) {
           return;
         }
-        if (oField.kind === "date" || oField.kind === "datetime") {
-          oControl.setDateValue(vValue ? new Date(vValue.from + "T00:00:00") : null);
-          oControl.setSecondDateValue(vValue && vValue.to ? new Date(vValue.to + "T00:00:00") : null);
-        } else if (oField.kind === "boolean" || oField.kind === "enum") {
+        if (oField.kind === "boolean" || oField.kind === "enum") {
           oControl.setSelectedKey(vValue || "");
         } else {
+          if (vValue && !Array.isArray(vValue)) {
+            // a date range of a variant saved before D65: { from, to }
+            vValue = vValue.from ? [vValue.to ? vValue.from + "..." + vValue.to : "=" + vValue.from] : [];
+          }
           oControl.setValue("");
           oControl.setValueState("None");
-          oControl.setTokens((vValue || []).map(function (sText) { return new Token({ text: sText, key: sText }); }));
+          oControl.setTokens((vValue || []).map(function (sText) {
+            var oCondition = filters.parse(oField, sText);
+            return oCondition ? this._token(oField, oCondition) : null;
+          }, this).filter(Boolean));
+          this._describe(oControl, oField);
         }
       }, this);
       oState.hidden.forEach(function (sProperty) { oColumns[sProperty] = false; });
@@ -1236,13 +1784,42 @@ export const LIST_CONTROLLER = `sap.ui.define([
         oControl.setValueStateText("Enter a valid value or condition (=, !=, >, >=, <, <=, a...b, *x*)");
         return false;
       }
-      var sToken = filters.text(oCondition);
-      if (!oControl.getTokens().some(function (t) { return t.getText() === sToken; })) {
-        oControl.addToken(new Token({ text: sToken, key: sToken }));
+      var oField = this._field(oControl.data("property"));
+      var sKey = filters.text(oCondition);
+      if (oField.filter && oField.filter.single) {
+        oControl.removeAllTokens();
+      }
+      if (!oControl.getTokens().some(function (t) { return t.getKey() === sKey; })) {
+        oControl.addToken(this._token(oField, oCondition));
+        this._describe(oControl, oField);
       }
       oControl.setValue("");
       oControl.setValueState("None");
       return true;
+    },
+
+    /** The token of a condition: its text as key (parsed by onSearch, kept in variants), shown as in SAP Fiori elements. */
+    _token: function (oField, oCondition, sText) {
+      return new Token({ key: filters.text(oCondition), text: sText || filters.display(oField, oCondition) });
+    },
+
+    /** Shows the descriptions of the values of a value help in the "equal to" tokens: "Euro (EUR)". */
+    _describe: function (oControl, oField) {
+      if (!oField.valueHelp || !oField.valueHelp.text) {
+        return;
+      }
+      this._mTexts = this._mTexts || {};
+      if (!this._mTexts[oField.property]) {
+        this._mTexts[oField.property] = support.valueHelpTexts(this.getView(), oField.valueHelp);
+      }
+      this._mTexts[oField.property].then(function (mTexts) {
+        oControl.getTokens().forEach(function (t) {
+          var oCondition = filters.parse(oField, t.getKey());
+          if (oCondition && oCondition.op === "EQ" && mTexts[oCondition.values[0]] !== undefined) {
+            t.setText(filters.display(oField, oCondition, mTexts[oCondition.values[0]]));
+          }
+        });
+      });
     },
 
     onFilterSubmit: function (oEvent) {
@@ -1268,18 +1845,14 @@ export const LIST_CONTROLLER = `sap.ui.define([
         var oFilter = null;
         // a mandatory filter (@Consumption.filter.mandatory, D57)
         if (oField.filter && oField.filter.mandatory) {
-          var bEmpty = oControl.getTokens ? oControl.getTokens().length === 0 && oControl.getValue() === "" : oControl.getSelectedKey ? oControl.getSelectedKey() === "" : !oControl.getDateValue();
+          var bEmpty = oControl.getTokens ? oControl.getTokens().length === 0 && oControl.getValue() === "" : oControl.getSelectedKey() === "";
           oControl.setValueState(bEmpty ? "Error" : "None");
           if (bEmpty) {
             oControl.setValueStateText("Fill in this filter");
             bValid = false;
           }
         }
-        if (oField.kind === "date" || oField.kind === "datetime") {
-          var oFrom = oControl.getDateValue();
-          var oTo = oControl.getSecondDateValue();
-          oFilter = filters.dateFilter(oField, oFrom ? support.dateText(oFrom) : "", oTo ? support.dateText(oTo) : "");
-        } else if (oField.kind === "boolean") {
+        if (oField.kind === "boolean") {
           var sKey = oControl.getSelectedKey();
           oFilter = sKey === "" ? null : new Filter(oField.property, "EQ", sKey === "true");
         } else if (oField.kind === "enum") {
@@ -1287,7 +1860,7 @@ export const LIST_CONTROLLER = `sap.ui.define([
           oFilter = sMember === "" ? null : new Filter(oField.property, "EQ", sMember);
         } else {
           bValid = this._commitText(oControl) && bValid;
-          var aConditions = oControl.getTokens().map(function (t) { return filters.parse(oField, t.getText()); }).filter(Boolean);
+          var aConditions = oControl.getTokens().map(function (t) { return filters.parse(oField, t.getKey()); }).filter(Boolean);
           oFilter = filters.fieldFilter(oField, aConditions);
         }
         if (oFilter) {
@@ -1552,20 +2125,26 @@ export const LIST_CONTROLLER = `sap.ui.define([
       oPopup.open(oEvent.getSource());
     },
 
+    /** The value help of a filter field: "Search and Select" (value help) and "Define Conditions" (D65). */
     onFilterValueHelp: function (oEvent) {
       var oControl = oEvent.getSource();
       var oField = this._field(oControl.data("property"));
       var that = this;
-      support.valueHelp(this.getView(), oField.valueHelp, true).then(function (aValues) {
-        aValues.forEach(function (sValue) {
-          var sToken = "=" + sValue;
-          if (!oControl.getTokens().some(function (t) { return t.getText() === sToken; })) {
-            oControl.addToken(new Token({ text: sToken, key: sToken }));
-          }
-        });
-        if (aValues.length > 0) {
-          that.onFilterChange();
+      if (!this._commitText(oControl)) {
+        oControl.setValue("");
+        oControl.setValueState("None");
+      }
+      var aCurrent = oControl.getTokens().map(function (t) {
+        var oCondition = filters.parse(oField, t.getKey());
+        return oCondition ? { condition: oCondition, text: t.getText() } : null;
+      }).filter(Boolean);
+      conditions.open(this.getView(), oField, aCurrent).then(function (aConditions) {
+        if (!aConditions) {
+          return;
         }
+        oControl.setTokens(aConditions.map(function (c) { return that._token(oField, c.condition, c.text); }));
+        oControl.setValueState("None");
+        that.onFilterChange();
       });
     },
 

@@ -176,25 +176,23 @@ function columns(table: UiTable): string {
     .join("\n            ");
 }
 
-/** The control of a filter field: conditions (tokens), date range or yes/no. */
+/** The control of a filter field: conditions (tokens) with their value help dialog (D65), or yes/no. */
 function filterControl(f: UiField): string {
   const controlId = `filter_${idOf(f.property)}`;
   switch (f.kind) {
-    case "date":
-    case "datetime":
-      return `<DateRangeSelection id="${controlId}" width="100%" change=".onFilterChange"/>`;
     case "boolean":
       return `<Select id="${controlId}" width="100%" change=".onFilterChange"><core:Item key="" text=""/><core:Item key="true" text="Yes"/><core:Item key="false" text="No"/></Select>`;
     case "enum":
       return `<Select id="${controlId}" width="100%" change=".onFilterChange">${enumItems(f, true)}</Select>`;
     default:
-      return `<MultiInput id="${controlId}" width="100%"${f.filter?.single === true ? ' maxTokens="1"' : ""} submit=".onFilterSubmit" tokenUpdate=".onFilterChange" showValueHelp="${f.valueHelp === undefined ? "false" : "true"}" valueHelpRequest=".onFilterValueHelp" placeholder="${esc(placeholderOf(f))}"><customData><core:CustomData key="property" value="${esc(f.property)}"/></customData></MultiInput>`;
+      return `<MultiInput id="${controlId}" width="100%"${f.filter?.single === true ? ' maxTokens="1"' : ""} submit=".onFilterSubmit" tokenUpdate=".onFilterChange" showValueHelp="true" valueHelpRequest=".onFilterValueHelp" placeholder="${esc(placeholderOf(f))}"><customData><core:CustomData key="property" value="${esc(f.property)}"/></customData></MultiInput>`;
   }
 }
 
 /** A hint of the condition syntax of a filter field. */
 function placeholderOf(f: UiField): string {
-  return f.kind === "text" ? "contains, =, *, !=" : "=, >, <, a...b";
+  if (f.kind === "text") return f.valueHelp === undefined && f.key !== true ? "contains, =, *, !=" : "=, *, !=, a...b";
+  return f.kind === "date" || f.kind === "datetime" ? "=, >, <, a...b, a - b" : "=, >, <, a...b";
 }
 
 function listReport(page: UiPage): string {

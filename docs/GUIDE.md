@@ -263,9 +263,18 @@ complète, annotation par annotation : [ANNOTATIONS.md](ANNOTATIONS.md).
   | `>100`, `>=100`, `<100`, `<=100` | comparaisons |
   | `1...5` | intervalle (bornes comprises) |
   | `Ro*`, `*me`, `*om*` | commence par, finit par, contient |
+  | `<empty>` | vide (texte : `''` ou `null`) |
+  | `!(*om*)`, `!(1...5)`, `!(<empty>)` | exclusions : ne contient pas, hors intervalle, non vide… |
 
-  Une suite de chiffres (NUMC) se saisit sans ses zéros de tête (`3` cherche `00000003`) ; les dates
-  se filtrent par plage. *Adapt Filters* ajoute les colonnes comme filtres ; *Clear* vide tout.
+  Une suite de chiffres (NUMC) se saisit sans ses zéros de tête (`3` cherche `00000003`) ; une
+  valeur seule cherche l'égalité pour une clé ou un champ avec value help. Les dates se saisissent
+  au format de la langue ou en ISO (`Jun 1, 2026 - Jul 31, 2026`, `2026-06-01...2026-07-31`).
+  L'icône du champ ouvre le dialogue de SAP Fiori elements ([D65](DECISIONS.md)) : *Search and
+  Select* (valeurs du value help, si le champ en a un) et *Define Conditions* (opérateur et
+  valeurs par ligne : *equal to*, *contains*, *between*, *greater than*, *empty*, leurs exclusions…,
+  selon le type du champ et `@Consumption.filter.selectionType`) ; les conditions incluses d'un
+  champ se combinent en « ou », les exclusions en « et non ». *Adapt Filters* ajoute les colonnes
+  comme filtres ; *Clear* vide tout.
 - **Vues de l'utilisateur** (variantes) : le titre du List Report ouvre la gestion des vues :
   enregistrer les filtres, les colonnes visibles et le tri sous un nom, choisir la vue par défaut.
   Elles sont enregistrées par utilisateur dans la base de l'application ([D51](DECISIONS.md)).

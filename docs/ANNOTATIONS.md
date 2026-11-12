@@ -45,16 +45,16 @@ Décisions : [D10](DECISIONS.md) (UI), [D44](DECISIONS.md), [D56](DECISIONS.md) 
 | `@UI.facet` purpose `#HEADER` : `#DATAPOINT_REFERENCE`, `#FIELDGROUP_REFERENCE`, `#IDENTIFICATION_REFERENCE` | ✅ | En-tête de l'Object Page (D57) |
 | `@UI.facet` : `#PRESENTATIONVARIANT_REFERENCE`, `#CHART_REFERENCE`, `#ADDRESS_REFERENCE`, `#CONTACT_REFERENCE`, purpose `#QUICK_VIEW` | ❌ | |
 | `@UI.dataPoint` (`title`, `description`, `targetValue`, `criticality`, `visualization: #PROGRESS / #RATING`) | ✅ | `UI.DataPoint`, barre de progression, notation, nombre (D57) |
-| `@UI.selectionField` | ✅ | Barre de filtres |
+| `@UI.selectionField` | ✅ | Barre de filtres, conditions et dialogue *Search and Select* / *Define Conditions* (D51, D65) |
 | `@UI.hidden` | ✅ | `UI.Hidden`, absent de l'UI |
 | `@UI.multiLineText` | ✅ | `UI.MultiLineText`, zone de texte (D57) |
 | `@UI.textArrangement` + `@ObjectModel.text.element` | ✅ | `Common.Text`, « Texte (ID) », « ID (Texte) », texte seul (D57) |
 | `@UI.masked`, `@UI.placeholder`, `@UI.inputMask` | ❌ | |
-| `@Consumption.valueHelpDefinition` (`entity`, `additionalBinding`, `useForValidation`) | ✅ | `Common.ValueList`, dialogue ou liste déroulante (D44, D56) |
+| `@Consumption.valueHelpDefinition` (`entity`, `additionalBinding`, `useForValidation`) | ✅ | `Common.ValueList`, dialogue ou liste déroulante (D44, D56) ; onglet *Search and Select* du dialogue des filtres (D65) |
 | `@Consumption.valueHelpDefinition` (`qualifier`, `distinctValues`, `presentationVariantQualifier`) | ❌ | Un value help par élément |
 | `@Consumption.filter.defaultValue` | ✅ | `Common.FilterDefaultValue`, filtre initial du List Report (D57) |
 | `@Consumption.filter.mandatory` | ✅ | `Capabilities.FilterRestrictions/RequiredProperties`, filtre obligatoire (D57) |
-| `@Consumption.filter.selectionType`, `multipleSelections` | 🟡 | `FilterExpressionRestrictions` ; l'UI limite à une valeur (`#SINGLE`, `multipleSelections: false`) |
+| `@Consumption.filter.selectionType`, `multipleSelections` | ✅ | `FilterExpressionRestrictions` ; opérateurs du dialogue des filtres : `#SINGLE` égal, `#INTERVAL` comparaisons et intervalles, une condition si `multipleSelections: false` (D57, D65) |
 | `@Consumption.hidden` | ✅ | Élément non exposé (sauf clé ou élément d'une association) (D57) |
 | `@Semantics.amount.currencyCode`, `@Semantics.quantity.unitOfMeasure` | ✅ | `Measures.ISOCurrency` / `Measures.Unit`, montant et devise |
 | `@Semantics.currencyCode`, `@Semantics.unitOfMeasure` | 📄 | `Common.IsCurrency`, `Common.IsUnit` (déduits du type) |

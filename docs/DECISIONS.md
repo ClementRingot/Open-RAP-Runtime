@@ -1248,3 +1248,43 @@ et la conséquence. Les numéros D1 à D13 correspondent aux points 1 à 13 du �
   configurés). À activer une fois : *Settings → Pages → Source : GitHub Actions*.
 - **Pourquoi** : une adresse à partager, toujours à jour, sans serveur à maintenir.
 - **Tests** : rendu vérifié dans Chromium (bureau, mobile sans défilement horizontal, mode sombre).
+
+## D65 — Aide à la saisie des filtres : *Search and Select* et *Define Conditions*
+
+- **Contexte** : les champs de filtre du List Report (et de l'ALP) acceptaient les conditions
+  saisies (D51) et ouvraient, pour un champ avec value help, une liste de valeurs (D44) ; il
+  manquait le dialogue de SAP Fiori elements où l'on compose les conditions (opérateur, valeurs,
+  exclusions) à côté de la sélection dans le value help. Le dialogue de `sap.ui.comp` /
+  `sap.ui.mdc` est SAPUI5 seulement.
+- **Décision** :
+  - l'icône de chaque champ de filtre à jetons (tous sauf booléens et types énumérés, qui restent
+    des listes de choix) ouvre un dialogue construit en `sap.m` (`controller/conditions.js`) :
+    onglet *Search and Select* (si le champ a un value help : recherche, table à sélection
+    multiple ou simple, descriptions de la vue de textes), onglet *Define Conditions* (une ligne
+    par condition : opérateur, valeur(s), aide à la saisie sur la valeur, *Add*), et en bas les
+    jetons *Selected Items and Conditions* ;
+  - opérateurs comme Fiori elements : *equal to*, *contains*, *starts with*, *ends with*,
+    *between*, *less than*, *less than or equal to*, *greater than*, *greater than or equal to*,
+    *empty*, et leurs exclusions (*not equal to*, *does not contain*, *not between*, *not empty*…),
+    filtrés par type : texte tous, nombres et NUMC comparaisons, dates et heures comparaisons et
+    *empty* (sélecteur de date / d'heure), UUID égal / différent ;
+  - `$filter` : conditions incluses d'un champ en `or`, exclusions en `and not`, champs en `and` ;
+    *empty* d'un texte = `''` ou `null` ; date-heure par jours entiers (UTC) ;
+  - jetons écrits comme Fiori elements : valeur seule (avec sa description : « Euro (EUR) »),
+    `!(=x)`, `*x*`, `a...b`, `<empty>`, `!(…)` ; la clé du jeton est la condition (`=x`, `!(*x*)`)
+    relue à la recherche et gardée dans les variantes (les variantes antérieures restent lues, y
+    compris les plages de dates `{ from, to }`) ;
+  - saisie directe : `!(…)`, `<empty>` et `a - b` (dates) en plus de D51 ; une valeur seule est
+    *contains* pour un texte libre, *equal to* pour une clé ou un champ avec value help ; les dates
+    se saisissent au format de la langue ou en ISO ;
+  - `@Consumption.filter.selectionType` (`AllowedExpressions` déjà dans le CSDL, D57) :
+    `#SINGLE` égal seulement, `#INTERVAL` comparaisons et intervalles (sans motif), une seule
+    condition si `multipleSelections: false` (sans exclusion pour `SingleRange`).
+- **Pourquoi** : c'est le « matchcode » des filtres Fiori elements ; garder la sélection dans le
+  value help et les conditions dans le même dialogue évite deux gestes différents pour un champ.
+- **Limites** : pas d'opérateurs de dates relatives (*today*, *last week*…) ; les booléens et types
+  énumérés gardent leur liste de choix ; une valeur saisie sans value help s'affiche sans
+  description.
+- **Tests** : `compiler/test/ui.test.ts` (lecture et écriture des conditions, opérateurs par type
+  et `selectionType`, `$filter`), `runtime/test/table-entity.test.ts` (dialogue dans Chromium :
+  sélection dans le value help, exclusion, conditions saisies, lignes filtrées).

@@ -221,10 +221,10 @@ ajoutent ce que la fixture n'utilise pas : numérotation, feature control global
 | Fonctionnalité | Statut | Note |
 |---|---|---|
 | List Report : colonnes (`UI.lineItem`), tri (`UI.presentationVariant`), pagination continue | ✅ | `sap.f.DynamicPage`, `sap.m.Table`. |
-| Champs de filtre (`UI.selectionField`), recherche (`@Search.searchable`) | ✅ | Conditions comme SAP Fiori (`=`, `!=`, `>`, `>=`, `<`, `<=`, `a...b`, `*x*`), plusieurs valeurs par champ, NUMC sans zéros de tête, plages de dates ; *Clear*, *Adapt Filters* (colonnes ajoutées comme filtres), résumé « Filtered By » (D51). |
+| Champs de filtre (`UI.selectionField`), recherche (`@Search.searchable`) | ✅ | Conditions comme SAP Fiori (`=`, `!=`, `>`, `>=`, `<`, `<=`, `a...b`, `*x*`, `<empty>`, exclusions `!(…)`), plusieurs valeurs par champ, NUMC sans zéros de tête, dates au format de la langue ; dialogue *Search and Select* / *Define Conditions* comme Fiori elements, opérateurs selon le type et `selectionType` (D65) ; *Clear*, *Adapt Filters* (colonnes ajoutées comme filtres), résumé « Filtered By » (D51). |
 | Variantes de l'utilisateur (`sap.m.VariantManagement`) | ✅ | Filtres, filtres et colonnes visibles, tri ; enregistrées par utilisateur par le service (`$variants`) ; variante par défaut, favoris (D51). |
 | Paramètres du tableau : colonnes visibles, tri | ✅ | `sap.m.p13n.Popup` ; nombre de lignes dans le titre du tableau. |
-| Aide à la saisie (`@Consumption.valueHelpDefinition`) | ✅ | Entité exposée implicitement, `Common.ValueList`, dialogue avec les descriptions de la vue de textes, dans les filtres et l'Object Page (D44). |
+| Aide à la saisie (`@Consumption.valueHelpDefinition`) | ✅ | Entité exposée implicitement, `Common.ValueList`, dialogue avec les descriptions de la vue de textes, dans l'Object Page (D44) et dans le dialogue des filtres avec les conditions (D65). |
 | Rafraîchissement de la liste après une modification sur l'Object Page, fil d'Ariane | ✅ | D51. |
 | Création non-draft depuis la List Report | ✅ | Object Page en mode création, `POST` à l'enregistrement. |
 | Suppression, actions de la table (`#FOR_ACTION` dans `UI.lineItem`) | ✅ | Sur la ligne sélectionnée. |

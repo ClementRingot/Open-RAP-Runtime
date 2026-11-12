@@ -24,6 +24,7 @@ import {
   type ODataService,
   type ValueHelp,
 } from "@rap-transpiler/model";
+import { allowedFilterExpressions } from "../csdl.js";
 
 export type FieldKind = "text" | "digits" | "integer" | "decimal" | "amount" | "boolean" | "date" | "time" | "datetime" | "uuid" | "enum";
 
@@ -59,8 +60,11 @@ export interface UiField {
   multiLine?: boolean;
   /** `@Semantics.email.address`, `@Semantics.telephone.type`, line item `#WITH_URL` (D57). */
   link?: { kind: "email" | "phone" | "url"; url?: string };
-  /** `@Consumption.filter`: default value, mandatory filter, a single value (D57). */
-  filter?: { defaultValue?: string; mandatory?: boolean; single?: boolean };
+  /**
+   * `@Consumption.filter`: default value, mandatory filter, a single condition (D57), the allowed
+   * conditions of `selectionType` (D65).
+   */
+  filter?: { defaultValue?: string; mandatory?: boolean; single?: boolean; expressions?: "SingleValue" | "SingleRange" | "MultiRange" };
 }
 
 /** A header facet of the object page (`@UI.facet` purpose #HEADER, D57). */
@@ -342,6 +346,11 @@ class LayoutBuilder {
     if (typeof defaultValue === "string" || typeof defaultValue === "number") filter.defaultValue = String(defaultValue);
     if (getAnnotation(annotations, "Consumption.filter.mandatory") === true) filter.mandatory = true;
     if (getAnnotation(annotations, "Consumption.filter.selectionType") === "#SINGLE" || getAnnotation(annotations, "Consumption.filter.multipleSelections") === false) filter.single = true;
+    const expressions = allowedFilterExpressions(annotations);
+    if (expressions !== undefined) {
+      filter.expressions = expressions;
+      if (expressions !== "MultiRange") filter.single = true;
+    }
     if (Object.keys(filter).length > 0) result.filter = filter;
   }
 
