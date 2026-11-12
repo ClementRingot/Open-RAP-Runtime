@@ -4,6 +4,18 @@
   "description": "Compiles SAP RAP sources (abapGit format) into a standalone Node.js OData V4 application.",
   "type": "module",
   "license": "MIT",
+  "homepage": "https://clementringot.github.io/RAP-Transpiler/",
+  "keywords": [
+    "sap",
+    "rap",
+    "abap",
+    "cds",
+    "odata",
+    "odata-v4",
+    "abapgit",
+    "compiler",
+    "cli"
+  ],
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
   "exports": {
@@ -16,9 +28,6 @@
       "default": "./dist/cli.js"
     }
   },
-  "bin": {
-    "rapt": "./dist/cli.js"
-  },
   "files": [
     "dist",
     "framework",
@@ -26,6 +35,9 @@
   ],
   "engines": {
     "node": ">=22"
+  },
+  "publishConfig": {
+    "access": "public"
   },
   "scripts": {
     "build": "tsc -p tsconfig.build.json && node scripts/copy-docs.mjs"
@@ -36,6 +48,5 @@
     "@rap-transpiler/model": "workspace:*",
     "chevrotain": "13.2.0",
     "fast-xml-parser": "5.12.0"
-  },
-  "homepage": "https://clementringot.github.io/RAP-Transpiler/"
+  }
 }

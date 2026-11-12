@@ -84,7 +84,9 @@ the `rapt` command of the PATH.
 Push a `v1.2.3` tag: the `release.yml` workflow builds the `.vsix` (version 1.2.3) and attaches
 it to the GitHub release of the tag. It also publishes it on the Visual Studio Marketplace when
 the `VSCE_PAT` secret is set (publisher `clementringot` to create on the Marketplace), and on
-Open VSX (VSCodium, Cursor…) when the `OVSX_PAT` secret is set.
+Open VSX (VSCodium, Cursor…) when the `OVSX_PAT` secret is set. The same tag publishes the CLI
+on npm (`rap-transpiler`) when the `NPM_TOKEN` secret is set (see the deployment guide of the
+documentation).
 
 ```sh
 git tag v0.1.0 && git push origin v0.1.0

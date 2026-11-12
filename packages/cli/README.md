@@ -18,7 +18,9 @@ rapt agent .                         # MCP server (stdio) of rapt for AI coding 
 ```
 
 Node.js 22 or later. The package contains everything `rapt dev` needs (OpenUI5, an embedded
-PostgreSQL); no SAP library, only permissive open source licenses.
+PostgreSQL); no SAP library, only permissive open source licenses. In a CI, without a global
+installation: `npx rap-transpiler check my-project`, or `rap-transpiler` as a `devDependency` of
+the project and `npx rapt …`.
 
 For AI agents (Claude Code, Cursor…): `claude mcp add rapt -- rapt agent .` gives the agent the
 tools `rapt_check`, `rapt_generate`, `rapt_new_business_object`, `rapt_floorplan`,

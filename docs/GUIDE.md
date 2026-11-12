@@ -71,8 +71,12 @@ rapt new my-project Travel --prefix ZRT    # a complete managed BO
 rapt dev my-project                         # http://localhost:8080/: development launchpad
 ```
 
-Install it with `npm install -g rap-transpiler` (Node.js 22), or run it with
-`npx rap-transpiler <command>`. From a clone of the repository: `pnpm install && pnpm build`,
+Install it with `npm install -g rap-transpiler` (Node.js 22): the package installs the `rapt`
+command with everything it needs (runtime, OpenUI5, PGlite) ([D65](DECISIONS.md)). Without a
+global installation: `npx rap-transpiler <command>` (for example `npx rap-transpiler check
+my-project` in a CI), or `rap-transpiler` as a `devDependency` of the project and `npx rapt …`.
+The libraries `@rap-transpiler/compiler`, `@rap-transpiler/runtime` and `@rap-transpiler/model`
+are published separately too. From a clone of the repository: `pnpm install && pnpm build`,
 then `node packages/compiler/dist/cli.js` instead of `rapt`.
 
 ## 3. The project

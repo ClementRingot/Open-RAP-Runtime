@@ -1,19 +1,35 @@
 {
   "name": "rap-transpiler",
   "version": "0.1.0",
-  "description": "rapt: develop, test and run SAP RAP business objects without an SAP system (OData V4, RAP managed runtime, transpiled ABAP, OpenUI5 UI).",
+  "description": "rapt, the command line of rap-transpiler: compiles SAP RAP sources (abapGit format) into a standalone Node.js OData V4 application, with what rapt dev serves (runtime, OpenUI5, PGlite).",
   "type": "module",
   "license": "MIT",
   "homepage": "https://clementringot.github.io/RAP-Transpiler/",
-  "keywords": ["abap", "rap", "sap", "cds", "odata", "abapgit", "openui5", "mcp"],
+  "keywords": [
+    "sap",
+    "rap",
+    "abap",
+    "cds",
+    "odata",
+    "odata-v4",
+    "abapgit",
+    "openui5",
+    "cli"
+  ],
   "bin": {
-    "rapt": "./bin/rapt.mjs"
+    "rapt": "./dist/rapt.js"
   },
   "files": [
-    "bin"
+    "dist"
   ],
   "engines": {
     "node": ">=22"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json"
   },
   "dependencies": {
     "@electric-sql/pglite": "0.5.16",

@@ -1306,22 +1306,31 @@ correspond to points 1 to 13 of §11 of PLAN.md. The milestones M1 to M6 are tho
 - **Context**: outside VS Code (CI pipelines, a terminal agent, another editor), rapt needed a
   clone of the repository.
 - **Decision**: the package `rap-transpiler` (`packages/cli`) gives the `rapt` command
-  (`npm install -g rap-transpiler`, `npx rap-transpiler check .`). It depends on
-  `@rap-transpiler/compiler` and `@rap-transpiler/runtime` and on what `rapt dev` serves (OpenUI5,
-  PGlite, less-openui5, at the versions of the runtime), like the `rapt/` of the extension (D39).
-  Its `bin/rapt.mjs` calls `main` of `@rap-transpiler/compiler/cli` (new export); `cli.js` runs
-  itself only when it is the program (`realpath` of `argv[1]`), not when imported.
-  `COMPILER_VERSION` is read from the `package.json` of the compiler. The `release.yml` workflow
-  publishes `@rap-transpiler/model`, `runtime`, `compiler` and `rap-transpiler` with the version of
-  the tag when the secret `NPM_TOKEN` is set (the `@rap-transpiler` organization must exist on
-  npm; the name `rapt` is taken on npm, hence `rap-transpiler`).
+  (`npm install -g rap-transpiler`, `npx rap-transpiler check .`, or a `devDependency` of the
+  project and `npx rapt …`). It depends on `@rap-transpiler/compiler` and
+  `@rap-transpiler/runtime` and on what `rapt dev` serves (OpenUI5, PGlite, less-openui5, at the
+  versions of the runtime, checked by a test), like the `rapt/` of the extension (D39). Its
+  `dist/rapt.js` calls `main` of `@rap-transpiler/compiler/cli` (new export); `cli.js` runs
+  itself only when it is the program (`isEntryPoint`: real paths compared, symbolic links and
+  Windows paths included), so the command runs once. The compiler no longer declares a `bin`:
+  one package gives `rapt`. `COMPILER_VERSION` is read from the `package.json` of the compiler.
+  Each package has a README for npm; `@rap-transpiler/model`, `compiler` and `runtime` are also
+  usable as libraries.
+- **Release**: the `npm` job of `release.yml` sets the version of the tag on the four packages,
+  builds them, packs them (`pnpm pack`), installs the archives with npm in an empty folder and
+  runs `rapt --help`, `rapt check` and `rapt build` of the fixture; then, when the secret
+  `NPM_TOKEN` is set, publishes them (`workspace:*` becomes the version of the tag). npm
+  provenance is added when the repository is public. Once: create the `rap-transpiler`
+  organization on npmjs.com and the `NPM_TOKEN` secret ([DEPLOYMENT.md](DEPLOYMENT.md)). The name
+  `rapt` is taken on npm, hence `rap-transpiler`.
 - **Why**: the same CLI everywhere; CI can check RAP sources without VS Code; a terminal agent
   can install it in one command.
 - **Note**: publishing makes the compiled code public on npm, as the `.vsix` of the website
   already does.
-- **Tests**: `cli/test/cli.test.ts`; the four packages packed (`pnpm pack`), installed with npm in
-  an empty folder: `rapt check`, `rapt dev` (UI, OpenUI5, OData, documentation) work;
-  `pnpm publish --dry-run`.
+- **Tests**: `cli/test/package.test.ts` (dependencies, a single run), `cli/test/cli.test.ts`
+  (`rapt check`, `rapt agent` in the help), `compiler/test/cli.test.ts` (`isEntryPoint`); the four
+  packages packed and installed with npm in an empty folder: `rapt check`, `rapt dev` (UI,
+  OpenUI5, OData, documentation) work; `pnpm publish --dry-run`.
 
 ## D66 — Menus of the extension: two ways to create, greyed-out commands, required floorplan
 

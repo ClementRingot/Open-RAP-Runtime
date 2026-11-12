@@ -5,7 +5,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 
-const BIN = fileURLToPath(new URL("../bin/rapt.mjs", import.meta.url));
+const BIN = fileURLToPath(new URL("../dist/rapt.js", import.meta.url));
 const FIXTURE = fileURLToPath(new URL("../../../fixtures/travel", import.meta.url));
 
 describe("rap-transpiler (npm)", () => {

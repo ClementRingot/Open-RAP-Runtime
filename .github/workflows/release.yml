@@ -2,8 +2,8 @@ name: Release
 
 # A tag v1.2.3 publishes the VS Code extension: the .vsix is attached to the GitHub release of
 # the tag, and published to the Visual Studio Marketplace and Open VSX when their tokens are set
-# (repository secrets VSCE_PAT and OVSX_PAT). With the secret NPM_TOKEN, it also publishes the npm
-# packages (D65): rap-transpiler (the rapt command) and @rap-transpiler/model, compiler, runtime.
+# (repository secrets VSCE_PAT and OVSX_PAT). It also publishes the rapt command line to npm
+# (rap-transpiler and @rap-transpiler/model, compiler, runtime, D65) when NPM_TOKEN is set.
 on:
   push:
     tags: ["v*"]
@@ -50,33 +50,57 @@ jobs:
         run: npx --yes ovsx@0.10 publish rap-transpiler-vscode.vsix --pat "$OVSX_PAT"
 
   npm:
+    # rapt on npm (D65): npm install -g rap-transpiler. Skipped when the NPM_TOKEN secret is not set;
+    # the @rap-transpiler organization must exist on npmjs.com.
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
     env:
-      NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
+      NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
     steps:
       - uses: actions/checkout@v4
-        if: env.NPM_TOKEN != ''
       - uses: pnpm/action-setup@v4
-        if: env.NPM_TOKEN != ''
       - uses: actions/setup-node@v4
-        if: env.NPM_TOKEN != ''
         with:
           node-version: 22
           cache: pnpm
           registry-url: https://registry.npmjs.org
-      - name: Versions of the packages from the tag
-        if: env.NPM_TOKEN != ''
-        run: |
-          for p in model compiler runtime cli; do (cd "packages/$p" && npm pkg set version="${GITHUB_REF_NAME#v}"); done
       - run: pnpm install --frozen-lockfile
-        if: env.NPM_TOKEN != ''
+      - name: Version of the packages from the tag
+        run: |
+          for p in model compiler runtime cli; do
+            (cd "packages/$p" && npm pkg set version="${GITHUB_REF_NAME#v}")
+          done
       - run: pnpm build
-        if: env.NPM_TOKEN != ''
-      - name: rapt of the package works
-        if: env.NPM_TOKEN != ''
-        run: node packages/cli/bin/rapt.mjs check fixtures/travel --warnings-as-errors
-      - name: Publish (workspace:* becomes the version of the tag)
-        if: env.NPM_TOKEN != ''
+      # the packages as published, installed by npm: rapt of rap-transpiler checks the fixture
+      - name: Packed packages work
+        run: |
+          V="${GITHUB_REF_NAME#v}"
+          P="$RUNNER_TEMP/packs"
+          mkdir -p "$P" "$RUNNER_TEMP/check"
+          for p in model compiler runtime cli; do
+            (cd "packages/$p" && pnpm pack --pack-destination "$P")
+          done
+          cd "$RUNNER_TEMP/check"
+          cat > package.json <<JSON
+          {
+            "private": true,
+            "dependencies": { "rap-transpiler": "file:$P/rap-transpiler-$V.tgz" },
+            "overrides": {
+              "@rap-transpiler/model": "file:$P/rap-transpiler-model-$V.tgz",
+              "@rap-transpiler/compiler": "file:$P/rap-transpiler-compiler-$V.tgz",
+              "@rap-transpiler/runtime": "file:$P/rap-transpiler-runtime-$V.tgz"
+            }
+          }
+          JSON
+          npm install --no-audit --no-fund
+          npx --no-install rapt --help | head -n 1 | grep -F "rapt $V:"
+          npx --no-install rapt check "$GITHUB_WORKSPACE/fixtures/travel" --warnings-as-errors
+          npx --no-install rapt build "$GITHUB_WORKSPACE/fixtures/travel" --out "$RUNNER_TEMP/travel"
+      - name: Publish to npm
+        if: env.NODE_AUTH_TOKEN != ''
         env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
-        run: pnpm -r --filter @rap-transpiler/model --filter @rap-transpiler/runtime --filter @rap-transpiler/compiler --filter rap-transpiler publish --access public --no-git-checks
+          # provenance (the package linked to this workflow run) needs a public repository
+          NPM_CONFIG_PROVENANCE: ${{ !github.event.repository.private }}
+        run: pnpm -r --filter "./packages/*" publish --access public --no-git-checks

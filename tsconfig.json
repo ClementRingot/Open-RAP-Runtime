@@ -5,6 +5,7 @@
     "paths": {
       "@rap-transpiler/model": ["./packages/model/src/index.ts"],
       "@rap-transpiler/compiler": ["./packages/compiler/src/index.ts"],
+      "@rap-transpiler/compiler/cli": ["./packages/compiler/src/cli.ts"],
       "@rap-transpiler/runtime": ["./packages/runtime/src/index.ts"]
     }
   },

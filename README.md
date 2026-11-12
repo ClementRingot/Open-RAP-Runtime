@@ -95,7 +95,7 @@ rapt dev my-project                         # http://localhost:8080/ — rebuilt
 | [Annotations](docs/ANNOTATIONS.md) | Each CDS annotation: what the `$metadata` and the UI do with it |
 | [Diagnostics](docs/DIAGNOSTICS.md) | The codes of `rapt check` |
 | [MCP server](docs/MCP.md) | The service for AI agents |
-| [Deployment](docs/DEPLOYMENT.md) | Docker, SAP BTP Cloud Foundry, HTTPS |
+| [Deployment](docs/DEPLOYMENT.md) | Docker, SAP BTP Cloud Foundry, HTTPS, publishing a version (npm, extension) |
 | [Utility classes](docs/UTILITIES.md), [Remote APIs](docs/REMOTE_APIS.md) | The behavior pool beyond RAP |
 | [Known gaps](KNOWN_GAPS.md), [Roadmap](docs/ROADMAP.md) | What is missing, what is coming |
 | [Decisions](docs/DECISIONS.md), [Plan](PLAN.md) | The technical choices and their reasons |
