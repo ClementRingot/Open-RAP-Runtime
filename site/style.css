@@ -50,6 +50,8 @@ section { padding: 64px 0; }
 nav { display: flex; align-items: center; gap: 18px; }
 nav a { color: var(--muted); text-decoration: none; font-size: .95rem; }
 nav a:hover { color: var(--text); }
+nav a.github { display: inline-flex; align-items: center; gap: 6px; }
+.button svg { vertical-align: -3px; margin-right: 4px; }
 
 .button { display: inline-block; padding: 11px 20px; border-radius: 8px; background: var(--accent); color: var(--accent-text); text-decoration: none; font-weight: 600; border: 1px solid var(--accent); }
 .button:hover { filter: brightness(1.08); }
@@ -158,7 +160,8 @@ footer { border-top: 1px solid var(--border); padding: 24px 0; color: var(--mute
 .foot { display: flex; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
 
 @media (max-width: 800px) {
-  nav a:not(.button) { display: none; }
+  nav a:not(.button):not(.github) { display: none; }
+  nav a.github span { display: none; }
   .pipeline { grid-template-columns: 1fr; }
   .arrow { transform: rotate(90deg); }
   .two { grid-template-columns: minmax(0, 1fr); }

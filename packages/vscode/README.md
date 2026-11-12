@@ -3,6 +3,7 @@
 Check, generate and run a RAP business object with
 [Open RAP Runtime](https://clementringot.github.io/Open-Rap-Runtime/), without an SAP system. The
 extension compiles nothing itself: it calls the `rapt` CLI (`--json`) and shows its results.
+Source code, issues and releases: [GitHub](https://github.com/ClementRingot/Open-RAP-Runtime).
 
 ## Features
 
