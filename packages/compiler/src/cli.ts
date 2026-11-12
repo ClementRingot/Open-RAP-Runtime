@@ -15,9 +15,10 @@ import { generateApplication, writeFiles, type GenerateOptions } from "./build.j
 import { parseArgs } from "node:util";
 import { DevSession, type DevOptions } from "./dev.js";
 import { countDiagnostics, formatDiagnostic, type Diagnostics } from "./diagnostics.js";
-import { generateLaunchpad } from "./gen/launchpad/index.js";
+import { buildLaunchpad } from "./gen/launchpad/index.js";
 import { loadProject } from "./input/project.js";
 import { buildModel, type BuildOptions } from "./ir/builder.js";
+import { registerApp, type RegisterResult } from "./launchpad/workspace.js";
 import { COMPILER_VERSION } from "./version.js";
 
 const USAGE = `rapt ${COMPILER_VERSION}: compiles RAP sources (abapGit format) into a Node.js OData V4 application
@@ -26,16 +27,21 @@ Usage:
   rapt check <src> [--service <SRVD>]           report the diagnostics of the sources
   rapt ir    <src> [--service <SRVD>] [--out f] print (or write) the intermediate representation
   rapt build <src> --out <dir> [--service <SRVD>] generate the application into <dir>
-  rapt launchpad <launchpad.json> --out <dir>    generate the launchpad of applications into <dir>
+  rapt launchpad <launchpad.json> --out <dir>    generate the launchpad into <dir>, with its applications built
+                                                 from their sources into <dir>/apps/<id>
+  rapt launchpad add <src> [--launchpad <file>]  add the application of <src> to the launchpad of the workspace
+                                                 (created, titled "Launchpad", when there is none)
   rapt dev   <src> [--port <n>] [--out <dir>]    build, run with an embedded database, rebuild on change
-  rapt new   <src> <Entity> [--prefix Z…]        write the sources of a new business object (and their XML)
+  rapt new   <src> <Entity> [--prefix Z…]        write the sources of a new business object (and their XML),
+                                                 and add the application to the launchpad of the workspace
   rapt abapgit <src> [--check]                   write the abapGit XML files the sources lack
   rapt mcp   <src>                               write rapt/mcp.json: the MCP tools of the service, to describe;
                                                  the application then serves them at /mcp
   rapt generate <src> <kind> <name> [--from X]   write one new object (table, view, projection, behavior,
                                                  pool, metadata, access, service, binding…; no kind: the list)
   rapt floorplan <src> [<EntitySet> <fp>]       the floorplan of the UI of each root entity set: listReport,
-                                                 worklist, analyticalListPage or formEntry (rapt/config.json)
+                                                 worklist, analyticalListPage or formEntry (rapt/config.json);
+                                                 choosing one adds the application to the launchpad
   rapt agent [<workspace>]                       MCP server (stdio) of rapt for AI coding agents: check,
                                                  create objects, floorplans, abapGit, documentation
 
@@ -50,8 +56,8 @@ Options:
   --out <path>       output file (rapt ir) or folder (rapt build, rapt launchpad, rapt dev: <src>/.rapt/dev)
   --port <n>         port of the application (rapt dev, default: PORT, else 8080)
   --host <address>   interface of rapt dev (default 127.0.0.1; 0.0.0.0 to open it to the network)
-  --json             machine-readable output (rapt check, rapt build: one JSON object;
-                     rapt dev: one JSON event per line)
+  --json             machine-readable output (rapt check, rapt build, rapt launchpad, rapt new…: one JSON
+                     object; rapt dev: one JSON event per line)
   --prefix <Z…>      prefix of the object names (rapt new, default Z): ZRT → zrt_travel, ZRT_R_Travel…
   --description <t>  description of the business object (rapt new)
   --from <name>      rapt generate: the object the new one derives from (view ← table, projection ← view,
@@ -61,6 +67,9 @@ Options:
   --root             rapt generate view: a root view entity
   --type <t>         rapt generate dataelement, domain: the built-in type (abap.char(10))
   --check            report the missing XML files without writing them, exit code 1 if any (rapt abapgit)
+  --launchpad <file> the launchpad.json of rapt new, rapt floorplan, rapt launchpad add (default: the nearest
+                     in the folder of the project or above, else <parent of the project>/launchpad.json)
+  --no-launchpad     rapt new, rapt floorplan: do not add the application to a launchpad
   --warnings-as-errors
   -h, --help
 `;
@@ -101,6 +110,8 @@ export async function main(argv: string[]): Promise<number> {
         expose: { type: "string" },
         root: { type: "boolean" },
         type: { type: "string" },
+        launchpad: { type: "string" },
+        "no-launchpad": { type: "boolean" },
         "warnings-as-errors": { type: "boolean" },
         help: { type: "boolean", short: "h" },
       },
@@ -142,7 +153,7 @@ export async function main(argv: string[]): Promise<number> {
     return 0;
   }
   if (command === "floorplan") {
-    return floorplanCommand(source, parsed.positionals[2], parsed.positionals[3], parsed.values["json"] === true);
+    return floorplanCommand(source, parsed.positionals[2], parsed.positionals[3], parsed.values, parsed.values["json"] === true);
   }
   if (command === "generate") {
     return generateCommand(source, parsed.positionals[2], parsed.positionals[3], parsed.values, parsed.values["json"] === true);
@@ -151,20 +162,10 @@ export async function main(argv: string[]): Promise<number> {
     return abapGitCommand(source, parsed.values["check"] === true, parsed.values["json"] === true);
   }
   if (command === "launchpad") {
-    const out = parsed.values["out"];
-    if (typeof out !== "string") {
-      process.stderr.write(`rapt launchpad needs --out <dir>\n\n${USAGE}`);
-      return 2;
+    if (source === "add") {
+      return launchpadAddCommand(parsed.positionals[2], parsed.values, parsed.values["json"] === true);
     }
-    const runtimeDir = parsed.values["runtime"];
-    const result = generateLaunchpad(source, { outDir: out, ...(typeof runtimeDir === "string" ? { runtimeDir } : {}) });
-    report(result.diagnostics);
-    if (result.files.length === 0 || (parsed.values["warnings-as-errors"] === true && result.diagnostics.items.some((d) => d.severity === "warning"))) {
-      return 1;
-    }
-    writeFiles(out, result.files);
-    process.stdout.write(`${result.files.length} files written to ${path.resolve(out)}\n`);
-    return 0;
+    return launchpadCommand(source, parsed.values, parsed.values["json"] === true);
   }
   const options: GenerateOptions = {};
   if (typeof parsed.values["service"] === "string") options.service = parsed.values["service"];
@@ -271,10 +272,12 @@ function abapGitCommand(source: string, check: boolean, json: boolean): number {
  * `rapt floorplan <src>`: the root entity sets and their floorplan; `rapt floorplan <src> <Set>
  * <floorplan>` sets it in rapt/config.json (D61).
  */
-function floorplanCommand(source: string, set: string | undefined, floorplan: string | undefined, json: boolean): number {
+function floorplanCommand(source: string, set: string | undefined, floorplan: string | undefined, values: Record<string, unknown>, json: boolean): number {
   const result = floorplans(source, set, floorplan);
+  // the application is created once its floorplan is chosen: it joins the launchpad (D69)
+  const launchpad = result.ok && "file" in result ? register(result.root, values) : undefined;
   if (json) {
-    process.stdout.write(`${JSON.stringify({ command: "floorplan", ...result })}\n`);
+    process.stdout.write(`${JSON.stringify({ command: "floorplan", ...result, ...(launchpad === undefined ? {} : { launchpad }) })}\n`);
     return result.ok ? 0 : 1;
   }
   if (!result.ok) {
@@ -282,7 +285,7 @@ function floorplanCommand(source: string, set: string | undefined, floorplan: st
     return 1;
   }
   if ("file" in result) {
-    process.stdout.write(`${result.set}: ${result.label} (${result.file})\n`);
+    process.stdout.write(`${result.set}: ${result.label} (${result.file})\n${launchpadLine(launchpad)}`);
     return 0;
   }
   for (const s of result.sets) process.stdout.write(`${s.set.padEnd(24)}${s.floorplan}${s.chosen ? "" : " (default, not chosen)"}\n`);
@@ -337,7 +340,8 @@ function newCommand(source: string, entity: string | undefined, values: Record<s
     ...(typeof values["description"] === "string" ? { description: values["description"] } : {}),
   });
   if (json) {
-    process.stdout.write(`${JSON.stringify({ command: "new", ok: result.error === undefined, root: path.resolve(source), ...result })}\n`);
+    const launchpad = result.error === undefined ? register(source, values) : undefined;
+    process.stdout.write(`${JSON.stringify({ command: "new", ok: result.error === undefined, root: path.resolve(source), ...result, ...(launchpad === undefined ? {} : { launchpad }) })}\n`);
     return result.error === undefined ? 0 : 1;
   }
   if (result.error !== undefined) {
@@ -347,7 +351,76 @@ function newCommand(source: string, entity: string | undefined, values: Record<s
   for (const file of result.written) {
     process.stdout.write(`written: ${file}\n`);
   }
+  process.stdout.write(launchpadLine(register(source, values)));
   process.stdout.write(`next: rapt dev ${source}\n`);
+  return 0;
+}
+
+/** Adds the application of a project to the launchpad of the workspace, unless --no-launchpad (D69). */
+function register(root: string, values: Record<string, unknown>): RegisterResult | undefined {
+  if (values["no-launchpad"] === true) {
+    return undefined;
+  }
+  return registerApp(root, {
+    ...(typeof values["launchpad"] === "string" ? { launchpad: values["launchpad"] } : {}),
+    ...(typeof values["service"] === "string" ? { service: values["service"] } : {}),
+  });
+}
+
+function launchpadLine(result: RegisterResult | undefined): string {
+  if (result === undefined) return "";
+  if (result.error !== undefined) return `launchpad: not added (${result.error})\n`;
+  if (!result.added) return `launchpad: ${result.app?.id ?? "the application"} already in ${result.file}\n`;
+  return `launchpad: ${result.app?.id ?? ""} added to ${result.file}${result.created ? " (created)" : ""}\n`;
+}
+
+/** `rapt launchpad add <src>`: the application of <src> in the launchpad of the workspace (D69). */
+function launchpadAddCommand(source: string | undefined, values: Record<string, unknown>, json: boolean): number {
+  if (source === undefined) {
+    process.stderr.write(`rapt launchpad add needs the folder of the project, e.g. rapt launchpad add .\n`);
+    return 2;
+  }
+  const result = registerApp(source, {
+    ...(typeof values["launchpad"] === "string" ? { launchpad: values["launchpad"] } : {}),
+    ...(typeof values["service"] === "string" ? { service: values["service"] } : {}),
+  });
+  if (json) {
+    process.stdout.write(`${JSON.stringify({ command: "launchpad add", ok: result.error === undefined, root: path.resolve(source), ...result })}\n`);
+  } else if (result.error !== undefined) {
+    process.stderr.write(`${result.error}\n`);
+  } else {
+    process.stdout.write(launchpadLine(result));
+  }
+  return result.error === undefined ? 0 : 1;
+}
+
+/** `rapt launchpad <launchpad.json> --out <dir>`: the launchpad and the applications of its sources (D37, D69). */
+async function launchpadCommand(file: string, values: Record<string, unknown>, json: boolean): Promise<number> {
+  const out = values["out"];
+  if (typeof out !== "string") {
+    process.stderr.write(`rapt launchpad needs --out <dir>\n\n${USAGE}`);
+    return 2;
+  }
+  const runtimeDir = values["runtime"];
+  const result = await buildLaunchpad(file, { outDir: out, ...(typeof runtimeDir === "string" ? { runtimeDir } : {}) });
+  const failed = result.files.length === 0 || (values["warnings-as-errors"] === true && result.diagnostics.items.some((d) => d.severity === "warning"));
+  if (!failed) {
+    writeFiles(out, result.files);
+  }
+  if (json) {
+    const diagnostics = result.diagnostics.sorted().map((d) => (d.file === undefined ? d : { ...d, path: path.resolve(path.dirname(path.resolve(file)), d.file) }));
+    const apps = result.apps.map((a) => ({ id: a.id, source: a.source, out: a.out }));
+    process.stdout.write(`${JSON.stringify({ command: "launchpad", ok: !failed, root: path.dirname(path.resolve(file)), file: path.resolve(file), ...(failed ? {} : { out: path.resolve(out), files: result.files.length }), apps, counts: countDiagnostics(diagnostics), diagnostics })}\n`);
+    return failed ? 1 : 0;
+  }
+  report(result.diagnostics);
+  if (failed) {
+    return 1;
+  }
+  for (const app of result.apps) {
+    process.stdout.write(`${app.id}: built from ${app.source} into ${app.out}\n`);
+  }
+  process.stdout.write(`${result.files.length} files written to ${path.resolve(out)}\n`);
   return 0;
 }
 

@@ -52,7 +52,7 @@ rapt dev my-project                         # http://localhost:8080/ — rebuilt
 | Behavior pool (ABAP Cloud) | The same code, transpiled and run: EML, messages, ABAP SQL, released classes (JSON, HTTP, bgPF, e-mail…) |
 | Service definition | OData V4 service at the SAP paths, `$batch`, CSRF, OIDC |
 | `rapt/mcp.json` | MCP server for AI agents |
-| `launchpad.json` | OpenUI5 launchpad: spaces, pages, tiles by role, single sign-on |
+| `launchpad.json` | OpenUI5 launchpad: spaces, pages, tiles by role, single sign-on; one per workspace, created and completed when each application is created |
 
 ![Object Page in edit mode](docs/images/object-page.png)
 
@@ -78,6 +78,9 @@ rapt dev my-project                         # http://localhost:8080/ — rebuilt
   helps, actions, editable compositions.
 - **Security**: OIDC (Keycloak, SAP Cloud Identity Services, Entra ID…), Web API bindings with
   OAuth 2.0 (client credentials, PKCE), authorization objects and `AUTHORITY-CHECK`, DCL, roles.
+- **One launchpad per workspace**: each application is added to it when it is created; ship
+  either the launchpad with all its applications (`rapt launchpad`) or one application alone
+  (`rapt build`).
 - **Deployment**: Docker, `docker compose`, SAP BTP Cloud Foundry (`cf push`), any Node.js
   server.
 - **VS Code extension**: object creation wizard as in ADT, *RAP Objects* view, floorplan choice,

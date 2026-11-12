@@ -1439,3 +1439,49 @@ correspond to points 1 to 13 of §11 of PLAN.md. The milestones M1 to M6 are tho
 - **Tests**: `compiler/test/ui.test.ts` (reading and writing of the conditions, operators by type
   and `selectionType`, `$filter`), `runtime/test/table-entity.test.ts` (dialog in Chromium:
   selection in the value help, exclusion, typed conditions, filtered rows).
+
+## D69 — One launchpad per workspace, applications added when they are created
+
+- **Context**: `launchpad.json` was written by hand (D37) and only referenced applications
+  already built (`build`). In a workspace of several applications (`rap-apps/helpdesk-tickets`,
+  `rap-apps/project-tracker`…), you had to write it, build each application then the launchpad,
+  and nothing said that only one was needed.
+- **Decision**:
+  - **One launchpad per workspace**, titled "Launchpad". The CLI looks for `launchpad.json` in
+    the folder of the project then its parents (4 levels, stopping after a folder that contains
+    `.git`, never in the root of the disk, the home folder or the temporary folder); without it,
+    it creates it in the **parent folder of the project** (the workspace), or in the project when
+    it is the root of a git repository or when its parent is one of these system folders.
+    `--launchpad <file>` designates another file. The extension always passes `--launchpad`: next
+    to the saved `.code-workspace`, otherwise in the **first folder** of the workspace — a single
+    launchpad, even for a multi-root workspace.
+  - **Added on creation**: `rapt new` (complete BO) and `rapt floorplan <src> <Set> <floorplan>`
+    (choosing the floorplan creates the Fiori application) add the application; `--no-launchpad`
+    refrains from it; `rapt launchpad add <src>` adds it on demand (`--json`). The `apps` entry
+    references the **sources** (`"source": "helpdesk-tickets"`, relative to the launchpad.json),
+    its `id` comes from the name of the folder, its `url` (local start) takes the first free port
+    from 8081. The tile goes into the "Applications" group (or the "Applications" section of the
+    first page of the first space): title of the application, intent `<EntitySet>-manage`
+    (`process` for a Worklist, `analyze` for an Analytical List Page, `create` for a Form Entry),
+    icon and counter of the starting entity set. **Idempotent**: an application already present
+    (same sources, or same id without sources) is not changed, nothing the user wrote is
+    rewritten; an unreadable file is not overwritten.
+  - **Build**: `rapt launchpad launchpad.json --out out/launchpad` also builds each application
+    referenced by `source` in `out/launchpad/apps/<id>`; `docker-compose.yml` builds them from
+    this folder (one PostgreSQL each) and the image of the launchpad ignores it. `source` and
+    `build` together are refused (LPD009); `build` stays possible for an application built
+    separately.
+  - **Two deployment modes**: the **launchpad with all its applications** (`rapt launchpad`), or
+    **one application alone** (`rapt build`), which does not depend on the launchpad: its shell
+    bar only shows if `/launchpad/config` answers. The extension asks for the mode in *Build the
+    application…* ("Launchpad (all the applications)" / "Application alone (standalone)");
+    *Build the launchpad…* builds the one of the workspace (`rapt.hasLaunchpad`). `rapt dev` keeps
+    its development launchpad (D49).
+- **Why**: the user creates applications, not configuration files; a single entry point per
+  workspace, like the Fiori Launchpad of a system, and the choice of shipping one application
+  alone stays open.
+- **Tests**: `compiler/test/launchpad.test.ts` (creation titled "Launchpad", idempotent addition
+  without rewriting a changed tile, two projects of one folder in the same launchpad, `rapt new`,
+  `--no-launchpad`, `--launchpad`, build of the applications with the launchpad, LPD009);
+  `vscode/test/rapt.test.ts` (file of the workspace, `rapt floorplan` and `rapt launchpad add` in
+  JSON).

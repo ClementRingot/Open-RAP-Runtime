@@ -44,6 +44,7 @@ describe("rapt agent", () => {
     const created = await call(server, "rapt_new_business_object", { project: "shop", entity: "Order", prefix: "ZSH" });
     expect(created?.isError).toBe(false);
     expect(existsSync(path.join(workspace, "shop", ".abapgit.xml"))).toBe(true);
+    expect(created?.structuredContent).toMatchObject({ launchpad: { file: "launchpad.json", added: true } });
     expect((await call(server, "rapt_projects"))?.structuredContent).toMatchObject({ projects: ["shop"] });
 
     const check = await call(server, "rapt_check");
@@ -54,8 +55,8 @@ describe("rapt agent", () => {
     expect((await call(server, "rapt_generate", { kind: "nope", name: "X" }))?.isError).toBe(true);
 
     const plans = await call(server, "rapt_floorplan");
-    expect(plans?.structuredContent).toMatchObject({ sets: [{ set: "Order", floorplan: "listReport" }] });
-    expect((await call(server, "rapt_floorplan", { entitySet: "Order", floorplan: "worklist" }))?.structuredContent).toMatchObject({ file: "rapt/config.json", floorplan: "worklist" });
+    expect(plans?.structuredContent).toMatchObject({ sets: [{ set: "Order", floorplan: "listReport", chosen: false }] });
+    expect((await call(server, "rapt_floorplan", { entitySet: "Order", floorplan: "worklist" }))?.structuredContent).toMatchObject({ file: "rapt/config.json", floorplan: "worklist", launchpad: { added: false } });
     expect((await call(server, "rapt_abapgit", { check: true }))?.structuredContent).toMatchObject({ written: [] });
   }, 120_000);
 

@@ -25,6 +25,7 @@ import { countDiagnostics } from "../diagnostics.js";
 import { documentationSources } from "../gen/docs/index.js";
 import { headingId } from "../gen/docs/markdown.js";
 import { loadProject } from "../input/project.js";
+import { registerApp } from "../launchpad/workspace.js";
 import { COMPILER_VERSION } from "../version.js";
 
 /** Versions of the protocol this server speaks, the newest first. */
@@ -212,6 +213,7 @@ export class AgentServer {
             entity: { type: "string", description: "Name of the root entity, e.g. Travel." },
             prefix: { type: "string", description: "Prefix of the object names (Z by default): ZRT gives zrt_travel, ZRT_R_Travel…" },
             description: { type: "string" },
+            launchpad: { type: "boolean", description: "Add the application to the launchpad of the workspace (default true)." },
           },
         },
         run: (args) => {
@@ -224,19 +226,23 @@ export class AgentServer {
           const description = str(args, "description");
           const result = newBusinessObject(root, entity, { ...(prefix === undefined ? {} : { prefix }), ...(description === undefined ? {} : { description }) });
           if (result.error !== undefined) throw new ToolError(result.error);
-          return { project: this.relative(root), written: result.written, next: "rapt_check, then the user runs rapt dev" };
+          // as rapt new: the application joins the launchpad of the workspace (D69)
+          const launchpad = args["launchpad"] === false ? undefined : registerApp(root);
+          return { project: this.relative(root), written: result.written, ...(launchpad === undefined ? {} : { launchpad: { ...launchpad, file: this.relative(launchpad.file) } }), next: "rapt_check, then the user runs rapt dev" };
         },
       },
       {
         name: "rapt_floorplan",
         title: "Floorplan of the UI",
         description:
-          "Without entitySet: the root entity sets of the service with their floorplan, and the floorplans with what each one needs. With entitySet and floorplan: sets the floorplan (listReport, worklist, analyticalListPage, formEntry) in rapt/config.json.",
-        inputSchema: { type: "object", properties: { project: PROJECT, entitySet: { type: "string" }, floorplan: { type: "string", enum: FLOORPLAN_CATALOG.map((f) => f.floorplan) } } },
+          "Without entitySet: the root entity sets of the service with their floorplan (chosen or default), and the floorplans with what each one needs. With entitySet and floorplan: sets the floorplan (listReport, worklist, analyticalListPage, formEntry) in rapt/config.json and adds the application to the launchpad of the workspace.",
+        inputSchema: { type: "object", properties: { project: PROJECT, entitySet: { type: "string" }, floorplan: { type: "string", enum: FLOORPLAN_CATALOG.map((f) => f.floorplan) }, launchpad: { type: "boolean", description: "Setting a floorplan adds the application to the launchpad of the workspace (default true)." } } },
         run: (args) => {
           const result = floorplans(this.project(args), str(args, "entitySet"), str(args, "floorplan"));
           if (!result.ok) throw new ToolError(result.error);
-          return { ...result, root: this.relative(result.root) };
+          // as rapt floorplan: the application is created once its floorplan is chosen (D69)
+          const launchpad = "file" in result && args["launchpad"] !== false ? registerApp(result.root) : undefined;
+          return { ...result, root: this.relative(result.root), ...(launchpad === undefined ? {} : { launchpad: { ...launchpad, file: this.relative(launchpad.file) } }) };
         },
       },
       {

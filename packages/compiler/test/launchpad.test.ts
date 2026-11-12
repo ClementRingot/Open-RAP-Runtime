@@ -3,7 +3,7 @@
  * build (service paths, entity sets, roles, claims), its diagnostics, and the generated folder.
  */
 
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
@@ -14,6 +14,7 @@ import { generateUi } from "../src/gen/ui/index.js";
 import { loadProject } from "../src/input/project.js";
 import { buildModel } from "../src/ir/builder.js";
 import { resolveLaunchpad } from "../src/launchpad/config.js";
+import type { RegisterResult } from "../src/launchpad/workspace.js";
 import { FIXTURE_DIR } from "./helpers.js";
 
 const SERVICE = "/sap/opu/odata4/sap/zrt_ui_travel_o4/srvd/sap/zrt_ui_travel/0001/";
@@ -215,5 +216,89 @@ describe("rapt launchpad", () => {
     expect(err.join("")).toContain("error LPD002");
     expect(existsSync(path.join(work, "cli-failed"))).toBe(false);
     expect(await main(["launchpad", file])).toBe(2);
+  });
+});
+
+describe("the launchpad of the workspace (D69)", () => {
+  let out: string[];
+  let ws: string;
+  const copy = (name: string): string => {
+    const dir = path.join(ws, name);
+    cpSync(FIXTURE_DIR, dir, { recursive: true, filter: (f) => ![".rapt", "out"].includes(path.relative(FIXTURE_DIR, f).split(path.sep)[0] ?? "") });
+    return dir;
+  };
+  const last = <T>(): T => JSON.parse(out.join("").trim().split("\n").pop() ?? "") as T;
+  beforeEach(() => {
+    out = [];
+    ws = mkdtempSync(path.join(tmpdir(), "rapt-workspace-test-"));
+    vi.spyOn(process.stdout, "write").mockImplementation((chunk) => {
+      out.push(String(chunk));
+      return true;
+    });
+    vi.spyOn(process.stderr, "write").mockImplementation(() => true);
+  });
+  afterEach(() => {
+    vi.restoreAllMocks();
+    rmSync(ws, { recursive: true, force: true });
+  });
+
+  it("creates one launchpad titled Launchpad next to the projects, and adds each application once", async () => {
+    const travel = copy("travel");
+    const flights = copy("flights");
+    expect(await main(["launchpad", "add", travel, "--json"])).toBe(0);
+    expect(last<RegisterResult>()).toMatchObject({ file: path.join(ws, "launchpad.json"), created: true, added: true, app: { id: "travel", source: "travel" } });
+    const file = path.join(ws, "launchpad.json");
+    const edited = JSON.parse(readFileSync(file, "utf8"));
+    expect(edited.title).toBe("Launchpad");
+    edited.groups[0].tiles[0].title = "Mes voyages";
+    writeFileSync(file, JSON.stringify(edited));
+
+    expect(await main(["launchpad", "add", travel, "--json"])).toBe(0);
+    expect(last<RegisterResult>()).toMatchObject({ created: false, added: false });
+    // the second project finds the launchpad of the first one
+    expect(await main(["launchpad", "add", flights, "--json"])).toBe(0);
+    expect(last<RegisterResult>()).toMatchObject({ file, created: false, added: true, app: { id: "flights", source: "flights", url: "http://localhost:8082/" } });
+
+    const source = JSON.parse(readFileSync(file, "utf8"));
+    expect(source.apps.map((a: { id: string }) => a.id)).toEqual(["travel", "flights"]);
+    expect(source.groups).toHaveLength(1);
+    expect(source.groups[0].tiles).toEqual([
+      expect.objectContaining({ title: "Mes voyages", app: "travel", intent: "Travel-manage", count: "Travel" }),
+      expect.objectContaining({ app: "flights", intent: "Travel2-manage" }),
+    ]);
+    expect(existsSync(path.join(travel, "launchpad.json"))).toBe(false);
+  });
+
+  it("adds the application on rapt new and rapt floorplan, unless --no-launchpad", async () => {
+    const orders = path.join(ws, "orders");
+    expect(await main(["new", orders, "Order", "--prefix", "ZOR", "--json"])).toBe(0);
+    expect(last<{ launchpad: RegisterResult }>().launchpad).toMatchObject({ file: path.join(ws, "launchpad.json"), created: true, added: true, app: { id: "orders" } });
+
+    expect(await main(["new", path.join(ws, "draft"), "Draft", "--prefix", "ZDR", "--no-launchpad", "--json"])).toBe(0);
+    expect(last<{ launchpad?: unknown }>().launchpad).toBeUndefined();
+
+    const travel = copy("travel");
+    const custom = path.join(ws, "custom", "launchpad.json");
+    expect(await main(["floorplan", travel, "Travel", "worklist", "--launchpad", custom, "--json"])).toBe(0);
+    expect(last<{ launchpad: RegisterResult }>().launchpad).toMatchObject({ file: custom, created: true, app: { source: "../travel" }, tile: { intent: "Travel-process" } });
+    expect(JSON.parse(readFileSync(path.join(ws, "launchpad.json"), "utf8")).apps.map((a: { id: string }) => a.id)).toEqual(["orders"]);
+  });
+
+  it("builds the applications of their sources with the launchpad", async () => {
+    copy("travel");
+    const file = path.join(ws, "launchpad.json");
+    writeFileSync(file, JSON.stringify({ title: "Launchpad", apps: [{ id: "travel", source: "travel", url: "http://localhost:8081/" }], groups: [{ title: "Applications", tiles: [{ app: "travel", count: "Travel" }] }] }));
+    const dir = path.join(ws, "out");
+    expect(await main(["launchpad", file, "--out", dir, "--json"])).toBe(0);
+    expect(last<{ ok: boolean; apps: unknown[] }>()).toMatchObject({ ok: true, apps: [{ id: "travel", out: path.join(dir, "apps", "travel") }] });
+    expect(existsSync(path.join(dir, "apps", "travel", "server.mjs"))).toBe(true);
+    expect(readFileSync(path.join(dir, "docker-compose.yml"), "utf8")).toContain("build: apps/travel");
+    expect(readFileSync(path.join(dir, ".dockerignore"), "utf8")).toContain("apps");
+    expect(JSON.parse(readFileSync(path.join(dir, "launchpad", "config.json"), "utf8")).apps).toEqual([expect.objectContaining({ id: "travel", title: "Travels" })]);
+  });
+
+  it("refuses an application with both its sources and its build", () => {
+    const { diagnostics } = resolve({ apps: [{ ...TRAVEL, source: "travel" }], groups: [] });
+    expect(codes(diagnostics)).toContain("error LPD009");
   });
 });

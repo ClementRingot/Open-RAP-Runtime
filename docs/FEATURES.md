@@ -255,6 +255,8 @@ dependent ETag, remote APIs.
 | Docker: launchpad, applications and their databases, Keycloak (`oidc` profile) | ✅ | Generated `docker-compose.yml`. |
 | Spaces and pages (`spaces` → `pages` → `sections`), assigned to roles | ✅ | Space tabs, list of the pages, last space remembered (D48). |
 | Development launchpad (`rapt dev`): application, documentation, `$metadata`, MCP | ✅ | D49. |
+| One "Launchpad" per workspace, applications added when they are created (`rapt new`, `rapt floorplan`, `rapt launchpad add`) | ✅ | D69; idempotent, `--launchpad`, `--no-launchpad`. |
+| Applications built with the launchpad from their sources (`source`); deployment of the complete launchpad or of one application alone | ✅ | D69; `out/launchpad/apps/<id>`, LPD009. |
 | Personalization by the user, notifications, navigation between applications from an application | ❌ | See KNOWN_GAPS. |
 
 ## Generated application and operations

@@ -23,9 +23,16 @@ extension compiles nothing itself: it calls the `rapt` CLI (`--json`) and shows 
 - **RAP: Start rapt dev**: the application runs with a PGlite database and is rebuilt on each
   save. The status bar shows the state (building, ready, errors) and opens the application in one
   click.
-- **RAP: Build the application…**: `rapt build` into the folder of your choice, after choosing
-  the floorplan of each root entity (List Report, Worklist, Analytical List Page, Form Entry)
-  when it was not chosen yet; *RAP: Start rapt dev* asks for it too.
+- **RAP: Build the application…**: either the **launchpad with all the applications** of the
+  workspace (`rapt launchpad`) or the **application alone** (`rapt build`, standalone), into the
+  folder of your choice, after choosing the floorplan of each root entity (List Report,
+  Worklist, Analytical List Page, Form Entry) when it was not chosen yet; *RAP: Start rapt dev*
+  asks for it too.
+- **One launchpad per workspace**: `launchpad.json` (titled "Launchpad"), next to the
+  `.code-workspace` or in the first folder of the workspace, is created with the first
+  application; each complete BO and each choice of floorplan add the application and its tile,
+  without touching what is already there. **RAP: Build the launchpad (all the applications)…**
+  builds it with its applications (active when it exists).
 - **RAP: New complete business object…**: `rapt new` asks for the name of the entity, the prefix
   and the description, writes a complete managed BO (table as a `.tabl.astabl` source, CDS,
   BDEF, behavior pool, service, initial data `rapt/seed.json`) with its abapGit files, then
