@@ -1322,3 +1322,32 @@ correspond to points 1 to 13 of §11 of PLAN.md. The milestones M1 to M6 are tho
 - **Tests**: `cli/test/cli.test.ts`; the four packages packed (`pnpm pack`), installed with npm in
   an empty folder: `rapt check`, `rapt dev` (UI, OpenUI5, OData, documentation) work;
   `pnpm publish --dry-run`.
+
+## D66 — Menus of the extension: two ways to create, greyed-out commands, required floorplan
+
+- **Context**: the right click of the explorer showed three creation entries (*New business
+  object*, *New RAP object (wizard)…*, *New RAP object… (table, view…)*), all the commands were
+  active even outside a project, and the application was generated as a List Report without the
+  floorplan having been chosen.
+- **Decision**:
+  - **Create**: two entries. *New complete business object…* (`rapt new`, possible in an empty
+    folder) builds the whole BO; *New RAP object…* (the wizard, D61) creates object by object.
+    The quick picks of D46 (`rapt.generate`) stay a command, outside the menus and the palette.
+  - **Groups** of the menu: create, project (check, abapGit), application (floorplan, rapt dev,
+    build); the *RAP Objects* view offers the same on a project, and a *New complete business
+    object* button when the workspace has no project.
+  - **Greyed out**: the extension computes the folders of the projects (`rapt.projects`) and
+    those of the projects that have a service definition (`rapt.apps`) from the sources of the
+    workspace, updated when a file is created or deleted. The commands have an `enablement`:
+    `resourcePath in rapt.projects` (or `rapt.apps`) in the explorer, a project (or a service) in
+    the workspace elsewhere; *Stop* and *Open the application* when rapt dev runs.
+  - **Required floorplan**: *Build the application…* and *Start rapt dev* ask for the floorplan
+    of each root entity set that has none; cancelling writes nothing and builds nothing.
+    `rapt floorplan --json` gives `chosen` per entity set, and `rapt floorplan . Set listReport`
+    writes the List Report in `rapt/config.json` (instead of removing it) to keep the choice. The
+    CLI keeps the List Report as the default.
+- **Why**: one way to do each gesture, an impossible command is not offered, and the floorplan is
+  a design choice of the application, not a default one suffers.
+- **Tests**: `vscode/test/rapt.test.ts` (folders of the projects and of the applications,
+  `chosen`, List Report kept).
+

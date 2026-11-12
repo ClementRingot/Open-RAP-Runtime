@@ -14,18 +14,22 @@ extension compiles nothing itself: it calls the `rapt` CLI (`--json`) and shows 
   underlined in the code.
 - **RAP Objects** view: the objects of the project grouped as in the project explorer of ADT
   (dictionary, data definitions, behavior definitions, services…).
-- **RAP: New RAP object (wizard)…**: the object types of `rapt generate` by category, as in the
-  *New ABAP Repository Object* wizard of ADT, with the objects of the project to derive from.
+- **RAP: New RAP object…**: create object by object (table, view, projection, BDEF, behavior
+  pool, service, binding…) with the wizard: the object types of `rapt generate` by category, as
+  in the *New ABAP Repository Object* wizard of ADT, with the objects of the project to derive
+  from.
 - **RAP: Choose the floorplan of the application**: List Report, Worklist, Analytical List Page
   or Form Entry, with what each one is for.
 - **RAP: Start rapt dev**: the application runs with a PGlite database and is rebuilt on each
   save. The status bar shows the state (building, ready, errors) and opens the application in one
   click.
-- **RAP: Build the application**: `rapt build` into the folder of your choice.
-- **RAP: New business object**: `rapt new` asks for the name of the entity, the prefix and the
-  description, writes a complete managed BO (table as a `.tabl.astabl` source, CDS, BDEF,
-  behavior pool, service, initial data `rapt/seed.json`) with its abapGit files, then offers to
-  start `rapt dev`.
+- **RAP: Build the application…**: `rapt build` into the folder of your choice, after choosing
+  the floorplan of each root entity (List Report, Worklist, Analytical List Page, Form Entry)
+  when it was not chosen yet; *RAP: Start rapt dev* asks for it too.
+- **RAP: New complete business object…**: `rapt new` asks for the name of the entity, the prefix
+  and the description, writes a complete managed BO (table as a `.tabl.astabl` source, CDS,
+  BDEF, behavior pool, service, initial data `rapt/seed.json`) with its abapGit files, then
+  offers to start `rapt dev`. Possible in an empty folder.
 - **RAP: Generate the abapGit files**: `rapt abapgit` writes the missing XML files (including
   those of the tables written as source) to import the repository into an SAP system with
   abapGit.
@@ -36,8 +40,10 @@ extension compiles nothing itself: it calls the `rapt` CLI (`--json`) and shows 
 - **AI agents**: the agent mode of VS Code finds the MCP server of rapt (`rapt agent`): check the
   project, create objects, set the floorplan, search the documentation of rap-transpiler. For
   Claude Code in the terminal: `claude mcp add rapt -- rapt agent .`.
-- Context menus of the explorer (project folder, `.abapgit.xml`) and buttons in the title bar of
-  the RAP sources.
+- Context menus of the explorer (project folder, `.abapgit.xml`) in three groups (create,
+  project, application), buttons in the title bar of the RAP sources. The commands that are not
+  possible yet are greyed out: outside a project, only *New complete business object…* is
+  active; *Floorplan*, *rapt dev* and *Build the application* wait for a service definition.
 
 A project is an abapGit folder: the folder that contains `.abapgit.xml` (otherwise, the parent of
 a `src` folder).

@@ -17,7 +17,9 @@ import {
   summary,
   validEntityName,
   GENERATE_KINDS,
+  menuContext,
   projectObjects,
+  unchosenFloorplans,
   wizardArgs,
   agentServers,
   terminalShims,
@@ -155,6 +157,9 @@ function cliFailed(error: Error): void {
 }
 
 async function build(root: string): Promise<void> {
+  if (!(await ensureFloorplans(root))) {
+    return;
+  }
   const defaultOut = path.join(root, "out", path.basename(root));
   const chosen = await vscode.window.showInputBox({ prompt: "Folder of the generated application", value: defaultOut, ignoreFocusOut: true });
   if (chosen === undefined) {
@@ -312,6 +317,24 @@ async function objectsOf(root: string): Promise<Record<string, string[]>> {
 }
 
 let objectsView: RapObjectsProvider | undefined;
+let contextTimer: NodeJS.Timeout | undefined;
+
+/** The context keys that grey out the commands not yet possible: no project, no service (D66). */
+async function updateMenuContext(): Promise<void> {
+  const files = await vscode.workspace.findFiles(SOURCE_FILES, "{**/node_modules/**,**/.rapt/**}");
+  const { projects, apps } = menuContext(files.map((f) => f.fsPath));
+  await vscode.commands.executeCommand("setContext", "rapt.projects", projects);
+  await vscode.commands.executeCommand("setContext", "rapt.apps", apps);
+  await vscode.commands.executeCommand("setContext", "rapt.hasProject", Object.keys(projects).length > 0);
+  await vscode.commands.executeCommand("setContext", "rapt.hasApp", Object.keys(apps).length > 0);
+}
+
+function scheduleMenuContext(): void {
+  clearTimeout(contextTimer);
+  contextTimer = setTimeout(() => void updateMenuContext(), 300);
+}
+
+const SOURCE_FILES = "**/{.abapgit.xml,*.astabl,*.asddls,*.asddlxs,*.asdcls,*.asbdef,*.srvdsrv,*.acds,*.abap}";
 
 /** "New RAP object (wizard)": the wizard of the catalog of rapt generate, like ADT (D61). */
 async function newObject(root: string, kind?: string): Promise<void> {
@@ -352,36 +375,68 @@ async function newObject(root: string, kind?: string): Promise<void> {
 
 /** "Choose the floorplan of the application": per root entity set, with what each floorplan is for (D61). */
 async function floorplan(root: string): Promise<void> {
-  type Answer = { sets: Array<{ set: string; floorplan: string }>; floorplans: Array<{ floorplan: string; label: string; description: string; needs: string }> };
-  let answer: Answer;
-  try {
-    answer = await runJson<Answer>(cli(), ["floorplan", root], root);
-  } catch (e) {
-    cliFailed(e as Error);
-    return;
-  }
+  const answer = await floorplans(root);
+  if (answer === undefined) return;
   if (answer.sets.length === 0) {
     void vscode.window.showWarningMessage("RAP: the service exposes no root entity.");
     return;
   }
-  const title = "RAP: floorplan of the application";
-  const set = answer.sets.length === 1 ? answer.sets[0] : (await vscode.window.showQuickPick(answer.sets.map((s) => ({ label: s.set, description: s.floorplan, s })), { title, placeHolder: "Root entity set" }))?.s;
+  const set = answer.sets.length === 1 ? answer.sets[0] : (await vscode.window.showQuickPick(answer.sets.map((s) => ({ label: s.set, description: s.chosen ? s.floorplan : "to choose", s })), { title: "RAP: floorplan of the application", placeHolder: "Root entity set" }))?.s;
   if (set === undefined) return;
+  if (await pickFloorplan(root, answer, set, false)) {
+    void vscode.window.showInformationMessage(`RAP: floorplan of ${set.set} saved (rapt/config.json).${dev?.root === root ? "" : " Start rapt dev to see it."}`);
+  }
+}
+
+type FloorplanAnswer = { sets: Array<{ set: string; floorplan: string; chosen?: boolean }>; floorplans: Array<{ floorplan: string; label: string; description: string; needs: string }> };
+
+async function floorplans(root: string): Promise<FloorplanAnswer | undefined> {
+  try {
+    return await runJson<FloorplanAnswer>(cli(), ["floorplan", root], root);
+  } catch (e) {
+    cliFailed(e as Error);
+    return undefined;
+  }
+}
+
+/** Asks the floorplan of an entity set and writes it; false when cancelled or refused. */
+async function pickFloorplan(root: string, answer: FloorplanAnswer, set: FloorplanAnswer["sets"][number], required: boolean): Promise<boolean> {
   const picked = await vscode.window.showQuickPick(
-    answer.floorplans.map((f) => ({ label: `${f.floorplan === set.floorplan ? "$(check) " : ""}${f.label}`, description: f.floorplan, detail: `${f.description} Annotations: ${f.needs}`, f })),
-    { title: `${title} — ${set.set}`, placeHolder: "How do users work on these objects?", matchOnDetail: true },
+    answer.floorplans.map((f) => ({ label: `${set.chosen === true && f.floorplan === set.floorplan ? "$(check) " : ""}${f.label}`, description: f.floorplan, detail: `${f.description} Annotations: ${f.needs}`, f })),
+    {
+      title: `RAP: floorplan of the application — ${set.set}${required ? " (required before generating the application)" : ""}`,
+      placeHolder: "How do users work on these objects?",
+      matchOnDetail: true,
+      ignoreFocusOut: required,
+    },
   );
-  if (picked === undefined) return;
+  if (picked === undefined) return false;
   try {
     const result = await runJson<{ ok: boolean; error?: string; file: string }>(cli(), ["floorplan", root, set.set, picked.f.floorplan], root);
     if (!result.ok) {
       void vscode.window.showErrorMessage(`RAP: ${result.error ?? "failed"}`);
-      return;
+      return false;
     }
-    void vscode.window.showInformationMessage(`RAP: ${set.set} is now a ${picked.f.label} (${result.file}).${dev?.root === root ? "" : " Start rapt dev to see it."}`);
+    output.appendLine(`rapt floorplan ${set.set}: ${picked.f.floorplan} (${result.file})`);
+    return true;
   } catch (e) {
     cliFailed(e as Error);
+    return false;
   }
+}
+
+/** The floorplan of each root entity set is chosen before the application is generated (D66). */
+async function ensureFloorplans(root: string): Promise<boolean> {
+  const answer = await floorplans(root);
+  if (answer === undefined) return false;
+  for (const name of unchosenFloorplans(answer.sets)) {
+    const set = answer.sets.find((s) => s.set === name);
+    if (set !== undefined && !(await pickFloorplan(root, answer, set, true))) {
+      void vscode.window.showWarningMessage(`RAP: choose the floorplan of ${name} to generate the application.`);
+      return false;
+    }
+  }
+  return true;
 }
 
 /** "Show the intermediate representation": rapt ir, in an editor (model.json). */
@@ -547,6 +602,9 @@ function onDevEvent(root: string, event: DevEvent): void {
 }
 
 async function devStart(root: string): Promise<void> {
+  if (!(await ensureFloorplans(root))) {
+    return;
+  }
   await devStop();
   const port = config().get<number>("dev.port") ?? 8080;
   const child = new DevProcess(cli(), root, port, (event) => onDevEvent(root, event), (line) => output.appendLine(line));
@@ -589,10 +647,16 @@ export function activate(context: vscode.ExtensionContext): void {
       await run(root);
     }
   };
+  const watcher = vscode.workspace.createFileSystemWatcher(SOURCE_FILES, false, true, false);
   context.subscriptions.push(
     output,
     diagnostics,
     status,
+    watcher,
+    watcher.onDidCreate(scheduleMenuContext),
+    watcher.onDidDelete(scheduleMenuContext),
+    vscode.workspace.onDidChangeWorkspaceFolders(scheduleMenuContext),
+    vscode.workspace.onDidRenameFiles(scheduleMenuContext),
     vscode.commands.registerCommand("rapt.check", withProject((root) => check(root))),
     vscode.commands.registerCommand("rapt.build", withProject(build)),
     vscode.commands.registerCommand("rapt.devStart", withProject(devStart)),
@@ -701,6 +765,7 @@ function registerAgentServer(context: vscode.ExtensionContext): void {
       }
     }),
   );
+  void updateMenuContext();
 }
 
 export async function deactivate(): Promise<void> {

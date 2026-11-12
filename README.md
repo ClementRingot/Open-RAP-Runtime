@@ -27,8 +27,8 @@ library ([LICENSES.md](LICENSES.md)).
 ## Get started in two minutes
 
 **In VS Code**: install the `rap-transpiler-vscode.vsix` extension (it contains everything), then
-run *RAP: New business object* and *RAP: Start rapt dev*. The browser opens on the development
-launchpad.
+run *RAP: New complete business object…* and *RAP: Start rapt dev* (which asks for the floorplan).
+The browser opens on the development launchpad.
 
 **On the command line** (Node.js 22): `npm install -g rap-transpiler` (or `npx rap-transpiler`),
 or from a clone `pnpm install && pnpm build`, then `node packages/compiler/dist/cli.js` instead of

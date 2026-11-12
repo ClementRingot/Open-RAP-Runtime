@@ -285,7 +285,7 @@ function floorplanCommand(source: string, set: string | undefined, floorplan: st
     process.stdout.write(`${result.set}: ${result.label} (${result.file})\n`);
     return 0;
   }
-  for (const s of result.sets) process.stdout.write(`${s.set.padEnd(24)}${s.floorplan}\n`);
+  for (const s of result.sets) process.stdout.write(`${s.set.padEnd(24)}${s.floorplan}${s.chosen ? "" : " (default, not chosen)"}\n`);
   process.stdout.write(`\nFloorplans:\n${FLOORPLAN_CATALOG.map((f) => `  ${f.floorplan.padEnd(20)}${f.label}: ${f.description}`).join("\n")}\n`);
   return 0;
 }

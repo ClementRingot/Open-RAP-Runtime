@@ -35,18 +35,24 @@ nothing else to install), then in the command palette (`Ctrl+Shift+P`):
 
 | Command | Effect |
 |---|---|
-| *RAP: New business object* | `rapt new`: a complete managed BO, with initial data |
-| *RAP: New RAP object (wizard)…* | the creation wizard, like *New ABAP Repository Object* of ADT: the types by category (Dictionary, Core Data Services, Behavior, Business Services, Source Code Library), a filter, a description, the fields of the type (source object, exposed entities, binding type…) |
-| *RAP: New RAP object…* | `rapt generate` with quick picks: a table, a view, a BDEF, a behavior pool… |
-| *RAP: Choose the floorplan of the application* | `rapt floorplan`: List Report, Worklist, Analytical List Page or Form Entry, with what each one needs |
+| *RAP: New complete business object…* | `rapt new`: a complete managed BO (table, CDS, BDEF, behavior pool, service, binding), with initial data; possible in an empty folder |
+| *RAP: New RAP object…* | create object by object with the wizard, like *New ABAP Repository Object* of ADT: the types by category (Dictionary, Core Data Services, Behavior, Business Services, Source Code Library), a filter, a description, the fields of the type (source object, exposed entities, binding type…) |
+| *RAP: Choose the floorplan of the application…* | `rapt floorplan`: List Report, Worklist, Analytical List Page or Form Entry, with what each one needs; asked anyway before the first generation |
 | *RAP: Show the intermediate representation* | `rapt ir`: the model (`model.json`) in an editor |
 | *RAP: Generate a launchpad* | `rapt launchpad`: the launchpad of several applications |
 | *RAP: Start rapt dev* | builds, starts and opens the development launchpad; restarts on each save |
 | *RAP: Check the BO* | `rapt check`: diagnostics in the Problems tab (also on each save) |
-| *RAP: Build the application* | `rapt build`: the deployable application |
+| *RAP: Build the application…* | `rapt build`: the deployable application |
 | *RAP: Generate the abapGit files* | `rapt abapgit`: the missing XML files for the import into SAP |
 | *RAP: Generate the MCP server of the service* | `rapt mcp`: the tools for AI agents |
 | *RAP: Choose the project mode* | `standard` or `enhanced` (`rapt/config.json`) |
+
+A right click on a folder of the explorer arranges these commands in three groups: **create**
+(complete BO, object by object), **project** (check, abapGit), **application** (floorplan, rapt
+dev, build). A command is greyed out as long as it is not possible: the project commands outside
+an abapGit project, the application commands as long as the project has no service definition.
+Before the application is built or started, the floorplan of each root entity must have been
+chosen: the extension asks for it when it was not ([D66](DECISIONS.md)).
 
 The **RAP Objects** view of the explorer arranges the objects of the project like the project
 explorer of ADT (dictionary, data definitions, metadata extensions, access controls, behavior
@@ -281,10 +287,12 @@ The List Report and the Object Page follow the `@UI` annotations: `headerInfo`, 
 - **Draft**: Create and Edit open a draft, each field is saved in it, Save activates, Cancel
   discards; the list shows the instances being edited.
 
-**Floorplans** ([D53](DECISIONS.md)): the List Report is the default. To choose another one:
-*RAP: Choose the floorplan of the application* in VS Code (each floorplan is described with the
-annotations it reads), or `rapt floorplan . Travel worklist`; without arguments,
-`rapt floorplan .` lists the entity sets and their floorplan. Both write `rapt/config.json`:
+**Floorplans** ([D53](DECISIONS.md)): the List Report is the default on the command line. To
+choose one: *RAP: Choose the floorplan of the application…* in VS Code (each floorplan is
+described with the annotations it reads; the extension also asks for it before building or
+starting an application whose floorplan was not chosen), or `rapt floorplan . Travel worklist`;
+without arguments, `rapt floorplan .` lists the entity sets, their floorplan and whether it was
+chosen. Both write `rapt/config.json` (the List Report too, once chosen):
 
 ```json
 {

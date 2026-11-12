@@ -4,7 +4,7 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { afterEach, describe, expect, it } from "vitest";
-import { agentServers, terminalShims, DevProcess, GENERATE_KINDS, groupObjects, projectObjects, wizardArgs, type CatalogEntry, diagnosticPath, findProjectRoot, LineSplitter, parseDevEvent, position, resolveCli, runJson, summary, type DevEvent } from "../src/rapt.js";
+import { agentServers, terminalShims, DevProcess, GENERATE_KINDS, groupObjects, menuContext, projectObjects, unchosenFloorplans, wizardArgs, type CatalogEntry, diagnosticPath, findProjectRoot, LineSplitter, parseDevEvent, position, resolveCli, runJson, summary, type DevEvent } from "../src/rapt.js";
 
 const REPO = fileURLToPath(new URL("../../../", import.meta.url));
 const FIXTURE = path.join(REPO, "fixtures", "travel");
@@ -137,10 +137,24 @@ describe("the creation wizard and the objects view (D61)", () => {
 
   it("sets the floorplan of an entity set with rapt floorplan", async () => {
     const dir = copy();
-    expect(await runJson(cli, ["floorplan", dir], dir)).toMatchObject({ sets: [{ set: "Travel", floorplan: "listReport" }], floorplans: expect.arrayContaining([expect.objectContaining({ floorplan: "worklist" })]) });
+    expect(await runJson(cli, ["floorplan", dir], dir)).toMatchObject({ sets: [{ set: "Travel", floorplan: "listReport", chosen: false }], floorplans: expect.arrayContaining([expect.objectContaining({ floorplan: "worklist" })]) });
     expect(await runJson(cli, ["floorplan", dir, "Travel", "worklist"], dir)).toMatchObject({ ok: true, file: "rapt/config.json" });
-    expect(await runJson(cli, ["floorplan", dir], dir)).toMatchObject({ sets: [{ set: "Travel", floorplan: "worklist" }] });
+    expect(await runJson(cli, ["floorplan", dir], dir)).toMatchObject({ sets: [{ set: "Travel", floorplan: "worklist", chosen: true }] });
+    // the default, once chosen, is kept: the application can be generated without asking again (D63)
+    await runJson(cli, ["floorplan", dir, "Travel", "listReport"], dir);
+    const answer = await runJson<{ sets: Array<{ set: string; chosen: boolean }> }>(cli, ["floorplan", dir], dir);
+    expect(answer.sets).toEqual([{ set: "Travel", floorplan: "listReport", chosen: true }]);
+    expect(unchosenFloorplans(answer.sets)).toEqual([]);
+    expect(unchosenFloorplans([{ set: "Travel", chosen: true }, { set: "Agency", chosen: false }])).toEqual(["Agency"]);
     expect(await runJson(cli, ["floorplan", dir, "Nope", "worklist"], dir)).toMatchObject({ ok: false });
+  });
+
+  it("enables the commands of the folders of a project, and of an application once a service is defined (D63)", () => {
+    const p = (f: string): string => path.resolve(f);
+    const { projects, apps } = menuContext([p("/w/bo/.abapgit.xml"), p("/w/bo/src/sub/zr.ddls.asddls"), p("/w/bo/src/zui.srvd.srvdsrv"), p("/w/lib/src/zcl.clas.abap"), p("/w/notes/a.abap")]);
+    expect(Object.keys(projects).sort()).toEqual([p("/w/bo"), p("/w/bo/.abapgit.xml"), p("/w/bo/src"), p("/w/bo/src/sub"), p("/w/lib"), p("/w/lib/.abapgit.xml"), p("/w/lib/src")].sort());
+    expect(Object.keys(apps).sort()).toEqual([p("/w/bo"), p("/w/bo/.abapgit.xml"), p("/w/bo/src"), p("/w/bo/src/sub")].sort());
+    expect(menuContext([])).toEqual({ projects: {}, apps: {} });
   });
 
   it("groups the objects as the project explorer of ADT", () => {

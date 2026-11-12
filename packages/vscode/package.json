@@ -95,31 +95,36 @@
         "command": "rapt.check",
         "title": "Check the BO",
         "category": "RAP",
-        "icon": "$(check)"
+        "icon": "$(check)",
+        "enablement": "rapt.hasProject && ((!explorerResourceIsFolder && resourceFilename != .abapgit.xml) || resourcePath in rapt.projects)"
       },
       {
         "command": "rapt.build",
-        "title": "Build the application",
+        "title": "Build the application…",
         "category": "RAP",
-        "icon": "$(package)"
+        "icon": "$(package)",
+        "enablement": "rapt.hasApp && ((!explorerResourceIsFolder && resourceFilename != .abapgit.xml) || resourcePath in rapt.apps)"
       },
       {
         "command": "rapt.devStart",
         "title": "Start rapt dev",
         "category": "RAP",
-        "icon": "$(play)"
+        "icon": "$(play)",
+        "enablement": "rapt.hasApp && ((!explorerResourceIsFolder && resourceFilename != .abapgit.xml) || resourcePath in rapt.apps)"
       },
       {
         "command": "rapt.devStop",
         "title": "Stop rapt dev",
         "category": "RAP",
-        "icon": "$(debug-stop)"
+        "icon": "$(debug-stop)",
+        "enablement": "rapt.devRunning"
       },
       {
         "command": "rapt.openUi",
         "title": "Open the application",
         "category": "RAP",
-        "icon": "$(globe)"
+        "icon": "$(globe)",
+        "enablement": "rapt.devRunning"
       },
       {
         "command": "rapt.showLog",
@@ -128,47 +133,54 @@
       },
       {
         "command": "rapt.newBo",
-        "title": "New business object",
+        "title": "New complete business object…",
         "category": "RAP",
-        "icon": "$(add)"
+        "icon": "$(new-folder)"
       },
       {
         "command": "rapt.abapgit",
         "title": "Generate the abapGit files",
         "category": "RAP",
-        "icon": "$(repo)"
+        "icon": "$(repo)",
+        "enablement": "rapt.hasProject && ((!explorerResourceIsFolder && resourceFilename != .abapgit.xml) || resourcePath in rapt.projects)"
       },
       {
         "command": "rapt.generate",
-        "title": "New RAP object… (table, view, BDEF, behavior pool, service…)",
+        "title": "New RAP object (quick picks)…",
         "category": "RAP",
-        "icon": "$(new-file)"
+        "icon": "$(new-file)",
+        "enablement": "rapt.hasProject && ((!explorerResourceIsFolder && resourceFilename != .abapgit.xml) || resourcePath in rapt.projects)"
       },
       {
         "command": "rapt.setMode",
         "title": "Choose the project mode (standard / enhanced)",
-        "category": "RAP"
+        "category": "RAP",
+        "enablement": "rapt.hasProject && ((!explorerResourceIsFolder && resourceFilename != .abapgit.xml) || resourcePath in rapt.projects)"
       },
       {
         "command": "rapt.mcp",
         "title": "Generate the MCP server of the service",
-        "category": "RAP"
+        "category": "RAP",
+        "enablement": "rapt.hasApp && ((!explorerResourceIsFolder && resourceFilename != .abapgit.xml) || resourcePath in rapt.apps)"
       },
       {
         "command": "rapt.newObject",
-        "title": "New RAP object (wizard)…",
+        "title": "New RAP object…",
         "category": "RAP",
-        "icon": "$(add)"
+        "icon": "$(add)",
+        "enablement": "rapt.hasProject && ((!explorerResourceIsFolder && resourceFilename != .abapgit.xml) || resourcePath in rapt.projects)"
       },
       {
         "command": "rapt.floorplan",
-        "title": "Choose the floorplan of the application (List Report, Worklist…)",
-        "category": "RAP"
+        "title": "Choose the floorplan of the application…",
+        "category": "RAP",
+        "enablement": "rapt.hasApp && ((!explorerResourceIsFolder && resourceFilename != .abapgit.xml) || resourcePath in rapt.apps)"
       },
       {
         "command": "rapt.ir",
         "title": "Show the intermediate representation (rapt ir)",
-        "category": "RAP"
+        "category": "RAP",
+        "enablement": "rapt.hasApp && ((!explorerResourceIsFolder && resourceFilename != .abapgit.xml) || resourcePath in rapt.apps)"
       },
       {
         "command": "rapt.launchpad",
@@ -191,48 +203,47 @@
         {
           "command": "rapt.openUi",
           "when": "rapt.devRunning"
+        },
+        {
+          "command": "rapt.generate",
+          "when": "false"
         }
       ],
       "explorer/context": [
         {
-          "command": "rapt.check",
-          "when": "resourceFilename == .abapgit.xml || explorerResourceIsFolder",
-          "group": "rapt@1"
-        },
-        {
-          "command": "rapt.devStart",
-          "when": "resourceFilename == .abapgit.xml || explorerResourceIsFolder",
-          "group": "rapt@2"
-        },
-        {
-          "command": "rapt.build",
-          "when": "resourceFilename == .abapgit.xml || explorerResourceIsFolder",
-          "group": "rapt@3"
-        },
-        {
           "command": "rapt.newBo",
           "when": "explorerResourceIsFolder || resourceFilename == .abapgit.xml",
-          "group": "rapt@0"
-        },
-        {
-          "command": "rapt.abapgit",
-          "when": "resourceFilename == .abapgit.xml || explorerResourceIsFolder",
-          "group": "rapt@4"
-        },
-        {
-          "command": "rapt.generate",
-          "when": "resourceFilename == .abapgit.xml || explorerResourceIsFolder",
-          "group": "rapt@0"
+          "group": "rapt1_create@1"
         },
         {
           "command": "rapt.newObject",
-          "when": "resourceFilename == .abapgit.xml || explorerResourceIsFolder",
-          "group": "rapt@0"
+          "when": "explorerResourceIsFolder || resourceFilename == .abapgit.xml",
+          "group": "rapt1_create@2"
+        },
+        {
+          "command": "rapt.check",
+          "when": "explorerResourceIsFolder || resourceFilename == .abapgit.xml",
+          "group": "rapt2_project@1"
+        },
+        {
+          "command": "rapt.abapgit",
+          "when": "explorerResourceIsFolder || resourceFilename == .abapgit.xml",
+          "group": "rapt2_project@2"
         },
         {
           "command": "rapt.floorplan",
-          "when": "resourceFilename == .abapgit.xml || explorerResourceIsFolder",
-          "group": "rapt@5"
+          "when": "explorerResourceIsFolder || resourceFilename == .abapgit.xml",
+          "group": "rapt3_app@1"
+        },
+        {
+          "command": "rapt.devStart",
+          "when": "explorerResourceIsFolder || resourceFilename == .abapgit.xml",
+          "group": "rapt3_app@2"
+        },
+        {
+          "command": "rapt.build",
+          "when": "explorerResourceIsFolder || resourceFilename == .abapgit.xml",
+          "group": "rapt3_app@3"
         }
       ],
       "editor/title": [
@@ -272,6 +283,11 @@
           "command": "rapt.refreshObjects",
           "when": "view == raptObjects",
           "group": "navigation@4"
+        },
+        {
+          "command": "rapt.newBo",
+          "when": "view == raptObjects",
+          "group": "1_create@1"
         }
       ],
       "view/item/context": [
@@ -281,14 +297,34 @@
           "group": "inline"
         },
         {
-          "command": "rapt.floorplan",
+          "command": "rapt.newObject",
           "when": "view == raptObjects && viewItem == raptProject",
-          "group": "rapt@1"
+          "group": "rapt1_create@1"
+        },
+        {
+          "command": "rapt.check",
+          "when": "view == raptObjects && viewItem == raptProject",
+          "group": "rapt2_project@1"
         },
         {
           "command": "rapt.abapgit",
           "when": "view == raptObjects && viewItem == raptProject",
-          "group": "rapt@2"
+          "group": "rapt2_project@2"
+        },
+        {
+          "command": "rapt.floorplan",
+          "when": "view == raptObjects && viewItem == raptProject",
+          "group": "rapt3_app@1"
+        },
+        {
+          "command": "rapt.devStart",
+          "when": "view == raptObjects && viewItem == raptProject",
+          "group": "rapt3_app@2"
+        },
+        {
+          "command": "rapt.build",
+          "when": "view == raptObjects && viewItem == raptProject",
+          "group": "rapt3_app@3"
         }
       ]
     },
@@ -346,6 +382,13 @@
         }
       ]
     },
+    "viewsWelcome": [
+      {
+        "view": "raptObjects",
+        "contents": "No RAP project (.abapgit.xml) in the workspace.\n[New complete business object](command:rapt.newBo)\nCreates the table, the views, the BDEF, the behavior pool and the service of a BO; then add objects one by one with \"New RAP object…\".",
+        "when": "!rapt.hasProject"
+      }
+    ],
     "mcpServerDefinitionProviders": [
       {
         "id": "rapt.agent",

@@ -235,7 +235,7 @@ dependent ETag, remote APIs.
 | Read-only fields, mandatory fields, fields editable on create only | ✅ | From the field characteristics of the BDEF. |
 | Messages (errors, success) | ✅ | `MessageBox`, `MessageToast`, `MessagePopover`. |
 | Buttons according to the authorizations of the user | ✅ | Create hidden without the global create authorization (`$permissions`); Edit, Delete, actions and creation of children disabled per instance (`__EntityControl`, `__OperationControl`, D36). Test `ui-authorizations.test.ts`. |
-| Worklist, Analytical List Page, Overview Page, Form entry floorplans | ✅ | `ui` of `rapt/config.json`, written by `rapt floorplan` or the VS Code command (D61); `@UI.chart` charts in SVG, `@UI.selectionVariant` tabs (D53). |
+| Worklist, Analytical List Page, Overview Page, Form entry floorplans | ✅ | `ui` of `rapt/config.json`, written by `rapt floorplan` or the VS Code command (D61), which asks for it before generating the application (D66); `@UI.chart` charts in SVG, `@UI.selectionVariant` tabs (D53). |
 | Draft in the UI: creation and editing in a draft, fields saved, Save / Discard, editing status in the list | ✅ | D54; as in Fiori Elements: *Editing Status* filter, draft of the user instead of the active instance, *Locked by X*, `DraftIndicator`, *Keep Draft* / *Discard Draft* (D58). |
 | Collaborative draft (`with collaborative draft`, `draft action Share`) | ✅ | Users of the draft, invitation, joining with Edit, refresh every 5 s (D59). |
 | Values of an enumerated type: labels, choice list in edit mode and in the filter | ✅ | `enhanced` mode (D55). |
