@@ -833,7 +833,7 @@ export function activate(context: vscode.ExtensionContext): void {
     }),
     vscode.commands.registerCommand("rapt.showLog", () => output.show()),
     vscode.commands.registerCommand("rapt.feedback", async () => {
-      // the feedback form of the website, which opens a pre-filled issue of the public feedback repository (D71)
+      // the feedback form of the website, which opens a pre-filled issue of the repository (D71, D74)
       const kind = await vscode.window.showQuickPick(
         [
           { label: "$(bug) Report a bug", feedback: "bug" as const },

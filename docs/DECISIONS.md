@@ -1505,6 +1505,8 @@ correspond to points 1 to 13 of §11 of PLAN.md. The milestones M1 to M6 are tho
 
 ## D71 — Feedback: a public feedback repository and a form on the website
 
+_The issues moved to the repository itself once public: see D74._
+
 - **Context**: the repository is private, so its issues are not open to the users; bug reports
   and feature requests had no place.
 - **Decision**: a public repository, `ClementRingot/open-rap-runtime-feedback`, holds the issues,
@@ -1568,3 +1570,15 @@ correspond to points 1 to 13 of §11 of PLAN.md. The milestones M1 to M6 are tho
   sources that go with it must be importable as they are.
 - **Tests**: `vscode/test/rapt.test.ts` (missing files written, existing files kept, a second run
   writes nothing).
+
+## D74 — The repository is public: feedback goes to its own issues
+
+- **Context**: the repository `ClementRingot/Open-RAP-Runtime` becomes public, so its issues are
+  open to the users; the separate feedback repository of D71 is no longer needed.
+- **Decision**: the feedback form of the website (and so the VS Code command *RAP: Report a bug
+  or request a feature…*) opens a pre-filled issue in the repository itself, with the same issue
+  forms, now in `.github/ISSUE_TEMPLATE` (bug report, feature request; blank issues disabled).
+  The npm packages give the repository and its issues (`repository`, `bugs`). The repository
+  `open-rap-runtime-feedback` points to the new place; its issues stay readable. The rest of D71
+  holds (fields filled from the query string, version and environment from the extension).
+- **Tests**: `compiler/test/docs.test.ts` (no link to the former name of the repository).

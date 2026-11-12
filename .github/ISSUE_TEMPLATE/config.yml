@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Documentation
+    url: https://clementringot.github.io/Open-Rap-Runtime/docs/index.html
+    about: The guide, the features, the diagnostic codes and the known gaps (with their workarounds).
+  - name: Feedback form of the website
+    url: https://clementringot.github.io/Open-Rap-Runtime/feedback.html
+    about: The same forms, with the version and the environment filled in.

@@ -1,0 +1,61 @@
+name: Bug report
+description: Something does not work as expected (rapt, the VS Code extension, a generated application).
+title: "[Bug]: "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for the report. This repository is public: do not paste secrets nor confidential sources.
+        Known limitations and their workarounds: [known gaps](https://clementringot.github.io/Open-Rap-Runtime/docs/known_gaps.html).
+  - type: dropdown
+    id: component
+    attributes:
+      label: Component
+      options:
+        - VS Code extension
+        - rapt command line
+        - rapt agent (MCP server for AI agents)
+        - Generated UI (List Report, Object Page, launchpad…)
+        - OData service / RAP runtime (behavior pool, EML, draft…)
+        - CDS / BDEF / ABAP compilation (rapt check diagnostics)
+        - Deployment (Docker, Cloud Foundry, OIDC)
+        - Documentation / website
+        - Other
+    validations:
+      required: true
+  - type: textarea
+    id: description
+    attributes:
+      label: What happened?
+      description: What you did, what you expected, what happened instead.
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      description: The smallest RAP sources (CDS, BDEF, behavior pool…) or commands that show the problem.
+      placeholder: |
+        1. rapt new demo Travel --prefix ZRT
+        2. …
+  - type: textarea
+    id: logs
+    attributes:
+      label: Diagnostics and logs
+      description: Output of `rapt check <project>`, error messages, log of the VS Code extension (Output → Open RAP Runtime).
+      render: text
+  - type: input
+    id: version
+    attributes:
+      label: Version
+      description: First line of `rapt --help`, or the version of the VS Code extension.
+      placeholder: "0.1.0"
+    validations:
+      required: true
+  - type: input
+    id: environment
+    attributes:
+      label: Environment
+      description: How you run it and where.
+      placeholder: "VS Code 1.10x on Windows 11 / npm on macOS / Docker…"

@@ -118,8 +118,7 @@ Open RAP Runtime, contains this documentation and serves the `.vsix` of the late
 
 Report a bug or request a feature with the
 [feedback form](https://clementringot.github.io/Open-Rap-Runtime/feedback.html) (it opens a
-pre-filled issue in the public
-[feedback repository](https://github.com/ClementRingot/open-rap-runtime-feedback)), or in VS Code
+pre-filled issue in the [issues](https://github.com/ClementRingot/Open-RAP-Runtime/issues) of this repository), or in VS Code
 with *RAP: Report a bug or request a feature…*.
 
 ## Contributing

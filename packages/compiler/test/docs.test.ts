@@ -68,7 +68,7 @@ rapt dev <src>
     const paths = files.map((f) => f.path);
     expect(paths).toEqual(expect.arrayContaining(["docs/index.html", "docs/guide.html", "docs/decisions.html", "docs/known_gaps.html", "docs/deployment.html", "docs/plan.html"]));
     for (const file of files) {
-      expect(file.content).not.toMatch(/github\.com\/ClementRingot\/(RAP-Transpiler|Open-Rap-Runtime)(?!-feedback)/i); // the private repository (the public feedback repository is fine)
+      expect(file.content).not.toMatch(/github\.com\/ClementRingot\/RAP-Transpiler/i); // the former name of the repository (D74)
       expect(file.content).toContain('<html lang="en">');
     }
     const guide = files.find((f) => f.path === "docs/guide.html")?.content ?? "";

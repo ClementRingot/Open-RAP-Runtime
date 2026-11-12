@@ -25,8 +25,8 @@
     <section class="feedback">
       <div class="wrap">
         <h1>Feedback</h1>
-        <p class="section-lead">Report a bug or ask for a feature. The form opens a pre-filled issue in the public
-          <a href="https://github.com/ClementRingot/open-rap-runtime-feedback/issues">feedback repository</a>
+        <p class="section-lead">Report a bug or ask for a feature. The form opens a pre-filled issue in the
+          <a href="https://github.com/ClementRingot/Open-RAP-Runtime/issues">issues of the repository</a>
           on GitHub, where you review it and submit it (a GitHub account is needed). Issues are public: do not
           paste secrets nor confidential sources.</p>
 
@@ -88,10 +88,10 @@
   </footer>
 
   <script>
-    // Builds the URL of a new issue of the feedback repository, with the issue form (template) and
+    // Builds the URL of a new issue of the repository of the project, with the issue form (template) and
     // its fields filled in (GitHub fills an issue form field from the query parameter of its id).
     (function () {
-      var REPO = "https://github.com/ClementRingot/open-rap-runtime-feedback";
+      var REPO = "https://github.com/ClementRingot/Open-RAP-Runtime";
       var COMPONENTS = {
         bug: ["VS Code extension", "rapt command line", "rapt agent (MCP server for AI agents)", "Generated UI (List Report, Object Page, launchpad…)", "OData service / RAP runtime (behavior pool, EML, draft…)", "CDS / BDEF / ABAP compilation (rapt check diagnostics)", "Deployment (Docker, Cloud Foundry, OIDC)", "Documentation / website", "Other"],
         feature: ["RAP (BDEF, behavior pool, EML, draft…)", "CDS (views, annotations, types…)", "Generated UI (floorplans, filters, Object Page…)", "OData service", "VS Code extension", "rapt command line / rapt agent", "Deployment and security", "Documentation / website", "Other"]

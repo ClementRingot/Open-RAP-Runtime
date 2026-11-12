@@ -1,0 +1,49 @@
+name: Feature request
+description: A RAP feature, an annotation, a command or an improvement you would like.
+title: "[Feature]: "
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Before asking, have a look at the [features](https://clementringot.github.io/Open-Rap-Runtime/docs/features.html)
+        and the [roadmap](https://clementringot.github.io/Open-Rap-Runtime/docs/roadmap.html).
+  - type: dropdown
+    id: component
+    attributes:
+      label: Area
+      options:
+        - RAP (BDEF, behavior pool, EML, draft…)
+        - CDS (views, annotations, types…)
+        - Generated UI (floorplans, filters, Object Page…)
+        - OData service
+        - VS Code extension
+        - rapt command line / rapt agent
+        - Deployment and security
+        - Documentation / website
+        - Other
+    validations:
+      required: true
+  - type: textarea
+    id: description
+    attributes:
+      label: What would you like?
+      description: The feature, and how it behaves on SAP when it exists there (ABAP documentation, ADT, Fiori Elements).
+    validations:
+      required: true
+  - type: textarea
+    id: usecase
+    attributes:
+      label: Why
+      description: What you are building, and what this feature would change for you.
+  - type: textarea
+    id: example
+    attributes:
+      label: Example
+      description: RAP sources, an annotation or a screenshot of the expected result.
+  - type: input
+    id: version
+    attributes:
+      label: Version
+      description: First line of `rapt --help`, or the version of the VS Code extension.
+      placeholder: "0.1.0"
