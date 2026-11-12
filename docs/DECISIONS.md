@@ -32,6 +32,13 @@ et la conséquence. Les numéros D1 à D13 correspondent aux points 1 à 13 du �
   `CREATE BY`. Le contrôle ABAP complet (types compris) s'exécute sur les sources réécrites, avec
   la configuration du transpiler ; chaque remplacement garde le nombre de lignes du texte
   remplacé, de sorte que les erreurs (ABP004) pointent sur la ligne d'origine.
+- **Ajustement (feature control)** : comme sur SAP, les demandes et résultats de feature control
+  (`FOR INSTANCE FEATURES`, `FOR GLOBAL FEATURES`) ne contiennent que ce que la BDEF déclare au
+  niveau correspondant : `%create`, `%update`, `%delete` des opérations `( features : … )`,
+  `%action-x` des actions `( features : … )`, `%assoc-_x` des `create ( features : … )`, `%field-x`
+  des champs `field ( features : instance )`. Un pool qui écrit `%update` sans
+  `update ( features : instance )` est refusé (ABP004) au lieu de passer `rapt check` puis
+  d'échouer à l'activation sur SAP.
 - **Pourquoi** : abaplint type ces constructions en `void` et le transpiler refuse alors l'ABP.
   Le PoC (PLAN.md, V10) a prouvé l'approche avec les paquets publiés ; J4 l'a généralisée.
 - **Conséquence** : on ne patche ni ne monkeypatche jamais le transpiler ou le runtime ; on leur

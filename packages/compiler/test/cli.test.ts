@@ -1,8 +1,9 @@
-import { mkdtempSync, readFileSync, rmSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
+import { pathToFileURL } from "node:url";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { main } from "../src/cli.js";
+import { isEntryPoint, main } from "../src/cli.js";
 import { FIXTURE_DIR, fixtureVariant } from "./helpers.js";
 
 describe("rapt CLI", () => {
@@ -21,6 +22,28 @@ describe("rapt CLI", () => {
     });
   });
   afterEach(() => vi.restoreAllMocks());
+
+  it("recognizes its own script whatever the form of the path", () => {
+    const dir = mkdtempSync(path.join(tmpdir(), "rapt-entry-"));
+    try {
+      mkdirSync(path.join(dir, "dist"));
+      const cli = path.join(dir, "dist", "cli.js");
+      writeFileSync(cli, "");
+      writeFileSync(path.join(dir, "other.js"), "");
+      const url = pathToFileURL(cli).href;
+      expect(isEntryPoint(url, cli)).toBe(true);
+      expect(isEntryPoint(url, path.relative(process.cwd(), cli))).toBe(true);
+      expect(isEntryPoint(url, path.join(dir, "other.js"))).toBe(false);
+      expect(isEntryPoint(url, path.join(dir, "missing.js"))).toBe(false);
+      expect(isEntryPoint(url, undefined)).toBe(false);
+      if (process.platform !== "win32") {
+        symlinkSync(cli, path.join(dir, "rapt-link"));
+        expect(isEntryPoint(url, path.join(dir, "rapt-link"))).toBe(true);
+      }
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
 
   it("check: succeeds on the fixture", async () => {
     expect(await main(["check", FIXTURE_DIR])).toBe(0);
