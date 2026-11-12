@@ -108,3 +108,6 @@ public.
 git tag v0.1.0 && git push origin v0.1.0
 ```
 
+Or without a tag: *Actions → Release → Run workflow* with the version (`0.1.0`); the release then
+creates the tag `v0.1.0` on the commit of the run.
+

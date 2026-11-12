@@ -4,9 +4,21 @@ name: Release
 # the tag, and published to the Visual Studio Marketplace and Open VSX when their tokens are set
 # (repository secrets VSCE_PAT and OVSX_PAT). It also publishes the rapt command line to npm
 # (open-rap-runtime and @open-rap-runtime/model, compiler, runtime, D65) when NPM_TOKEN is set.
+# It also runs by hand (Actions → Release → Run workflow, or the API) with a version: the release
+# then creates the tag v<version> on the commit of the run.
 on:
   push:
     tags: ["v*"]
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Version to release, without the v (e.g. 0.1.0)"
+        required: true
+        type: string
+
+env:
+  # the tag of the release: the pushed tag, or v<version> of a run by hand
+  RELEASE_TAG: ${{ github.event_name == 'workflow_dispatch' && format('v{0}', inputs.version) || github.ref_name }}
 
 permissions:
   contents: write
@@ -28,7 +40,7 @@ jobs:
       - run: pnpm build
       - name: Version of the extension from the tag
         working-directory: packages/vscode
-        run: npm pkg set version="${GITHUB_REF_NAME#v}"
+        run: npm pkg set version="${RELEASE_TAG#v}"
       - name: Package the extension (.vsix)
         run: pnpm --filter open-rap-runtime-vscode run package
       - name: Embedded rapt works
@@ -37,9 +49,9 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          cp packages/vscode/open-rap-runtime-vscode.vsix "open-rap-runtime-vscode-${GITHUB_REF_NAME#v}.vsix"
-          gh release create "$GITHUB_REF_NAME" "open-rap-runtime-vscode-${GITHUB_REF_NAME#v}.vsix" --title "$GITHUB_REF_NAME" --generate-notes \
-            || gh release upload "$GITHUB_REF_NAME" "open-rap-runtime-vscode-${GITHUB_REF_NAME#v}.vsix" --clobber
+          cp packages/vscode/open-rap-runtime-vscode.vsix "open-rap-runtime-vscode-${RELEASE_TAG#v}.vsix"
+          gh release create "$RELEASE_TAG" "open-rap-runtime-vscode-${RELEASE_TAG#v}.vsix" --title "$RELEASE_TAG" --target "$GITHUB_SHA" --generate-notes \
+            || gh release upload "$RELEASE_TAG" "open-rap-runtime-vscode-${RELEASE_TAG#v}.vsix" --clobber
       - name: Visual Studio Marketplace
         if: env.VSCE_PAT != ''
         working-directory: packages/vscode
@@ -70,13 +82,13 @@ jobs:
       - name: Version of the packages from the tag
         run: |
           for p in model compiler runtime cli; do
-            (cd "packages/$p" && npm pkg set version="${GITHUB_REF_NAME#v}")
+            (cd "packages/$p" && npm pkg set version="${RELEASE_TAG#v}")
           done
       - run: pnpm build
       # the packages as published, installed by npm: rapt of open-rap-runtime checks the fixture
       - name: Packed packages work
         run: |
-          V="${GITHUB_REF_NAME#v}"
+          V="${RELEASE_TAG#v}"
           P="$RUNNER_TEMP/packs"
           mkdir -p "$P" "$RUNNER_TEMP/check"
           # one folder per package: pnpm pack names the archives after the package names
