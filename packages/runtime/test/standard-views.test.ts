@@ -86,7 +86,7 @@ describe("standard views (I_Currency)", () => {
           await page.waitForTimeout(500);
           return page.locator(".sapMDialog tr.sapMLIB").count();
         },
-        { timeout: 45_000, intervals: [1_000] },
+        { timeout: 45_000, interval: 1_000 },
       )
       .toBe(1);
     await page.locator(".sapMDialog tr.sapMLIB", { hasText: "Swiss Franc" }).first().click();
