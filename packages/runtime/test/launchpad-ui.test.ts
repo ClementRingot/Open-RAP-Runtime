@@ -86,6 +86,9 @@ describe.skipIf(browserType === undefined)("the launchpad in a browser", () => {
     // the shell bar of the launchpad above the pages of the application
     await page.waitForFunction(`(document.querySelector('#container-rapt---appView--shellBar')?.offsetParent ?? null) !== null`, undefined, { timeout: 30_000 });
     expect(await page.locator("#container-rapt---appView--shellBar").textContent()).toContain("Travel Agency");
+    // the pages fill the window below the shell bar: the document itself does not scroll
+    expect(await page.evaluate("document.scrollingElement.scrollHeight - document.scrollingElement.clientHeight")).toBe(0);
+    expect(await page.evaluate("Math.round(document.querySelector('#container-rapt---appView--app').getBoundingClientRect().bottom)")).toBe(800);
     await page.locator("#container-rapt---appView--shellBar img").first().click();
     await page.locator(tile("travel-manage")).waitFor({ timeout: 60_000 });
     expect(await page.evaluate("location.pathname")).toBe("/ui/index.html");

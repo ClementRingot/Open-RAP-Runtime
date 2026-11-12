@@ -7,6 +7,7 @@
 import { existsSync, readdirSync, readFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { SHELL_STYLE } from "../ui/static.js";
 import { headingId, pageId, type RenderOptions, renderMarkdown } from "./markdown.js";
 
 export interface DocPage {
@@ -142,7 +143,7 @@ const COMPONENT = `sap.ui.define(["sap/ui/core/UIComponent"], function (UICompon
 `;
 
 const VIEW = `<mvc:View controllerName="rapt.docs.controller.Docs" xmlns:mvc="sap.ui.core.mvc" xmlns="sap.m" xmlns:f="sap.f" xmlns:core="sap.ui.core" displayBlock="true" height="100%">
-  <Page id="shell" showHeader="{= !!\${ui>/shell} }" enableScrolling="false">
+  <Page id="shell" showHeader="{= !!\${ui>/shell} }" enableScrolling="false" class="raptShell">
     <customHeader>
       <f:ShellBar id="shellBar" title="Documentation" secondTitle="{ui>/shell/title}" homeIcon="{ui>/shell/logo}" homeIconPressed=".onHome" showNavButton="false"/>
     </customHeader>
@@ -260,7 +261,7 @@ const CONTROLLER = `sap.ui.define([
 });
 `;
 
-const STYLE = `.raptDoc { padding: 1rem 2rem 3rem 2rem; max-width: 60rem; font-family: var(--sapFontFamily); color: var(--sapTextColor); line-height: 1.5; }
+const STYLE = `${SHELL_STYLE}.raptDoc { padding: 1rem 2rem 3rem 2rem; max-width: 60rem; font-family: var(--sapFontFamily); color: var(--sapTextColor); line-height: 1.5; }
 .raptDoc h1 { font-size: 1.75rem; margin: 0.5rem 0 1rem; }
 .raptDoc h2 { font-size: 1.35rem; margin: 2rem 0 0.75rem; border-bottom: 1px solid var(--sapGroup_TitleBorderColor); padding-bottom: 0.25rem; }
 .raptDoc h3 { font-size: 1.1rem; margin: 1.5rem 0 0.5rem; }

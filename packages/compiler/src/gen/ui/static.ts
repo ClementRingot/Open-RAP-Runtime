@@ -31,8 +31,16 @@ export function indexHtml(layout: UiLayout): string {
 `;
 }
 
+/**
+ * The content of the shell page sits between the shell bar and the bottom of the window: the
+ * inline `height: 100%` that sap.m.App writes on its ancestors would push it one shell bar below
+ * the window, and the document would scroll as well as the page.
+ */
+export const SHELL_STYLE = `.raptShell > section { height: auto !important; }
+`;
+
 /** Filter bar of the list report: fields and buttons aligned on the bottom of the inputs. */
-export const STYLE = `.raptFilterBar { column-gap: 1rem; row-gap: 0.5rem; }
+export const STYLE = `${SHELL_STYLE}.raptFilterBar { column-gap: 1rem; row-gap: 0.5rem; }
 .raptFilterBar .raptFilterItem { margin: 0; }
 .raptFilterBar .raptFilterButtons { margin-left: auto; align-items: flex-end; }
 .raptChartArea { padding: 0 0 1rem 0; }
@@ -111,7 +119,7 @@ export function manifest(layout: UiLayout): string {
  * launchpad (D37) when the application is served behind one (home, user, logout).
  */
 export const APP_VIEW = `<mvc:View controllerName="rapt.app.controller.App" xmlns:mvc="sap.ui.core.mvc" xmlns="sap.m" xmlns:f="sap.f" displayBlock="true" height="100%">
-  <Page id="shell" showHeader="{= !!\${ui>/shell} }" enableScrolling="false">
+  <Page id="shell" showHeader="{= !!\${ui>/shell} }" enableScrolling="false" class="raptShell">
     <customHeader>
       <f:ShellBar id="shellBar" title="{ui>/shell/title}" secondTitle="{ui>/shell/launchpad}" homeIcon="{ui>/shell/logo}" homeIconTooltip="Home" homeIconPressed=".onHome" avatarPressed=".onAvatarPressed">
         <f:profile>
