@@ -50,6 +50,19 @@ function markdownFiles(dir: string): string[] {
   return files.sort((a, b) => rank(a) - rank(b) || path.basename(a).localeCompare(path.basename(b)));
 }
 
+/** The Markdown of the documentation, page by page (for `rapt agent`, D64). */
+export function documentationSources(dir = documentationDir()): Array<{ id: string; file: string; title: string; markdown: string }> {
+  if (dir === undefined) {
+    return [];
+  }
+  return markdownFiles(dir).map((file) => {
+    const markdown = readFileSync(file, "utf8");
+    const name = path.basename(file);
+    const first = /^#\s+(.+)$/m.exec(markdown)?.[1]?.replace(/`/g, "");
+    return { id: pageId(name), file: name, title: name === "README.md" ? "rap-transpiler" : (first ?? name), markdown };
+  });
+}
+
 export function documentationPages(dir = documentationDir(), options: RenderOptions = {}): DocPage[] {
   if (dir === undefined) {
     return [];
@@ -263,6 +276,11 @@ const STYLE = `.raptDoc { padding: 1rem 2rem 3rem 2rem; max-width: 60rem; font-f
 
 /** The files of the documentation app (`docs/` of the development build). */
 export function generateDocsApp(pages: DocPage[] = documentationPages()): Array<{ path: string; content: string }> {
+  if (pages.length === 0) {
+    // never an empty app: say where the documentation should have been (a packaging problem)
+    const text = "The documentation of rap-transpiler was not found next to the compiler (packages/compiler/docs). Run pnpm build, or reinstall the VS Code extension.";
+    pages = [{ id: "readme", title: "Documentation not found", file: "README.md", html: `<h1 id="anchor-documentation-not-found">Documentation not found</h1><p>${text}</p>`, text, headings: [] }];
+  }
   return [
     { path: "index.html", content: INDEX },
     { path: "manifest.json", content: MANIFEST },

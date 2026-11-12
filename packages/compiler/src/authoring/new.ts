@@ -366,13 +366,19 @@ rapt dev .              # http://localhost:8080/: the app, rebuilt on every save
 rapt generate . <kind> <name> [--from X]   # a new object with the right file names (no kind: list)
 rapt abapgit .          # the abapGit XML files the sources lack
 rapt mcp .              # rapt/mcp.json: the MCP tools of the service, to describe
+rapt agent .            # MCP server (stdio) of rapt for coding agents: check, objects, documentation
 \`\`\`
+
+\`rapt\` is on the PATH of the terminals of VS Code with the RAP Transpiler extension; elsewhere,
+\`npm install -g rap-transpiler\` (or \`npx rap-transpiler …\`). In VS Code, the agent mode also
+finds the MCP server of rapt (tools \`rapt_check\`, \`rapt_generate\`, \`rapt_docs_search\`…).
 
 ## Rules
 
-- Write ABAP Cloud and CDS as in the ABAP Development Tools; RAP managed, without draft.
+- Write ABAP Cloud and CDS as in the ABAP Development Tools; RAP managed, with or without draft.
 - Run \`rapt check .\` after every change until there is no error; the codes are explained in
-  the documentation (tile *Documentation* of \`rapt dev\`, or docs/DIAGNOSTICS.md of rap-transpiler).
+  the documentation (tile *Documentation* of \`rapt dev\`, the tool \`rapt_docs_read\` of
+  \`rapt agent\`, or https://clementringot.github.io/RAP-Transpiler/docs/diagnostics.html).
 - Keep \`rapt/config.json\` in mode \`standard\` when the BO must activate on SAP; \`enhanced\`
   allows rap-transpiler extensions (mandatory fields checked automatically, managed BO on a
   custom entity).

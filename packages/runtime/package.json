@@ -44,5 +44,6 @@
     "@rap-transpiler/compiler": "workspace:*",
     "@types/pg": "^8.23.1",
     "less-openui5": "0.12.0"
-  }
+  },
+  "homepage": "https://clementringot.github.io/RAP-Transpiler/"
 }

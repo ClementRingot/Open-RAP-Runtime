@@ -4,7 +4,7 @@
  * and `rapt dev`; the extension compiles nothing itself.
  */
 
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { chmodSync, existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import * as vscode from "vscode";
 import {
@@ -19,6 +19,8 @@ import {
   GENERATE_KINDS,
   projectObjects,
   wizardArgs,
+  agentServers,
+  terminalShims,
   type CatalogEntry,
   type AbapGitResult,
   type GenerateResult,
@@ -630,6 +632,73 @@ export function activate(context: vscode.ExtensionContext): void {
         root,
         setTimeout(() => void check(root, true), 300),
       );
+    }),
+    vscode.workspace.onDidChangeConfiguration((event) => {
+      if (event.affectsConfiguration("rapt.terminal") || event.affectsConfiguration("rapt.cliPath") || event.affectsConfiguration("rapt.nodePath")) {
+        installTerminalCommand(context);
+      }
+    }),
+  );
+  installTerminalCommand(context);
+  registerAgentServer(context);
+}
+
+/**
+ * `rapt` in the integrated terminals (D64): shims in the storage of the extension, first on the
+ * PATH of the terminals it opens from now on. Updated when the CLI settings change.
+ */
+function installTerminalCommand(context: vscode.ExtensionContext): void {
+  const collection = context.environmentVariableCollection;
+  collection.clear();
+  if (config().get<boolean>("terminal.addToPath") === false) {
+    return;
+  }
+  const shims = terminalShims(cli());
+  if (shims.length === 0) {
+    return;
+  }
+  const bin = path.join(context.globalStorageUri.fsPath, "bin");
+  mkdirSync(bin, { recursive: true });
+  for (const shim of shims) {
+    const file = path.join(bin, shim.name);
+    writeFileSync(file, shim.content);
+    if (shim.executable) {
+      chmodSync(file, 0o755);
+    }
+  }
+  collection.description = "Adds the rapt command of the RAP Transpiler extension";
+  collection.prepend("PATH", `${bin}${path.delimiter}`);
+}
+
+/** The MCP server of rapt (`rapt agent`), offered to the agent mode of VS Code (D64). */
+function registerAgentServer(context: vscode.ExtensionContext): void {
+  const lm = vscode.lm as typeof vscode.lm & { registerMcpServerDefinitionProvider?: typeof vscode.lm.registerMcpServerDefinitionProvider };
+  if (typeof lm.registerMcpServerDefinitionProvider !== "function" || typeof vscode.McpStdioServerDefinition !== "function") {
+    return;
+  }
+  const changed = new vscode.EventEmitter<void>();
+  const version = String((context.extension.packageJSON as { version?: string }).version ?? "");
+  context.subscriptions.push(
+    changed,
+    vscode.workspace.onDidChangeWorkspaceFolders(() => changed.fire()),
+    lm.registerMcpServerDefinitionProvider("rapt.agent", {
+      onDidChangeMcpServerDefinitions: changed.event,
+      provideMcpServerDefinitions: () => {
+        if (config().get<boolean>("agent.enabled") === false) {
+          return [];
+        }
+        const folders = (vscode.workspace.workspaceFolders ?? []).map((f) => ({ name: f.name, path: f.uri.fsPath }));
+        return agentServers(cli(), folders).map((server) => {
+          const definition = new vscode.McpStdioServerDefinition(server.label, server.command, server.args, server.env, version);
+          definition.cwd = vscode.Uri.file(server.cwd);
+          return definition;
+        });
+      },
+    }),
+    vscode.workspace.onDidChangeConfiguration((event) => {
+      if (event.affectsConfiguration("rapt.agent") || event.affectsConfiguration("rapt.cliPath") || event.affectsConfiguration("rapt.nodePath")) {
+        changed.fire();
+      }
     }),
   );
 }

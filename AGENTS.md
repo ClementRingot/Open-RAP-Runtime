@@ -9,7 +9,7 @@ writes an `AGENTS.md` in the projects it creates.
 A TypeScript compiler (pnpm monorepo) that turns the sources of a RAP BO (abapGit format) into a
 Node.js application: OData V4, RAP managed runtime, ABAP transpiled by abaplint, PostgreSQL,
 OpenUI5 UI. Read [README.md](README.md), [docs/GUIDE.md](docs/GUIDE.md) and the list of decisions
-[docs/DECISIONS.md](docs/DECISIONS.md) (D1 to D63) first.
+[docs/DECISIONS.md](docs/DECISIONS.md) (D1 to D65) first.
 
 ```
 packages/model/      types of the IR (model.json) and shared derivations (OData, value helps, MCP)
@@ -19,6 +19,7 @@ packages/compiler/   rapt CLI (src/cli.ts), parsers (bdef/, cds/, srvd/, dcl/, d
 packages/runtime/    Fastify server (app.ts, server.ts), OData (odata/), RAP (rap/), ABAP (abap/),
                      auth (auth/), launchpad (launchpad/), MCP (mcp/), UI (ui/), platform.ts
 packages/vscode/     VS Code extension: calls the CLI with --json, compiles nothing
+packages/cli/        npm package rap-transpiler: the rapt command with what rapt dev needs
 fixtures/travel      reference BO (must stay importable and activatable on SAP)
 fixtures/custom-entity   custom entity, enhanced mode
 fixtures/table-entity    BO on a table entity, simple and enumerated types, enhanced mode
@@ -58,8 +59,9 @@ after a change to the compiler.
    `fixtures/travel` (whose snapshots are the reference).
 7. **Generated UI**: ES5 JavaScript in TypeScript strings (`gen/ui/static.ts`); mind the escaping
    (`\\d` in the TS gives `\d` in the JS). The ids of the controls are used by the browser tests.
-8. **Everything in English**: documentation, website, code, comments, messages and the README of
-   the generated applications.
+8. **Everything in English**: documentation, website, code, comments, messages, the README of
+   the generated applications, and everything around the repository: commit messages, branch
+   names, pull requests (title, description, review comments), issues and release notes.
 9. **Generated files**: never edit `.rapt/`, `dist/`, `packages/compiler/docs/`, nor the virtual
    objects `<standard>/…` (standard views, D44).
 
@@ -73,4 +75,5 @@ after a change to the compiler.
 - UI annotation: `gen/ui/layout.ts` (layout.json), then views (`views.ts`) and controllers
   (`static.ts`).
 - CLI command: `cli.ts` (usage, options, `--json`), then the VS Code command
-  (`packages/vscode/src/extension.ts`, `package.json`).
+  (`packages/vscode/src/extension.ts`, `package.json`), and the tool of `rapt agent` when an agent
+  needs it (`compiler/src/agent/server.ts`).

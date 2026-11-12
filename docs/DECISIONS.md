@@ -1254,3 +1254,64 @@ correspond to points 1 to 13 of §11 of PLAN.md. The milestones M1 to M6 are tho
   the same Markdown keeps a single source, already shown in `rapt dev`.
 - **Tests**: `compiler/test/docs.test.ts` (rendering of the links for the website), website
   checked in Chromium (pages, navigation, mobile, dark mode).
+
+## D64 — rapt for AI coding agents: `rapt agent`, `rapt` in the terminals of VS Code
+
+- **Context**: AI agents (GitHub Copilot in agent mode, Claude Code, Cursor…) write more and more
+  of the RAP sources. With a shell, they can run `rapt check --json`; but in VS Code `rapt` was
+  only inside the extension (not on the PATH), and the documentation of rap-transpiler (codes,
+  annotations, known gaps and their workarounds) is not in the project of the user, so an agent
+  could not find it. Also, the `.vsix` lost this documentation: the staging of the extension
+  removed the `docs` folders and the `.md` files of the packages, and the documentation app of
+  `rapt dev` was empty when started from the extension.
+- **Decision**:
+  - **`rapt agent [<workspace>]`**: an MCP server over stdio (newline-delimited JSON-RPC) with the
+    tools `rapt_projects`, `rapt_check` (diagnostics, without writing), `rapt_object_types` (the
+    catalog of D61), `rapt_generate`, `rapt_new_business_object`, `rapt_floorplan`,
+    `rapt_abapgit`, `rapt_docs_search` (sections of the documentation by relevance) and
+    `rapt_docs_read` (a page or a section, as Markdown), and instructions given on
+    `initialize` (check after each change, standard mode, read the documentation). The paths are
+    relative to the workspace; a path outside it is refused. The project is given, or the only
+    one of the workspace. Distinct from `rapt mcp` (D47), the MCP server of a *service*.
+  - **VS Code**: the extension registers `rapt agent` for the agent mode of VS Code
+    (`vscode.lm.registerMcpServerDefinitionProvider`, contribution `mcpServerDefinitionProviders`,
+    one server per workspace folder, setting `rapt.agent.enabled`); and it puts `rapt` on the
+    PATH of its integrated terminals (`environmentVariableCollection`): shims `rapt` (sh) and
+    `rapt.cmd` (Windows) in the storage of the extension start the CLI the extension uses, with
+    the Node.js of VS Code (setting `rapt.terminal.addToPath`). An agent of the terminal (Claude
+    Code) then runs `rapt` or `claude mcp add rapt -- rapt agent .` without installing anything.
+  - **Documentation in the `.vsix`**: the staging keeps `@rap-transpiler/compiler/docs` and fails
+    when it is missing; the documentation app shows "Documentation not found" instead of an empty
+    list if the documentation is ever missing.
+- **Why an MCP server and not only the CLI**: the CLI with `--json` and the AGENTS.md of the
+  project are enough for an agent with a shell; the MCP server adds what the CLI does not give:
+  discovery without configuration in VS Code, typed inputs (the catalog of the objects as enums),
+  and the documentation of rap-transpiler, searchable, wherever the extension or the npm package
+  is installed. It reuses the functions of the CLI: one engine (D39).
+- **Tests**: `compiler/test/agent.test.ts` (protocol, business object created, checked, object
+  generated, floorplan, abapGit, paths outside the workspace, several projects, documentation,
+  stdio of the built CLI), `vscode/test/rapt.test.ts` (shims run `rapt check` through the PATH,
+  server definitions), `compiler/test/docs.test.ts` (empty documentation); `.vsix` built and its
+  `rapt dev` checked to serve the 14 documentation pages.
+
+## D65 — npm package `rap-transpiler`
+
+- **Context**: outside VS Code (CI pipelines, a terminal agent, another editor), rapt needed a
+  clone of the repository.
+- **Decision**: the package `rap-transpiler` (`packages/cli`) gives the `rapt` command
+  (`npm install -g rap-transpiler`, `npx rap-transpiler check .`). It depends on
+  `@rap-transpiler/compiler` and `@rap-transpiler/runtime` and on what `rapt dev` serves (OpenUI5,
+  PGlite, less-openui5, at the versions of the runtime), like the `rapt/` of the extension (D39).
+  Its `bin/rapt.mjs` calls `main` of `@rap-transpiler/compiler/cli` (new export); `cli.js` runs
+  itself only when it is the program (`realpath` of `argv[1]`), not when imported.
+  `COMPILER_VERSION` is read from the `package.json` of the compiler. The `release.yml` workflow
+  publishes `@rap-transpiler/model`, `runtime`, `compiler` and `rap-transpiler` with the version of
+  the tag when the secret `NPM_TOKEN` is set (the `@rap-transpiler` organization must exist on
+  npm; the name `rapt` is taken on npm, hence `rap-transpiler`).
+- **Why**: the same CLI everywhere; CI can check RAP sources without VS Code; a terminal agent
+  can install it in one command.
+- **Note**: publishing makes the compiled code public on npm, as the `.vsix` of the website
+  already does.
+- **Tests**: `cli/test/cli.test.ts`; the four packages packed (`pnpm pack`), installed with npm in
+  an empty folder: `rapt check`, `rapt dev` (UI, OpenUI5, OData, documentation) work;
+  `pnpm publish --dry-run`.

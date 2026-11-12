@@ -51,6 +51,9 @@ rapt dev <src>
     expect(pages[0]?.file).toBe("README.md");
     expect(pages.map((p) => p.id)).toEqual(expect.arrayContaining(["features", "diagnostics", "decisions"]));
     expect(generateDocsApp(pages).map((f) => f.path)).toContain("pages.json");
+    // without documentation (a packaging problem), the app says so instead of being empty
+    const empty = JSON.parse(generateDocsApp([]).find((f) => f.path === "pages.json")?.content ?? "[]") as Array<{ title: string }>;
+    expect(empty.map((p) => p.title)).toEqual(["Documentation not found"]);
   });
 
   it("renders the pages of the website without links to the repository (D63)", () => {

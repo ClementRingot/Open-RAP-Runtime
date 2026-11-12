@@ -12,11 +12,14 @@
       "default": "./dist/index.js"
     }
   },
-  "files": ["dist"],
+  "files": [
+    "dist"
+  ],
   "engines": {
     "node": ">=22"
   },
   "scripts": {
     "build": "tsc -p tsconfig.build.json"
-  }
+  },
+  "homepage": "https://clementringot.github.io/RAP-Transpiler/"
 }

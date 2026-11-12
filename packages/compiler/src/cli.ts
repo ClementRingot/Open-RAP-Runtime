@@ -1,11 +1,14 @@
 #!/usr/bin/env node
 /** rapt: command line of the RAP → Node.js compiler. */
 
-import { mkdirSync, writeFileSync } from "node:fs";
+import { mkdirSync, realpathSync, writeFileSync } from "node:fs";
+import { pathToFileURL } from "node:url";
 import path from "node:path";
 import { generateAbapGitFiles, type AbapGitResult } from "./authoring/abapgit.js";
 import { generateObject, OBJECT_KINDS } from "./authoring/generate.js";
-import { FLOORPLAN_CATALOG, OBJECT_CATALOG, readFloorplans, writeFloorplan } from "./authoring/catalog.js";
+import { FLOORPLAN_CATALOG, OBJECT_CATALOG } from "./authoring/catalog.js";
+import { floorplans } from "./authoring/floorplan.js";
+import { serveAgent } from "./agent/server.js";
 import { writeMcpFile } from "./authoring/mcp.js";
 import { newBusinessObject } from "./authoring/new.js";
 import { generateApplication, writeFiles, type GenerateOptions } from "./build.js";
@@ -33,6 +36,8 @@ Usage:
                                                  pool, metadata, access, service, binding…; no kind: the list)
   rapt floorplan <src> [<EntitySet> <fp>]       the floorplan of the UI of each root entity set: listReport,
                                                  worklist, analyticalListPage or formEntry (rapt/config.json)
+  rapt agent [<workspace>]                       MCP server (stdio) of rapt for AI coding agents: check,
+                                                 create objects, floorplans, abapGit, documentation
 
 Options:
   --service <name>   service definition to build (required when the sources have several)
@@ -108,6 +113,9 @@ export async function main(argv: string[]): Promise<number> {
   if (parsed.values["help"] === true || command === undefined) {
     process.stdout.write(USAGE);
     return command === undefined && parsed.values["help"] !== true ? 2 : 0;
+  }
+  if (command === "agent") {
+    return serveAgent(source ?? ".");
   }
   if (source === undefined) {
     process.stderr.write(`missing <src>\n\n${USAGE}`);
@@ -264,33 +272,21 @@ function abapGitCommand(source: string, check: boolean, json: boolean): number {
  * <floorplan>` sets it in rapt/config.json (D61).
  */
 function floorplanCommand(source: string, set: string | undefined, floorplan: string | undefined, json: boolean): number {
-  const root = path.resolve(source);
-  const { model } = buildModel(loadProject(root));
-  const sets = (model?.service.entitySets ?? [])
-    .filter((s) => s.valueHelp !== true && s.draftAdministrativeData !== true && model?.entities.find((e) => e.name === s.entity)?.root === true)
-    .map((s) => s.name);
-  const fail = (message: string): number => {
-    if (json) process.stdout.write(`${JSON.stringify({ command: "floorplan", ok: false, root, error: message })}\n`);
-    else process.stderr.write(`${message}\n`);
+  const result = floorplans(source, set, floorplan);
+  if (json) {
+    process.stdout.write(`${JSON.stringify({ command: "floorplan", ...result })}\n`);
+    return result.ok ? 0 : 1;
+  }
+  if (!result.ok) {
+    process.stderr.write(`${result.error}\n`);
     return 1;
-  };
-  if (set !== undefined) {
-    if (!sets.includes(set)) return fail(`${set}: not a root entity set of the service (${sets.join(", ") || "none"})`);
-    const known = FLOORPLAN_CATALOG.find((f) => f.floorplan === floorplan);
-    if (known === undefined) return fail(`${floorplan ?? "?"}: one of ${FLOORPLAN_CATALOG.map((f) => f.floorplan).join(", ")}`);
-    const file = writeFloorplan(root, set, known.floorplan);
-    if (json) process.stdout.write(`${JSON.stringify({ command: "floorplan", ok: true, root, file, set, floorplan: known.floorplan })}\n`);
-    else process.stdout.write(`${set}: ${known.label} (${file})\n`);
+  }
+  if ("file" in result) {
+    process.stdout.write(`${result.set}: ${result.label} (${result.file})\n`);
     return 0;
   }
-  const current = readFloorplans(root);
-  const result = { command: "floorplan", ok: true, root, sets: sets.map((s) => ({ set: s, floorplan: current[s] ?? "listReport" })), floorplans: FLOORPLAN_CATALOG };
-  if (json) {
-    process.stdout.write(`${JSON.stringify(result)}\n`);
-  } else {
-    for (const s of result.sets) process.stdout.write(`${s.set.padEnd(24)}${s.floorplan}\n`);
-    process.stdout.write(`\nFloorplans:\n${FLOORPLAN_CATALOG.map((f) => `  ${f.floorplan.padEnd(20)}${f.label}: ${f.description}`).join("\n")}\n`);
-  }
+  for (const s of result.sets) process.stdout.write(`${s.set.padEnd(24)}${s.floorplan}\n`);
+  process.stdout.write(`\nFloorplans:\n${FLOORPLAN_CATALOG.map((f) => `  ${f.floorplan.padEnd(20)}${f.label}: ${f.description}`).join("\n")}\n`);
   return 0;
 }
 
@@ -386,7 +382,16 @@ async function dev(source: string, generate: GenerateOptions, out: unknown, port
   return 0;
 }
 
-const invokedDirectly = process.argv[1] !== undefined && import.meta.url === new URL(`file://${process.argv[1]}`).href;
-if (invokedDirectly || process.argv[1]?.endsWith("/rapt")) {
+/** Run as the program (node dist/cli.js, or the rapt link of npm to this file), not imported. */
+function invokedDirectly(): boolean {
+  const script = process.argv[1];
+  if (script === undefined) return false;
+  try {
+    return import.meta.url === pathToFileURL(realpathSync(script)).href;
+  } catch {
+    return false;
+  }
+}
+if (invokedDirectly()) {
   process.exitCode = await main(process.argv.slice(2));
 }

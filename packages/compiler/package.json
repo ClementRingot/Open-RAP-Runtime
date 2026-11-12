@@ -10,6 +10,10 @@
     ".": {
       "types": "./dist/index.d.ts",
       "default": "./dist/index.js"
+    },
+    "./cli": {
+      "types": "./dist/cli.d.ts",
+      "default": "./dist/cli.js"
     }
   },
   "bin": {
@@ -32,5 +36,6 @@
     "@rap-transpiler/model": "workspace:*",
     "chevrotain": "13.2.0",
     "fast-xml-parser": "5.12.0"
-  }
+  },
+  "homepage": "https://clementringot.github.io/RAP-Transpiler/"
 }

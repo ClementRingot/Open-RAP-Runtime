@@ -118,6 +118,12 @@ The existing CDS grammars were not reused: the one of SAP-samples/vscode-abap-cd
 Apache-2.0 and its copy FreHu/abap-cds-grammar declares itself "Unlicense" without the origin
 clearly allowing it.
 
+### npm package `rap-transpiler` (`packages/cli`)
+
+The `rapt` command (D65): it depends on the packages above and on what `rapt dev` serves
+(OpenUI5, `less-openui5`, PGlite, at the versions of the runtime, licenses listed above). No other
+dependency.
+
 ### Website (`site/`)
 
 Static HTML and CSS written for the project (MIT of the repository); the documentation pages are

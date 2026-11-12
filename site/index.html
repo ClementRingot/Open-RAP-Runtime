@@ -86,7 +86,7 @@
           <article><h3>Generated Fiori UI</h3><p>List Report, Object Page, Worklist, Analytical List Page, Overview Page, Form Entry; filters, variants, value helps.</p></article>
           <article><h3>Recent CDS</h3><p>Table entities, simple and enumerated types, standard views (<code>I_Currency</code>, <code>I_Country</code>…) with their data.</p></article>
           <article><h3>Web APIs and OAuth 2.0</h3><p>Web API binding, OIDC tokens (client credentials, PKCE), built-in development OAuth server.</p></article>
-          <article><h3>AI agents (MCP)</h3><p>The service becomes an MCP server: each tool applies the checks of the BO.</p></article>
+          <article><h3>AI agents (MCP)</h3><p>The service becomes an MCP server: each tool applies the checks of the BO. And <code>rapt agent</code> helps coding agents write the BO: check, create objects, read the docs.</p></article>
           <article><h3>Faithful to SAP</h3><p><code>standard</code> mode: what builds activates on SAP. <code>enhanced</code> mode for the extensions.</p></article>
           <article><h3>Deployment</h3><p>Docker, <code>docker compose</code>, SAP BTP Cloud Foundry (<code>cf push</code>), any Node.js server.</p></article>
         </div>
@@ -110,7 +110,9 @@
         </div>
         <div>
           <h2>Or on the command line</h2>
-<pre><code>rapt new my-project Travel --prefix ZRT
+<pre><code>npm install -g rap-transpiler
+
+rapt new my-project Travel --prefix ZRT
 rapt dev my-project
 # http://localhost:8080/
 

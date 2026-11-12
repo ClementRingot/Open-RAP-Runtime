@@ -55,6 +55,9 @@ definitions, services, classes); its title bar creates an object, checks the pro
 
 Syntax highlighting covers ABAP, CDS (DDLS, DDLX, DCL, SRVD, tables, types) and BDEF.
 
+The integrated terminals of VS Code have the `rapt` command of the extension (setting
+`rapt.terminal.addToPath`), and the agent mode of VS Code finds the MCP server of rapt (§13).
+
 ### On the command line
 
 ```sh
@@ -62,8 +65,9 @@ rapt new my-project Travel --prefix ZRT    # a complete managed BO
 rapt dev my-project                         # http://localhost:8080/: development launchpad
 ```
 
-From a clone of the repository: `pnpm install && pnpm build`, then
-`node packages/compiler/dist/cli.js` instead of `rapt`.
+Install it with `npm install -g rap-transpiler` (Node.js 22), or run it with
+`npx rap-transpiler <command>`. From a clone of the repository: `pnpm install && pnpm build`,
+then `node packages/compiler/dist/cli.js` instead of `rapt`.
 
 ## 3. The project
 
@@ -371,6 +375,10 @@ Dockerfile, docker-compose.yml, keycloak/, manifest.yml   container, PostgreSQL,
 
 ## 11. CLI reference
 
+`rapt` comes with the VS Code extension (on the PATH of its terminals) or from npm
+(`npm install -g rap-transpiler`, [D65](DECISIONS.md)).
+
+
 | Command | Purpose |
 |---|---|
 | `rapt check <src>` | diagnostics (`file:line:column: severity CODE message`), exit code 1 on error |
@@ -383,6 +391,7 @@ Dockerfile, docker-compose.yml, keycloak/, manifest.yml   container, PostgreSQL,
 | `rapt mcp <src>` | MCP tools (`rapt/mcp.json`) |
 | `rapt launchpad <launchpad.json> --out <dir>` | launchpad |
 | `rapt ir <src> [--out f]` | intermediate representation (JSON) |
+| `rapt agent [<workspace>]` | MCP server (stdio) of rapt for AI coding agents (§13) |
 
 Common options: `--service <SRVD>` (several service definitions), `--mode`, `--json` (output for
 tools: one JSON object; one event per line for `rapt dev`), `--warnings-as-errors`.
@@ -432,6 +441,26 @@ credentials* token acts on behalf of its client (technical user), with the roles
 (`OIDC_ROLES_CLAIM=scope` to read the scopes).
 
 ## 13. For an AI agent writing a BO
+
+An agent uses rapt in either of two ways ([D64](DECISIONS.md)):
+
+- **Commands**: `rapt check <src> --json` and the other commands of §11. In VS Code, `rapt` is on
+  the PATH of the integrated terminals; elsewhere, `npm install -g rap-transpiler`.
+- **MCP server** `rapt agent`: in VS Code, the agent mode finds it by itself (*RAP Transpiler*
+  extension, setting `rapt.agent.enabled`). Other clients start it:
+  `claude mcp add rapt -- rapt agent .` (Claude Code), or in a `.mcp.json` file
+  `{ "mcpServers": { "rapt": { "command": "rapt", "args": ["agent", "."] } } }`.
+
+| Tool | Purpose |
+|---|---|
+| `rapt_projects` | the RAP projects of the workspace |
+| `rapt_check` | diagnostics of a project (compiled, nothing written) |
+| `rapt_object_types` | the object types of `rapt_generate` and the floorplans |
+| `rapt_generate`, `rapt_new_business_object` | create an object, or a complete business object |
+| `rapt_floorplan`, `rapt_abapgit` | floorplan of the UI, abapGit XML files |
+| `rapt_docs_search`, `rapt_docs_read` | the documentation of rap-transpiler (this guide, codes, annotations, known gaps…) |
+
+Then:
 
 1. Read the project (`src/`, `rapt/`); `rapt check <src> --json` gives the diagnostics with
    absolute paths, line and column.

@@ -30,8 +30,9 @@ library ([LICENSES.md](LICENSES.md)).
 run *RAP: New business object* and *RAP: Start rapt dev*. The browser opens on the development
 launchpad.
 
-**On the command line** (Node.js 22, from a clone: `pnpm install && pnpm build`, then
-`node packages/compiler/dist/cli.js` instead of `rapt`):
+**On the command line** (Node.js 22): `npm install -g rap-transpiler` (or `npx rap-transpiler`),
+or from a clone `pnpm install && pnpm build`, then `node packages/compiler/dist/cli.js` instead of
+`rapt`:
 
 ```sh
 rapt new my-project Travel --prefix ZRT    # a complete managed BO, with data
@@ -80,7 +81,10 @@ rapt dev my-project                         # http://localhost:8080/ — rebuilt
 - **Deployment**: Docker, `docker compose`, SAP BTP Cloud Foundry (`cf push`), any Node.js
   server.
 - **VS Code extension**: object creation wizard as in ADT, *RAP Objects* view, floorplan choice,
-  every command of the CLI, diagnostics in the Problems tab, ABAP, CDS and BDEF highlighting.
+  every command of the CLI, diagnostics in the Problems tab, ABAP, CDS and BDEF highlighting;
+  `rapt` in the integrated terminals.
+- **AI coding agents**: `rapt agent`, an MCP server that checks the project, creates objects and
+  searches the documentation; registered by the extension for the agent mode of VS Code.
 
 ## Documentation
 
@@ -115,6 +119,7 @@ packages/model/      types of the IR (model.json), shared naming conventions
 packages/compiler/   rapt CLI, parsers (BDEF, CDS, SRVD, DCL), IR, generators
 packages/runtime/    runtime of the generated applications (OData V4, RAP managed, launchpad, MCP)
 packages/vscode/     VS Code extension (calls the rapt CLI)
+packages/cli/        npm package rap-transpiler (the rapt command)
 fixtures/            reference BOs: travel (Travel / Booking), custom-entity, table-entity
 site/                project website
 ```

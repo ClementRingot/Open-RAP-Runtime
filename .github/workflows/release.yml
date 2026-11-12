@@ -2,7 +2,8 @@ name: Release
 
 # A tag v1.2.3 publishes the VS Code extension: the .vsix is attached to the GitHub release of
 # the tag, and published to the Visual Studio Marketplace and Open VSX when their tokens are set
-# (repository secrets VSCE_PAT and OVSX_PAT).
+# (repository secrets VSCE_PAT and OVSX_PAT). With the secret NPM_TOKEN, it also publishes the npm
+# packages (D65): rap-transpiler (the rapt command) and @rap-transpiler/model, compiler, runtime.
 on:
   push:
     tags: ["v*"]
@@ -47,3 +48,35 @@ jobs:
         if: env.OVSX_PAT != ''
         working-directory: packages/vscode
         run: npx --yes ovsx@0.10 publish rap-transpiler-vscode.vsix --pat "$OVSX_PAT"
+
+  npm:
+    runs-on: ubuntu-latest
+    env:
+      NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
+    steps:
+      - uses: actions/checkout@v4
+        if: env.NPM_TOKEN != ''
+      - uses: pnpm/action-setup@v4
+        if: env.NPM_TOKEN != ''
+      - uses: actions/setup-node@v4
+        if: env.NPM_TOKEN != ''
+        with:
+          node-version: 22
+          cache: pnpm
+          registry-url: https://registry.npmjs.org
+      - name: Versions of the packages from the tag
+        if: env.NPM_TOKEN != ''
+        run: |
+          for p in model compiler runtime cli; do (cd "packages/$p" && npm pkg set version="${GITHUB_REF_NAME#v}"); done
+      - run: pnpm install --frozen-lockfile
+        if: env.NPM_TOKEN != ''
+      - run: pnpm build
+        if: env.NPM_TOKEN != ''
+      - name: rapt of the package works
+        if: env.NPM_TOKEN != ''
+        run: node packages/cli/bin/rapt.mjs check fixtures/travel --warnings-as-errors
+      - name: Publish (workspace:* becomes the version of the tag)
+        if: env.NPM_TOKEN != ''
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: pnpm -r --filter @rap-transpiler/model --filter @rap-transpiler/runtime --filter @rap-transpiler/compiler --filter rap-transpiler publish --access public --no-git-checks

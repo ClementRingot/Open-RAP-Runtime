@@ -324,6 +324,16 @@
           "type": "string",
           "default": "Z",
           "description": "Prefix proposed for the objects of a new business object (Z or Y…)."
+        },
+        "rapt.terminal.addToPath": {
+          "type": "boolean",
+          "default": true,
+          "description": "Put the rapt command (the CLI of the extension) on the PATH of the integrated terminals, for you and for the AI agents that run commands."
+        },
+        "rapt.agent.enabled": {
+          "type": "boolean",
+          "default": true,
+          "markdownDescription": "Offer the MCP server of rapt (`rapt agent`) to the agent mode of VS Code: check the project, create objects, read the documentation of rap-transpiler."
         }
       }
     },
@@ -335,7 +345,13 @@
           "icon": "$(package)"
         }
       ]
-    }
+    },
+    "mcpServerDefinitionProviders": [
+      {
+        "id": "rapt.agent",
+        "label": "rapt (rap-transpiler)"
+      }
+    ]
   },
   "scripts": {
     "build": "tsc -p tsconfig.build.json --noEmit && esbuild src/extension.ts --bundle --platform=node --target=node20 --format=cjs --external:vscode --sourcemap --outfile=dist/extension.cjs",

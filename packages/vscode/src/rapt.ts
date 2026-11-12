@@ -411,3 +411,34 @@ export function summary(counts: Counts): string {
   const plural = (n: number, one: string, many: string): string => `${n} ${n > 1 ? many : one}`;
   return `${plural(counts.error, "error", "errors")}, ${plural(counts.warning, "warning", "warnings")}`;
 }
+
+/**
+ * The `rapt` command of the integrated terminals (D64): small scripts that start the CLI the
+ * extension uses (the bundled one by default, with the Node.js of VS Code), in a folder the
+ * extension puts first on the PATH of its terminals. Agents and humans then type `rapt check .`
+ * without installing anything. Nothing when the CLI is itself `rapt` of the PATH.
+ */
+export function terminalShims(cli: Cli): Array<{ name: string; content: string; executable: boolean }> {
+  if (cli.args.length === 0) {
+    return [];
+  }
+  const env = Object.entries(cli.env ?? {});
+  const quoteSh = (s: string): string => `'${s.replace(/'/g, `'\\''`)}'`;
+  const sh = `#!/bin/sh\n# rapt of the RAP Transpiler extension for VS Code\n${env.map(([k, v]) => `${k}=${quoteSh(v)} `).join("")}exec ${[cli.command, ...cli.args].map(quoteSh).join(" ")} "$@"\n`;
+  const cmd = `@echo off\r\nrem rapt of the RAP Transpiler extension for VS Code\r\n${env.map(([k, v]) => `set "${k}=${v}"\r\n`).join("")}${[cli.command, ...cli.args].map((a) => `"${a}"`).join(" ")} %*\r\n`;
+  return [
+    { name: "rapt", content: sh, executable: true },
+    { name: "rapt.cmd", content: cmd, executable: false },
+  ];
+}
+
+/** The MCP server of rapt for the agent mode of VS Code (D64): `rapt agent <workspace folder>`. */
+export function agentServers(cli: Cli, folders: Array<{ name: string; path: string }>): Array<{ label: string; command: string; args: string[]; env: Record<string, string>; cwd: string }> {
+  return folders.map((folder) => ({
+    label: folders.length === 1 ? "rapt (rap-transpiler)" : `rapt (rap-transpiler): ${folder.name}`,
+    command: cli.command,
+    args: [...cli.args, "agent", folder.path],
+    env: { ...(cli.env ?? {}) },
+    cwd: folder.path,
+  }));
+}

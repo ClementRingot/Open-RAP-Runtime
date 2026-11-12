@@ -57,7 +57,10 @@ writeFileSync(
 run("npm", ["install", "--omit=dev", "--ignore-scripts", "--no-audit", "--no-fund", "--install-links", "--no-package-lock"], stage);
 
 // files the CLI and the server never read: source maps, types, documentation, tests of the
-// packages, OpenUI5 design time (UI adaptation), PGlite extensions (not loaded by the runtime)
+// packages, OpenUI5 design time (UI adaptation), PGlite extensions (not loaded by the runtime).
+// The documentation of rap-transpiler itself is kept: the documentation app of rapt dev and the
+// MCP server of the extension read it (D49, D64).
+const KEPT_FOLDER = new Set([path.join(stage, "node_modules", "@rap-transpiler", "compiler", "docs")]);
 let removed = 0;
 const remove = (full) => {
   removed += statSync(full).isDirectory() ? readdirSync(full, { recursive: true }).length : 1;
@@ -70,6 +73,9 @@ const prune = (dir) => {
   const isPackage = statSync(path.join(dir, "package.json"), { throwIfNoEntry: false }) !== undefined;
   for (const entry of readdirSync(dir, { withFileTypes: true })) {
     const full = path.join(dir, entry.name);
+    if (KEPT_FOLDER.has(full)) {
+      continue;
+    }
     if (entry.isDirectory()) {
       if ((isPackage && UNUSED_PACKAGE_FOLDER.has(entry.name)) || entry.name === "designtime") {
         remove(full);
@@ -87,4 +93,8 @@ rmSync(packs, { recursive: true, force: true });
 
 const cli = path.join(stage, "node_modules", "@rap-transpiler", "compiler", "dist", "cli.js");
 statSync(cli);
+// the documentation must be there: without it the documentation app of rapt dev is empty
+for (const doc of ["README.md", "GUIDE.md", "DECISIONS.md"]) {
+  statSync(path.join(stage, "node_modules", "@rap-transpiler", "compiler", "docs", doc));
+}
 process.stdout.write(`rapt staged in ${stage} (${removed} files pruned)\n`);

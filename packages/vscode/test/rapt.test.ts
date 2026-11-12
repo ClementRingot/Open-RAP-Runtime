@@ -1,9 +1,10 @@
-import { cpSync, mkdtempSync, rmSync } from "node:fs";
+import { execFileSync } from "node:child_process";
+import { chmodSync, cpSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { afterEach, describe, expect, it } from "vitest";
-import { DevProcess, GENERATE_KINDS, groupObjects, projectObjects, wizardArgs, type CatalogEntry, diagnosticPath, findProjectRoot, LineSplitter, parseDevEvent, position, resolveCli, runJson, summary, type DevEvent } from "../src/rapt.js";
+import { agentServers, terminalShims, DevProcess, GENERATE_KINDS, groupObjects, projectObjects, wizardArgs, type CatalogEntry, diagnosticPath, findProjectRoot, LineSplitter, parseDevEvent, position, resolveCli, runJson, summary, type DevEvent } from "../src/rapt.js";
 
 const REPO = fileURLToPath(new URL("../../../", import.meta.url));
 const FIXTURE = path.join(REPO, "fixtures", "travel");
@@ -149,5 +150,33 @@ describe("the creation wizard and the objects view (D61)", () => {
       abap: ["/p/src/zbp.clas.abap"],
       srvb: ["/p/src/zui.srvb.xml"],
     });
+  });
+
+  it("puts rapt on the PATH of the terminals with a shim that runs the CLI of the extension (D64)", () => {
+    expect(terminalShims({ command: "rapt", args: [] })).toEqual([]);
+    const cliJs = path.join(REPO, "packages", "compiler", "dist", "cli.js");
+    const shims = terminalShims({ command: process.execPath, args: [cliJs], env: { ELECTRON_RUN_AS_NODE: "1" } });
+    expect(shims.map((s) => s.name)).toEqual(["rapt", "rapt.cmd"]);
+    expect(shims[1]?.content).toContain('set "ELECTRON_RUN_AS_NODE=1"');
+    expect(shims[1]?.content).toContain(`"${cliJs}" %*`);
+    if (process.platform !== "win32") {
+      const bin = mkdtempSync(path.join(tmpdir(), "rapt-bin-"));
+      try {
+        writeFileSync(path.join(bin, "rapt"), shims[0]?.content ?? "");
+        chmodSync(path.join(bin, "rapt"), 0o755);
+        const out = execFileSync("sh", ["-c", "rapt check \"$0\" --json", FIXTURE], { env: { ...process.env, PATH: `${bin}${path.delimiter}${process.env["PATH"] ?? ""}` }, encoding: "utf8" });
+        expect(JSON.parse(out)).toMatchObject({ command: "check", ok: true });
+      } finally {
+        rmSync(bin, { recursive: true, force: true });
+      }
+    }
+  }, 60_000);
+
+  it("offers rapt agent to the agent mode of VS Code, one server per workspace folder (D64)", () => {
+    const cli = { command: "/vscode/code", args: ["/ext/cli.js"], env: { ELECTRON_RUN_AS_NODE: "1" } };
+    expect(agentServers(cli, [{ name: "shop", path: "/w/shop" }])).toEqual([
+      { label: "rapt (rap-transpiler)", command: "/vscode/code", args: ["/ext/cli.js", "agent", "/w/shop"], env: { ELECTRON_RUN_AS_NODE: "1" }, cwd: "/w/shop" },
+    ]);
+    expect(agentServers(cli, [{ name: "a", path: "/a" }, { name: "b", path: "/b" }]).map((s) => s.label)).toEqual(["rapt (rap-transpiler): a", "rapt (rap-transpiler): b"]);
   });
 });

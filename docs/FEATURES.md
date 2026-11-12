@@ -272,3 +272,13 @@ dependent ETag, remote APIs.
 | Optimized UI5 bundle (`ui5 build`) | ❌ | Resources served from the npm sources (D27). |
 | Cloud Foundry (SAP BTP): `manifest.yml`, route and bound PostgreSQL read from `VCAP_*` | ✅ | D50, guide [DEPLOYMENT.md](DEPLOYMENT.md). |
 | MCP server of the service (`rapt mcp`, `/mcp`) | ✅ | One tool per operation, descriptions in `rapt/mcp.json` (D47, guide [MCP.md](MCP.md)). |
+
+## Tooling
+
+| Feature | Status | Note |
+|---|---|---|
+| VS Code extension: commands of the CLI, Problems, wizard, *RAP Objects* view, floorplans | ✅ | D39, D61. |
+| `rapt` on the PATH of the terminals of VS Code | ✅ | Shims of the extension (D64). |
+| MCP server of rapt for AI coding agents (`rapt agent`), registered in the agent mode of VS Code | ✅ | Check, objects, floorplans, abapGit, documentation (D64). |
+| npm package `rap-transpiler` (`rapt`) | ✅ | Published by the release workflow with `NPM_TOKEN` (D65). |
+| Website with the documentation | ✅ | D62, D63. |

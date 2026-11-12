@@ -31,6 +31,11 @@ extension compiles nothing itself: it calls the `rapt` CLI (`--json`) and shows 
   abapGit.
 - Every other command of the CLI: project mode (standard / enhanced), MCP server, intermediate
   representation, launchpad.
+- **`rapt` in the terminal**: the integrated terminals have the `rapt` command of the extension
+  (`rapt check .`, `rapt dev .`…), for you and for the AI agents that run commands.
+- **AI agents**: the agent mode of VS Code finds the MCP server of rapt (`rapt agent`): check the
+  project, create objects, set the floorplan, search the documentation of rap-transpiler. For
+  Claude Code in the terminal: `claude mcp add rapt -- rapt agent .`.
 - Context menus of the explorer (project folder, `.abapgit.xml`) and buttons in the title bar of
   the RAP sources.
 
@@ -65,6 +70,8 @@ the `rapt` command of the PATH.
 | `rapt.dev.port` | `8080` | port of the application |
 | `rapt.dev.openUi` | `true` | open the browser when rapt dev starts |
 | `rapt.new.prefix` | `Z` | prefix proposed for a new business object |
+| `rapt.terminal.addToPath` | `true` | `rapt` on the PATH of the integrated terminals |
+| `rapt.agent.enabled` | `true` | MCP server of rapt for the agent mode of VS Code |
 
 ## Publishing a version
 

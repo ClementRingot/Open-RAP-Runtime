@@ -200,6 +200,14 @@ Reference versions: `@abaplint/core` 2.120.98, `@abaplint/transpiler` 2.14.24,
 | Shared (public) variants, variant applied automatically, contexts | Not supported: personal variants. |
 | Order of the columns, grouping | Not supported (visibility and sorting only). |
 
+## rapt agent (D64)
+
+| Gap | Status |
+|---|---|
+| Transport | stdio only; one request at a time (the compiler is not reentrant on a project). |
+| Running the application | No tool starts `rapt dev`: the user starts it (a long-running server is not a tool call); the agent then uses the OData service or the MCP server of the service. |
+| Agent mode of VS Code | Needs VS Code 1.101 or later (the MCP server API); one server per workspace folder. |
+
 ## Website (D63)
 
 | Gap | Status |
