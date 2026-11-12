@@ -33,7 +33,7 @@ import type { Outcome, RapWriteHandler, SetInfo } from "./write.js";
 export const DRAFT_LOCK_MINUTES = 15;
 
 const ACTIVATION: AccessMode = { local: false, privileged: false, external: false, keepKeys: true };
-const DRAFT_ACTIONS = new Set(["Edit", "Activate", "Prepare", "Resume", "Discard"]);
+const DRAFT_ACTIONS = new Set(["Edit", "Activate", "Prepare", "Resume", "Discard", "Share"]);
 
 interface Admin {
   DraftUUID: string;
@@ -124,6 +124,30 @@ export class DraftRuntime {
   private async removeDraft(db: Kysely<unknown>, root: BoEntity, row: Row & { DraftUUID: string }): Promise<void> {
     await this.remove(db, root, row);
     await sql`DELETE FROM "rapt_draft_admin" WHERE "DraftUUID" = ${row.DraftUUID}`.execute(db);
+    await sql`DELETE FROM "rapt_draft_user" WHERE "DraftUUID" = ${row.DraftUUID}`.execute(db);
+  }
+
+  /** A BO `with collaborative draft` (D59). */
+  private collaborative(bo: BoEntity): boolean {
+    return bo.bdef.collaborativeDraft === true;
+  }
+
+  /** Adds a user to the users of a collaborative draft (O: owner, E: editor). */
+  private async addUser(db: Kysely<unknown>, draftUuid: string, user: string, role: "O" | "E"): Promise<void> {
+    await sql`INSERT INTO "rapt_draft_user" ("DraftUUID", "UserID", "UserDescription", "UserAccessRole") VALUES (${draftUuid}, ${user}, ${user}, ${role}) ON CONFLICT ("DraftUUID", "UserID") DO NOTHING`.execute(db);
+  }
+
+  private async isUser(db: Kysely<unknown>, draftUuid: string, user: string): Promise<boolean> {
+    const { rows } = await sql<{ n: number }>`SELECT 1 AS n FROM "rapt_draft_user" WHERE "DraftUUID" = ${draftUuid} AND "UserID" = ${user}`.execute(db);
+    return rows.length > 0;
+  }
+
+  /** A new draft: its administrative data, and its owner for a collaborative draft. */
+  private async newDraft(db: Kysely<unknown>, bo: BoEntity, draftUuid: string, user: string): Promise<void> {
+    await sql`INSERT INTO "rapt_draft_admin" ("DraftUUID", "CreatedByUser", "LastChangedByUser", "InProcessByUser", "RootEntity") VALUES (${draftUuid}, ${user}, ${user}, ${user}, ${bo.entity.name})`.execute(db);
+    if (this.collaborative(bo)) {
+      await this.addUser(db, draftUuid, user, "O");
+    }
   }
 
   private expired(admin: Admin): boolean {
@@ -136,7 +160,7 @@ export class DraftRuntime {
     if (admin === undefined) {
       throw notFound(`the draft of ${set.info.set.name}`);
     }
-    if (admin.InProcessByUser !== user) {
+    if (admin.InProcessByUser !== user && !(this.collaborative(set.bo) && (await this.isUser(db, row.DraftUUID, user)))) {
       throw new ODataError(409, "DRAFT_LOCKED", `The draft is in process by ${admin.InProcessByUser}`);
     }
     return admin;
@@ -343,7 +367,7 @@ export class DraftRuntime {
       throw new ODataError(409, "CONFLICT", `${this.writes.path(set, this.writes.projectedKey(set, row))} already has a draft`);
     }
     const draftUuid = randomUUID();
-    await sql`INSERT INTO "rapt_draft_admin" ("DraftUUID", "CreatedByUser", "LastChangedByUser", "InProcessByUser", "RootEntity") VALUES (${draftUuid}, ${user}, ${user}, ${user}, ${set.bo.entity.name})`.execute(tx.db);
+    await this.newDraft(tx.db, set.bo, draftUuid, user);
     await this.insert(tx.db, set.bo, row, draftUuid, false);
     await this.createInline(tx.db, set, row, draftUuid, body);
     return { set, key: { ...this.writes.projectedKey(set, row), IsActiveEntity: false } };
@@ -431,6 +455,12 @@ export class DraftRuntime {
         if (admin?.InProcessByUser === user && body["PreserveChanges"] !== true) {
           return { ...outcome(200), entity: { set, key: draftKey(key) } };
         }
+        if (admin !== undefined && admin.InProcessByUser !== user && this.collaborative(set.bo)) {
+          // collaborative draft (D59): the user joins the draft of the instance
+          await this.addUser(db, existing.DraftUUID, user, "E");
+          await this.touchAdmin(db, existing.DraftUUID, user);
+          return { ...outcome(200), entity: { set, key: draftKey(key) } };
+        }
         if (admin !== undefined && admin.InProcessByUser !== user && !this.expired(admin)) {
           throw new ODataError(409, "DRAFT_LOCKED", `${this.writes.path(set, this.writes.projectedKey(set, key))} is being edited by ${admin.InProcessByUser}`);
         }
@@ -451,7 +481,7 @@ export class DraftRuntime {
         throw notFound(this.writes.path(set, this.writes.projectedKey(set, key)));
       }
       const draftUuid = randomUUID();
-      await sql`INSERT INTO "rapt_draft_admin" ("DraftUUID", "CreatedByUser", "LastChangedByUser", "InProcessByUser", "RootEntity") VALUES (${draftUuid}, ${user}, ${user}, ${user}, ${set.bo.entity.name})`.execute(db);
+      await this.newDraft(db, set.bo, draftUuid, user);
       await this.copy(tx, set.bo, active, draftUuid);
       return { ...outcome(200), entity: { set, key: draftKey(key) } };
     }
@@ -464,13 +494,30 @@ export class DraftRuntime {
     }
     const admin = await this.admin(db, row.DraftUUID);
     if (name === "Resume") {
-      if (admin !== undefined && admin.InProcessByUser !== user && !this.expired(admin)) {
+      if (admin !== undefined && admin.InProcessByUser !== user && !this.expired(admin) && !(this.collaborative(set.bo) && (await this.isUser(db, row.DraftUUID, user)))) {
         throw new ODataError(409, "DRAFT_LOCKED", `The draft is in process by ${admin.InProcessByUser}`);
       }
       await sql`UPDATE "rapt_draft_admin" SET "InProcessByUser" = ${user}, "LastChangeDateTime" = now() WHERE "DraftUUID" = ${row.DraftUUID}`.execute(db);
       return { ...outcome(200), entity: { set, key: draftKey(key) } };
     }
     await this.owned(db, set, row, user);
+    if (name === "Share") {
+      // collaborative draft (D59): the users invited to edit the draft
+      if (!this.collaborative(set.bo)) {
+        throw badRequest(`${set.info.set.name} has no collaborative draft`);
+      }
+      const body = parseObject(request.body);
+      const users = Array.isArray(body["Users"]) ? (body["Users"] as unknown[]) : [];
+      for (const entry of users) {
+        const id = typeof entry === "object" && entry !== null ? (entry as Record<string, unknown>)["UserID"] : undefined;
+        if (typeof id !== "string" || id.trim() === "" || id.length > 12) {
+          throw badRequest("Share: Users is a list of { UserID, UserAccessRole }, UserID of at most 12 characters", "Users");
+        }
+        await this.addUser(db, row.DraftUUID, id.trim().toUpperCase(), "E");
+      }
+      await this.touchAdmin(db, row.DraftUUID, user);
+      return outcome(204);
+    }
     if (name === "Discard") {
       await this.removeDraft(db, set.bo, row);
       return outcome(204);

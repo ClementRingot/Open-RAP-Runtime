@@ -16,6 +16,7 @@ export interface Locator {
   locator(selector: string, options?: { hasText?: string }): Locator;
   waitFor(options?: { state?: string; timeout?: number }): Promise<void>;
   textContent(): Promise<string | null>;
+  allTextContents(): Promise<string[]>;
   isEnabled(): Promise<boolean>;
 }
 export interface Page {

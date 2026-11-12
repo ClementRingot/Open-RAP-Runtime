@@ -37,7 +37,7 @@ describe.skipIf(browserType === undefined)("authorizations in the generated UI",
   it("tells the UI which creations the user may perform", async () => {
     const response = await t.app.inject({ method: "GET", url: `${SERVICE}$permissions` });
     expect(response.statusCode).toBe(200);
-    expect(JSON.parse(response.body)).toEqual({ Travel: { create: false } });
+    expect(JSON.parse(response.body)).toMatchObject({ Travel: { create: false } });
   });
 
   it("hides Create and disables Edit, Delete and the actions for a viewer", async () => {

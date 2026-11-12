@@ -84,13 +84,42 @@ describe.skipIf(browserType === undefined)("draft in the UI", () => {
     expect(await odata(`Travel(TravelUUID=${T2},IsActiveEntity=true)`)).toMatchObject({ Description: "Berlin, in a draft", HasDraftEntity: false });
   }, 120_000);
 
+  it("works like Fiori Elements: draft indicator, keep the draft when leaving, own draft in the list (D58)", async () => {
+    const page = await open();
+    await page.locator(ROWS, { hasText: "70002" }).first().click();
+    await page.locator(id("TravelObject", "edit")).click();
+    await page.waitForFunction("location.hash.includes('IsActiveEntity=false')", undefined, { timeout: 30_000 });
+    await page.locator(id("TravelObject", "draftMarker")).waitFor({ timeout: 30_000 });
+    await page.locator(field("Travel", "Description")).fill("Kept as a draft");
+    await page.locator(field("Travel", "Description")).press("Tab");
+    await expect.poll(async () => page.locator(id("TravelObject", "draftStatus")).textContent(), { timeout: 10_000 }).toMatch(/Draft (saved|updated)/);
+    // leaving the page: keep the draft
+    await page.locator(id("TravelObject", "crumbList")).click();
+    await page.locator(".sapMMessageBox button", { hasText: "Keep Draft" }).first().click();
+    await page.locator(ROWS).first().waitFor({ timeout: 30_000 });
+    // the list shows the own draft instead of the active instance, with its marker
+    await expect.poll(async () => page.locator(ROWS, { hasText: "70002" }).count(), { timeout: 15_000 }).toBe(1);
+    expect(await page.locator(ROWS, { hasText: "70002" }).first().textContent()).toContain("Draft");
+    // Editing Status: own drafts
+    await page.locator(id("TravelList", "filter_EditingStatus")).click();
+    await page.locator("li.sapMSelectListItemBase", { hasText: "Own Draft" }).first().click();
+    await page.locator(id("TravelList", "go")).click();
+    await expect.poll(async () => page.locator(`${id("TravelList", "table")} ${ROWS}`).count(), { timeout: 15_000 }).toBe(1);
+    // back to the draft, discarded from the object page
+    await page.locator(ROWS, { hasText: "70002" }).first().click();
+    await page.locator(id("TravelObject", "cancel")).click();
+    await page.locator(".sapMMessageBox button", { hasText: "Discard" }).first().click();
+    await page.waitForFunction("location.hash.includes('IsActiveEntity=true')", undefined, { timeout: 30_000 });
+    expect((await odata(`Travel(TravelUUID=${T2},IsActiveEntity=true)`))["HasDraftEntity"]).toBe(false);
+  }, 120_000);
+
   it("discards a draft", async () => {
     const page = await open();
     await page.locator(ROWS, { hasText: "70002" }).first().click();
     await page.locator(id("TravelObject", "edit")).click();
     await page.waitForFunction("location.hash.includes('IsActiveEntity=false')", undefined, { timeout: 30_000 });
     await page.locator(id("TravelObject", "cancel")).click();
-    await page.locator(".sapMMessageBox button", { hasText: "OK" }).first().click();
+    await page.locator(".sapMMessageBox button", { hasText: "Discard" }).first().click();
     await page.waitForFunction("location.hash.includes('IsActiveEntity=true')", undefined, { timeout: 30_000 });
     expect((await odata(`Travel(TravelUUID=${T2},IsActiveEntity=true)`))["HasDraftEntity"]).toBe(false);
   }, 120_000);

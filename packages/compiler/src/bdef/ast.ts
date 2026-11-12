@@ -21,7 +21,7 @@ export type ImplementationKind = "managed" | "unmanaged" | "abstract" | "project
 export type HeaderItemAst =
   | { kind: "implementation"; type: ImplementationKind; className?: Name; unique: boolean; saving?: { variant: "additional" | "unmanaged"; fullData: boolean }; loc: Loc }
   | { kind: "strict"; version: number; loc: Loc }
-  | { kind: "withDraft"; loc: Loc }
+  | { kind: "withDraft"; collaborative?: true; loc: Loc }
   | { kind: "privilegedMode"; disabling?: Name; loc: Loc }
   | { kind: "use"; what: string; loc: Loc }
   | { kind: "foreignEntity"; name: Name; loc: Loc }

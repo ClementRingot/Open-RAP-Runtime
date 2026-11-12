@@ -134,7 +134,7 @@ describe("authorizations in the controls of the instances (D36)", () => {
 
   it("tells the UI whether the user may create", async () => {
     const permissions = async (token: string): Promise<unknown> => JSON.parse((await t.app.inject({ method: "GET", url: `${SERVICE}$permissions`, headers: { authorization: `Bearer ${token}` } })).body);
-    expect(await permissions(await tokenOf("mona", ["travel_manager"]))).toEqual({ Travel: { create: true } });
-    expect(await permissions(await tokenOf("alice", ["travel_agent"], { agency: "070001" }))).toEqual({ Travel: { create: false } });
+    expect(await permissions(await tokenOf("mona", ["travel_manager"]))).toEqual({ Travel: { create: true }, $user: "MONA" });
+    expect(await permissions(await tokenOf("alice", ["travel_agent"], { agency: "070001" }))).toEqual({ Travel: { create: false }, $user: "ALICE" });
   });
 });

@@ -55,6 +55,7 @@ Le code de retour est 1 dès qu'il y a une erreur (ou un avertissement avec
 | BDEF006 | erreur | Association inconnue |
 | BDEF007 | erreur | Table persistante inconnue |
 | BDEF028 | erreur | BO draft (`with draft`) dont une entité n'a pas de `draft table` (D54) |
+| BDEF029 | erreur | `with collaborative draft` sans `draft action Share` (D59) |
 | BDEF027 | erreur ou info | BO managed avec unmanaged save sur une entité custom : extension de rap-transpiler, non activable sur SAP (D43). Erreur en mode `standard`, info en mode `enhanced` (D45) |
 | BDEF008 | erreur | Mapping incohérent avec la vue CDS ou la table |
 | BDEF009 | erreur | Élément sans colonne correspondante |

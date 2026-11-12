@@ -184,15 +184,22 @@ export const COMPONENT = `sap.ui.define([
 
     init: function () {
       UIComponent.prototype.init.apply(this, arguments);
-      var oUi = new JSONModel({ editMode: false, createMode: false, draft: false, busy: false, tableSelected: false, childSelected: false, permissions: {} });
+      var oUi = new JSONModel({ editMode: false, createMode: false, draft: false, busy: false, tableSelected: false, childSelected: false, permissions: {}, user: undefined, collab: { users: [] } });
+      var that = this;
+      this._aUserCallbacks = [];
       this.setModel(oUi, "ui");
       this.setModel(Messaging.getMessageModel(), "message");
       // the creations the user may perform (global authorization): Create is hidden otherwise
       var sService = this.getManifestEntry("/sap.app/dataSources/mainService/uri");
       fetch(sService + "$permissions", { credentials: "same-origin", headers: { accept: "application/json" } })
         .then(function (oResponse) { return oResponse.ok ? oResponse.json() : {}; })
-        .then(function (oPermissions) { oUi.setProperty("/permissions", oPermissions); })
-        .catch(function () { /* the permissions stay unknown: every button is shown */ });
+        .then(function (oPermissions) {
+          oUi.setProperty("/permissions", oPermissions);
+          // the user, for the draft markers (D58)
+          oUi.setProperty("/user", oPermissions.$user || "");
+          that._fireUser();
+        })
+        .catch(function () { /* the permissions stay unknown: every button is shown */ oUi.setProperty("/user", ""); that._fireUser(); });
       // behind a launchpad (D37): its shell bar above the pages; standalone, the request fails
       var sTitle = this.getManifestEntry("/sap.app/title");
       fetch("/launchpad/config", { credentials: "same-origin", headers: { accept: "application/json" } })
@@ -204,6 +211,21 @@ export const COMPONENT = `sap.ui.define([
         })
         .catch(function () { /* not behind a launchpad */ });
       this.getRouter().initialize();
+    },
+
+    /** Calls back with the user once known (from $permissions). */
+    whenUser: function (fnCallback) {
+      var sUser = this.getModel("ui").getProperty("/user");
+      if (sUser !== undefined) {
+        fnCallback(sUser);
+      } else {
+        this._aUserCallbacks.push(fnCallback);
+      }
+    },
+
+    _fireUser: function () {
+      var sUser = this.getModel("ui").getProperty("/user");
+      (this._aUserCallbacks || []).splice(0).forEach(function (fn) { fn(sUser); });
     },
 
     /** A change was saved: the lists show it when the user comes back to them. */
@@ -1058,6 +1080,21 @@ export const LIST_CONTROLLER = `sap.ui.define([
       this._aFilters = [];
       this.getView().setModel(this._oLr, "lr");
       this._oStandard = this._state();
+      if (oPage.draft) {
+        // the draft condition needs the user (D58)
+        var oList = this;
+        this.getOwnerComponent().whenUser(function () {
+          // once the table is bound to the model
+          var fnApply = function () {
+            if (oList.byId("table").getBinding("items")) {
+              oList._applyTableFilters();
+            } else {
+              setTimeout(fnApply, 50);
+            }
+          };
+          fnApply();
+        });
+      }
       // the default values of the filters (@Consumption.filter.defaultValue, D57)
       var bDefaults = false;
       oPage.list.filterFields.forEach(function (f) {
@@ -1293,12 +1330,43 @@ export const LIST_CONTROLLER = `sap.ui.define([
         return true;
       });
       var oBinding = this.byId("table").getBinding("items");
-      if (aEnum.length > 0 || this._bEnumFilter) {
-        var aClauses = (oPage.draft ? ["(IsActiveEntity eq true or HasActiveEntity eq false)"] : []).concat(aEnum);
-        oBinding.changeParameters({ $filter: aClauses.length > 0 ? aClauses.join(" and ") : undefined });
+      if (!oBinding) {
+        return;
+      }
+      var sDraft = this._draftClause();
+      if (aEnum.length > 0 || this._bEnumFilter || sDraft !== "") {
+        var aClauses = (sDraft === "" ? [] : ["(" + sDraft + ")"]).concat(aEnum);
+        var sFilter = aClauses.length > 0 ? aClauses.join(" and ") : undefined;
+        if (sFilter !== this._sParameterFilter) {
+          this._sParameterFilter = sFilter;
+          oBinding.changeParameters({ $filter: sFilter });
+        }
         this._bEnumFilter = aEnum.length > 0;
       }
       oBinding.filter(aFilters.length > 0 ? new Filter({ filters: aFilters, and: true }) : []);
+    },
+
+    /**
+     * The draft condition of the list (D58), as Fiori Elements: all (the own drafts, and the
+     * active instances without an own draft), own drafts, locked by another user, no changes.
+     */
+    _draftClause: function () {
+      if (!this._page().draft) {
+        return "";
+      }
+      var sMe = String(this.getOwnerComponent().getModel("ui").getProperty("/user") || "").replace(/'/g, "''");
+      var oStatus = this.byId("filter_EditingStatus");
+      var sStatus = oStatus ? oStatus.getSelectedKey() : "";
+      if (sStatus === "own") {
+        return "IsActiveEntity eq false";
+      }
+      if (sStatus === "locked") {
+        return "IsActiveEntity eq true and HasDraftEntity eq true" + (sMe ? " and DraftAdministrativeData/InProcessByUser ne '" + sMe + "'" : "");
+      }
+      if (sStatus === "unchanged") {
+        return "IsActiveEntity eq true and HasDraftEntity eq false";
+      }
+      return sMe ? "IsActiveEntity eq false or HasDraftEntity eq false or DraftAdministrativeData/InProcessByUser ne '" + sMe + "'" : "IsActiveEntity eq true or HasActiveEntity eq false";
     },
 
     _service: function () {
@@ -1356,7 +1424,7 @@ export const LIST_CONTROLLER = `sap.ui.define([
       var sKey = oEvent.getParameter("key");
       var oVariant = this._page().selectionVariants.find(function (v) { return v.key === sKey; });
       this._oLr.setProperty("/tab", sKey);
-      var sDraft = this._page().draft ? "IsActiveEntity eq true or HasActiveEntity eq false" : "";
+      var sDraft = this._draftClause();
       var sFilter = [sDraft, oVariant && oVariant.filter ? oVariant.filter : ""].filter(Boolean).map(function (f) { return "(" + f + ")"; }).join(" and ");
       this.byId("table").getBinding("items").changeParameters({ $filter: sFilter || undefined });
     },
@@ -1394,6 +1462,9 @@ export const LIST_CONTROLLER = `sap.ui.define([
     },
 
     onClearFilters: function () {
+      if (this.byId("filter_EditingStatus")) {
+        this.byId("filter_EditingStatus").setSelectedKey("");
+      }
       var oState = this._state();
       oState.filters = {};
       oState.search = "";
@@ -1728,8 +1799,13 @@ export const OBJECT_CONTROLLER = `sap.ui.define([
   "sap/m/MessagePopover",
   "sap/m/MessageItem",
   "sap/ui/core/routing/History",
-  "rapt/app/controller/support"
-], function (Controller, Messaging, MessageBox, MessageToast, MessagePopover, MessageItem, History, support) {
+  "rapt/app/controller/support",
+  "sap/m/Dialog",
+  "sap/m/Button",
+  "sap/m/Input",
+  "sap/m/Label",
+  "sap/m/VBox"
+], function (Controller, Messaging, MessageBox, MessageToast, MessagePopover, MessageItem, History, support, Dialog, Button, Input, Label, VBox) {
   "use strict";
 
   return Controller.extend("rapt.app.controller.Object", {
@@ -1762,6 +1838,82 @@ export const OBJECT_CONTROLLER = `sap.ui.define([
       this._ui().setProperty("/childSelected", false);
     },
 
+    /** Collaborative draft (D59): the users of the draft, the changes of the others (polling). */
+    _startCollab: function () {
+      var that = this;
+      this._loadCollabUsers();
+      this._iCollab = setInterval(function () {
+        var oModel = that.getView().getModel();
+        if (!that._ui().getProperty("/draft") || oModel.hasPendingChanges()) {
+          return;
+        }
+        var oBinding = that.getView().getElementBinding();
+        if (oBinding) {
+          oBinding.refresh();
+        }
+        that._loadCollabUsers();
+      }, 5000);
+    },
+
+    _stopCollab: function () {
+      if (this._iCollab) {
+        clearInterval(this._iCollab);
+        this._iCollab = undefined;
+      }
+    },
+
+    _loadCollabUsers: function () {
+      var oContext = this.getView().getBindingContext();
+      var oUi = this._ui();
+      var sService = this.getOwnerComponent().getManifestEntry("/sap.app/dataSources/mainService/uri");
+      if (!oContext) {
+        return;
+      }
+      oContext.requestProperty("DraftUUID").then(function (sUuid) {
+        if (!sUuid) {
+          return undefined;
+        }
+        return fetch(sService + "DraftAdministrativeUser?$orderby=UserID&$filter=" + encodeURIComponent("DraftUUID eq " + sUuid), { credentials: "same-origin", headers: { accept: "application/json" } })
+          .then(function (r) { return r.ok ? r.json() : { value: [] }; })
+          .then(function (oData) {
+            oUi.setProperty("/collab/users", (oData.value || []).map(function (u) {
+              return { UserID: u.UserID, initials: String(u.UserID).slice(0, 2).toUpperCase(), owner: u.UserAccessRole === "O" };
+            }));
+          });
+      }).catch(function () { /* the list stays as it was */ });
+    },
+
+    /** Invites a user to the collaborative draft: the action Share (D59). */
+    onInvite: function () {
+      var that = this;
+      var oInput = new Input({ placeholder: "User ID", width: "100%" });
+      var oDialog = new Dialog({
+        title: "Invite Users",
+        content: [new VBox({ items: [new Label({ text: "User", labelFor: oInput }), oInput] }).addStyleClass("sapUiSmallMargin")],
+        beginButton: new Button({
+          text: "Invite",
+          type: "Emphasized",
+          press: function () {
+            var sUser = oInput.getValue().trim();
+            oDialog.close();
+            if (sUser === "") {
+              return;
+            }
+            that._draftAction("Share", { Users: [{ UserID: sUser, UserAccessRole: "E" }], ShareAll: false }).then(function () {
+              MessageToast.show(sUser.toUpperCase() + " can now edit the draft");
+              that._loadCollabUsers();
+            }, function (oError) {
+              MessageBox.error(support.errorText(oError));
+            });
+          }
+        }),
+        endButton: new Button({ text: "Cancel", press: function () { oDialog.close(); } }),
+        afterClose: function () { oDialog.destroy(); }
+      });
+      this.getView().addDependent(oDialog);
+      oDialog.open();
+    },
+
     _onObjectMatched: function (oEvent) {
       // changes left behind (back button in edit mode) must not be sent with the next save
       this.getView().getModel().resetChanges("changes");
@@ -1775,6 +1927,26 @@ export const OBJECT_CONTROLLER = `sap.ui.define([
         path: "/" + this._sSet + "(" + sKey + ")",
         parameters: { $$updateGroupId: bDraft ? "$auto" : "changes" }
       });
+      this._stopCollab();
+      if (bDraft) {
+        // each change is saved in the draft: "Saving draft..." then "Draft saved" (D58)
+        var oIndicator = this.byId("draftStatus");
+        var oBinding = this.getView().getElementBinding();
+        if (oIndicator && oBinding && !oBinding._raptIndicator) {
+          oBinding._raptIndicator = true;
+          oBinding.attachPatchSent(function () { oIndicator.showDraftSaving(); });
+          oBinding.attachPatchCompleted(function (oPatch) {
+            if (oPatch.getParameter("success")) {
+              oIndicator.showDraftSaved();
+            } else {
+              oIndicator.clearDraftState();
+            }
+          });
+        }
+        if (this.byId("collab")) {
+          this._startCollab();
+        }
+      }
       if (bDraft) {
         // a new draft (no active instance) is a creation: its keys may still be entered
         var that = this;
@@ -1795,7 +1967,8 @@ export const OBJECT_CONTROLLER = `sap.ui.define([
     _draftAction: function (sName, oParameters) {
       var oView = this.getView();
       var oNamespace = oView.getModel("layout").getProperty("/namespace");
-      var oAction = oView.getModel().bindContext(oNamespace + "." + sName + "(...)", oView.getBindingContext(), { $$inheritExpandSelect: true });
+      // Share returns nothing: no inherited $expand / $select (D59)
+      var oAction = oView.getModel().bindContext(oNamespace + "." + sName + "(...)", oView.getBindingContext(), sName === "Share" ? {} : { $$inheritExpandSelect: true });
       Object.keys(oParameters || {}).forEach(function (sParameter) {
         oAction.setParameter(sParameter, oParameters[sParameter]);
       });
@@ -1840,6 +2013,32 @@ export const OBJECT_CONTROLLER = `sap.ui.define([
     _leave: function (fnLeave) {
       var oModel = this.getView().getModel();
       var that = this;
+      if (this._ui().getProperty("/draft")) {
+        // leaving a draft, as Fiori Elements: keep it for later, or discard it (D58)
+        var oContext = this.getView().getBindingContext();
+        MessageBox.show("Do you want to keep the draft of your changes?", {
+          title: "Leave Page",
+          actions: ["Keep Draft", "Discard Draft", MessageBox.Action.CANCEL],
+          emphasizedAction: "Keep Draft",
+          onClose: function (sAction) {
+            if (sAction === "Keep Draft") {
+              that._stopCollab();
+              that.getOwnerComponent().markStale();
+              fnLeave();
+            } else if (sAction === "Discard Draft" && oContext) {
+              oContext.delete("$auto").then(function () {
+                that._stopCollab();
+                that.getOwnerComponent().markStale();
+                MessageToast.show("Draft discarded");
+                fnLeave();
+              }, function (oError) {
+                MessageBox.error(support.errorText(oError));
+              });
+            }
+          }
+        });
+        return;
+      }
       if (!this._ui().getProperty("/editMode") || !oModel.hasPendingChanges("changes")) {
         fnLeave();
         return;
@@ -2011,11 +2210,15 @@ export const OBJECT_CONTROLLER = `sap.ui.define([
         // draft (D54): Discard, back to the active instance (or the list)
         var that = this;
         var oContext = this.getView().getBindingContext();
-        MessageBox.confirm("Discard this draft?", {
+        MessageBox.confirm(that._bHasActive ? "Discard all changes?" : "Discard this draft?", {
+          title: "Discard Draft",
+          actions: ["Discard", MessageBox.Action.CANCEL],
+          emphasizedAction: "Discard",
           onClose: function (sAction) {
-            if (sAction !== MessageBox.Action.OK) {
+            if (sAction !== "Discard") {
               return;
             }
+            that._stopCollab();
             var bHasActive = that._bHasActive;
             var sActive = support.keyOf(oContext.getPath()).replace("IsActiveEntity=false", "IsActiveEntity=true");
             // DELETE of the draft root discards the draft (D54)

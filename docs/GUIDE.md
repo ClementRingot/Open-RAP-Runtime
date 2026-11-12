@@ -203,7 +203,13 @@ side effects. Détails et exceptions : [FEATURES.md](FEATURES.md).
 `total etag`, `draft action Edit; draft action Activate optimized; draft action Discard; draft
 action Resume; draft determine action Prepare;`. La table de brouillons n'a pas à exister : elle
 est générée. Le service a la clé `IsActiveEntity`, `HasDraftEntity`, `DraftAdministrativeData` et
-les actions de SAP ; déterminations et validations s'exécutent à l'activation.
+les actions de SAP ; déterminations et validations s'exécutent à l'activation. L'UI suit Fiori
+Elements : filtre *Editing Status*, *Locked by X*, « Draft updated », *Keep Draft* en quittant
+la page ([D58](DECISIONS.md)).
+
+**Collaborative draft** ([D59](DECISIONS.md)) : `with collaborative draft;` et `draft action
+Share;` ; plusieurs utilisateurs éditent le même brouillon (bouton *Invite*, ou *Edit* sur une
+instance déjà en brouillon).
 
 ### Behavior pool (ABAP)
 

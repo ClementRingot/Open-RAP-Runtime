@@ -165,7 +165,7 @@ export async function createApp(options: AppOptions): Promise<FastifyInstance> {
     }
     if (odataRequest.path === "$permissions" && request.method === "GET") {
       // the operations of the entity sets the user may perform (creation), for the UI (D36)
-      const permissions = writes instanceof RapWriteHandler ? await withReader(user, () => writes.permissions(ctx)) : {};
+      const permissions = { ...(writes instanceof RapWriteHandler ? await withReader(user, () => writes.permissions(ctx)) : {}), $user: user.abapName };
       return send(reply, { status: 200, headers: { "Content-Type": "application/json", "Cache-Control": "no-store", ...extra }, body: JSON.stringify(permissions) });
     }
     if (odataRequest.path === "$variants" && (request.method === "GET" || request.method === "PUT")) {

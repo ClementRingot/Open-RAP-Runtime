@@ -159,7 +159,8 @@ Versions de référence : `@abaplint/core` 2.120.98, `@abaplint/transpiler` 2.14
 |---|---|
 | Déterminations et validations pendant l'édition du brouillon (`on modify` sur le brouillon, `Prepare` qui valide) | Non exécutées dans le brouillon : elles s'exécutent à l'activation ; `Prepare` renvoie le brouillon sans contrôle. |
 | Actions de l'application sur un brouillon | Réponse 501 : activer d'abord. |
-| `SiblingEntity`, `draft query view`, brouillon collaboratif, `with draft` sur un BO à unmanaged save | Non pris en charge. |
+| `SiblingEntity`, `draft query view`, `with draft` sur un BO à unmanaged save | Non pris en charge (la liste obtient l'effet de `SiblingEntity` par `DraftAdministrativeData/InProcessByUser`, D58). |
+| Collaborative draft (D59) | Pas de temps réel (WebSocket) : l'Object Page relit le brouillon toutes les 5 s ; pas de verrou par champ ; `ShareAll` ignoré ; rejoindre un brouillon ne contrôle que l'autorisation d'Edit ; navigation `DraftAdministrativeData/DraftAdministrativeUser` en deux segments : lire `DraftAdministrativeUser?$filter=DraftUUID eq …`. |
 | Messages d'état (`%state_area`) | Renvoyés comme messages de transition à l'activation. |
 | Verrou exclusif | Repris par un autre utilisateur après 15 minutes sans modification, comme SAP ; pas de durée réglable. |
 

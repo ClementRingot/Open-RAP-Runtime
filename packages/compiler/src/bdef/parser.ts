@@ -189,9 +189,14 @@ class BdefParser extends EmbeddedActionsParser {
         {
           ALT: (): HeaderItemAst => {
             this.CONSUME(K.with);
+            let collaborative = false;
+            this.OPTION9(() => {
+              this.CONSUME(K.collaborative);
+              collaborative = true;
+            });
             this.CONSUME(K.draft);
             this.CONSUME2(Semicolon);
-            return { kind: "withDraft", loc: start };
+            return collaborative ? { kind: "withDraft", collaborative: true, loc: start } : { kind: "withDraft", loc: start };
           },
         },
         {

@@ -33,7 +33,7 @@ const FIELD_CHARACTERISTICS: Record<string, FieldCharacteristic> = {
 };
 
 /** The actions of a draft BO, provided by the runtime (D54). */
-export const DRAFT_ACTIONS = new Set(["edit", "activate", "discard", "resume", "prepare"]);
+export const DRAFT_ACTIONS = new Set(["edit", "activate", "discard", "resume", "prepare", "share"]);
 
 export interface BehaviorContext {
   diagnostics: Diagnostics;
@@ -81,6 +81,10 @@ export function buildBehavior(name: string, ast: BdefAst, file: SourceFile, ctx:
         break;
       case "withDraft":
         behavior.draft = true;
+        if (header.collaborative === true) {
+          // with collaborative draft: several users edit the draft, invited by Share (D59)
+          behavior.collaborativeDraft = true;
+        }
         break;
       case "privilegedMode":
         behavior.privilegedMode = true;
@@ -545,8 +549,10 @@ function buildItem(
     case "unsupported":
       if (item.what === "draft") {
         // draft action Edit, Activate, Discard, Resume; draft determine action Prepare (D54)
-        if (!/^draft\s+(determine\s+)?action\s+(Edit|Activate|Discard|Resume|Prepare)\b/i.test(item.text)) {
+        if (!/^draft\s+(determine\s+)?action\s+(Edit|Activate|Discard|Resume|Prepare|Share)\b/i.test(item.text)) {
           diagnostics.warning("BDEF003", `draft statement ignored: ${item.text}`, at(item.loc));
+        } else if (/\bShare\b/i.test(item.text)) {
+          model.draftShare = true;
         }
       } else {
         diagnostics.warning("BDEF003", `${item.what} is not supported yet and is ignored: ${item.text}`, at(item.loc));

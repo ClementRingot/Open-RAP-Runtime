@@ -360,6 +360,9 @@ function checkExposedTypes(model: Model, diagnostics: Diagnostics): void {
 /** The entity of the administrative data of the drafts (D54), a table of the runtime. */
 export const DRAFT_ADMIN_ENTITY = "DraftAdministrativeData";
 export const DRAFT_ADMIN_TABLE = "rapt_draft_admin";
+/** The users of the collaborative drafts (D59). */
+export const DRAFT_USER_ENTITY = "DraftAdministrativeUser";
+export const DRAFT_USER_TABLE = "rapt_draft_user";
 
 /**
  * Draft (D54): each exposed entity of a draft BO gets the key IsActiveEntity, HasActiveEntity,
@@ -367,8 +370,13 @@ export const DRAFT_ADMIN_TABLE = "rapt_draft_admin";
  * IsActiveEntity too, and it is read from a view of its active instances and its drafts.
  */
 function applyDraft(model: Model, diagnostics: Diagnostics): void {
-  const drafted = new Map<string, { table: string; root: boolean }>();
+  const drafted = new Map<string, { table: string; root: boolean; collaborative: boolean }>();
   for (const behavior of model.behaviors.filter((b) => b.implementationType === "managed" && b.draft === true)) {
+    const collaborative = behavior.collaborativeDraft === true;
+    const root = behavior.entities.find((e) => e.root);
+    if (collaborative && root !== undefined && root.draftShare !== true) {
+      diagnostics.error("BDEF029", `${root.entity}: with collaborative draft needs the draft action Share (draft action Share;)`, root.src);
+    }
     for (const entity of behavior.entities) {
       if (entity.draftTable === undefined) {
         diagnostics.error("BDEF028", `${entity.entity}: a draft BO needs a draft table for each entity (draft table <name>)`, entity.src);
@@ -378,7 +386,7 @@ function applyDraft(model: Model, diagnostics: Diagnostics): void {
         diagnostics.error("BDEF028", `${entity.entity}: draft needs a persistent table (not an unmanaged save)`, entity.src);
         continue;
       }
-      drafted.set(entity.entity.toUpperCase(), { table: entity.draftTable, root: entity.root });
+      drafted.set(entity.entity.toUpperCase(), { table: entity.draftTable, root: entity.root, collaborative });
     }
   }
   if (drafted.size === 0) {
@@ -389,7 +397,7 @@ function applyDraft(model: Model, diagnostics: Diagnostics): void {
   const bool: FieldModel["type"] = { kind: "bool" };
   for (const entity of exposed.filter(isDrafted)) {
     const base = baseEntityOf(model, entity);
-    const info = drafted.get(base.name.toUpperCase()) as { table: string; root: boolean };
+    const info = drafted.get(base.name.toUpperCase()) as { table: string; root: boolean; collaborative: boolean };
     const hidden = { ui: { hidden: true } };
     entity.fields.push(
       { name: "IsActiveEntity", type: bool, key: true, annotations: { endusertext: { label: "Is Active" }, ...hidden }, draft: true },
@@ -404,7 +412,7 @@ function applyDraft(model: Model, diagnostics: Diagnostics): void {
       }
     }
     entity.associations.push({ name: DRAFT_ADMIN_ENTITY, target: DRAFT_ADMIN_ENTITY, kind: "association", cardinality: { min: 0, max: 1 }, on: [{ source: "DraftUUID", target: "DraftUUID" }] });
-    entity.draft = { view: `${entity.sqlView ?? sqlName(entity.name)}_all`.slice(0, 63), table: info.table, base: base.name, root: info.root };
+    entity.draft = { view: `${entity.sqlView ?? sqlName(entity.name)}_all`.slice(0, 63), table: info.table, base: base.name, root: info.root, ...(info.collaborative ? { collaborative: true as const } : {}) };
   }
   const text = (length: number): FieldModel["type"] => ({ kind: "char", length });
   const stamp: FieldModel["type"] = { kind: "timestampl" };
@@ -427,6 +435,28 @@ function applyDraft(model: Model, diagnostics: Diagnostics): void {
     draft: { admin: true },
   });
   model.service.entitySets.push({ name: DRAFT_ADMIN_ENTITY, entity: DRAFT_ADMIN_ENTITY, draftAdministrativeData: true });
+  if ([...drafted.values()].some((d) => d.collaborative)) {
+    // collaborative draft (D59): the users of a draft, DraftAdministrativeData/DraftAdministrativeUser
+    const admin = model.entities.find((e) => e.name === DRAFT_ADMIN_ENTITY) as EntityModel;
+    admin.associations.push({ name: DRAFT_USER_ENTITY, target: DRAFT_USER_ENTITY, kind: "association", cardinality: { min: 0, max: "*" }, on: [{ source: "DraftUUID", target: "DraftUUID" }] });
+    model.entities.push({
+      name: DRAFT_USER_ENTITY,
+      kind: "view",
+      root: false,
+      sqlView: DRAFT_USER_TABLE,
+      fields: [
+        { name: "DraftUUID", type: { kind: "raw", length: 16 }, key: true, annotations: label("Draft") },
+        { name: "UserID", type: text(12), key: true, annotations: label("User") },
+        { name: "UserDescription", type: text(80), key: false, annotations: label("User Name") },
+        { name: "UserAccessRole", type: text(1), key: false, annotations: label("Access Role") },
+        { name: "UserEditingState", type: text(1), key: false, annotations: label("Editing State") },
+      ],
+      associations: [],
+      annotations: label("Draft Administrative User"),
+      draft: { admin: true },
+    });
+    model.service.entitySets.push({ name: DRAFT_USER_ENTITY, entity: DRAFT_USER_ENTITY, draftAdministrativeData: true });
+  }
 }
 
 /** The ON pairs of projection associations name the target fields as the target projection does. */

@@ -371,7 +371,7 @@ export class ReadEngine {
     // drafts (D54): the active instances, and the drafts in process by the user
     if (info.entity.draft !== undefined && !("admin" in info.entity.draft)) {
       const user = currentReader()?.abapName ?? "";
-      conditions.push(sql`(${sql.ref(`${alias}.IsActiveEntity`)} OR EXISTS (SELECT 1 FROM "rapt_draft_admin" "dra" WHERE "dra"."DraftUUID" = ${sql.ref(`${alias}.DraftUUID`)} AND "dra"."InProcessByUser" = ${user}))`);
+      conditions.push(sql`(${sql.ref(`${alias}.IsActiveEntity`)} OR EXISTS (SELECT 1 FROM "rapt_draft_admin" "dra" WHERE "dra"."DraftUUID" = ${sql.ref(`${alias}.DraftUUID`)} AND ("dra"."InProcessByUser" = ${user} OR EXISTS (SELECT 1 FROM "rapt_draft_user" "dru" WHERE "dru"."DraftUUID" = "dra"."DraftUUID" AND "dru"."UserID" = ${user}))))`);
     }
     const access = this.accessCondition(info, alias);
     if (access !== undefined) {

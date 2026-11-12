@@ -7,6 +7,7 @@ dans [FEATURES.md](FEATURES.md), les écarts assumés dans [KNOWN_GAPS.md](../KN
 
 - Déterminations et validations pendant l'édition (`Prepare`, `on modify` sur le brouillon),
   messages d'état (`%state_area`), actions de l'application sur un brouillon, `SiblingEntity`.
+- Collaborative draft en temps réel (WebSocket), verrous par champ.
 
 ## Floorplans : compléments
 

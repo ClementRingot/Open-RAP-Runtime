@@ -218,6 +218,7 @@ function listReport(page: UiPage): string {
       <f:DynamicPageHeader pinnable="true">
         <FlexBox id="filterBar" wrap="Wrap" alignItems="End" class="raptFilterBar">
           ${search}
+          ${page.draft === undefined ? "" : `<VBox id="filterItem_EditingStatus" class="raptFilterItem" width="12rem"><Label text="Editing Status" labelFor="filter_EditingStatus"/><Select id="filter_EditingStatus" width="100%" change=".onFilterChange"><core:Item key="" text="All"/><core:Item key="own" text="Own Draft"/><core:Item key="locked" text="Locked by Another User"/><core:Item key="unchanged" text="No Changes"/></Select></VBox>`}
           ${filters}
           <HBox id="filterButtons" class="raptFilterItem raptFilterButtons">
             <Button id="go" text="Go" type="Emphasized" press=".onSearch"/>
@@ -298,7 +299,7 @@ function listReport(page: UiPage): string {
           <ColumnListItem type="Navigation" press=".onItemPress">
             <cells>
               ${table.columns.map(display).join("\n              ")}
-              ${page.draft === undefined ? "" : `<ObjectMarker type="${esc("{= ${IsActiveEntity} ? 'Locked' : 'Draft' }")}" visible="${esc("{= !${IsActiveEntity} || ${HasDraftEntity} }")}"/>`}
+              ${page.draft === undefined ? "" : `<ObjectMarker type="${esc("{= %{IsActiveEntity} ? 'LockedBy' : 'Draft' }")}" additionalInfo="${esc("{= %{IsActiveEntity} ? %{DraftAdministrativeData/InProcessByUser} : '' }")}" visible="${esc("{= !%{IsActiveEntity} || %{HasDraftEntity} }")}"/>`}
             </cells>
           </ColumnListItem>
         </items>
@@ -472,6 +473,22 @@ function headerContent(page: UiPage): string {
   return `<uxap:headerContent><FlexBox wrap="Wrap" alignItems="Start">${blocks.join("")}</FlexBox></uxap:headerContent>`;
 }
 
+/**
+ * The draft state in the header of the object page (D58): the draft marker, the lock of another
+ * user, and for a collaborative draft (D59) its users and the invitation.
+ */
+function draftHeader(page: UiPage): string {
+  if (page.draft === undefined) {
+    return "";
+  }
+  const markers = `<HBox class="sapUiTinyMarginTop"><ObjectMarker id="draftMarker" type="Draft" visible="{ui>/draft}"/><ObjectMarker id="lockMarker" type="LockedBy" additionalInfo="{DraftAdministrativeData/InProcessByUser}" visible="${esc("{= !${ui>/draft} && %{HasDraftEntity} === true && %{DraftAdministrativeData/InProcessByUser} !== ${ui>/user} }")}"/></HBox>`;
+  if (page.draft.collaborative !== true || !page.draft.root) {
+    return markers;
+  }
+  const users = `<HBox id="collabUsers" items="{ui>/collab/users}" class="sapUiTinyMarginBegin"><Avatar initials="{ui>initials}" displaySize="XS" tooltip="{ui>UserID}" class="sapUiTinyMarginEnd"/></HBox>`;
+  return `${markers}<HBox id="collab" alignItems="Center" visible="{ui>/draft}" class="sapUiTinyMarginTop"><Label text="Editing together:"/>${users}<Button id="invite" icon="sap-icon://add-employee" text="Invite" type="Transparent" press=".onInvite"/></HBox>`;
+}
+
 function objectPage(page: UiPage, layout: UiLayout): string {
   const title = page.title === undefined ? `<Title text="${esc(page.typeName)}" wrapping="true"/>` : `<Title text="{${page.title}}" wrapping="true"/>`;
   const edit = page.updatable
@@ -488,7 +505,7 @@ function objectPage(page: UiPage, layout: UiLayout): string {
         ${breadcrumbs(page, layout)}
         <uxap:heading>${title}</uxap:heading>
         <uxap:snappedTitleOnMobile><Title text="${esc(page.typeName)}"/></uxap:snappedTitleOnMobile>
-        <uxap:expandedContent>${page.description === undefined ? `<Text text="${esc(page.typeName)}"/>` : `<Text text="{${page.description}}"/>`}</uxap:expandedContent>
+        <uxap:expandedContent><VBox>${page.description === undefined ? `<Text text="${esc(page.typeName)}"/>` : `<Text text="{${page.description}}"/>`}${draftHeader(page)}</VBox></uxap:expandedContent>
         <uxap:actions>
           ${edit}
           ${remove}
@@ -504,7 +521,7 @@ function objectPage(page: UiPage, layout: UiLayout): string {
       <OverflowToolbar>
         <Button id="messages" icon="sap-icon://message-popup" type="Negative" text="{= \${message>/}.length }" visible="{= \${message>/}.length > 0 }" press=".onMessages"/>
         <ToolbarSpacer/>
-        <ObjectStatus id="draftStatus" text="Draft" state="Information" icon="sap-icon://edit" visible="{ui>/draft}" class="sapUiSmallMarginBegin"/>
+        <DraftIndicator id="draftStatus" visible="{ui>/draft}" minDisplayTime="500"/>
         <Button id="save" text="{= \${ui>/createMode} ? 'Create' : 'Save' }" type="Emphasized" press=".onSave"/>
         <Button id="cancel" text="{= \${ui>/draft} ? 'Discard Draft' : 'Cancel' }" press=".onCancel"/>
       </OverflowToolbar>

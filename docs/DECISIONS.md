@@ -1143,3 +1143,47 @@ et la conséquence. Les numéros D1 à D13 correspondent aux points 1 à 13 du �
   chaque BO ; elles changent ce que voit l'utilisateur sans changer le BO.
 - **Tests** : `compiler/test/table-entity.test.ts` (CSDL), `runtime/test/table-entity.test.ts`
   (navigateur), fixture `fixtures/table-entity`.
+
+## D58 — UI du draft comme Fiori Elements
+
+- **Contexte** : la première UI du draft (D54) éditait et activait, mais sans les repères de
+  Fiori Elements : la liste montrait l'instance active même quand l'utilisateur avait un
+  brouillon, sans filtre d'état d'édition ni indicateur d'enregistrement.
+- **Décision** :
+  - **List Report** : filtre *Editing Status* (*All*, *Own Draft*, *Locked by Another User*,
+    *No Changes*) ; *All* montre les brouillons de l'utilisateur à la place de leurs instances
+    actives (`IsActiveEntity eq false or HasDraftEntity eq false or
+    DraftAdministrativeData/InProcessByUser ne '<utilisateur>'`, comme `SiblingEntity` chez SAP) ;
+    marqueurs *Draft* et *Locked by X* (`ObjectMarker`). L'instance active pointe vers les
+    données d'administration de son brouillon (`DraftUUID`), comme SAP.
+  - **Object Page** : marqueur *Draft* dans l'en-tête, *Locked by X* sur une instance qu'un autre
+    utilisateur édite, `DraftIndicator` dans le pied (« Saving draft… », « Draft updated ») ;
+    *Discard Draft* demande « Discard all changes? » ; quitter la page en brouillon propose
+    *Keep Draft* / *Discard Draft* (le brouillon reste dans la liste).
+  - L'utilisateur courant est donné à l'UI par `$permissions` (`$user`).
+- **Pourquoi** : un utilisateur de Fiori Elements retrouve les mêmes gestes ; aucune bibliothèque
+  SAP (contrôles OpenUI5 `ObjectMarker`, `DraftIndicator`).
+- **Tests** : `runtime/test/ui-draft.test.ts` (navigateur).
+
+## D59 — Collaborative draft
+
+- **Contexte** : `with collaborative draft;` et `draft action Share;` (ABAP Cloud) permettent à
+  plusieurs utilisateurs d'éditer le même brouillon ; les utilisateurs invités par `Share` ou qui
+  rejoignent le brouillon le modifient, l'activent ou l'abandonnent.
+- **Décision** :
+  - BDEF : `with collaborative draft;` dans l'en-tête, `draft action Share;` obligatoire (BDEF029),
+    `use action Share;` dans la projection.
+  - Base : `rapt_draft_user` (brouillon, utilisateur, rôle `O` propriétaire / `E` éditeur).
+  - OData : action `Share(Users: Collection(DraftAdministrativeUserInput{UserID, UserAccessRole}),
+    ShareAll)`, `Common.DraftRoot/ShareAction`, entité `DraftAdministrativeUser`
+    (navigation `DraftAdministrativeData/DraftAdministrativeUser`).
+  - Runtime : le créateur est propriétaire ; `Edit` d'une instance dont un autre utilisateur a le
+    brouillon fait rejoindre le brouillon (au lieu de 409) ; tout utilisateur du brouillon le
+    lit, le modifie, l'active, l'abandonne ; les autres reçoivent 409 / 404 comme pour un brouillon
+    exclusif.
+  - UI : en brouillon, les utilisateurs (avatars) et *Invite* (`Share`) ; la page relit le
+    brouillon toutes les 5 secondes pour montrer les changements des autres.
+- **Pourquoi** : le comportement de SAP (actions, entités, annotation) pour que Fiori Elements et
+  les clients OData s'y retrouvent ; le rafraîchissement périodique remplace les WebSockets
+  (ABAP Channels) de SAP.
+- **Tests** : `runtime/test/draft-collaborative.test.ts` (OData, navigateur, BDEF029).

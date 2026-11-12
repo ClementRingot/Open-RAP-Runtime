@@ -280,7 +280,7 @@ export interface EntityModel {
    * (`IsActiveEntity`), the draft table, the base entity. `admin`: the synthetic entity
    * DraftAdministrativeData.
    */
-  draft?: { view: string; table: string; base: string; root: boolean } | { admin: true };
+  draft?: { view: string; table: string; base: string; root: boolean; collaborative?: true } | { admin: true };
   fields: FieldModel[];
   associations: AssociationModel[];
   annotations: Annotations;
@@ -304,6 +304,8 @@ export interface BehaviorModel {
   saving?: SavingModel;
   /** `with draft` (D54). */
   draft?: boolean;
+  /** `with collaborative draft` (D59): several users edit a draft, invited by the action Share. */
+  collaborativeDraft?: true;
   /** The saver class of the behavior pool (`lsc_…`), for additional and unmanaged save. */
   saver?: SaverModel;
   entities: EntityBehaviorModel[];
@@ -469,6 +471,8 @@ export interface EntityBehaviorModel {
   useEtag: boolean;
   /** Draft (D54): the table of the drafts of the entity (`draft table`). */
   draftTable?: string;
+  /** `draft action Share` (collaborative draft, D59). */
+  draftShare?: true;
   /** Handlers of the authorization and feature control methods. */
   globalAuthorizationHandler?: HandlerRef;
   instanceAuthorizationHandler?: HandlerRef;

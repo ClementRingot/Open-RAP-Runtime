@@ -220,6 +220,11 @@ class CsdlBuilder {
     const returnsSelf = operation.returnType?.entityType === true && operation.returnType.type === operation.boundType;
     const children: XmlElement[] = [el("Parameter", { Name: "_it", Type: this.bindingType(operation), Nullable: "false" })];
     for (const parameter of operation.parameters) {
+      if (parameter.complexType !== undefined) {
+        const type = `${SCHEMA_ALIAS}.${parameter.complexType}`;
+        children.push(el("Parameter", { Name: parameter.name, Type: parameter.collection === true ? `Collection(${type})` : type, Nullable: parameter.nullable ? undefined : "false" }));
+        continue;
+      }
       children.push(el("Parameter", { Name: parameter.name, ...edmAttributes(parameter.edm), Nullable: parameter.nullable ? undefined : "false" }));
     }
     if (operation.returnType !== undefined) {
@@ -722,7 +727,7 @@ class CsdlBuilder {
         annotation(
           "Common.DraftRoot",
           {},
-          record("Common.DraftRootType", pv("ActivationAction", { String: action("Activate") }), pv("EditAction", { String: action("Edit") }), pv("PreparationAction", { String: action("Prepare") }), pv("DiscardAction", { String: action("Discard") }), pv("ResumeAction", { String: action("Resume") })),
+          record("Common.DraftRootType", pv("ActivationAction", { String: action("Activate") }), pv("EditAction", { String: action("Edit") }), pv("PreparationAction", { String: action("Prepare") }), pv("DiscardAction", { String: action("Discard") }), pv("ResumeAction", { String: action("Resume") }), set.draft.collaborative === true ? pv("ShareAction", { String: action("Share") }) : undefined),
         ),
       );
     } else if (set.draft !== undefined) {

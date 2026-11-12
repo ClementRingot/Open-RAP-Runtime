@@ -160,7 +160,7 @@ export interface UiCard {
 export interface UiPage {
   set: string;
   /** A draft BO (D54): Edit opens a draft, Save activates it, Cancel discards it. */
-  draft?: { root: boolean };
+  draft?: { root: boolean; collaborative?: true };
   /** The floorplan of the start page of a root entity set (D53). */
   floorplan: "listReport" | "worklist" | "analyticalListPage" | "formEntry";
   /** The charts of the entity (`@UI.chart`), for the Analytical List Page and the cards. */

@@ -462,6 +462,14 @@ function draftTables(model: Model): string[] {
   "InProcessByUser" varchar(12) NOT NULL DEFAULT '',
   "RootEntity" text NOT NULL DEFAULT ''
 );
+CREATE TABLE IF NOT EXISTS "rapt_draft_user" (
+  "DraftUUID" uuid NOT NULL,
+  "UserID" varchar(12) NOT NULL,
+  "UserDescription" varchar(80) NOT NULL DEFAULT '',
+  "UserAccessRole" varchar(1) NOT NULL DEFAULT 'E',
+  "UserEditingState" varchar(1) NOT NULL DEFAULT 'N',
+  PRIMARY KEY ("DraftUUID", "UserID")
+);
 `);
   }
   return statements;
@@ -484,7 +492,8 @@ function draftViews(model: Model): string[] {
     const exists = keys.map((k) => `d.${quoteIdentifier(baseName(k))} = a.${quoteIdentifier(k.name)}`).join(" AND ");
     statements.push(`CREATE VIEW ${quoteIdentifier(draft.view)} AS
 SELECT ${fields.map((f) => `a.${quoteIdentifier(f.name)}`).join(", ")}, TRUE AS "IsActiveEntity", FALSE AS "HasActiveEntity",
-  EXISTS (SELECT 1 FROM ${quoteIdentifier(draft.table)} d WHERE ${exists}) AS "HasDraftEntity", NULL::uuid AS "DraftUUID"
+  EXISTS (SELECT 1 FROM ${quoteIdentifier(draft.table)} d WHERE ${exists}) AS "HasDraftEntity",
+  (SELECT d."DraftUUID" FROM ${quoteIdentifier(draft.table)} d WHERE ${exists} LIMIT 1) AS "DraftUUID"
 FROM ${quoteIdentifier(entity.sqlView ?? "")} a
 UNION ALL
 SELECT ${fields.map((f) => `d.${quoteIdentifier(baseName(f))} AS ${quoteIdentifier(f.name)}`).join(", ")}, FALSE, d."HasActiveEntity", FALSE, d."DraftUUID"

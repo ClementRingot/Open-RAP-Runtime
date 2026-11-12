@@ -67,6 +67,7 @@ export const K = {
   by: keyword("by"),
   class: keyword("class"),
   control: keyword("control"),
+  collaborative: keyword("collaborative"),
   corresponding: keyword("corresponding"),
   create: keyword("create"),
   define: keyword("define"),

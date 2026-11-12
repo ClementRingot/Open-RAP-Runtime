@@ -9,6 +9,8 @@ import { baseEntityOf, entitySetOfEntity, findEntity, findEntityBehavior, same }
 import type { ActionModel, EntityBehaviorModel, EntityModel, FieldCharacteristic, FieldModel, Model } from "./model.js";
 
 export const SCHEMA_ALIAS = "SAP__self";
+/** The parameter type of Share (collaborative draft, D59): the users to invite. */
+export const DRAFT_USER_INPUT = "DraftAdministrativeUserInput";
 export const CONTAINER_NAME = "Container";
 
 export interface ODataProperty {
@@ -84,8 +86,8 @@ export interface ODataEntitySet {
   searchFields: string[];
   /** Exposed implicitly as a value help (D44). */
   valueHelp?: true;
-  /** An entity set of a draft BO (D54). */
-  draft?: { root: boolean };
+  /** An entity set of a draft BO (D54); `collaborative`: with collaborative draft (D59). */
+  draft?: { root: boolean; collaborative?: true };
   /** DraftAdministrativeData (D54). */
   draftAdministrativeData?: true;
 }
@@ -94,6 +96,9 @@ export interface ODataParameter {
   name: string;
   edm: EdmType;
   nullable: boolean;
+  /** A complex type of the service instead of `edm` (Share: Users, D59). */
+  complexType?: string;
+  collection?: boolean;
 }
 
 export interface ODataOperation {
@@ -462,6 +467,24 @@ export function buildODataService(model: Model): ODataService {
         draftOperation("Resume", self),
         draftOperation("Discard", undefined),
       );
+      if (draft.collaborative === true) {
+        // collaborative draft (D59): Share invites users to the draft
+        service.operations.push(
+          draftOperation("Share", undefined, [
+            { name: "Users", edm: { type: "Edm.String" }, nullable: false, complexType: DRAFT_USER_INPUT, collection: true },
+            { name: "ShareAll", edm: { type: "Edm.Boolean" }, nullable: true },
+          ]),
+        );
+        if (!service.complexTypes.some((c) => c.name === DRAFT_USER_INPUT)) {
+          service.complexTypes.push({
+            name: DRAFT_USER_INPUT,
+            properties: [
+              { name: "UserID", edm: { type: "Edm.String", maxLength: 12 }, nullable: false },
+              { name: "UserAccessRole", edm: { type: "Edm.String", maxLength: 1 }, nullable: true },
+            ],
+          });
+        }
+      }
     }
     service.entityTypes.push(entityType);
     service.entitySets.push({
@@ -473,7 +496,7 @@ export function buildODataService(model: Model): ODataService {
       deletable: publicOperation(behavior, "delete"),
       searchable: getBoolean(entity.annotations, "Search.searchable") === true,
       searchFields: entity.fields.filter((f) => getBoolean(f.annotations, "Search.defaultSearchElement") === true).map((f) => f.name),
-      ...(draft === undefined ? {} : { draft: { root: draft.root } }),
+      ...(draft === undefined ? {} : { draft: { root: draft.root, ...(draft.collaborative === true ? { collaborative: true as const } : {}) } }),
       ...(set.draftAdministrativeData === true ? { draftAdministrativeData: true as const } : {}),
       ...(set.valueHelp === true ? { valueHelp: true as const } : {}),
     });
