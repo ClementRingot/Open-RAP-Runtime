@@ -16,6 +16,7 @@ import {
   type BehaviorModel,
   type EntityBehaviorModel,
   type EntityModel,
+  type FeatureControl,
   type Model,
 } from "@rap-transpiler/model";
 
@@ -82,6 +83,14 @@ export function bdefAssociations(model: Model, behavior: BehaviorModel, entity: 
     }
   }
   return result;
+}
+
+/** Actions and associations (`create`) of an entity under feature control of the given level. */
+function featureControlled<A extends { name: string }>(entity: EntityBehaviorModel, associations: A[], level: FeatureControl): { actions: ActionModel[]; associations: A[] } {
+  return {
+    actions: entity.actions.filter((a) => a.features === level),
+    associations: associations.filter((a) => entity.associations.some((b) => same(b.name, a.name) && b.create && b.createFeatures === level)),
+  };
 }
 
 /** Ancestors of an entity, from its parent up to the root. */
@@ -187,13 +196,28 @@ export function generateDerivedTypes(model: Model, behavior: BehaviorModel): Der
     w.structure(`ts_e${e}_full`, [{ include: derivedType.key(e), as: "%key" }, ...(hasData ? [{ include: derivedType.data(e) }] : [])]);
     w.structure(derivedType.control(e), cds.fields.map((f) => component(f.name, "flag")));
     w.structure(derivedType.element(e), [...cds.fields.map((f) => component(f.name, "flag")), ...cds.associations.map((a) => component(a.name, "flag"))]);
-    w.structure(derivedType.fieldControl(e), cds.fields.map((f) => component(f.name, "flag")));
+    const featureFields = new Set(
+      Object.entries(entity.fieldCharacteristics)
+        .filter(([, characteristics]) => characteristics.includes("featuresInstance"))
+        .map(([field]) => field.toUpperCase()),
+    );
     if (actions.length > 0) {
       w.structure(`ts_e${e}_act`, actions.map((a) => component(a.name, "flag")));
     }
     if (associations.length > 0) {
       w.structure(`ts_e${e}_asc`, associations.map((a) => component(a.name, "flag")));
     }
+    // feature control: only the operations, actions, associations and fields declared with features
+    for (const [suffix, level] of [["ifc", "instance"], ["gfc", "global"]] as const) {
+      const controlled = featureControlled(entity, associations, level);
+      if (controlled.actions.length > 0) {
+        w.structure(`ts_e${e}_${suffix}_act`, controlled.actions.map((a) => component(a.name, "flag")));
+      }
+      if (controlled.associations.length > 0) {
+        w.structure(`ts_e${e}_${suffix}_asc`, controlled.associations.map((a) => component(a.name, "flag")));
+      }
+    }
+    w.structure(derivedType.fieldControl(e), cds.fields.filter((f) => featureFields.has(f.name.toUpperCase())).map((f) => component(f.name, "flag")));
     w.structure(`ts_e${e}_tkyw`, [{ include: derivedType.tky(e), as: "%tky" }]);
 
     // operations
@@ -259,14 +283,22 @@ export function generateDerivedTypes(model: Model, behavior: BehaviorModel): Der
 
     // authorization and feature control
     const flags = (names: string[]) => names.map((n) => ({ component: n, type: "flag" }));
+    const featureParts = (suffix: "ifc" | "gfc", level: FeatureControl, operations: Array<"create" | "update" | "delete">) => {
+      const controlled = featureControlled(entity, associations, level);
+      return [
+        ...flags(operations.filter((kind) => entity.operations.some((o) => o.kind === kind && o.features === level)).map((kind) => `%${kind}`)),
+        ...(controlled.actions.length > 0 ? [{ component: "%action", type: `ts_e${e}_${suffix}_act` }] : []),
+        ...(controlled.associations.length > 0 ? [{ component: "%assoc", type: `ts_e${e}_${suffix}_asc` }] : []),
+      ];
+    };
     w.structure(derivedType.globalAuthRequest(e), [...flags(["%create", "%update", "%delete"]), ...actionPart, ...assocPart]);
     w.alias(derivedType.globalAuthResult(e), derivedType.globalAuthRequest(e));
     w.structure(derivedType.instanceAuthRequest(e), [...flags(["%update", "%delete"]), ...actionPart, ...assocPart]);
     w.structure(`ts_e${e}_iauth_r`, [{ include: derivedType.tky(e), as: "%tky" }, ...flags(["%update", "%delete"]), ...actionPart, ...assocPart], derivedType.instanceAuthResult(e));
-    w.structure(`ts_e${e}_feat`, [...flags(["%update", "%delete"]), ...actionPart, ...assocPart, { component: "%field", type: derivedType.fieldControl(e) }]);
+    w.structure(`ts_e${e}_feat`, [...featureParts("ifc", "instance", ["update", "delete"]), { component: "%field", type: derivedType.fieldControl(e) }]);
     w.alias(derivedType.instanceFeaturesRequest(e), `ts_e${e}_feat`);
     w.structure(`ts_e${e}_ifeat_r`, [{ include: derivedType.tky(e), as: "%tky" }, { include: `ts_e${e}_feat`, as: "%features" }], derivedType.instanceFeaturesResult(e));
-    w.structure(derivedType.globalFeaturesRequest(e), [...flags(["%create", "%update", "%delete"]), ...actionPart, ...assocPart]);
+    w.structure(derivedType.globalFeaturesRequest(e), featureParts("gfc", "global", ["create", "update", "delete"]));
     w.alias(derivedType.globalFeaturesResult(e), derivedType.globalFeaturesRequest(e));
 
     // responses

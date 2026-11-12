@@ -2,8 +2,8 @@
 /** rapt: command line of the RAP → Node.js compiler. */
 
 import { mkdirSync, realpathSync, writeFileSync } from "node:fs";
-import { pathToFileURL } from "node:url";
 import path from "node:path";
+import { fileURLToPath } from "node:url";
 import { generateAbapGitFiles, type AbapGitResult } from "./authoring/abapgit.js";
 import { generateObject, OBJECT_KINDS } from "./authoring/generate.js";
 import { FLOORPLAN_CATALOG, OBJECT_CATALOG } from "./authoring/catalog.js";
@@ -382,16 +382,25 @@ async function dev(source: string, generate: GenerateOptions, out: unknown, port
   return 0;
 }
 
-/** Run as the program (node dist/cli.js, or the rapt link of npm to this file), not imported. */
-function invokedDirectly(): boolean {
-  const script = process.argv[1];
-  if (script === undefined) return false;
+/**
+ * Whether `script` (process.argv[1]) is the module at `moduleUrl`: compares the real paths, so
+ * that relative paths, symbolic links (npm bin) and Windows paths (backslashes, drive letter case,
+ * 8.3 short names) are recognized.
+ */
+export function isEntryPoint(moduleUrl: string, script: string | undefined, realpath: (p: string) => string = realpathSync.native): boolean {
+  if (script === undefined) {
+    return false;
+  }
   try {
-    return import.meta.url === pathToFileURL(realpathSync(script)).href;
+    const self = realpath(fileURLToPath(moduleUrl));
+    const invoked = realpath(path.resolve(script));
+    return process.platform === "win32" ? self.toLowerCase() === invoked.toLowerCase() : self === invoked;
   } catch {
     return false;
   }
 }
-if (invokedDirectly()) {
+
+// not when imported (the rapt of the npm package rap-transpiler imports main, D65)
+if (isEntryPoint(import.meta.url, process.argv[1])) {
   process.exitCode = await main(process.argv.slice(2));
 }

@@ -136,6 +136,16 @@ describe("ABAP generation of the fixture", () => {
     expect(diagnostics).toContainEqual(expect.objectContaining({ code: "ABP006", message: "Travel has no field EndDat", file: `src/${ABP}`, line }));
   });
 
+  it("types feature control with the operations, actions and fields declared with features only", async () => {
+    const withUpdate = (c: string): string => c.replace("%action-acceptTravel = COND #(", "%update = if_abap_behv=>fc-o-disabled\n                        %action-acceptTravel = COND #(");
+    const undeclared = await generate({ [ABP]: withUpdate });
+    expect(undeclared.diagnostics).toContainEqual(expect.objectContaining({ code: "ABP004", file: `src/${ABP}`, message: expect.stringMatching(/%update/i) }));
+    const declared = await generate({ [ABP]: withUpdate, "zrt_r_travel.bdef.asbdef": (c) => c.replace(/^(\s*)update\b[^;]*;/m, "$1update ( features : instance );") });
+    expect(declared.diagnostics.filter((d) => d.severity === "error")).toEqual([]);
+    const deduct = await generate({ [ABP]: (c) => c.replace("%action-acceptTravel = COND #(", "%action-deductDiscount = if_abap_behv=>fc-o-disabled\n                        %action-acceptTravel = COND #(") });
+    expect(deduct.diagnostics).toContainEqual(expect.objectContaining({ code: "ABP004", message: expect.stringMatching(/deductDiscount/i) }));
+  });
+
   it("reports typing errors of the rewritten code on the original line", async () => {
     const { diagnostics } = await generate({ [ABP]: (c) => c.replace("%element-EndDate = if_abap_behv=>mk-on ) TO reported-travel.\n      ENDIF.", "%element-EndDat = if_abap_behv=>mk-on ) TO reported-travel.\n      ENDIF.") });
     const error = diagnostics.find((d) => d.code === "ABP004");

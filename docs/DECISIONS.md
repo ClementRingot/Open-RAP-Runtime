@@ -32,6 +32,13 @@ correspond to points 1 to 13 of §11 of PLAN.md. The milestones M1 to M6 are tho
   `CREATE BY`. The complete ABAP check (types included) runs on the rewritten sources, with the
   configuration of the transpiler; each replacement keeps the number of lines of the replaced
   text, so that the errors (ABP004) point to the original line.
+- **Adjustment (feature control)**: as on SAP, the feature control requests and results
+  (`FOR INSTANCE FEATURES`, `FOR GLOBAL FEATURES`) only contain what the BDEF declares at the
+  matching level: `%create`, `%update`, `%delete` of the `( features : … )` operations,
+  `%action-x` of the `( features : … )` actions, `%assoc-_x` of the `create ( features : … )`,
+  `%field-x` of the `field ( features : instance )` fields. A pool that writes `%update` without
+  `update ( features : instance )` is refused (ABP004) instead of passing `rapt check` and then
+  failing on activation on SAP.
 - **Why**: abaplint types these constructs as `void` and the transpiler then refuses the ABP.
   The PoC (PLAN.md, V10) proved the approach with the published packages; M4 generalized it.
 - **Consequence**: the transpiler and the runtime are never patched nor monkeypatched; they are
