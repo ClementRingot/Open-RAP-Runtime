@@ -59,6 +59,7 @@ rapt dev <src>
       ["app", "/ui/index.html"],
       ["docs", "/docs/index.html"],
       ["metadata", "/sap/opu/odata4/sap/zrt_ui_travel_o4/srvd/sap/zrt_ui_travel/0001/$metadata"],
+      ["oauth", "/oauth/.well-known/openid-configuration"],
       ["mcp", "/docs/index.html#/page/mcp"],
     ]);
     expect(launchpad.groups[0]?.tiles[0]?.count).toBe("/sap/opu/odata4/sap/zrt_ui_travel_o4/srvd/sap/zrt_ui_travel/0001/Travel/$count");
