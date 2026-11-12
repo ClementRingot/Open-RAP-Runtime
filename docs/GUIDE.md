@@ -36,7 +36,11 @@ d'autre à installer), puis dans la palette de commandes (`Ctrl+Shift+P`) :
 | Commande | Effet |
 |---|---|
 | *RAP : Nouveau business object* | `rapt new` : un BO managed complet, avec données initiales |
-| *RAP : Nouvel objet RAP…* | `rapt generate` : une table, une vue, une BDEF, un behavior pool… |
+| *RAP : Nouvel objet RAP (assistant)…* | l'assistant de création, comme *New ABAP Repository Object* d'ADT : les types par catégorie (Dictionary, Core Data Services, Behavior, Business Services, Source Code Library), un filtre, une description, les champs du type (objet source, entités exposées, type de binding…) |
+| *RAP : Nouvel objet RAP…* | `rapt generate` en listes rapides : une table, une vue, une BDEF, un behavior pool… |
+| *RAP : Choisir le floorplan de l'application* | `rapt floorplan` : List Report, Worklist, Analytical List Page ou Form Entry, avec ce que chacun demande |
+| *RAP : Afficher la représentation intermédiaire* | `rapt ir` : le modèle (`model.json`) dans un éditeur |
+| *RAP : Générer un launchpad* | `rapt launchpad` : le launchpad de plusieurs applications |
 | *RAP : Lancer rapt dev* | construit, lance et ouvre le launchpad de développement ; relance à chaque enregistrement |
 | *RAP : Vérifier le BO* | `rapt check` : diagnostics dans l'onglet Problèmes (aussi à chaque enregistrement) |
 | *RAP : Générer l'application* | `rapt build` : l'application déployable |
@@ -44,7 +48,12 @@ d'autre à installer), puis dans la palette de commandes (`Ctrl+Shift+P`) :
 | *RAP : Générer le serveur MCP du service* | `rapt mcp` : les outils pour les agents IA |
 | *RAP : Choisir le mode du projet* | `standard` ou `enhanced` (`rapt/config.json`) |
 
-La coloration syntaxique couvre ABAP, CDS (DDLS, DDLX, DCL, SRVD, tables) et BDEF.
+La vue **Objets RAP** de l'explorateur range les objets du projet comme l'explorateur de projet
+d'ADT (dictionnaire, data definitions, metadata extensions, access controls, behavior
+definitions, services, classes) ; sa barre de titre crée un objet, vérifie le projet et lance
+`rapt dev` ([D61](DECISIONS.md)).
+
+La coloration syntaxique couvre ABAP, CDS (DDLS, DDLX, DCL, SRVD, tables, types) et BDEF.
 
 ### En ligne de commande
 
@@ -115,6 +124,8 @@ rapt generate . behavior ZC_ShopOrder          # BDEF de projection
 rapt generate . access ZC_ShopOrder            # DCL
 rapt generate . service ZUI_SHOPORDER --expose ZC_ShopOrder,ZC_ShopItem
 rapt generate . binding ZUI_SHOPORDER_O4 --for ZUI_SHOPORDER
+rapt generate . dataelement ZSHOP_ORDER_NO --type abap.numc(8)
+rapt generate . domain ZSHOP_STATUS --type abap.char(1)
 rapt generate . tableentity ZSHOP_ITEM --root   # table entity : table et entité en un objet
 rapt generate . type ZSHOP_NAME                 # type simple CDS
 rapt generate . enum ZSHOP_STATUS               # type énuméré CDS
@@ -265,8 +276,10 @@ complète, annotation par annotation : [ANNOTATIONS.md](ANNOTATIONS.md).
 - **Draft** : Create et Edit ouvrent un brouillon, chaque champ y est enregistré, Save active,
   Cancel abandonne ; la liste montre les instances en cours d'édition.
 
-**Floorplans** ([D53](DECISIONS.md)) : le List Report est le défaut ; `rapt/config.json` en choisit
-un autre par entity set :
+**Floorplans** ([D53](DECISIONS.md)) : le List Report est le défaut. Pour en choisir un autre :
+*RAP : Choisir le floorplan de l'application* dans VS Code (chaque floorplan est décrit avec les
+annotations qu'il lit), ou `rapt floorplan . Travel worklist` ; sans arguments, `rapt floorplan .`
+liste les entity sets et leur floorplan. Les deux écrivent `rapt/config.json` :
 
 ```json
 {

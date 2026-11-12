@@ -80,8 +80,9 @@ rapt dev mon-projet                         # http://localhost:8080/ — recharg
   `AUTHORITY-CHECK`, DCL, rôles.
 - **Déploiement** : Docker, `docker compose`, SAP BTP Cloud Foundry (`cf push`), n'importe quel
   serveur Node.js.
-- **Extension VS Code** : commandes, diagnostics dans l'onglet Problèmes, coloration ABAP, CDS et
-  BDEF.
+- **Extension VS Code** : assistant de création d'objets comme dans ADT, vue *Objets RAP*, choix du
+  floorplan, toutes les commandes de la CLI, diagnostics dans l'onglet Problèmes, coloration ABAP,
+  CDS et BDEF.
 
 ## Documentation
 

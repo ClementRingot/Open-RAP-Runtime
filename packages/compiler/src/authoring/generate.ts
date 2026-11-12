@@ -9,7 +9,8 @@
 
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
-import { getAnnotation, isUuid, type EntityModel, type FieldModel, type TableModel } from "@rap-transpiler/model";
+import { getAnnotation, isUuid, type AbapType, type EntityModel, type FieldModel, type TableModel } from "@rap-transpiler/model";
+import { parseBuiltInType } from "../ddic/catalog.js";
 import { parseBdef } from "../bdef/parser.js";
 import { abapGitXml, xmlElement } from "../ddic/table-source.js";
 import { Diagnostics } from "../diagnostics.js";
@@ -26,6 +27,8 @@ export const OBJECT_KINDS = {
   custom: "CDS custom entity and its query class (.ddls.asddls, .clas.abap)",
   tableentity: "CDS table entity: a table and its entity, the persistence of a BO (.ddls.asddls)",
   type: "CDS simple type (.drty.acds)",
+  dataelement: "data element, of a built-in type (--type abap.char(10)) or a domain (--from) (.dtel.xml)",
+  domain: "domain of a built-in type (--type abap.char(1)) (.doma.xml)",
   enum: "CDS enumerated type (.drty.acds)",
   metadata: "metadata extension (UI annotations) of an entity (.ddlx.asddlxs)",
   access: "access control (DCL) of an entity (.dcls.asdcls)",
@@ -50,6 +53,8 @@ export interface GenerateObjectOptions {
   root?: boolean;
   /** Binding: ui (default) or webapi (D60). */
   bindingType?: string;
+  /** Data element, domain: the built-in type, `abap.char(10)`. */
+  type?: string;
   description?: string;
 }
 
@@ -471,6 +476,58 @@ ${exposed.map((e) => `  expose ${e} as ${aliasOf(e)};`).join("\n")}
 `;
 }
 
+/** The DDIC type of a built-in type: DATATYPE, LENG, DECIMALS. */
+function ddicOf(type: AbapType): [string, string | undefined][] {
+  const datatype = type.kind === "bool" ? "CHAR" : type.kind === "timestamp" || type.kind === "timestampl" ? "DEC" : type.kind.toUpperCase();
+  const length = type.kind === "bool" ? 1 : type.kind === "timestamp" ? 15 : type.kind === "timestampl" ? 21 : type.length;
+  const decimals = type.kind === "timestampl" ? 7 : type.decimals;
+  return [
+    ["DATATYPE", datatype],
+    ["LENG", length === undefined ? undefined : String(length).padStart(6, "0")],
+    ["DECIMALS", decimals === undefined ? undefined : String(decimals).padStart(6, "0")],
+  ];
+}
+
+/** A data element (DTEL), on a domain or a built-in type, with its field labels. */
+function dataElementXml(name: string, description: string, base: { domain?: string; type?: AbapType }): string {
+  const text = description.slice(0, 60);
+  return abapGitXml(
+    "DTEL",
+    xmlElement(
+      "DD04V",
+      [
+        ["ROLLNAME", name.toUpperCase()],
+        ["DDLANGUAGE", "E"],
+        ...(base.domain === undefined ? [] : ([["DOMNAME", base.domain.toUpperCase()]] as [string, string][])),
+        ["HEADLEN", "55"],
+        ["SCRLEN1", "10"],
+        ["SCRLEN2", "20"],
+        ["SCRLEN3", "40"],
+        ["DDTEXT", text],
+        ["REPTEXT", text],
+        ["SCRTEXT_S", text.slice(0, 10)],
+        ["SCRTEXT_M", text.slice(0, 20)],
+        ["SCRTEXT_L", text.slice(0, 40)],
+        ["DTELMASTER", "E"],
+        ...(base.type === undefined ? [] : [["REFKIND", "D"] as [string, string], ...ddicOf(base.type)]),
+      ],
+      3,
+    ),
+  );
+}
+
+/** A domain (DOMA) of a built-in type. */
+function domainXml(name: string, description: string, type: AbapType): string {
+  return abapGitXml(
+    "DOMA",
+    xmlElement(
+      "DD01V",
+      [["DOMNAME", name.toUpperCase()], ["DDLANGUAGE", "E"], ...ddicOf(type), ["OUTPUTLEN", type.length === undefined ? undefined : String(type.length).padStart(6, "0")], ["DDTEXT", description.slice(0, 60)], ["DOMMASTER", "E"]],
+      3,
+    ),
+  );
+}
+
 function bindingSource(name: string, service: string, description: string, webApi = false): string {
   const services = `    <SERVICES>
      <item>
@@ -609,6 +666,19 @@ export function generateObject(dir: string, kind: string, name: string, options:
         return { written: [], error: "rapt generate service needs the exposed entities: --expose A,B" };
       }
       files.push([`${lower}.srvd.srvdsrv`, serviceSource(name, exposed, description)]);
+      break;
+    }
+    case "dataelement":
+    case "domain": {
+      const builtIn = parseBuiltInType(options.type ?? (kind === "domain" || options.from === undefined ? "abap.char(10)" : ""));
+      if (kind === "dataelement" && options.from !== undefined) {
+        files.push([`${lower}.dtel.xml`, dataElementXml(name, description, { domain: options.from })]);
+        break;
+      }
+      if (builtIn === undefined) {
+        return { written: [], error: `${options.type ?? ""}: a built-in type is expected, e.g. --type abap.char(10)` };
+      }
+      files.push(kind === "domain" ? [`${lower}.doma.xml`, domainXml(name, description, builtIn)] : [`${lower}.dtel.xml`, dataElementXml(name, description, { type: builtIn })]);
       break;
     }
     case "binding": {

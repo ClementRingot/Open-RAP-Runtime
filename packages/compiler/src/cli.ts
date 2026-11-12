@@ -1,10 +1,11 @@
 #!/usr/bin/env node
 /** rapt: command line of the RAP → Node.js compiler. */
 
-import { writeFileSync } from "node:fs";
+import { mkdirSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { generateAbapGitFiles, type AbapGitResult } from "./authoring/abapgit.js";
 import { generateObject, OBJECT_KINDS } from "./authoring/generate.js";
+import { FLOORPLAN_CATALOG, OBJECT_CATALOG, readFloorplans, writeFloorplan } from "./authoring/catalog.js";
 import { writeMcpFile } from "./authoring/mcp.js";
 import { newBusinessObject } from "./authoring/new.js";
 import { generateApplication, writeFiles, type GenerateOptions } from "./build.js";
@@ -30,6 +31,8 @@ Usage:
                                                  the application then serves them at /mcp
   rapt generate <src> <kind> <name> [--from X]   write one new object (table, view, projection, behavior,
                                                  pool, metadata, access, service, binding…; no kind: the list)
+  rapt floorplan <src> [<EntitySet> <fp>]       the floorplan of the UI of each root entity set: listReport,
+                                                 worklist, analyticalListPage or formEntry (rapt/config.json)
 
 Options:
   --service <name>   service definition to build (required when the sources have several)
@@ -51,6 +54,7 @@ Options:
   --for <name>       rapt generate: the BDEF of a pool, the service definition of a binding
   --expose <A,B>     rapt generate service: the exposed entities
   --root             rapt generate view: a root view entity
+  --type <t>         rapt generate dataelement, domain: the built-in type (abap.char(10))
   --check            report the missing XML files without writing them, exit code 1 if any (rapt abapgit)
   --warnings-as-errors
   -h, --help
@@ -91,6 +95,7 @@ export async function main(argv: string[]): Promise<number> {
         for: { type: "string" },
         expose: { type: "string" },
         root: { type: "boolean" },
+        type: { type: "string" },
         "warnings-as-errors": { type: "boolean" },
         help: { type: "boolean", short: "h" },
       },
@@ -127,6 +132,9 @@ export async function main(argv: string[]): Promise<number> {
     process.stdout.write(`${result.file}: ${result.tools} tools (${result.added.length} new${result.removed.length === 0 ? "" : `, removed: ${result.removed.join(", ")}`})\n`);
     process.stdout.write("describe each tool in that file; the application serves them at /mcp (rapt dev, rapt build)\n");
     return 0;
+  }
+  if (command === "floorplan") {
+    return floorplanCommand(source, parsed.positionals[2], parsed.positionals[3], parsed.values["json"] === true);
   }
   if (command === "generate") {
     return generateCommand(source, parsed.positionals[2], parsed.positionals[3], parsed.values, parsed.values["json"] === true);
@@ -210,6 +218,7 @@ export async function main(argv: string[]): Promise<number> {
       }
       const json = `${JSON.stringify(model, null, 2)}\n`;
       if (typeof parsed.values["out"] === "string") {
+        mkdirSync(path.dirname(path.resolve(parsed.values["out"])), { recursive: true });
         writeFileSync(parsed.values["out"], json);
       } else {
         process.stdout.write(json);
@@ -250,7 +259,47 @@ function abapGitCommand(source: string, check: boolean, json: boolean): number {
   return failed ? 1 : 0;
 }
 
+/**
+ * `rapt floorplan <src>`: the root entity sets and their floorplan; `rapt floorplan <src> <Set>
+ * <floorplan>` sets it in rapt/config.json (D61).
+ */
+function floorplanCommand(source: string, set: string | undefined, floorplan: string | undefined, json: boolean): number {
+  const root = path.resolve(source);
+  const { model } = buildModel(loadProject(root));
+  const sets = (model?.service.entitySets ?? [])
+    .filter((s) => s.valueHelp !== true && s.draftAdministrativeData !== true && model?.entities.find((e) => e.name === s.entity)?.root === true)
+    .map((s) => s.name);
+  const fail = (message: string): number => {
+    if (json) process.stdout.write(`${JSON.stringify({ command: "floorplan", ok: false, root, error: message })}\n`);
+    else process.stderr.write(`${message}\n`);
+    return 1;
+  };
+  if (set !== undefined) {
+    if (!sets.includes(set)) return fail(`${set}: not a root entity set of the service (${sets.join(", ") || "none"})`);
+    const known = FLOORPLAN_CATALOG.find((f) => f.floorplan === floorplan);
+    if (known === undefined) return fail(`${floorplan ?? "?"}: one of ${FLOORPLAN_CATALOG.map((f) => f.floorplan).join(", ")}`);
+    const file = writeFloorplan(root, set, known.floorplan);
+    if (json) process.stdout.write(`${JSON.stringify({ command: "floorplan", ok: true, root, file, set, floorplan: known.floorplan })}\n`);
+    else process.stdout.write(`${set}: ${known.label} (${file})\n`);
+    return 0;
+  }
+  const current = readFloorplans(root);
+  const result = { command: "floorplan", ok: true, root, sets: sets.map((s) => ({ set: s, floorplan: current[s] ?? "listReport" })), floorplans: FLOORPLAN_CATALOG };
+  if (json) {
+    process.stdout.write(`${JSON.stringify(result)}\n`);
+  } else {
+    for (const s of result.sets) process.stdout.write(`${s.set.padEnd(24)}${s.floorplan}\n`);
+    process.stdout.write(`\nFloorplans:\n${FLOORPLAN_CATALOG.map((f) => `  ${f.floorplan.padEnd(20)}${f.label}: ${f.description}`).join("\n")}\n`);
+  }
+  return 0;
+}
+
 function generateCommand(source: string, kind: string | undefined, name: string | undefined, values: Record<string, unknown>, json: boolean): number {
+  if (kind === undefined && json) {
+    // the catalog of the objects, for the creation wizard of the VS Code extension (D61)
+    process.stdout.write(`${JSON.stringify({ command: "generate", ok: true, root: path.resolve(source), kinds: OBJECT_CATALOG })}\n`);
+    return 0;
+  }
   if (kind === undefined || name === undefined) {
     process.stderr.write(`rapt generate needs a kind and a name, e.g. rapt generate . behavior ZR_Travel\n\nKinds:\n${Object.entries(OBJECT_KINDS)
       .map(([k, d]) => `  ${k.padEnd(11)}${d}`)
@@ -265,6 +314,7 @@ function generateCommand(source: string, kind: string | undefined, name: string 
     ...(expose === undefined ? {} : { expose: expose.split(",").map((e) => e.trim()).filter((e) => e !== "") }),
     ...(values["root"] === true ? { root: true } : {}),
     ...(str("binding-type") === undefined ? {} : { bindingType: str("binding-type") as string }),
+    ...(str("type") === undefined ? {} : { type: str("type") as string }),
     ...(str("description") === undefined ? {} : { description: str("description") as string }),
   });
   if (json) {

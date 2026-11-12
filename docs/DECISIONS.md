@@ -1214,3 +1214,27 @@ et la conséquence. Les numéros D1 à D13 correspondent aux points 1 à 13 du �
   autre système) sans installer d'IdP ; en production, l'IdP reste la seule source de jetons.
 - **Tests** : `runtime/test/web-api.test.ts` (binding, client credentials, PKCE),
   `runtime/test/auth.test.ts` (jeton de client).
+
+## D61 — Création guidée des objets, floorplan, parité CLI / extension
+
+- **Contexte** : ADT guide la création d'un objet (*New ABAP Repository Object* : types par
+  catégorie, description, objet de référence) ; l'extension n'offrait qu'une suite de listes
+  rapides, et le floorplan de l'UI ne se choisissait qu'en éditant `rapt/config.json`.
+- **Décision** :
+  - **Catalogue** : `authoring/catalog.ts` décrit chaque type d'objet (catégorie, libellé,
+    description, fichiers, longueur du nom, champs : objet source, entités exposées, type de
+    binding, type intégré) ; `rapt generate <src> --json` sans type le renvoie. L'extension en
+    construit son assistant : la CLI reste la seule source.
+  - **Assistant** (webview *Nouvel objet RAP*) : filtre, types par catégorie, formulaire du type
+    (les objets du projet proposés comme source), *Créer* lance `rapt generate` (ou `rapt new` pour
+    un BO complet) et ouvre le fichier. Nouveaux types : élément de données et domaine (`--type`).
+  - **Vue *Objets RAP*** : les objets du projet groupés comme l'explorateur de projet d'ADT.
+  - **Floorplan** : `rapt floorplan <src> [<EntitySet> <floorplan>]` lit et écrit
+    `ui.floorplans` de `rapt/config.json` ; la commande VS Code décrit chaque floorplan (usage,
+    annotations nécessaires).
+  - **Parité** : chaque commande de la CLI a sa commande VS Code (`check`, `ir`, `build`,
+    `launchpad`, `dev`, `new`, `abapgit`, `mcp`, `generate`, `floorplan`).
+- **Pourquoi** : un développeur ABAP retrouve les gestes d'ADT ; le choix du floorplan devient
+  explicite et documenté au moment de le faire.
+- **Tests** : `vscode/test/rapt.test.ts` (catalogue, arguments de l'assistant, `rapt floorplan`,
+  groupes), assistant vérifié dans Chromium.

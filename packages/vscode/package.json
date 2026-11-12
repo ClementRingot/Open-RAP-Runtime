@@ -29,7 +29,8 @@
   "main": "./dist/extension.cjs",
   "activationEvents": [
     "workspaceContains:**/.abapgit.xml",
-    "workspaceContains:**/*.tabl.astabl"
+    "workspaceContains:**/*.tabl.astabl",
+    "onView:raptObjects"
   ],
   "contributes": {
     "languages": [
@@ -152,6 +153,33 @@
         "command": "rapt.mcp",
         "title": "Générer le serveur MCP du service",
         "category": "RAP"
+      },
+      {
+        "command": "rapt.newObject",
+        "title": "Nouvel objet RAP (assistant)…",
+        "category": "RAP",
+        "icon": "$(add)"
+      },
+      {
+        "command": "rapt.floorplan",
+        "title": "Choisir le floorplan de l'application (List Report, Worklist…)",
+        "category": "RAP"
+      },
+      {
+        "command": "rapt.ir",
+        "title": "Afficher la représentation intermédiaire (rapt ir)",
+        "category": "RAP"
+      },
+      {
+        "command": "rapt.launchpad",
+        "title": "Générer un launchpad (rapt launchpad)",
+        "category": "RAP"
+      },
+      {
+        "command": "rapt.refreshObjects",
+        "title": "Rafraîchir",
+        "category": "RAP",
+        "icon": "$(refresh)"
       }
     ],
     "menus": {
@@ -195,6 +223,16 @@
           "command": "rapt.generate",
           "when": "resourceFilename == .abapgit.xml || explorerResourceIsFolder",
           "group": "rapt@0"
+        },
+        {
+          "command": "rapt.newObject",
+          "when": "resourceFilename == .abapgit.xml || explorerResourceIsFolder",
+          "group": "rapt@0"
+        },
+        {
+          "command": "rapt.floorplan",
+          "when": "resourceFilename == .abapgit.xml || explorerResourceIsFolder",
+          "group": "rapt@5"
         }
       ],
       "editor/title": [
@@ -212,6 +250,45 @@
           "command": "rapt.devStop",
           "when": "rapt.devRunning",
           "group": "navigation@91"
+        }
+      ],
+      "view/title": [
+        {
+          "command": "rapt.newObject",
+          "when": "view == raptObjects",
+          "group": "navigation@1"
+        },
+        {
+          "command": "rapt.check",
+          "when": "view == raptObjects",
+          "group": "navigation@2"
+        },
+        {
+          "command": "rapt.devStart",
+          "when": "view == raptObjects && !rapt.devRunning",
+          "group": "navigation@3"
+        },
+        {
+          "command": "rapt.refreshObjects",
+          "when": "view == raptObjects",
+          "group": "navigation@4"
+        }
+      ],
+      "view/item/context": [
+        {
+          "command": "rapt.newObject",
+          "when": "view == raptObjects && viewItem == raptProject",
+          "group": "inline"
+        },
+        {
+          "command": "rapt.floorplan",
+          "when": "view == raptObjects && viewItem == raptProject",
+          "group": "rapt@1"
+        },
+        {
+          "command": "rapt.abapgit",
+          "when": "view == raptObjects && viewItem == raptProject",
+          "group": "rapt@2"
         }
       ]
     },
@@ -249,6 +326,15 @@
           "description": "Préfixe proposé pour les objets d'un nouveau business object (Z ou Y…)."
         }
       }
+    },
+    "views": {
+      "explorer": [
+        {
+          "id": "raptObjects",
+          "name": "Objets RAP",
+          "icon": "$(package)"
+        }
+      ]
     }
   },
   "scripts": {

@@ -106,11 +106,11 @@ export const GENERATE_KINDS: GenerateKind[] = [
 ];
 
 /** The objects of a project by kind, from the file names of its sources. */
-export function projectObjects(fileNames: string[]): Record<"table" | "entity" | "bdef" | "srvd", string[]> {
-  const result = { table: new Set<string>(), entity: new Set<string>(), bdef: new Set<string>(), srvd: new Set<string>() };
+export function projectObjects(fileNames: string[]): Record<"table" | "entity" | "bdef" | "srvd" | "domain", string[]> {
+  const result = { table: new Set<string>(), entity: new Set<string>(), bdef: new Set<string>(), srvd: new Set<string>(), domain: new Set<string>() };
   for (const file of fileNames) {
     const base = file.split(/[\\/]/).pop() ?? file;
-    const match = /^([^.]+)\.(tabl|ddls|bdef|srvd)\.(astabl|xml|asddls|asbdef|srvdsrv)$/i.exec(base);
+    const match = /^([^.]+)\.(tabl|ddls|bdef|srvd|doma)\.(astabl|xml|asddls|asbdef|srvdsrv)$/i.exec(base);
     if (match === null) continue;
     const name = (match[1] ?? "").replace(/#/g, "/");
     const type = (match[2] ?? "").toLowerCase();
@@ -118,8 +118,88 @@ export function projectObjects(fileNames: string[]): Record<"table" | "entity" |
     else if (type === "ddls" && match[3]?.toLowerCase() === "asddls") result.entity.add(name.toUpperCase());
     else if (type === "bdef" && match[3]?.toLowerCase() === "asbdef") result.bdef.add(name.toUpperCase());
     else if (type === "srvd" && match[3]?.toLowerCase() === "srvdsrv") result.srvd.add(name.toUpperCase());
+    else if (type === "doma") result.domain.add(name.toUpperCase());
   }
-  return { table: [...result.table].sort(), entity: [...result.entity].sort(), bdef: [...result.bdef].sort(), srvd: [...result.srvd].sort() };
+  const sorted = (set: Set<string>): string[] => [...set].sort();
+  return { table: sorted(result.table), entity: sorted(result.entity), bdef: sorted(result.bdef), srvd: sorted(result.srvd), domain: sorted(result.domain) };
+}
+
+// ---------------------------------------------------------------------------------------------
+// the creation wizard (D61): the catalog of rapt generate, and the command line of a choice
+
+export interface ObjectInput {
+  option: "--from" | "--for" | "--expose" | "--root" | "--binding-type" | "--type";
+  label: string;
+  of?: "table" | "entity" | "bdef" | "srvd" | "domain";
+  values?: string[];
+  required: boolean;
+  multiple?: boolean;
+  default?: string;
+}
+
+export interface CatalogEntry {
+  kind: string;
+  category: string;
+  label: string;
+  description: string;
+  files: string;
+  maxLength: number;
+  namePattern: string;
+  inputs: ObjectInput[];
+}
+
+/** The answers of the wizard → the arguments of `rapt generate` (or of `rapt new` for a BO); an error message otherwise. */
+export function wizardArgs(root: string, entry: CatalogEntry, name: string, description: string, values: Record<string, string | string[]>): string[] | string {
+  if (!/^[A-Za-z][A-Za-z0-9_]*$/.test(name)) {
+    return "Le nom est fait de lettres, de chiffres et de _, en commençant par une lettre";
+  }
+  if (name.length > entry.maxLength) {
+    return `Le nom a au plus ${entry.maxLength} caractères`;
+  }
+  if (entry.kind === "bo") {
+    const prefix = typeof values["--prefix"] === "string" && values["--prefix"] !== "" ? ["--prefix", values["--prefix"]] : [];
+    return ["new", root, name, ...prefix, ...(description === "" ? [] : ["--description", description])];
+  }
+  const args = ["generate", root, entry.kind, name];
+  for (const input of entry.inputs) {
+    const value = values[input.option];
+    const list = Array.isArray(value) ? value.filter((v) => v !== "") : value === undefined || value === "" ? [] : [value];
+    if (list.length === 0) {
+      if (input.required) return `${input.label} : obligatoire`;
+      continue;
+    }
+    if (input.option === "--root") {
+      if (list[0] === "true") args.push("--root");
+    } else {
+      args.push(input.option, input.multiple === true ? list.join(",") : (list[0] as string));
+    }
+  }
+  if (description !== "") args.push("--description", description);
+  return args;
+}
+
+/** The object groups of the "Objets RAP" view, as in the project explorer of ADT. */
+export const OBJECT_GROUPS: Array<{ id: string; label: string; pattern: RegExp }> = [
+  { id: "ddic", label: "Dictionnaire (tables, éléments de données, domaines)", pattern: /\.(tabl\.astabl|tabl\.xml|dtel\.xml|doma\.xml)$/i },
+  { id: "cds", label: "Core Data Services (data definitions, types)", pattern: /\.(ddls\.asddls|drty\.acds|drty\.asdrty)$/i },
+  { id: "ddlx", label: "Metadata extensions", pattern: /\.ddlx\.asddlxs$/i },
+  { id: "dcl", label: "Access controls", pattern: /\.dcls\.asdcls$/i },
+  { id: "bdef", label: "Behavior definitions", pattern: /\.bdef\.asbdef$/i },
+  { id: "srvd", label: "Service definitions", pattern: /\.srvd\.srvdsrv$/i },
+  { id: "srvb", label: "Service bindings", pattern: /\.srvb\.xml$/i },
+  { id: "abap", label: "Classes et interfaces", pattern: /\.(clas|intf)\.abap$/i },
+];
+
+/** The main file of each object of a project, by group; a table written as source hides its XML. */
+export function groupObjects(fileNames: string[]): Record<string, string[]> {
+  const result: Record<string, string[]> = {};
+  const sources = new Set(fileNames.filter((f) => /\.tabl\.astabl$/i.test(f)).map((f) => f.replace(/\.astabl$/i, ".xml").toLowerCase()));
+  for (const file of [...fileNames].sort()) {
+    if (sources.has(file.toLowerCase())) continue;
+    const group = OBJECT_GROUPS.find((g) => g.pattern.test(file));
+    if (group !== undefined) (result[group.id] ??= []).push(file);
+  }
+  return result;
 }
 
 /** The entity name of `rapt new`: letters and digits, starting with a letter. */

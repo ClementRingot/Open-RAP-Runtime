@@ -3,7 +3,7 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { afterEach, describe, expect, it } from "vitest";
-import { DevProcess, GENERATE_KINDS, projectObjects, diagnosticPath, findProjectRoot, LineSplitter, parseDevEvent, position, resolveCli, runJson, summary, type DevEvent } from "../src/rapt.js";
+import { DevProcess, GENERATE_KINDS, groupObjects, projectObjects, wizardArgs, type CatalogEntry, diagnosticPath, findProjectRoot, LineSplitter, parseDevEvent, position, resolveCli, runJson, summary, type DevEvent } from "../src/rapt.js";
 
 const REPO = fileURLToPath(new URL("../../../", import.meta.url));
 const FIXTURE = path.join(REPO, "fixtures", "travel");
@@ -88,7 +88,7 @@ describe("rapt from the extension", () => {
 describe("rapt generate in VS Code", () => {
   it("lists the objects of the project by kind", () => {
     const objects = projectObjects(["/p/src/zrt_travel.tabl.astabl", "/p/src/zrt_travel.tabl.xml", "/p/src/zrt_r_travel.ddls.asddls", "/p/src/zrt_r_travel.ddls.xml", "/p/src/zrt_r_travel.bdef.asbdef", "/p/src/zrt_ui_travel.srvd.srvdsrv", "/p/src/readme.md"]);
-    expect(objects).toEqual({ table: ["zrt_travel"], entity: ["ZRT_R_TRAVEL"], bdef: ["ZRT_R_TRAVEL"], srvd: ["ZRT_UI_TRAVEL"] });
+    expect(objects).toEqual({ table: ["zrt_travel"], entity: ["ZRT_R_TRAVEL"], bdef: ["ZRT_R_TRAVEL"], srvd: ["ZRT_UI_TRAVEL"], domain: [] });
   });
 
   it("proposes the names RAP uses", () => {
@@ -98,5 +98,56 @@ describe("rapt generate in VS Code", () => {
     expect(name("pool", "ZRT_R_TRAVEL")).toBe("ZBP_RT_R_TRAVEL");
     expect(name("binding", "ZRT_UI_TRAVEL")).toBe("ZRT_UI_TRAVEL_O4");
     expect(name("service", "ZRT_C_TRAVEL")).toBe("ZUI_TRAVEL");
+  });
+});
+
+describe("the creation wizard and the objects view (D61)", () => {
+  const dirs: string[] = [];
+  afterEach(() => {
+    for (const dir of dirs.splice(0)) rmSync(dir, { recursive: true, force: true });
+  });
+  function copy(): string {
+    const dir = mkdtempSync(path.join(tmpdir(), "rapt-wizard-"));
+    cpSync(fileURLToPath(new URL("../../../fixtures/travel", import.meta.url)), dir, { recursive: true, filter: (f) => !f.includes(`${path.sep}.rapt`) });
+    dirs.push(dir);
+    return dir;
+  }
+  const cli = resolveCli({ workspaceFolders: [REPO], execPath: process.execPath, nodePath: process.execPath });
+
+  it("reads the catalog of rapt generate and turns the answers into a command line", async () => {
+    const dir = copy();
+    const { kinds } = await runJson<{ kinds: CatalogEntry[] }>(cli, ["generate", dir], dir);
+    expect(kinds.map((k) => k.category)).toContain("Core Data Services");
+    const binding = kinds.find((k) => k.kind === "binding") as CatalogEntry;
+    expect(wizardArgs(dir, binding, "ZAPI_TRAVEL_O4", "Travel API", { "--for": "ZRT_UI_TRAVEL", "--binding-type": "webapi" })).toEqual(["generate", dir, "binding", "ZAPI_TRAVEL_O4", "--for", "ZRT_UI_TRAVEL", "--binding-type", "webapi", "--description", "Travel API"]);
+    expect(wizardArgs(dir, binding, "ZAPI", "", {})).toBe("Service definition : obligatoire");
+    expect(wizardArgs(dir, binding, "9bad", "", {})).toMatch(/lettres/);
+    const service = kinds.find((k) => k.kind === "service") as CatalogEntry;
+    expect(wizardArgs(dir, service, "ZUI_X", "", { "--expose": ["ZRT_C_TRAVEL", "ZRT_C_BOOKING"] })).toEqual(["generate", dir, "service", "ZUI_X", "--expose", "ZRT_C_TRAVEL,ZRT_C_BOOKING"]);
+    const view = kinds.find((k) => k.kind === "view") as CatalogEntry;
+    const args = wizardArgs(dir, view, "ZR_Order", "", { "--from": "zrt_travel", "--root": "true" }) as string[];
+    expect(args).toEqual(["generate", dir, "view", "ZR_Order", "--from", "zrt_travel", "--root"]);
+    expect(await runJson(cli, args.slice(0, 1).concat(args.slice(1)), dir)).toMatchObject({ ok: true, written: expect.arrayContaining(["src/zr_order.ddls.asddls"]) });
+    const element = kinds.find((k) => k.kind === "dataelement") as CatalogEntry;
+    expect(await runJson(cli, wizardArgs(dir, element, "ZRT_ORDER_NO", "Order number", { "--type": "abap.numc(8)" }) as string[], dir)).toMatchObject({ ok: true, written: ["src/zrt_order_no.dtel.xml"] });
+    const bo = kinds.find((k) => k.kind === "bo") as CatalogEntry;
+    expect(wizardArgs(dir, bo, "Order", "Orders", { "--prefix": "ZOR" })).toEqual(["new", dir, "Order", "--prefix", "ZOR", "--description", "Orders"]);
+  });
+
+  it("sets the floorplan of an entity set with rapt floorplan", async () => {
+    const dir = copy();
+    expect(await runJson(cli, ["floorplan", dir], dir)).toMatchObject({ sets: [{ set: "Travel", floorplan: "listReport" }], floorplans: expect.arrayContaining([expect.objectContaining({ floorplan: "worklist" })]) });
+    expect(await runJson(cli, ["floorplan", dir, "Travel", "worklist"], dir)).toMatchObject({ ok: true, file: "rapt/config.json" });
+    expect(await runJson(cli, ["floorplan", dir], dir)).toMatchObject({ sets: [{ set: "Travel", floorplan: "worklist" }] });
+    expect(await runJson(cli, ["floorplan", dir, "Nope", "worklist"], dir)).toMatchObject({ ok: false });
+  });
+
+  it("groups the objects as the project explorer of ADT", () => {
+    expect(groupObjects(["/p/src/zt.tabl.astabl", "/p/src/zt.tabl.xml", "/p/src/zr.ddls.asddls", "/p/src/zr.ddls.xml", "/p/src/zs.drty.acds", "/p/src/zbp.clas.abap", "/p/src/zbp.clas.locals_imp.abap", "/p/src/zui.srvb.xml"])).toEqual({
+      ddic: ["/p/src/zt.tabl.astabl"],
+      cds: ["/p/src/zr.ddls.asddls", "/p/src/zs.drty.acds"],
+      abap: ["/p/src/zbp.clas.abap"],
+      srvb: ["/p/src/zui.srvb.xml"],
+    });
   });
 });
