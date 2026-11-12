@@ -18,6 +18,8 @@ packages/compiler/   CLI rapt (src/cli.ts), parsers (bdef/, cds/, srvd/, dcl/, d
                      création d'objets (authoring/ : new, generate, abapgit, mcp), standard/ (vues SAP)
 packages/runtime/    serveur Fastify (app.ts, server.ts), OData (odata/), RAP (rap/), ABAP (abap/),
                      auth (auth/), launchpad (launchpad/), MCP (mcp/), UI (ui/), platform.ts
+packages/cli/        paquet npm rap-transpiler : bin rapt (appelle le compilateur), dépendances
+                     servies par rapt dev aux versions du runtime (D66)
 packages/vscode/     extension VS Code : appelle la CLI avec --json, ne compile rien
 fixtures/travel      BO de référence (doit rester importable et activable sur SAP)
 fixtures/custom-entity   entité custom, mode enhanced

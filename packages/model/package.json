@@ -4,6 +4,25 @@
   "description": "Intermediate representation (IR) shared by the rap-transpiler compiler and runtime.",
   "type": "module",
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ClementRingot/RAP-Transpiler.git",
+    "directory": "packages/model"
+  },
+  "homepage": "https://github.com/ClementRingot/RAP-Transpiler#readme",
+  "bugs": {
+    "url": "https://github.com/ClementRingot/RAP-Transpiler/issues"
+  },
+  "keywords": [
+    "sap",
+    "rap",
+    "abap",
+    "cds",
+    "odata",
+    "odata-v4",
+    "abapgit",
+    "intermediate-representation"
+  ],
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
   "exports": {
@@ -12,9 +31,14 @@
       "default": "./dist/index.js"
     }
   },
-  "files": ["dist"],
+  "files": [
+    "dist"
+  ],
   "engines": {
     "node": ">=22"
+  },
+  "publishConfig": {
+    "access": "public"
   },
   "scripts": {
     "build": "tsc -p tsconfig.build.json"

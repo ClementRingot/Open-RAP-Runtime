@@ -1248,3 +1248,49 @@ et la conséquence. Les numéros D1 à D13 correspondent aux points 1 à 13 du �
   configurés). À activer une fois : *Settings → Pages → Source : GitHub Actions*.
 - **Pourquoi** : une adresse à partager, toujours à jour, sans serveur à maintenir.
 - **Tests** : rendu vérifié dans Chromium (bureau, mobile sans défilement horizontal, mode sombre).
+
+## D66 — rapt sur npm : `npm install -g rap-transpiler`
+
+- **Contexte** : rapt ne s'obtenait qu'avec l'extension VS Code (D39) ou depuis un clone
+  (`pnpm install && pnpm build`). Le nom `rapt` est déjà pris sur npm.
+- **Décision** :
+  - **Paquets publiés** : `@rap-transpiler/model`, `@rap-transpiler/compiler`,
+    `@rap-transpiler/runtime` (bibliothèques : `files`, `repository`, `publishConfig.access`
+    `public`, README ; `workspace:*` remplacé par la version à la publication, LICENSE de la
+    racine ajoutée par pnpm) et **`rap-transpiler`** (`packages/cli`), le paquet de la ligne de
+    commande : `bin: { rapt }`. `npm install -g rap-transpiler` puis `rapt …`, ou sans
+    installation `npx rap-transpiler check .` ; Node.js 22 ou plus. L'extension VS Code reste
+    privée (hors npm).
+  - **Ce que `rapt dev` sert est porté par `rap-transpiler`**, pas par le compilateur : le
+    paquet dépend du compilateur, du runtime, d'OpenUI5, de PGlite et de `less-openui5` aux
+    versions des `devDependencies` du runtime (celles que `rapt build` écrit dans l'application
+    générée, et que `stage-rapt.mjs` installe dans le `.vsix`). Le compilateur reste léger pour
+    un usage en bibliothèque ou `check` en CI ; le runtime ne change pas (une application
+    générée choisit elle-même ses dépendances, PGlite y est optionnel). Un test vérifie que les
+    versions de `packages/cli` suivent celles du runtime.
+  - **Un seul `rapt`** : le compilateur n'a plus de `bin` (quand deux paquets d'un même
+    `node_modules` déclarent `rapt`, npm n'en lie qu'un, sans garantie sur lequel). Le `rapt` de
+    `rap-transpiler` importe `@rap-transpiler/compiler/cli` (nouvel export) et appelle `main` ;
+    il pointe `process.argv[1]` sur lui-même pour que `cli.js` ne se lance pas une seconde fois.
+    Il fonctionne donc aussi sous Windows (shim `rapt.cmd` de npm) sans dépendre de la détection
+    du point d'entrée de `cli.js`.
+  - **Installation à plat** : comme dans le `.vsix`, `rapt dev` lie au dossier généré le premier
+    `node_modules` qui contient `@abaplint/runtime` en remontant du runtime : celui de
+    `rap-transpiler` (installation globale npm), du projet ou du cache de npx. Les installations
+    isolées (`pnpm add -g`) ne sont pas prises en charge.
+  - **Version** : `COMPILER_VERSION` (aide de la CLI, `generator` de `model.json`) est lue dans le
+    `package.json` du compilateur ; le tag de version la fixe.
+  - **Publication** : le job `npm` de `release.yml` (tag `v*`) fixe la version des quatre paquets
+    depuis le tag, les construit, installe avec npm les archives de `pnpm pack` et lance leur
+    `rapt` sur la fixture (`--help`, `check`, `build`), puis `pnpm -r publish --access public` si
+    le secret `NPM_TOKEN` existe (sinon la publication est sautée, comme pour `VSCE_PAT` et
+    `OVSX_PAT`). Provenance npm (`id-token: write`) quand le dépôt est public. Prérequis : une
+    organisation npm `rap-transpiler` (portée `@rap-transpiler`) et un jeton *granular* avec le
+    droit de publier `rap-transpiler` et `@rap-transpiler/*`.
+- **Pourquoi** : rapt sans VS Code ni clone (CI, autres éditeurs, agents IA) en une commande ; un
+  paquet non scopé au nom du projet, facile à retenir, au-dessus des bibliothèques scopées ;
+  `rapt dev` complet sans dépendances optionnelles ni téléchargement au premier lancement.
+- **Tests** : `cli/test/package.test.ts` (versions servies alignées sur le runtime, `rapt --help`
+  exécuté une seule fois) ; vérifié sous Windows avec les archives de `pnpm pack` installées par
+  npm : `rapt --help`, `rapt check`, `rapt build`, `rapt dev` (OData sur PGlite, ressources
+  OpenUI5, thème compilé), `npx rap-transpiler check`.

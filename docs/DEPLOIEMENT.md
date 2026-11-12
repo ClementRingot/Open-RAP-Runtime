@@ -63,3 +63,26 @@ réseau (collègues, téléphone), toujours sans connexion : à réserver à un 
 L'application parle HTTP ; le TLS se termine devant elle (routeur de Cloud Foundry, ingress
 Kubernetes, reverse proxy nginx ou Caddy, service managé du cloud). `PUBLIC_URL` donne l'adresse
 HTTPS.
+
+## Publier une version de rap-transpiler (mainteneurs)
+
+Un tag `v1.2.3` lance `release.yml` : l'extension VS Code (release GitHub, Marketplace avec le
+secret `VSCE_PAT`, Open VSX avec `OVSX_PAT`) et la CLI sur npm ([D66](DECISIONS.md)) :
+`rap-transpiler` (la commande `rapt`), `@rap-transpiler/model`, `@rap-transpiler/compiler` et
+`@rap-transpiler/runtime`, tous en version 1.2.3.
+
+Une fois, pour npm :
+
+1. Créer sur [npmjs.com](https://www.npmjs.com/org/create) l'organisation **`rap-transpiler`**
+   (gratuite pour des paquets publics) : elle porte la portée `@rap-transpiler`.
+2. Créer un jeton *Granular Access Token* (*Read and write*, paquets `rap-transpiler` et portée
+   `@rap-transpiler`, ou l'organisation entière) et l'enregistrer comme secret **`NPM_TOKEN`**
+   du dépôt (*Settings → Secrets and variables → Actions*).
+
+Sans `NPM_TOKEN`, le job `npm` construit et vérifie les paquets (archives de `pnpm pack`
+installées par npm, `rapt check` et `rapt build` de la fixture) mais ne publie rien. La
+provenance npm (lien entre le paquet et le workflow) est ajoutée quand le dépôt est public.
+
+```sh
+git tag v0.1.0 && git push origin v0.1.0
+```

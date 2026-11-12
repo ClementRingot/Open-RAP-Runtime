@@ -30,13 +30,16 @@ propriétaire ([LICENSES.md](LICENSES.md)).
 *RAP : Nouveau business object* et *RAP : Lancer rapt dev*. Le navigateur s'ouvre sur le
 launchpad de développement.
 
-**En ligne de commande** (Node.js 22, depuis un clone : `pnpm install && pnpm build`, puis
-`node packages/compiler/dist/cli.js` à la place de `rapt`) :
+**En ligne de commande** (Node.js 22 ou plus) :
 
 ```sh
+npm install -g rap-transpiler                # installe la commande rapt (avec OpenUI5 et PGlite)
 rapt new mon-projet Travel --prefix ZRT    # un BO managed complet, avec des données
 rapt dev mon-projet                         # http://localhost:8080/ — rechargé à chaque enregistrement
 ```
+
+Sans installation : `npx rap-transpiler check mon-projet`. Depuis un clone :
+`pnpm install && pnpm build`, puis `node packages/compiler/dist/cli.js` à la place de `rapt`.
 
 ![Launchpad de développement](docs/images/dev-launchpad.png)
 
@@ -93,7 +96,7 @@ rapt dev mon-projet                         # http://localhost:8080/ — recharg
 | [Annotations](docs/ANNOTATIONS.md) | Chaque annotation CDS : ce qu'en font le `$metadata` et l'UI |
 | [Diagnostics](docs/DIAGNOSTICS.md) | Les codes de `rapt check` |
 | [Serveur MCP](docs/MCP.md) | Le service pour les agents IA |
-| [Déploiement](docs/DEPLOIEMENT.md) | Docker, SAP BTP Cloud Foundry, HTTPS |
+| [Déploiement](docs/DEPLOIEMENT.md) | Docker, SAP BTP Cloud Foundry, HTTPS, publication d'une version (npm, extension) |
 | [Classes utilitaires](docs/UTILITAIRES.md), [API distantes](docs/API_DISTANTES.md) | Le behavior pool au-delà de RAP |
 | [Écarts connus](KNOWN_GAPS.md), [Feuille de route](docs/ROADMAP.md) | Ce qui manque, ce qui vient |
 | [Décisions](docs/DECISIONS.md), [Plan](PLAN.md) | Les choix techniques et leurs raisons |
@@ -115,6 +118,7 @@ pnpm test                    # vitest : compilateur, runtime, navigateur (Playwr
 packages/model/      types de l'IR (model.json), conventions de nommage partagées
 packages/compiler/   CLI rapt, parsers (BDEF, CDS, SRVD, DCL), IR, générateurs
 packages/runtime/    runtime des applications générées (OData V4, RAP managed, launchpad, MCP)
+packages/cli/        paquet npm rap-transpiler : la commande rapt avec OpenUI5 et PGlite
 packages/vscode/     extension VS Code (appelle la CLI rapt)
 fixtures/            BO de référence : travel (Travel / Booking), custom-entity, table-entity
 ```

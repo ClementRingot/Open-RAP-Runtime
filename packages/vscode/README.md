@@ -60,7 +60,9 @@ travail, puis la commande `rapt` du PATH.
 Pousser un tag `v1.2.3` : le workflow `release.yml` construit le `.vsix` (version 1.2.3) et le
 joint à la release GitHub du tag. Il le publie aussi sur le Visual Studio Marketplace si le
 secret `VSCE_PAT` est défini (éditeur `clementringot` à créer sur le Marketplace), et sur
-Open VSX (VSCodium, Cursor…) si le secret `OVSX_PAT` est défini.
+Open VSX (VSCodium, Cursor…) si le secret `OVSX_PAT` est défini. Le même tag publie la CLI sur
+npm (`rap-transpiler`) si le secret `NPM_TOKEN` est défini : voir
+[DEPLOIEMENT.md](https://github.com/ClementRingot/RAP-Transpiler/blob/main/docs/DEPLOIEMENT.md#publier-une-version-de-rap-transpiler-mainteneurs).
 
 ```sh
 git tag v0.1.0 && git push origin v0.1.0

@@ -57,10 +57,19 @@ La coloration syntaxique couvre ABAP, CDS (DDLS, DDLX, DCL, SRVD, tables, types)
 
 ### En ligne de commande
 
+Node.js 22 ou plus. Le paquet npm `rap-transpiler` installe la commande `rapt` avec tout ce
+qu'il lui faut (runtime, OpenUI5, PGlite) ([D66](DECISIONS.md)) :
+
 ```sh
+npm install -g rap-transpiler
 rapt new mon-projet Travel --prefix ZRT    # un BO managed complet
 rapt dev mon-projet                         # http://localhost:8080/ : launchpad de développement
 ```
+
+Sans installation globale : `npx rap-transpiler <commande> …` (par exemple
+`npx rap-transpiler check mon-projet` dans une CI), ou `rap-transpiler` en `devDependency` du
+projet et `npx rapt …`. Les bibliothèques `@rap-transpiler/compiler`, `@rap-transpiler/runtime`
+et `@rap-transpiler/model` sont aussi publiées séparément (usage en bibliothèque).
 
 Depuis un clone du dépôt : `pnpm install && pnpm build`, puis `node packages/compiler/dist/cli.js`
 à la place de `rapt`.

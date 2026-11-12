@@ -1,0 +1,55 @@
+{
+  "name": "rap-transpiler",
+  "version": "0.1.0",
+  "description": "rapt, the command line of rap-transpiler: compiles SAP RAP sources (abapGit format) into a standalone Node.js OData V4 application, with what rapt dev serves (runtime, OpenUI5, PGlite).",
+  "type": "module",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ClementRingot/RAP-Transpiler.git",
+    "directory": "packages/cli"
+  },
+  "homepage": "https://github.com/ClementRingot/RAP-Transpiler#readme",
+  "bugs": {
+    "url": "https://github.com/ClementRingot/RAP-Transpiler/issues"
+  },
+  "keywords": [
+    "sap",
+    "rap",
+    "abap",
+    "cds",
+    "odata",
+    "odata-v4",
+    "abapgit",
+    "openui5",
+    "cli"
+  ],
+  "bin": {
+    "rapt": "./dist/rapt.js"
+  },
+  "files": [
+    "dist"
+  ],
+  "engines": {
+    "node": ">=22"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json"
+  },
+  "dependencies": {
+    "@electric-sql/pglite": "0.5.16",
+    "@openui5/sap.f": "1.136.22",
+    "@openui5/sap.m": "1.136.22",
+    "@openui5/sap.ui.core": "1.136.22",
+    "@openui5/sap.ui.layout": "1.136.22",
+    "@openui5/sap.ui.unified": "1.136.22",
+    "@openui5/sap.uxap": "1.136.22",
+    "@openui5/themelib_sap_horizon": "1.136.22",
+    "@rap-transpiler/compiler": "workspace:*",
+    "@rap-transpiler/runtime": "workspace:*",
+    "less-openui5": "0.12.0"
+  }
+}

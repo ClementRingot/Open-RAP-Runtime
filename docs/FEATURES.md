@@ -263,6 +263,7 @@ ajoutent ce que la fixture n'utilise pas : numérotation, feature control global
 | Fonctionnalité | Statut | Note |
 |---|---|---|
 | `package.json`, `server.mjs`, runtime embarqué (`vendor/`), `npm install` | ✅ | Test e2e. |
+| CLI `rapt` publiée sur npm (`npm install -g rap-transpiler`, `npx rap-transpiler`) | ✅ | D66 ; archives de `pnpm pack` vérifiées à chaque tag avant publication. |
 | Configuration par variables d'environnement (`.env.example`) | ✅ | |
 | PostgreSQL (`DATABASE_URL`), schéma appliqué au démarrage | ✅ | Test e2e sur PostgreSQL 16. |
 | PGlite embarqué (`PGLITE_DIR`) pour le développement | ✅ | Test e2e : démarrage, données conservées après un redémarrage (D33). |
