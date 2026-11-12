@@ -1552,3 +1552,19 @@ correspond to points 1 to 13 of §11 of PLAN.md. The milestones M1 to M6 are tho
 - **Tests**: `vscode/test/rapt.test.ts` (name of a project in the prompts, applications of the
   workspace, URL of the feedback form); a launchpad of three projects (one already built, two without floorplan) under a folder
   with an accent built by `rapt launchpad` in 2 s.
+
+## D73 — The missing abapGit files are written before a build in VS Code
+
+- **Context**: a project written by hand or by an AI agent can lack its abapGit files
+  (`.abapgit.xml`, the XML of the objects): `rapt build` does not need them, but the sources then
+  do not import into an SAP system with abapGit, which is the purpose of the project.
+- **Decision**: *Build the application* (standalone or launchpad) and *Build the launchpad* run
+  `rapt abapgit` on each application before building it: the missing files are written, the
+  existing ones are kept. The written files are listed in the log of the extension and announced
+  in a message; the objects that cannot be completed (a table without source) are logged; a
+  failure does not stop the build. The command line (`rapt build`, `rapt launchpad`) writes
+  nothing into the sources: in a terminal or a CI, `rapt abapgit` is run explicitly.
+- **Why**: the build of the extension is the moment the user hands the application over; the
+  sources that go with it must be importable as they are.
+- **Tests**: `vscode/test/rapt.test.ts` (missing files written, existing files kept, a second run
+  writes nothing).

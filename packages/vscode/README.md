@@ -28,7 +28,9 @@ extension compiles nothing itself: it calls the `rapt` CLI (`--json`) and shows 
   the same launchpad) or the **application alone** (`rapt build`, standalone), into the folder of
   your choice. The floorplan of each root entity (List Report, Worklist, Analytical List Page,
   Form Entry) is asked first when it was not chosen yet, application by application, with the
-  name of the application in the prompt; *RAP: Start rapt dev* asks for it too.
+  name of the application in the prompt; *RAP: Start rapt dev* asks for it too. The missing
+  abapGit files of each application (`.abapgit.xml`, the XML of the objects) are written before
+  the build, the existing ones are kept.
 - **One launchpad per workspace**: `launchpad.json` (titled "Launchpad"), next to the
   `.code-workspace` or in the first folder of the workspace, is created with the first
   application; each complete BO and each choice of floorplan add the application and its tile,

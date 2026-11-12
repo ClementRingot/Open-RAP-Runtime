@@ -1,5 +1,5 @@
 import { execFileSync } from "node:child_process";
-import { chmodSync, cpSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { chmodSync, cpSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -133,6 +133,18 @@ describe("the creation wizard and the objects view (D61)", () => {
     expect(await runJson(cli, wizardArgs(dir, element, "ZRT_ORDER_NO", "Order number", { "--type": "abap.numc(8)" }) as string[], dir)).toMatchObject({ ok: true, written: ["src/zrt_order_no.dtel.xml"] });
     const bo = kinds.find((k) => k.kind === "bo") as CatalogEntry;
     expect(wizardArgs(dir, bo, "Order", "Orders", { "--prefix": "ZOR" })).toEqual(["new", dir, "Order", "--prefix", "ZOR", "--description", "Orders"]);
+  });
+
+  it("writes the missing abapGit files before a build, and only those (D73)", async () => {
+    const dir = copy();
+    const removed = [".abapgit.xml", ...readdirSync(path.join(dir, "src")).filter((f) => f.endsWith(".xml")).map((f) => `src/${f}`)];
+    for (const file of removed) rmSync(path.join(dir, file));
+    writeFileSync(path.join(dir, "src", "zrt_travel.tabl.xml"), "<kept/>");
+    const first = await runJson<{ written: string[] }>(cli, ["abapgit", dir], dir);
+    expect(first.written).toContain(".abapgit.xml");
+    expect(first.written).not.toContain("src/zrt_travel.tabl.xml");
+    expect(readFileSync(path.join(dir, "src", "zrt_travel.tabl.xml"), "utf8")).toBe("<kept/>");
+    expect((await runJson<{ written: string[] }>(cli, ["abapgit", dir], dir)).written).toEqual([]);
   });
 
   it("sets the floorplan of an entity set with rapt floorplan", async () => {

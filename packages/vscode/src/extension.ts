@@ -235,6 +235,7 @@ async function build(root: string): Promise<void> {
   if (!(await ensureFloorplans(root))) {
     return;
   }
+  await ensureAbapGit(root);
   const defaultOut = path.join(root, "out", path.basename(root));
   const chosen = await vscode.window.showInputBox({ prompt: "Folder of the generated application", value: defaultOut, ignoreFocusOut: true });
   if (chosen === undefined) {
@@ -571,6 +572,7 @@ async function gatherApps(file: string, apps: string[]): Promise<boolean> {
     if (!(await ensureFloorplans(app))) {
       return false;
     }
+    await ensureAbapGit(app);
     try {
       notifyLaunchpad(await runJson<LaunchpadAddResult>(cli(), ["launchpad", "add", app, "--launchpad", file], app));
     } catch (e) {
@@ -585,9 +587,11 @@ async function gatherApps(file: string, apps: string[]): Promise<boolean> {
 async function buildLaunchpad(file: string, checked: string[] = []): Promise<void> {
   const done = new Set(checked.map((c) => path.resolve(c)));
   for (const source of launchpadSources(file, readFileSync(file, "utf8"))) {
-    if (!done.has(path.resolve(source)) && existsSync(source) && !(await ensureFloorplans(source))) {
+    if (done.has(path.resolve(source)) || !existsSync(source)) continue;
+    if (!(await ensureFloorplans(source))) {
       return;
     }
+    await ensureAbapGit(source);
   }
   const base = path.dirname(file);
   const target = await vscode.window.showInputBox({ prompt: "Folder of the generated launchpad (with its applications)", value: path.join(base, "out", "launchpad"), ignoreFocusOut: true });
@@ -657,6 +661,24 @@ async function setMode(root: string): Promise<void> {
   writeFileSync(file, `${JSON.stringify({ ...current, mode: picked.label }, null, 2)}\n`);
   void vscode.window.showInformationMessage(`RAP: mode ${picked.label} (rapt/config.json)`);
   await check(root, true);
+}
+
+/**
+ * Before a build: the abapGit files that are missing (.abapgit.xml, the XML of each object) are
+ * written, so that the built sources import into an SAP system as they are (D73). Existing files
+ * are kept; a failure is logged and does not stop the build.
+ */
+async function ensureAbapGit(root: string): Promise<void> {
+  try {
+    const result = await runJson<AbapGitResult>(cli(), ["abapgit", root], root);
+    if (result.written.length === 0) return;
+    output.appendLine(`rapt abapgit ${root}: ${result.written.length} missing abapGit file(s) written`);
+    for (const file of result.written) output.appendLine(`  written: ${file}`);
+    for (const skipped of result.skipped) output.appendLine(`  ${skipped.file}: ${skipped.reason}`);
+    void vscode.window.showInformationMessage(`RAP: ${appName(root)}: ${result.written.length} missing abapGit file(s) written (${result.written.slice(0, 3).join(", ")}${result.written.length > 3 ? "…" : ""}).`);
+  } catch (e) {
+    output.appendLine(`rapt abapgit ${root}: ${(e as Error).message}`);
+  }
 }
 
 async function abapGit(root: string): Promise<void> {
