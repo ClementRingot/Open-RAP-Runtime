@@ -56,7 +56,7 @@ describe("rapt from the extension", () => {
     expect(position({ severity: "error", code: "X", message: "", line: 3, column: 5 })).toEqual({ line: 2, character: 4 });
     expect(position({ severity: "error", code: "X", message: "" })).toEqual({ line: 0, character: 0 });
     expect(diagnosticPath("/w/bo", { severity: "error", code: "X", message: "", file: "src/a.abap" })).toBe(path.join("/w/bo", "src", "a.abap"));
-    expect(summary({ error: 1, warning: 2, info: 0 })).toBe("1 erreur, 2 avertissements");
+    expect(summary({ error: 1, warning: 2, info: 0 })).toBe("1 error, 2 warnings");
   });
 
   it("runs rapt check --json", async () => {
@@ -120,8 +120,8 @@ describe("the creation wizard and the objects view (D61)", () => {
     expect(kinds.map((k) => k.category)).toContain("Core Data Services");
     const binding = kinds.find((k) => k.kind === "binding") as CatalogEntry;
     expect(wizardArgs(dir, binding, "ZAPI_TRAVEL_O4", "Travel API", { "--for": "ZRT_UI_TRAVEL", "--binding-type": "webapi" })).toEqual(["generate", dir, "binding", "ZAPI_TRAVEL_O4", "--for", "ZRT_UI_TRAVEL", "--binding-type", "webapi", "--description", "Travel API"]);
-    expect(wizardArgs(dir, binding, "ZAPI", "", {})).toBe("Service definition : obligatoire");
-    expect(wizardArgs(dir, binding, "9bad", "", {})).toMatch(/lettres/);
+    expect(wizardArgs(dir, binding, "ZAPI", "", {})).toBe("Service definition: required");
+    expect(wizardArgs(dir, binding, "9bad", "", {})).toMatch(/letters/);
     const service = kinds.find((k) => k.kind === "service") as CatalogEntry;
     expect(wizardArgs(dir, service, "ZUI_X", "", { "--expose": ["ZRT_C_TRAVEL", "ZRT_C_BOOKING"] })).toEqual(["generate", dir, "service", "ZUI_X", "--expose", "ZRT_C_TRAVEL,ZRT_C_BOOKING"]);
     const view = kinds.find((k) => k.kind === "view") as CatalogEntry;

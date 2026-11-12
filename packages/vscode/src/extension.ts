@@ -78,13 +78,13 @@ async function project(uri?: vscode.Uri): Promise<string | undefined> {
   const roots = [...new Set(found.map((f) => path.dirname(f.fsPath)))].sort();
   if (roots.length <= 1) {
     if (roots.length === 0) {
-      void vscode.window.showWarningMessage("RAP : aucun projet abapGit (.abapgit.xml) dans l'espace de travail.");
+      void vscode.window.showWarningMessage("RAP: no abapGit project (.abapgit.xml) in the workspace.");
     }
     return roots[0];
   }
   const picked = await vscode.window.showQuickPick(
     roots.map((root) => ({ label: path.basename(root), description: vscode.workspace.asRelativePath(root), root })),
-    { placeHolder: "Projet RAP" },
+    { placeHolder: "RAP project" },
   );
   return picked?.root;
 }
@@ -130,11 +130,11 @@ async function check(root: string, quiet = false): Promise<void> {
     const result = await runJson(cli(), ["check", root], root);
     publish(root, result.diagnostics);
     if (!dev) {
-      showStatus(result.ok ? "$(pass)" : "$(error)", `RAP : ${summary(result.counts)}`, result.ok ? undefined : "workbench.actions.view.problems");
+      showStatus(result.ok ? "$(pass)" : "$(error)", `RAP: ${summary(result.counts)}`, result.ok ? undefined : "workbench.actions.view.problems");
     }
     if (!quiet) {
-      const message = `RAP ${path.basename(root)} : ${summary(result.counts)}`;
-      void (result.ok ? vscode.window.showInformationMessage(message) : vscode.window.showErrorMessage(message, "Problèmes").then((a) => a && vscode.commands.executeCommand("workbench.actions.view.problems")));
+      const message = `RAP ${path.basename(root)}: ${summary(result.counts)}`;
+      void (result.ok ? vscode.window.showInformationMessage(message) : vscode.window.showErrorMessage(message, "Problems").then((a) => a && vscode.commands.executeCommand("workbench.actions.view.problems")));
     }
   } catch (e) {
     cliFailed(e as Error);
@@ -143,10 +143,10 @@ async function check(root: string, quiet = false): Promise<void> {
 
 function cliFailed(error: Error): void {
   output.appendLine(error.message);
-  void vscode.window.showErrorMessage(`RAP : ${error.message.split("\n")[0]}`, "Configurer", "Journal").then((action) => {
-    if (action === "Configurer") {
+  void vscode.window.showErrorMessage(`RAP: ${error.message.split("\n")[0]}`, "Settings", "Log").then((action) => {
+    if (action === "Settings") {
       void vscode.commands.executeCommand("workbench.action.openSettings", "rapt.cliPath");
-    } else if (action === "Journal") {
+    } else if (action === "Log") {
       output.show();
     }
   });
@@ -154,21 +154,21 @@ function cliFailed(error: Error): void {
 
 async function build(root: string): Promise<void> {
   const defaultOut = path.join(root, "out", path.basename(root));
-  const chosen = await vscode.window.showInputBox({ prompt: "Dossier de l'application générée", value: defaultOut, ignoreFocusOut: true });
+  const chosen = await vscode.window.showInputBox({ prompt: "Folder of the generated application", value: defaultOut, ignoreFocusOut: true });
   if (chosen === undefined) {
     return;
   }
-  await vscode.window.withProgress({ location: vscode.ProgressLocation.Notification, title: "RAP : génération de l'application" }, async () => {
+  await vscode.window.withProgress({ location: vscode.ProgressLocation.Notification, title: "RAP: generating the application" }, async () => {
     try {
       const result = await runJson(cli(), ["build", root, "--out", chosen], root);
       publish(root, result.diagnostics);
       if (result.ok) {
-        const action = await vscode.window.showInformationMessage(`RAP : ${result.files ?? 0} fichiers écrits dans ${result.out ?? chosen}`, "Ouvrir le dossier");
+        const action = await vscode.window.showInformationMessage(`RAP: ${result.files ?? 0} files written to ${result.out ?? chosen}`, "Open folder");
         if (action !== undefined) {
           void vscode.commands.executeCommand("revealFileInOS", vscode.Uri.file(path.join(result.out ?? chosen, "package.json")));
         }
       } else {
-        void vscode.window.showErrorMessage(`RAP : génération impossible, ${summary(result.counts)}`);
+        void vscode.window.showErrorMessage(`RAP: generation failed, ${summary(result.counts)}`);
       }
     } catch (e) {
       cliFailed(e as Error);
@@ -191,7 +191,7 @@ async function newBoFolder(uri?: vscode.Uri): Promise<string | undefined> {
   if (folders.length === 1) {
     return folders[0]?.uri.fsPath;
   }
-  const picked = await vscode.window.showOpenDialog({ canSelectFolders: true, canSelectFiles: false, openLabel: "Créer le BO ici" });
+  const picked = await vscode.window.showOpenDialog({ canSelectFolders: true, canSelectFiles: false, openLabel: "Create the BO here" });
   return picked?.[0]?.fsPath;
 }
 
@@ -201,32 +201,32 @@ async function newBo(uri?: vscode.Uri): Promise<void> {
     return;
   }
   const entity = await vscode.window.showInputBox({
-    title: "RAP : nouveau business object",
-    prompt: "Nom de l'entité (ex. Travel, SalesOrder)",
+    title: "RAP: new business object",
+    prompt: "Entity name (e.g. Travel, SalesOrder)",
     ignoreFocusOut: true,
-    validateInput: (value) => (validEntityName(value) ? undefined : "Lettres et chiffres, en commençant par une lettre"),
+    validateInput: (value) => (validEntityName(value) ? undefined : "Letters and digits, starting with a letter"),
   });
   if (entity === undefined) {
     return;
   }
   const prefix = await vscode.window.showInputBox({
-    title: "RAP : nouveau business object",
-    prompt: "Préfixe des objets (Z ou Y…) : ZRT donne zrt_travel, ZRT_R_Travel, ZBP_RT_R_TRAVEL…",
+    title: "RAP: new business object",
+    prompt: "Prefix of the objects (Z or Y…): ZRT gives zrt_travel, ZRT_R_Travel, ZBP_RT_R_TRAVEL…",
     value: config().get<string>("new.prefix") || "Z",
     ignoreFocusOut: true,
-    validateInput: (value) => (/^[ZYzy][A-Za-z0-9_]*$/.test(value) ? undefined : "Commence par Z ou Y"),
+    validateInput: (value) => (/^[ZYzy][A-Za-z0-9_]*$/.test(value) ? undefined : "Starts with Z or Y"),
   });
   if (prefix === undefined) {
     return;
   }
-  const description = await vscode.window.showInputBox({ title: "RAP : nouveau business object", prompt: "Description", value: entity, ignoreFocusOut: true });
+  const description = await vscode.window.showInputBox({ title: "RAP: new business object", prompt: "Description", value: entity, ignoreFocusOut: true });
   if (description === undefined) {
     return;
   }
   try {
     const result = await runJson<NewResult>(cli(), ["new", root, entity, "--prefix", prefix, "--description", description], root);
     if (!result.ok) {
-      void vscode.window.showErrorMessage(`RAP : ${result.error ?? "création impossible"}`);
+      void vscode.window.showErrorMessage(`RAP: ${result.error ?? "creation failed"}`);
       return;
     }
     output.appendLine(`rapt new ${entity}: ${result.written.join(", ")}`);
@@ -234,7 +234,7 @@ async function newBo(uri?: vscode.Uri): Promise<void> {
     if (behavior !== undefined) {
       await vscode.window.showTextDocument(vscode.Uri.file(path.join(root, behavior)));
     }
-    const action = await vscode.window.showInformationMessage(`RAP : ${entity} créé (${result.written.length} fichiers).`, "Lancer rapt dev");
+    const action = await vscode.window.showInformationMessage(`RAP: ${entity} created (${result.written.length} files).`, "Start rapt dev");
     if (action !== undefined) {
       await devStart(root);
     }
@@ -243,12 +243,12 @@ async function newBo(uri?: vscode.Uri): Promise<void> {
   }
 }
 
-/** "Nouvel objet RAP…": rapt generate, with the object to derive from picked in a list (D46). */
+/** "New RAP object…": rapt generate, with the object to derive from picked in a list (D46). */
 async function generate(root: string): Promise<void> {
-  const title = "RAP : nouvel objet";
+  const title = "RAP: new object";
   const picked = await vscode.window.showQuickPick(
     GENERATE_KINDS.map((k) => ({ label: k.label, description: k.kind, option: k })),
-    { title, placeHolder: "Type d'objet", ignoreFocusOut: true },
+    { title, placeHolder: "Object type", ignoreFocusOut: true },
   );
   if (picked === undefined) {
     return;
@@ -266,10 +266,10 @@ async function generate(root: string): Promise<void> {
   }
   const name = await vscode.window.showInputBox({
     title,
-    prompt: `Nom de l'objet (${kind.label})`,
+    prompt: `Object name (${kind.label})`,
     value: source !== undefined && kind.name !== undefined ? kind.name(source) : "",
     ignoreFocusOut: true,
-    validateInput: (value) => (/^[A-Za-z][A-Za-z0-9_]*$/.test(value) ? undefined : "Lettres, chiffres et _, en commençant par une lettre"),
+    validateInput: (value) => (/^[A-Za-z][A-Za-z0-9_]*$/.test(value) ? undefined : "Letters, digits and _, starting with a letter"),
   });
   if (name === undefined) {
     return;
@@ -279,18 +279,18 @@ async function generate(root: string): Promise<void> {
     args.push(kind.source.option, source);
   }
   if (kind.kind === "view") {
-    const root = await vscode.window.showQuickPick(["Vue racine (root view entity)", "Vue enfant"], { title, ignoreFocusOut: true });
+    const root = await vscode.window.showQuickPick(["Root view entity", "Child view entity"], { title, ignoreFocusOut: true });
     if (root === undefined) {
       return;
     }
-    if (root.startsWith("Vue racine")) {
+    if (root.startsWith("Root")) {
       args.push("--root");
     }
   }
   try {
     const result = await runJson<GenerateResult>(cli(), args, root);
     if (!result.ok) {
-      void vscode.window.showErrorMessage(`RAP : ${result.error ?? "création impossible"}`);
+      void vscode.window.showErrorMessage(`RAP: ${result.error ?? "creation failed"}`);
       return;
     }
     output.appendLine(`rapt generate ${kind.kind} ${name}: ${result.written.join(", ")}`);
@@ -311,7 +311,7 @@ async function objectsOf(root: string): Promise<Record<string, string[]>> {
 
 let objectsView: RapObjectsProvider | undefined;
 
-/** "Nouvel objet RAP (assistant)": the wizard of the catalog of rapt generate, like ADT (D61). */
+/** "New RAP object (wizard)": the wizard of the catalog of rapt generate, like ADT (D61). */
 async function newObject(root: string, kind?: string): Promise<void> {
   let catalog: CatalogEntry[];
   try {
@@ -321,25 +321,25 @@ async function newObject(root: string, kind?: string): Promise<void> {
     return;
   }
   openWizard({
-    title: `Nouvel objet RAP — ${path.basename(root)}`,
+    title: `New RAP object — ${path.basename(root)}`,
     catalog,
     objects: await objectsOf(root),
     ...(kind === undefined ? {} : { kind }),
     finish: async (answer) => {
       const entry = catalog.find((e) => e.kind === answer.kind);
-      if (entry === undefined) return "Type d'objet inconnu";
+      if (entry === undefined) return "Unknown object type";
       const args = wizardArgs(root, entry, answer.name, answer.description, answer.values);
       if (typeof args === "string") return args;
       try {
         const result = await runJson<GenerateResult>(cli(), args, root);
-        if (!result.ok) return result.error ?? "création impossible";
+        if (!result.ok) return result.error ?? "creation failed";
         output.appendLine(`rapt ${args[0]} ${answer.kind} ${answer.name}: ${result.written.join(", ")}`);
         objectsView?.refresh();
         const main = result.written.find((f) => !f.endsWith(".xml") && !f.endsWith(".json") && f !== ".abapgit.xml") ?? result.written[0];
         if (main !== undefined) {
           await vscode.window.showTextDocument(vscode.Uri.file(path.join(root, main)));
         }
-        void vscode.window.showInformationMessage(`RAP : ${answer.name} créé (${result.written.length} fichiers).`);
+        void vscode.window.showInformationMessage(`RAP: ${answer.name} created (${result.written.length} files).`);
         return undefined;
       } catch (e) {
         return (e as Error).message.split("\n")[0];
@@ -348,7 +348,7 @@ async function newObject(root: string, kind?: string): Promise<void> {
   });
 }
 
-/** "Choisir le floorplan de l'application": per root entity set, with what each floorplan is for (D61). */
+/** "Choose the floorplan of the application": per root entity set, with what each floorplan is for (D61). */
 async function floorplan(root: string): Promise<void> {
   type Answer = { sets: Array<{ set: string; floorplan: string }>; floorplans: Array<{ floorplan: string; label: string; description: string; needs: string }> };
   let answer: Answer;
@@ -359,36 +359,36 @@ async function floorplan(root: string): Promise<void> {
     return;
   }
   if (answer.sets.length === 0) {
-    void vscode.window.showWarningMessage("RAP : le service n'expose aucune entité racine.");
+    void vscode.window.showWarningMessage("RAP: the service exposes no root entity.");
     return;
   }
-  const title = "RAP : floorplan de l'application";
-  const set = answer.sets.length === 1 ? answer.sets[0] : (await vscode.window.showQuickPick(answer.sets.map((s) => ({ label: s.set, description: s.floorplan, s })), { title, placeHolder: "Entity set racine" }))?.s;
+  const title = "RAP: floorplan of the application";
+  const set = answer.sets.length === 1 ? answer.sets[0] : (await vscode.window.showQuickPick(answer.sets.map((s) => ({ label: s.set, description: s.floorplan, s })), { title, placeHolder: "Root entity set" }))?.s;
   if (set === undefined) return;
   const picked = await vscode.window.showQuickPick(
-    answer.floorplans.map((f) => ({ label: `${f.floorplan === set.floorplan ? "$(check) " : ""}${f.label}`, description: f.floorplan, detail: `${f.description} Annotations : ${f.needs}`, f })),
-    { title: `${title} — ${set.set}`, placeHolder: "Comment l'utilisateur travaille-t-il sur ces objets ?", matchOnDetail: true },
+    answer.floorplans.map((f) => ({ label: `${f.floorplan === set.floorplan ? "$(check) " : ""}${f.label}`, description: f.floorplan, detail: `${f.description} Annotations: ${f.needs}`, f })),
+    { title: `${title} — ${set.set}`, placeHolder: "How do users work on these objects?", matchOnDetail: true },
   );
   if (picked === undefined) return;
   try {
     const result = await runJson<{ ok: boolean; error?: string; file: string }>(cli(), ["floorplan", root, set.set, picked.f.floorplan], root);
     if (!result.ok) {
-      void vscode.window.showErrorMessage(`RAP : ${result.error ?? "impossible"}`);
+      void vscode.window.showErrorMessage(`RAP: ${result.error ?? "failed"}`);
       return;
     }
-    void vscode.window.showInformationMessage(`RAP : ${set.set} en ${picked.f.label} (${result.file}).${dev?.root === root ? "" : " Lancez rapt dev pour le voir."}`);
+    void vscode.window.showInformationMessage(`RAP: ${set.set} is now a ${picked.f.label} (${result.file}).${dev?.root === root ? "" : " Start rapt dev to see it."}`);
   } catch (e) {
     cliFailed(e as Error);
   }
 }
 
-/** "Afficher la représentation intermédiaire": rapt ir, in an editor (model.json). */
+/** "Show the intermediate representation": rapt ir, in an editor (model.json). */
 async function showIr(root: string): Promise<void> {
   const target = path.join(root, ".rapt", "model.json");
   try {
     await runJson(cli(), ["ir", root, "--out", target], root).catch(() => undefined);
     if (!existsSync(target)) {
-      void vscode.window.showErrorMessage("RAP : la représentation intermédiaire n'a pas pu être construite (voir « Vérifier le BO »).");
+      void vscode.window.showErrorMessage("RAP: the intermediate representation could not be built (see \"Check the BO\").");
       return;
     }
     await vscode.window.showTextDocument(vscode.Uri.file(target), { preview: true });
@@ -397,50 +397,50 @@ async function showIr(root: string): Promise<void> {
   }
 }
 
-/** "Générer le launchpad": rapt launchpad <launchpad.json> --out <dossier>. */
+/** "Generate a launchpad": rapt launchpad <launchpad.json> --out <folder>. */
 async function launchpad(): Promise<void> {
   const files = await vscode.workspace.findFiles("**/launchpad.json", "{**/node_modules/**,**/.rapt/**}", 20);
   const file = files.length === 1 ? files[0] : (await vscode.window.showQuickPick(files.map((f) => ({ label: vscode.workspace.asRelativePath(f), f })), { placeHolder: "launchpad.json" }))?.f;
   if (file === undefined) {
-    void vscode.window.showWarningMessage("RAP : aucun launchpad.json dans l'espace de travail.");
+    void vscode.window.showWarningMessage("RAP: no launchpad.json in the workspace.");
     return;
   }
-  const out = await vscode.window.showOpenDialog({ canSelectFolders: true, canSelectFiles: false, canSelectMany: false, openLabel: "Générer le launchpad ici" });
+  const out = await vscode.window.showOpenDialog({ canSelectFolders: true, canSelectFiles: false, canSelectMany: false, openLabel: "Generate the launchpad here" });
   const target = out?.[0];
   if (target === undefined) return;
   try {
     const result = await runJson<RaptResult>(cli(), ["launchpad", file.fsPath, "--out", target.fsPath], path.dirname(file.fsPath));
     if (result.ok) {
-      void vscode.window.showInformationMessage(`RAP : launchpad généré dans ${target.fsPath}.`);
+      void vscode.window.showInformationMessage(`RAP: launchpad generated in ${target.fsPath}.`);
     } else {
       publish(path.dirname(file.fsPath), result.diagnostics);
-      void vscode.window.showErrorMessage("RAP : launchpad.json a des erreurs (onglet Problèmes).");
+      void vscode.window.showErrorMessage("RAP: launchpad.json has errors (Problems panel).");
     }
   } catch (e) {
     cliFailed(e as Error);
   }
 }
 
-/** "Générer le serveur MCP du service": rapt/mcp.json, opened to describe each tool (D47). */
+/** "Generate the MCP server of the service": rapt/mcp.json, opened to describe each tool (D47). */
 async function mcp(root: string): Promise<void> {
   try {
     const result = await runJson<GenerateResult & { tools: number; added: string[]; removed: string[]; file: string }>(cli(), ["mcp", root], root);
     if (!result.ok) {
-      void vscode.window.showErrorMessage(`RAP : ${result.error ?? "génération impossible"}`);
+      void vscode.window.showErrorMessage(`RAP: ${result.error ?? "generation failed"}`);
       return;
     }
     await vscode.window.showTextDocument(vscode.Uri.file(path.join(root, result.file)));
     const port = config().get<number>("dev.port") ?? 8080;
-    output.appendLine(`rapt mcp: ${result.tools} outils (${result.added.length} nouveaux). Connexion : claude mcp add --transport http rap http://localhost:${port}/mcp`);
+    output.appendLine(`rapt mcp: ${result.tools} tools (${result.added.length} new). Connect: claude mcp add --transport http rap http://localhost:${port}/mcp`);
     void vscode.window.showInformationMessage(
-      `RAP : ${result.tools} outils MCP. Décrivez chaque outil dans rapt/mcp.json ; l'application les sert sur /mcp (rapt dev : http://localhost:${port}/mcp).`,
+      `RAP: ${result.tools} MCP tools. Describe each tool in rapt/mcp.json; the application serves them at /mcp (rapt dev: http://localhost:${port}/mcp).`,
     );
   } catch (e) {
     cliFailed(e as Error);
   }
 }
 
-/** "Choisir le mode du projet": standard (as on SAP) or enhanced, in rapt/config.json (D45). */
+/** "Choose the mode of the project": standard (as on SAP) or enhanced, in rapt/config.json (D45). */
 async function setMode(root: string): Promise<void> {
   const file = path.join(root, "rapt", "config.json");
   let current: Record<string, unknown> = {};
@@ -451,17 +451,17 @@ async function setMode(root: string): Promise<void> {
   }
   const picked = await vscode.window.showQuickPick(
     [
-      { label: "standard", description: "Comme sur SAP : ce qui ne s'active pas sur SAP est refusé", picked: current["mode"] !== "enhanced" },
-      { label: "enhanced", description: "Extensions rap-transpiler : managed + unmanaged save sur entité custom, champs obligatoires contrôlés", picked: current["mode"] === "enhanced" },
+      { label: "standard", description: "As on SAP: what would not activate on SAP is refused", picked: current["mode"] !== "enhanced" },
+      { label: "enhanced", description: "rap-transpiler extensions: managed + unmanaged save on a custom entity, mandatory fields checked, enumerations in OData", picked: current["mode"] === "enhanced" },
     ],
-    { title: "RAP : mode du projet", placeHolder: `Mode actuel : ${current["mode"] === "enhanced" ? "enhanced" : "standard"}`, ignoreFocusOut: true },
+    { title: "RAP: mode of the project", placeHolder: `Current mode: ${current["mode"] === "enhanced" ? "enhanced" : "standard"}`, ignoreFocusOut: true },
   );
   if (picked === undefined) {
     return;
   }
   mkdirSync(path.dirname(file), { recursive: true });
   writeFileSync(file, `${JSON.stringify({ ...current, mode: picked.label }, null, 2)}\n`);
-  void vscode.window.showInformationMessage(`RAP : mode ${picked.label} (rapt/config.json)`);
+  void vscode.window.showInformationMessage(`RAP: mode ${picked.label} (rapt/config.json)`);
   await check(root, true);
 }
 
@@ -472,7 +472,7 @@ async function abapGit(root: string): Promise<void> {
       output.appendLine(`${skipped.file}: ${skipped.reason}`);
     }
     for (const file of result.written) {
-      output.appendLine(`écrit : ${file}`);
+      output.appendLine(`written: ${file}`);
     }
     if (result.issues.length > 0) {
       publish(
@@ -481,9 +481,9 @@ async function abapGit(root: string): Promise<void> {
       );
     }
     const message =
-      result.written.length === 0 ? "RAP : les fichiers abapGit sont à jour." : `RAP : ${result.written.length} fichier(s) abapGit écrit(s).`;
-    const extra = result.skipped.length > 0 ? ` ${result.skipped.length} objet(s) à compléter (voir le journal).` : "";
-    void (result.ok ? vscode.window.showInformationMessage(message + extra) : vscode.window.showErrorMessage(`${message}${extra} Erreurs dans les sources de tables.`, "Problèmes").then((a) => a && vscode.commands.executeCommand("workbench.actions.view.problems")));
+      result.written.length === 0 ? "RAP: the abapGit files are up to date." : `RAP: ${result.written.length} abapGit file(s) written.`;
+    const extra = result.skipped.length > 0 ? ` ${result.skipped.length} object(s) to complete (see the log).` : "";
+    void (result.ok ? vscode.window.showInformationMessage(message + extra) : vscode.window.showErrorMessage(`${message}${extra} Errors in the table sources.`, "Problems").then((a) => a && vscode.commands.executeCommand("workbench.actions.view.problems")));
   } catch (e) {
     cliFailed(e as Error);
   }
@@ -499,11 +499,11 @@ function showStatus(icon: string, text: string, command?: string, tooltip?: stri
 function onDevEvent(root: string, event: DevEvent): void {
   switch (event.type) {
     case "building":
-      showStatus("$(sync~spin)", "RAP : construction…", "rapt.devStop", "Arrêter rapt dev");
-      output.appendLine(`[dev] construction de ${event.root}`);
+      showStatus("$(sync~spin)", "RAP: building…", "rapt.devStop", "Stop rapt dev");
+      output.appendLine(`[dev] building ${event.root}`);
       break;
     case "changed":
-      output.appendLine(`[dev] ${event.file} modifié`);
+      output.appendLine(`[dev] ${event.file} changed`);
       break;
     case "diagnostics":
       publish(root, event.diagnostics);
@@ -513,8 +513,8 @@ function onDevEvent(root: string, event: DevEvent): void {
       if (dev !== undefined) {
         dev.url = event.url;
       }
-      showStatus("$(radio-tower)", `RAP : ${new URL(event.url).host}`, "rapt.openUi", `${event.url}\nCliquer pour ouvrir l'application`);
-      output.appendLine(`[dev] prêt : ${event.url}`);
+      showStatus("$(radio-tower)", `RAP: ${new URL(event.url).host}`, "rapt.openUi", `${event.url}\nClick to open the application`);
+      output.appendLine(`[dev] ready: ${event.url}`);
       // the browser opens on the first start of a session, not on each rebuild
       if (config().get<boolean>("dev.openUi") === true && dev !== undefined && dev.opened !== true) {
         dev.opened = true;
@@ -522,21 +522,21 @@ function onDevEvent(root: string, event: DevEvent): void {
       }
       break;
     case "failed":
-      showStatus("$(error)", event.running ? "RAP : erreurs (version précédente active)" : "RAP : erreurs", "workbench.actions.view.problems");
+      showStatus("$(error)", event.running ? "RAP: errors (previous version running)" : "RAP: errors", "workbench.actions.view.problems");
       break;
     case "server-failed":
-      showStatus("$(error)", "RAP : le serveur n'a pas démarré", "rapt.showLog");
+      showStatus("$(error)", "RAP: the server did not start", "rapt.showLog");
       break;
     case "database-reset":
-      output.appendLine("[dev] le schéma a changé : base de développement réinitialisée");
-      void vscode.window.showInformationMessage("RAP : le schéma a changé, la base de développement a été réinitialisée.");
+      output.appendLine("[dev] the schema changed: development database reset");
+      void vscode.window.showInformationMessage("RAP: the schema changed, the development database was reset.");
       break;
     case "error":
       output.appendLine(`[dev] ${event.message}`);
-      void vscode.window.showErrorMessage(`RAP : ${event.message}`);
+      void vscode.window.showErrorMessage(`RAP: ${event.message}`);
       break;
     case "server-stopped":
-      output.appendLine(`[dev] le serveur s'est arrêté (code ${event.code})`);
+      output.appendLine(`[dev] the server stopped (code ${event.code})`);
       break;
     case "log":
       output.appendLine(event.line);
@@ -555,9 +555,9 @@ async function devStart(root: string): Promise<void> {
     if (dev === session) {
       dev = undefined;
       void vscode.commands.executeCommand("setContext", "rapt.devRunning", false);
-      showStatus("$(debug-start)", "RAP : dev arrêté", "rapt.devStart");
+      showStatus("$(debug-start)", "RAP: dev stopped", "rapt.devStart");
       if (code !== 0 && code !== null) {
-        cliFailed(new Error(`rapt dev s'est arrêté (code ${code}), voir le journal RAP Transpiler`));
+        cliFailed(new Error(`rapt dev stopped (code ${code}), see the RAP Transpiler log`));
       }
     }
   });
@@ -569,7 +569,7 @@ async function devStop(): Promise<void> {
   if (current !== undefined) {
     await current.process.stop();
     void vscode.commands.executeCommand("setContext", "rapt.devRunning", false);
-    showStatus("$(debug-start)", "RAP : dev arrêté", "rapt.devStart");
+    showStatus("$(debug-start)", "RAP: dev stopped", "rapt.devStart");
   }
 }
 
@@ -578,7 +578,7 @@ export function activate(context: vscode.ExtensionContext): void {
   output = vscode.window.createOutputChannel("RAP Transpiler");
   diagnostics = vscode.languages.createDiagnosticCollection("rapt");
   status = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Left, 50);
-  showStatus("$(debug-start)", "RAP", "rapt.devStart", "Lancer rapt dev");
+  showStatus("$(debug-start)", "RAP", "rapt.devStart", "Start rapt dev");
 
   const withProject = (run: (root: string) => Promise<void>) => async (uri?: vscode.Uri | { root?: string }) => {
     // a project of the "Objets RAP" view, or a file / folder of the explorer
@@ -597,7 +597,7 @@ export function activate(context: vscode.ExtensionContext): void {
     vscode.commands.registerCommand("rapt.devStop", devStop),
     vscode.commands.registerCommand("rapt.openUi", async () => {
       if (dev?.url === undefined) {
-        void vscode.window.showWarningMessage("RAP : rapt dev ne tourne pas.", "Lancer").then((a) => a && vscode.commands.executeCommand("rapt.devStart"));
+        void vscode.window.showWarningMessage("RAP: rapt dev is not running.", "Start").then((a) => a && vscode.commands.executeCommand("rapt.devStart"));
         return;
       }
       await vscode.env.openExternal(vscode.Uri.parse(dev.url));

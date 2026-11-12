@@ -1,78 +1,76 @@
-# AGENTS.md — travailler sur rap-transpiler
+# AGENTS.md — working on rap-transpiler
 
-Instructions pour les agents IA (et les humains) qui modifient ce dépôt. Pour **utiliser**
-rap-transpiler dans un projet RAP, voir la section 13 du [guide](docs/GUIDE.md) ; `rapt new` écrit
-aussi un `AGENTS.md` dans les projets qu'il crée.
+Instructions for the AI agents (and the humans) who change this repository. To **use**
+rap-transpiler in a RAP project, see section 13 of the [guide](docs/GUIDE.md); `rapt new` also
+writes an `AGENTS.md` in the projects it creates.
 
-## Le projet en bref
+## The project in short
 
-Compilateur TypeScript (monorepo pnpm) qui transforme les sources d'un BO RAP (format abapGit) en
-application Node.js : OData V4, runtime RAP managed, ABAP transpilé par abaplint, PostgreSQL, UI
-OpenUI5. Lire d'abord [README.md](README.md), [docs/GUIDE.md](docs/GUIDE.md) et la liste des
-décisions [docs/DECISIONS.md](docs/DECISIONS.md) (D1 à D62).
+A TypeScript compiler (pnpm monorepo) that turns the sources of a RAP BO (abapGit format) into a
+Node.js application: OData V4, RAP managed runtime, ABAP transpiled by abaplint, PostgreSQL,
+OpenUI5 UI. Read [README.md](README.md), [docs/GUIDE.md](docs/GUIDE.md) and the list of decisions
+[docs/DECISIONS.md](docs/DECISIONS.md) (D1 to D63) first.
 
 ```
-packages/model/      types de l'IR (model.json) et dérivations partagées (OData, value helps, MCP)
-packages/compiler/   CLI rapt (src/cli.ts), parsers (bdef/, cds/, srvd/, dcl/, ddic/), IR (ir/),
-                     générateurs (gen/ : sql, csdl, abap, ui, launchpad, docs, mcp, app),
-                     création d'objets (authoring/ : new, generate, abapgit, mcp), standard/ (vues SAP)
-packages/runtime/    serveur Fastify (app.ts, server.ts), OData (odata/), RAP (rap/), ABAP (abap/),
+packages/model/      types of the IR (model.json) and shared derivations (OData, value helps, MCP)
+packages/compiler/   rapt CLI (src/cli.ts), parsers (bdef/, cds/, srvd/, dcl/, ddic/), IR (ir/),
+                     generators (gen/: sql, csdl, abap, ui, launchpad, docs, mcp, app),
+                     object creation (authoring/: new, generate, abapgit, mcp), standard/ (SAP views)
+packages/runtime/    Fastify server (app.ts, server.ts), OData (odata/), RAP (rap/), ABAP (abap/),
                      auth (auth/), launchpad (launchpad/), MCP (mcp/), UI (ui/), platform.ts
-packages/vscode/     extension VS Code : appelle la CLI avec --json, ne compile rien
-fixtures/travel      BO de référence (doit rester importable et activable sur SAP)
-fixtures/custom-entity   entité custom, mode enhanced
-fixtures/table-entity    BO sur une table entity, types simples et énumérés, mode enhanced
-site/                    site du projet (GitHub Pages, workflow site.yml)
+packages/vscode/     VS Code extension: calls the CLI with --json, compiles nothing
+fixtures/travel      reference BO (must stay importable and activatable on SAP)
+fixtures/custom-entity   custom entity, enhanced mode
+fixtures/table-entity    BO on a table entity, simple and enumerated types, enhanced mode
+site/                    project website (GitHub Pages, site.yml workflow, docs rendered by scripts/build-site.mjs)
 ```
 
-## Commandes
+## Commands
 
 ```sh
 pnpm install
-pnpm build          # tsc de chaque paquet ; le compilateur copie aussi docs/ dans packages/compiler/docs
+pnpm build          # tsc of each package; the compiler also copies docs/ into packages/compiler/docs
 pnpm typecheck
-pnpm test           # vitest, ~3 min ; tests navigateur avec Playwright s'il est installé
-npx vitest run packages/compiler/test/ui.test.ts      # un fichier
+pnpm test           # vitest, ~3 min; browser tests with Playwright when it is installed
+npx vitest run packages/compiler/test/ui.test.ts      # one file
 node packages/compiler/dist/cli.js check fixtures/travel
 node packages/compiler/dist/cli.js dev fixtures/travel --port 8081
+node scripts/build-site.mjs _site                     # the website, with the documentation pages
 ```
 
-Les tests du runtime importent `@rap-transpiler/compiler` construit : `pnpm build` avant de les
-lancer après une modification du compilateur.
+The runtime tests import the built `@rap-transpiler/compiler`: run `pnpm build` before running them
+after a change to the compiler.
 
-## Règles
+## Rules
 
-1. **Comportement de SAP d'abord.** En mode `standard`, une source se comporte comme sur SAP ;
-   une différence volontaire va en mode `enhanced` (D45) ou dans [KNOWN_GAPS.md](KNOWN_GAPS.md).
-2. **Aucune bibliothèque SAP propriétaire** (ni SAPUI5, ni `sap.fe`, ni `sap.ushell`, ni CAP) ;
-   dépendances sous licences permissives, listées dans [LICENSES.md](LICENSES.md), versions
-   épinglées.
-3. **Ne pas contourner abaplint** : une fonctionnalité ABAP que le transpiler ne traite pas se
-   documente dans KNOWN_GAPS.md (avec le contournement) plutôt que d'être bricolée.
-4. **Une décision par fonctionnalité** : ajouter une entrée `Dnn` à docs/DECISIONS.md (contexte,
-   décision, pourquoi, tests), mettre à jour docs/FEATURES.md, docs/DIAGNOSTICS.md (nouveaux
-   codes), KNOWN_GAPS.md et le guide.
-5. **Diagnostics positionnés** : `fichier:ligne:colonne`, un code par problème (`CDS0xx`,
-   `BDEF0xx`, `ABP0xx`…), sévérité juste ; jamais d'exception non rattrapée sur une source fausse.
-6. **Tests** : chaque fonctionnalité a ses tests (compilateur et runtime ; navigateur pour l'UI).
-   Les variantes de la fixture passent par `generatedVariant` / `fixtureVariant` plutôt que de
-   modifier `fixtures/travel` (dont les snapshots servent de référence).
-7. **UI générée** : JavaScript ES5 dans des chaînes TypeScript (`gen/ui/static.ts`) ; attention à
-   l'échappement (`\\d` dans le TS donne `\d` dans le JS). Les ids de contrôles sont utilisés par
-   les tests navigateur.
-8. **Documentation en français**, code et commentaires en anglais ; le README des applications
-   générées est en anglais.
-9. **Fichiers générés** : ne jamais éditer `.rapt/`, `dist/`, `packages/compiler/docs/`, ni les
-   objets virtuels `<standard>/…` (vues standards, D44).
+1. **SAP behavior first.** In `standard` mode, a source behaves as on SAP; a deliberate
+   difference goes to the `enhanced` mode (D45) or into [KNOWN_GAPS.md](KNOWN_GAPS.md).
+2. **No proprietary SAP library** (no SAPUI5, no `sap.fe`, no `sap.ushell`, no CAP);
+   dependencies under permissive licenses, listed in [LICENSES.md](LICENSES.md), pinned versions.
+3. **Do not work around abaplint**: an ABAP feature the transpiler does not handle is documented
+   in KNOWN_GAPS.md (with the workaround) rather than patched.
+4. **One decision per feature**: add a `Dnn` entry to docs/DECISIONS.md (context, decision, why,
+   tests), update docs/FEATURES.md, docs/DIAGNOSTICS.md (new codes), KNOWN_GAPS.md and the guide.
+5. **Positioned diagnostics**: `file:line:column`, one code per problem (`CDS0xx`, `BDEF0xx`,
+   `ABP0xx`…), the right severity; never an uncaught exception on a wrong source.
+6. **Tests**: each feature has its tests (compiler and runtime; browser for the UI). Variants of
+   the fixture go through `generatedVariant` / `fixtureVariant` rather than changing
+   `fixtures/travel` (whose snapshots are the reference).
+7. **Generated UI**: ES5 JavaScript in TypeScript strings (`gen/ui/static.ts`); mind the escaping
+   (`\\d` in the TS gives `\d` in the JS). The ids of the controls are used by the browser tests.
+8. **Everything in English**: documentation, website, code, comments, messages and the README of
+   the generated applications.
+9. **Generated files**: never edit `.rapt/`, `dist/`, `packages/compiler/docs/`, nor the virtual
+   objects `<standard>/…` (standard views, D44).
 
-## Ajouter une fonctionnalité, en pratique
+## Adding a feature, in practice
 
-- Type CDS (DRTY) : `ddic/cds-types.ts` puis `ir/dictionary.ts` (comme un élément de données).
-- Construction CDS ou BDEF : parser (`cds/adapter.ts`, `bdef/parser.ts`) → IR (`ir/`) → modèle
-  (`packages/model`) → générateurs et runtime → tests → documentation.
-- Classe ABAP Cloud libérée : implémentation clean-room dans `gen/abap/framework-*.ts` (signatures
-  publiques de SAP), noyau JavaScript dans `runtime/src/abap/` si nécessaire (D24, D40).
-- Annotation UI : `gen/ui/layout.ts` (layout.json), puis vues (`views.ts`) et contrôleurs
+- CDS type (DRTY): `ddic/cds-types.ts` then `ir/dictionary.ts` (like a data element).
+- CDS or BDEF construct: parser (`cds/adapter.ts`, `bdef/parser.ts`) → IR (`ir/`) → model
+  (`packages/model`) → generators and runtime → tests → documentation.
+- Released ABAP Cloud class: clean-room implementation in `gen/abap/framework-*.ts` (public
+  signatures of SAP), JavaScript kernel in `runtime/src/abap/` when needed (D24, D40).
+- UI annotation: `gen/ui/layout.ts` (layout.json), then views (`views.ts`) and controllers
   (`static.ts`).
-- Commande de la CLI : `cli.ts` (usage, options, `--json`), puis la commande VS Code
+- CLI command: `cli.ts` (usage, options, `--json`), then the VS Code command
   (`packages/vscode/src/extension.ts`, `package.json`).

@@ -1,276 +1,274 @@
-# Couverture fonctionnelle : BO RAP managed
+# Feature coverage: managed RAP BO
 
-Cible (décision D14) : toutes les fonctionnalités d'un BO RAP managed ; le draft est venu ensuite
-(D54).
-Ce tableau est mis à jour à chaque jalon.
+Target (decision D14): all the features of a managed RAP BO; draft came afterwards (D54).
+This table is updated at each milestone.
 
-Légende : ✅ pris en charge et testé · 🟡 partiel ou non couvert par un test (voir la note) ·
-⏳ prévu (jalon indiqué) · ❌ hors périmètre (raison indiquée).
+Legend: ✅ supported and tested · 🟡 partial or not covered by a test (see the note) ·
+⏳ planned (milestone given) · ❌ out of scope (reason given).
 
-Depuis J1, toutes les constructions de ces tableaux sont analysées et représentées dans l'IR,
-avec un diagnostic positionné pour celles qui sont hors périmètre ; le statut indique le
-comportement de l'application générée. Les tests de J4 portent sur la fixture Travel/Booking et
-sur ses variantes (`packages/runtime/test/variants.ts`, tests `rap-variant*.test.ts`) qui
-ajoutent ce que la fixture n'utilise pas : numérotation, feature control global, saver
-(additional, unmanaged), ABAP SQL, ETag dépendant, API distantes.
+Since M1, all the constructs of these tables are parsed and represented in the IR, with a
+positioned diagnostic for those that are out of scope; the status gives the behavior of the
+generated application. The tests of M4 use the Travel/Booking fixture and its variants
+(`packages/runtime/test/variants.ts`, `rap-variant*.test.ts` tests) which add what the fixture
+does not use: numbering, global feature control, saver (additional, unmanaged), ABAP SQL,
+dependent ETag, remote APIs.
 
-## BDEF : en-tête et entités
+## BDEF: header and entities
 
-| Fonctionnalité | Statut | Note |
+| Feature | Status | Note |
 |---|---|---|
 | `managed implementation in class … unique` | ✅ | |
-| `strict`, `strict ( 2 )` | ✅ | Accepté ; les règles strictes sont celles de SAP, l'outil ne les revérifie pas toutes. |
-| `define root behavior for` / entité enfant, `alias` | ✅ | |
+| `strict`, `strict ( 2 )` | ✅ | Accepted; the strict rules are those of SAP, the tool does not check them all again. |
+| `define root behavior for` / child entity, `alias` | ✅ | |
 | `persistent table`, `mapping for … corresponding` | ✅ | |
-| `lock master`, `lock dependent by` | ✅ | Verrou de ligne PostgreSQL sur l'instance du lock master (`FOR UPDATE NOWAIT`, cause `locked`, 409) ; un LUW à la fois par processus (D11). Conflit avec une autre transaction testé sur PostgreSQL (`rap-locks.test.ts`), y compris un verrou refusé en EML : la LUW continue. |
-| `etag master` | ✅ | `If-Match` exigé (428), ETag périmé 412, `*` accepté ; dans un change set, comparé à l'état lu avant lui (D32). |
-| `etag dependent by` | ✅ | ETag du maître (`@odata.etag`, `Core.OptimisticConcurrency` par la navigation), contrôlé sur les modifications ; un changement de l'entité dépendante change l'ETag du maître (D32). Test `rap-variant-etag.test.ts`. |
-| `authorization master ( global )`, `( instance )`, `( global, instance )` | ✅ | Handlers appelés hors local mode ; refus → 403. |
-| `authorization dependent by` | ✅ | Contrôle du master (`%update`) pour les opérations de l'entité dépendante. |
-| `AUTHORITY-CHECK OBJECT … ID … FIELD …` (`DUMMY`, `sy-subrc` 0/4/12) | ✅ | Objets d'autorisation de abapGit (SUSO), rôles de `rapt/authorizations.json` donnés par les rôles du jeton OIDC, valeurs issues des claims (D34). Tests `rap-authorizations.test.ts`, `keycloak.test.ts`. |
-| `early numbering` managed (UUID) | ✅ | |
-| Numérotation externe (clé fournie, `mandatory : create`, `readonly : update`) | ✅ | |
-| `early numbering` non managed (handler `FOR NUMBERING`) | ✅ | Création directe (`rap-variant-features.test.ts`) et création par association, deep create compris (`FOR CREATE Travel\_Booking`, un appel pour tous les parents, `failed`/`reported` ; `rap-variant-numbering.test.ts`). |
-| `late numbering` | ❌ | Nécessite la phase `adjust_numbers` d'un saver. |
-| `with additional save`, `with unmanaged save` (en-tête ou entité, `with full data`) | ✅ | Classe saver `lsc_…` : `save_modified` et `cleanup` ; unmanaged : lecture et verrous par la vue CDS (D30). Tests `rap-variant-additional-save`, `rap-variant-unmanaged-save`. |
-| Saver hérité de `cl_abap_behavior_saver_failed` (`failed` dans `save_modified`) | ✅ | Annule la LUW, écriture managed comprise ; message renvoyé au client. |
-| `with draft`, `draft table`, `total etag`, `draft action Edit / Activate optimized / Discard / Resume`, `draft determine action Prepare` | ✅ | Tables de brouillons, `IsActiveEntity`, verrou exclusif, activation par le runtime managed (D54). Voir les écarts dans [KNOWN_GAPS.md](../KNOWN_GAPS.md). |
-| Implémentation `unmanaged` | ❌ | Hors cible (BO managed). |
-| `with privileged mode` | ✅ | `PRIVILEGED` saute les contrôles d'autorisation. |
-| `changedocuments`, `event`, `extensible` | ❌ | Pas d'infrastructure équivalente. |
+| `lock master`, `lock dependent by` | ✅ | PostgreSQL row lock on the instance of the lock master (`FOR UPDATE NOWAIT`, cause `locked`, 409); one LUW at a time per process (D11). Conflict with another transaction tested on PostgreSQL (`rap-locks.test.ts`), including a lock refused in EML: the LUW goes on. |
+| `etag master` | ✅ | `If-Match` required (428), stale ETag 412, `*` accepted; in a change set, compared with the state read before it (D32). |
+| `etag dependent by` | ✅ | ETag of the master (`@odata.etag`, `Core.OptimisticConcurrency` through the navigation), checked on changes; a change of the dependent entity changes the ETag of the master (D32). Test `rap-variant-etag.test.ts`. |
+| `authorization master ( global )`, `( instance )`, `( global, instance )` | ✅ | Handlers called outside local mode; refusal → 403. |
+| `authorization dependent by` | ✅ | Check of the master (`%update`) for the operations of the dependent entity. |
+| `AUTHORITY-CHECK OBJECT … ID … FIELD …` (`DUMMY`, `sy-subrc` 0/4/12) | ✅ | Authorization objects of abapGit (SUSO), roles of `rapt/authorizations.json` given by the roles of the OIDC token, values from the claims (D34). Tests `rap-authorizations.test.ts`, `keycloak.test.ts`. |
+| Managed `early numbering` (UUID) | ✅ | |
+| External numbering (key given, `mandatory : create`, `readonly : update`) | ✅ | |
+| Unmanaged `early numbering` (`FOR NUMBERING` handler) | ✅ | Direct creation (`rap-variant-features.test.ts`) and creation by association, deep create included (`FOR CREATE Travel\_Booking`, one call for all the parents, `failed`/`reported`; `rap-variant-numbering.test.ts`). |
+| `late numbering` | ❌ | Needs the `adjust_numbers` phase of a saver. |
+| `with additional save`, `with unmanaged save` (header or entity, `with full data`) | ✅ | Saver class `lsc_…`: `save_modified` and `cleanup`; unmanaged: reads and locks through the CDS view (D30). Tests `rap-variant-additional-save`, `rap-variant-unmanaged-save`. |
+| Saver inheriting from `cl_abap_behavior_saver_failed` (`failed` in `save_modified`) | ✅ | Rolls back the LUW, managed write included; message returned to the client. |
+| `with draft`, `draft table`, `total etag`, `draft action Edit / Activate optimized / Discard / Resume`, `draft determine action Prepare` | ✅ | Draft tables, `IsActiveEntity`, exclusive lock, activation by the managed runtime (D54). See the gaps in [KNOWN_GAPS.md](../KNOWN_GAPS.md). |
+| `unmanaged` implementation | ❌ | Out of the target (managed BO). |
+| `with privileged mode` | ✅ | `PRIVILEGED` skips the authorization checks. |
+| `changedocuments`, `event`, `extensible` | ❌ | No equivalent infrastructure. |
 
-## Opérations
+## Operations
 
-| Fonctionnalité | Statut | Note |
+| Feature | Status | Note |
 |---|---|---|
-| `create`, `update`, `delete` | ✅ | OData (POST, PATCH, PUT, DELETE) et EML. |
-| `internal create/update/delete` | ✅ | Disponibles en EML, non exposés en OData (405). |
-| Suppression en cascade des compositions | ✅ | |
-| `association _X { create; }` (create par association) | ✅ | OData (navigation, deep insert) et EML. |
-| `( features : instance )` sur les opérations | ✅ | `__EntityControl`, `__OperationControl` ; opération refusée → 409. |
-| `( features : global )` | ✅ | Handler `FOR GLOBAL FEATURES` ; opération refusée → 409 ; exposé comme le feature control d'instance (`__EntityControl`), bouton Delete désactivé dans l'UI. |
-| `( precheck )` | ✅ | create, update, delete, actions, create par association. |
+| `create`, `update`, `delete` | ✅ | OData (POST, PATCH, PUT, DELETE) and EML. |
+| `internal create/update/delete` | ✅ | Available in EML, not exposed in OData (405). |
+| Cascading delete of the compositions | ✅ | |
+| `association _X { create; }` (create by association) | ✅ | OData (navigation, deep insert) and EML. |
+| `( features : instance )` on the operations | ✅ | `__EntityControl`, `__OperationControl`; refused operation → 409. |
+| `( features : global )` | ✅ | `FOR GLOBAL FEATURES` handler; refused operation → 409; exposed like the instance feature control (`__EntityControl`), Delete button disabled in the UI. |
+| `( precheck )` | ✅ | create, update, delete, actions, create by association. |
 
-## Champs
+## Fields
 
-| Fonctionnalité | Statut | Note |
+| Feature | Status | Note |
 |---|---|---|
-| `readonly` | ✅ | Ignoré pour un consommateur OData (D25) ; modifiable en local mode. |
-| `mandatory` | ✅ | Pas de contrôle runtime, comme RAP (D20). En mode `enhanced` (D45) : contrôlé à la sauvegarde, sans validation, un message par champ. |
+| `readonly` | ✅ | Ignored for an OData consumer (D25); changeable in local mode. |
+| `mandatory` | ✅ | No runtime check, as in RAP (D20). In `enhanced` mode (D45): checked on save, without a validation, one message per field. |
 | `numbering : managed` | ✅ | |
 | `readonly : update`, `mandatory : create` | ✅ | |
-| `features : instance` (feature control dynamique des champs) | ✅ | `__FieldControl` (`Common.FieldControl`), modification d'un champ en lecture seule refusée (400), champ non modifiable dans l'UI. |
-| `suppress` | ✅ | Propriété absente du service. |
+| `features : instance` (dynamic field feature control) | ✅ | `__FieldControl` (`Common.FieldControl`), change of a read-only field refused (400), field not editable in the UI. |
+| `suppress` | ✅ | Property absent from the service. |
 
-## Actions et fonctions
+## Actions and functions
 
-| Fonctionnalité | Statut | Note |
+| Feature | Status | Note |
 |---|---|---|
-| Action d'instance, `result [1] $self` | ✅ | |
-| Action sans résultat | ✅ | 204 en OData. |
-| Résultat `entity …`, cardinalités `[0..*]` | ✅ | Collection d'entités d'un autre entity set. |
-| `internal action` | ✅ | Disponible en EML, non exposée en OData. |
-| `static action` | ✅ | Liée à la collection ; résultat `$self` = l'instance créée. |
-| `factory action` | ✅ | Le résultat est l'instance de `mapped` pour le `%cid` de l'appel. |
-| Paramètre d'action (`parameter` vers une entité abstraite) | ✅ | |
-| `( features : instance )` sur une action | ✅ | `Core.OperationAvailable` via `__OperationControl`. |
-| `( features : global )` sur une action | ✅ | Action d'instance : `Core.OperationAvailable` via `__OperationControl` (valeur commune à toutes les instances) ; action statique : contrôle à l'exécution seulement. |
-| `function` d'instance | ✅ | GET ; résultat entité abstraite (type complexe). |
-| `static function` | ✅ | GET sur la collection. |
-| `determine action` | ❌ | Prévu après le MVP. |
+| Instance action, `result [1] $self` | ✅ | |
+| Action without a result | ✅ | 204 in OData. |
+| Result `entity …`, cardinalities `[0..*]` | ✅ | Collection of entities of another entity set. |
+| `internal action` | ✅ | Available in EML, not exposed in OData. |
+| `static action` | ✅ | Bound to the collection; result `$self` = the created instance. |
+| `factory action` | ✅ | The result is the instance of `mapped` for the `%cid` of the call. |
+| Action parameter (`parameter` to an abstract entity) | ✅ | |
+| `( features : instance )` on an action | ✅ | `Core.OperationAvailable` through `__OperationControl`. |
+| `( features : global )` on an action | ✅ | Instance action: `Core.OperationAvailable` through `__OperationControl` (one value for all the instances); static action: check at runtime only. |
+| Instance `function` | ✅ | GET; abstract entity result (complex type). |
+| `static function` | ✅ | GET on the collection. |
+| `determine action` | ❌ | Planned after the MVP. |
 
-## Déterminations et validations
+## Determinations and validations
 
-| Fonctionnalité | Statut | Note |
+| Feature | Status | Note |
 |---|---|---|
-| `determination … on modify` (triggers `create`, `field`) | ✅ | Sémantique D21, par tours ; une action interne exécutée depuis une détermination. |
-| Triggers `update`, `delete` | ✅ | `delete` : la détermination reçoit les clés des instances supprimées (encore en base jusqu'à la sauvegarde). |
+| `determination … on modify` (triggers `create`, `field`) | ✅ | D21 semantics, in rounds; an internal action run from a determination. |
+| `update`, `delete` triggers | ✅ | `delete`: the determination receives the keys of the deleted instances (still in the database until the save). |
 | `determination … on save` | ✅ | |
-| `validation … on save` | ✅ | Échec → 400 et annulation du LUW. |
+| `validation … on save` | ✅ | Failure → 400 and rollback of the LUW. |
 
-## Messages et réponses
+## Messages and responses
 
-| Fonctionnalité | Statut | Note |
+| Feature | Status | Note |
 |---|---|---|
 | `failed`, `reported`, `mapped` | ✅ | |
 | `new_message_with_text` | ✅ | |
-| `new_message` (classe de messages T100, MSAG) | ✅ | Code OData `CLASSE/NNN`. |
-| Classes d'exception implémentant `if_abap_behv_message` | ✅ | Socle « clean-room » `cx_root` (D24) ; attributs du message résolus par nom. |
-| `%element` → `target` OData | ✅ | Relatif à la ressource de la requête, sinon absolu `/Set(clé)/Propriété`. |
-| Sévérités → erreur OData ou en-tête `sap-messages` | ✅ | |
-| `%state_area`, messages d'état | 🟡 | Sans draft, les messages sont renvoyés comme messages de transition. |
+| `new_message` (T100 message class, MSAG) | ✅ | OData code `CLASS/NNN`. |
+| Exception classes implementing `if_abap_behv_message` | ✅ | Clean-room `cx_root` base (D24); attributes of the message resolved by name. |
+| `%element` → OData `target` | ✅ | Relative to the resource of the request, otherwise absolute `/Set(key)/Property`. |
+| Severities → OData error or `sap-messages` header | ✅ | |
+| `%state_area`, state messages | 🟡 | Without draft, the messages are returned as transition messages. |
 
-## EML dans l'ABP
+## EML in the ABP
 
-| Fonctionnalité | Statut | Note |
+| Feature | Status | Note |
 |---|---|---|
-| `READ ENTITIES` / `READ ENTITY` (`FIELDS`, `ALL FIELDS`, `FROM`), `RESULT`, `FAILED`, `REPORTED` | ✅ | Abaissé par notre passe (D2). |
+| `READ ENTITIES` / `READ ENTITY` (`FIELDS`, `ALL FIELDS`, `FROM`), `RESULT`, `FAILED`, `REPORTED` | ✅ | Lowered by our pass (D2). |
 | `READ … BY \_assoc`, `LINK` | ✅ | |
-| `READ … EXECUTE` (fonctions) | ✅ | |
-| `MODIFY ENTITIES` `CREATE`, `UPDATE`, `DELETE`, `EXECUTE` (`FIELDS`, `SET FIELDS`, `FROM`, `AUTO FILL CID`) | ✅ | Y compris les formes qu'abaplint n'analyse pas (`AUTO FILL CID SET FIELDS`). |
+| `READ … EXECUTE` (functions) | ✅ | |
+| `MODIFY ENTITIES` `CREATE`, `UPDATE`, `DELETE`, `EXECUTE` (`FIELDS`, `SET FIELDS`, `FROM`, `AUTO FILL CID`) | ✅ | Including the forms abaplint does not parse (`AUTO FILL CID SET FIELDS`). |
 | `MODIFY … CREATE BY \_assoc` | ✅ | |
-| `IN LOCAL MODE`, `PRIVILEGED` | ✅ | Local mode : ni autorisation ni feature control, champs en lecture seule modifiables. |
-| `COMMIT ENTITIES`, `ROLLBACK ENTITIES` dans un handler | ✅ | Interdits, comme dans RAP (erreur à l'exécution). |
+| `IN LOCAL MODE`, `PRIVILEGED` | ✅ | Local mode: neither authorization nor feature control, read-only fields changeable. |
+| `COMMIT ENTITIES`, `ROLLBACK ENTITIES` in a handler | ✅ | Forbidden, as in RAP (runtime error). |
 | `GET PERMISSIONS`, `SET LOCKS`, `MODIFY … OPERATIONS`, `RELATING TO`, `AUGMENTING`, `RAISE ENTITY EVENT` | ❌ | Diagnostic ABP005/ABP007. |
 
-## ABAP SQL dans l'ABP
+## ABAP SQL in the ABP
 
-| Fonctionnalité | Statut | Note |
+| Feature | Status | Note |
 |---|---|---|
-| `SELECT` sur les tables et entités CDS du projet : `SINGLE`, `INTO TABLE`, `APPENDING`, `CORRESPONDING`, `WHERE` (dont `IN` sur un range, `LIKE`, `BETWEEN`, `EXISTS`), `ORDER BY` (dont `PRIMARY KEY`), `UP TO n ROWS`, `GROUP BY`/`HAVING`, agrégats, jointures, `FOR ALL ENTRIES` | ✅ | Vues au format ABAP du schéma `rapt_abap`, dans la transaction de la LUW (D26). Test `rap-variant-sql.test.ts`. |
-| Test d'existence `SELECT SINGLE @abap_true … INTO @DATA(x)`, `MAX`/`MIN` en déclaration en ligne | ✅ | Déclarés par la passe de réécriture (abaplint ne les type pas). |
-| Autres littéraux, agrégats ou expressions en déclaration en ligne | ❌ | Diagnostic ABP009 : déclarer la cible. |
-| `SELECT … ENDSELECT` | 🟡 | Avec `SELECT *` seulement (ABP007 sinon). |
-| `OPEN CURSOR`, `FETCH NEXT CURSOR` | 🟡 | Hors ABAP Cloud (refusés par la vérification, comme sur SAP) ; pris en charge par le runtime. |
-| Types des entités CDS dans l'ABP (`DATA ls TYPE zr_travel`) | ✅ | Tables « ombre » (D19, D26). |
-| `MESSAGE … INTO` | ✅ | Textes des classes de messages du projet. |
-| `INSERT`, `UPDATE`, `MODIFY`, `DELETE` dans le saver (`save_modified`) | ✅ | `MAPPING FROM ENTITY` et `INDICATORS SET STRUCTURE %control` exacts (kernel) ; écritures classiques par les vues `rapt_abap` et leurs triggers (D30). |
-| `INSERT`, `UPDATE`, `MODIFY`, `DELETE` dans un handler ; `WITH` | ❌ | Diagnostic ABP007 : le runtime RAP écrit le BO, le modifier par EML. |
+| `SELECT` on the tables and CDS entities of the project: `SINGLE`, `INTO TABLE`, `APPENDING`, `CORRESPONDING`, `WHERE` (including `IN` on a range, `LIKE`, `BETWEEN`, `EXISTS`), `ORDER BY` (including `PRIMARY KEY`), `UP TO n ROWS`, `GROUP BY`/`HAVING`, aggregates, joins, `FOR ALL ENTRIES` | ✅ | Views in ABAP format of the `rapt_abap` schema, in the transaction of the LUW (D26). Test `rap-variant-sql.test.ts`. |
+| Existence check `SELECT SINGLE @abap_true … INTO @DATA(x)`, `MAX`/`MIN` in an inline declaration | ✅ | Declared by the rewriting pass (abaplint does not type them). |
+| Other literals, aggregates or expressions in an inline declaration | ❌ | Diagnostic ABP009: declare the target. |
+| `SELECT … ENDSELECT` | 🟡 | With `SELECT *` only (ABP007 otherwise). |
+| `OPEN CURSOR`, `FETCH NEXT CURSOR` | 🟡 | Not ABAP Cloud (refused by the check, as on SAP); supported by the runtime. |
+| Types of the CDS entities in the ABP (`DATA ls TYPE zr_travel`) | ✅ | "Shadow" tables (D19, D26). |
+| `MESSAGE … INTO` | ✅ | Texts of the message classes of the project. |
+| `INSERT`, `UPDATE`, `MODIFY`, `DELETE` in the saver (`save_modified`) | ✅ | Exact `MAPPING FROM ENTITY` and `INDICATORS SET STRUCTURE %control` (kernel); classic writes through the `rapt_abap` views and their triggers (D30). |
+| `INSERT`, `UPDATE`, `MODIFY`, `DELETE` in a handler; `WITH` | ❌ | Diagnostic ABP007: the RAP runtime writes the BO, change it with EML. |
 
-## API distantes dans l'ABP (D31)
+## Remote APIs in the ABP (D31)
 
-| Fonctionnalité | Statut | Note |
+| Feature | Status | Note |
 |---|---|---|
-| Client HTTP : `cl_http_destination_provider` (`create_by_url`, `create_by_comm_arrangement`, `create_by_cloud_destination`), `cl_web_http_client_manager`, `if_web_http_client`, `if_web_http_request`, `if_web_http_response` | ✅ | Chemin, requête, en-têtes, corps texte ou binaire, formulaire, basic/bearer, statut, en-têtes et corps de la réponse. Test `rap-variant-remote.test.ts`. |
-| Destinations | ✅ | Variables d'environnement `DESTINATION_<NOM>_URL`, `_USER`/`_PASSWORD`, `_TOKEN`, `_HEADERS` ; listées dans le `.env.example` généré. |
-| Client proxy OData V4 (`/iwbep/cl_cp_factory_remote`, `cl_web_odata_client_factory`) avec la classe d'un SCM2 | ✅ | Lecture de liste (`create_by_range`, `and`/`or`/`not`, `$select`, `$orderby`, `$top`, `$skip`, `$count`), lecture par clé, création, mise à jour, suppression, ETag, jeton CSRF. |
-| Client proxy OData V2 avec les entités abstraites d'un SCM | ✅ | `d.results`, `__count`, `/Date()/`, `$inlinecount`, `substringof`. |
+| HTTP client: `cl_http_destination_provider` (`create_by_url`, `create_by_comm_arrangement`, `create_by_cloud_destination`), `cl_web_http_client_manager`, `if_web_http_client`, `if_web_http_request`, `if_web_http_response` | ✅ | Path, query, headers, text or binary body, form, basic/bearer, status, headers and body of the response. Test `rap-variant-remote.test.ts`. |
+| Destinations | ✅ | Environment variables `DESTINATION_<NAME>_URL`, `_USER`/`_PASSWORD`, `_TOKEN`, `_HEADERS`; listed in the generated `.env.example`. |
+| OData V4 client proxy (`/iwbep/cl_cp_factory_remote`, `cl_web_odata_client_factory`) with the class of an SCM2 | ✅ | List read (`create_by_range`, `and`/`or`/`not`, `$select`, `$orderby`, `$top`, `$skip`, `$count`), read by key, create, update, delete, ETag, CSRF token. |
+| OData V2 client proxy with the abstract entities of an SCM | ✅ | `d.results`, `__count`, `/Date()/`, `$inlinecount`, `substringof`. |
 | Exceptions `cx_http_dest_provider_error`, `cx_web_http_client_error`, `/iwbep/cx_gateway`, `/iwbep/cx_cp_remote` | ✅ | `get_text( )`, `http_status_code`, `http_error_body`. |
-| `$batch`, `$expand`, deep insert, navigation par association, actions et fonctions distantes, value controls | ❌ | Voir KNOWN_GAPS.md. |
+| `$batch`, `$expand`, deep insert, navigation by association, remote actions and functions, value controls | ❌ | See KNOWN_GAPS.md. |
 | Communication targets, SOAP (`cl_soap_destination_provider`), RFC | ❌ | |
 
-## Classes utilitaires d'ABAP Cloud dans l'ABP (D40)
+## ABAP Cloud utility classes in the ABP (D40)
 
-| Fonctionnalité | Statut | Note |
+| Feature | Status | Note |
 |---|---|---|
-| JSON : `/ui2/cl_json` (`serialize`, `deserialize`), `xco_cp_json` (`from_string`, `from_abap`, `apply`, `write_to`, `builder`) | ✅ | Modes de nommage, `compress`, `name_mappings`, booléens, dates, horodatages ISO, base64. Guide : [UTILITAIRES.md](UTILITAIRES.md). |
-| Encodages : `cl_web_http_utility`, `cl_abap_conv_codepage`, `cl_abap_gzip`, `xco_cp=>string` / `xstring` | ✅ | Base64, UTF-8/16, ISO-8859-1, windows-1252, URL, HTML, gzip. |
-| Texte : `cl_abap_char_utilities`, `cl_abap_string_utilities`, types `string_table`, `xstring_table` | ✅ | |
-| Numérotation : `cl_numberrange_runtime` | ✅ | Intervalles de `rapt/number-ranges.json`, table `rapt_number_range`. |
-| Dates : `cl_abap_tstmp`, `cl_abap_utclong`, `xco_cp=>sy`, `xco_cp_time` | ✅ | Fuseau UTC. |
-| Journal applicatif : `cl_bali_*` | ✅ | Tables `rapt_application_log(_item)`, lecture par filtre. |
-| Hachage : `cl_abap_message_digest`, `cl_abap_hmac` | ✅ | MD5, SHA1, SHA2. |
-| Nombres aléatoires : `cl_abap_random*` | ✅ | Générateur déterministe par graine (non cryptographique). |
-| Expressions régulières : `cl_abap_regex`, `cl_abap_matcher`, types `match_result(_tab)` | ✅ | Moteur JavaScript. |
-| RTTS : `cl_abap_typedescr` et sous-classes | 🟡 | `describe_by_data(_ref)`, `describe_by_object_ref` ; pas `describe_by_name` ni la création de types. |
-| Traitement en arrière-plan : `cl_bgmc_process_factory`, `if_bgmc_op_single`, `if_bgmc_op_single_tx_uncontr`, `cl_abap_tx` (D41) | ✅ | Après la validation de la LUW, dans une LUW à part ; `COMMIT ENTITIES` dans une opération non contrôlée ; état dans `rapt_background_process`. Test `background.test.ts`. |
-| E-mail : `cl_bcs_mail_message`, `cl_bcs_mail_textpart`, `cl_bcs_mail_binarypart` (D41) | ✅ | Envoyé après la validation de la LUW par `MAIL_SMTP_URL`, sinon gardé dans `rapt_mail`. |
+| JSON: `/ui2/cl_json` (`serialize`, `deserialize`), `xco_cp_json` (`from_string`, `from_abap`, `apply`, `write_to`, `builder`) | ✅ | Naming modes, `compress`, `name_mappings`, booleans, dates, ISO timestamps, base64. Guide: [UTILITIES.md](UTILITIES.md). |
+| Encodings: `cl_web_http_utility`, `cl_abap_conv_codepage`, `cl_abap_gzip`, `xco_cp=>string` / `xstring` | ✅ | Base64, UTF-8/16, ISO-8859-1, windows-1252, URL, HTML, gzip. |
+| Text: `cl_abap_char_utilities`, `cl_abap_string_utilities`, types `string_table`, `xstring_table` | ✅ | |
+| Numbering: `cl_numberrange_runtime` | ✅ | Intervals of `rapt/number-ranges.json`, table `rapt_number_range`. |
+| Dates: `cl_abap_tstmp`, `cl_abap_utclong`, `xco_cp=>sy`, `xco_cp_time` | ✅ | UTC time zone. |
+| Application log: `cl_bali_*` | ✅ | Tables `rapt_application_log(_item)`, read by filter. |
+| Hashing: `cl_abap_message_digest`, `cl_abap_hmac` | ✅ | MD5, SHA1, SHA2. |
+| Random numbers: `cl_abap_random*` | ✅ | Deterministic generator by seed (not cryptographic). |
+| Regular expressions: `cl_abap_regex`, `cl_abap_matcher`, types `match_result(_tab)` | ✅ | JavaScript engine. |
+| RTTS: `cl_abap_typedescr` and subclasses | 🟡 | `describe_by_data(_ref)`, `describe_by_object_ref`; not `describe_by_name` nor the creation of types. |
+| Background processing: `cl_bgmc_process_factory`, `if_bgmc_op_single`, `if_bgmc_op_single_tx_uncontr`, `cl_abap_tx` (D41) | ✅ | After the commit of the LUW, in a separate LUW; `COMMIT ENTITIES` in an uncontrolled operation; state in `rapt_background_process`. Test `background.test.ts`. |
+| E-mail: `cl_bcs_mail_message`, `cl_bcs_mail_textpart`, `cl_bcs_mail_binarypart` (D41) | ✅ | Sent after the commit of the LUW through `MAIL_SMTP_URL`, otherwise kept in `rapt_mail`. |
 
 ## Projection
 
-| Fonctionnalité | Statut | Note |
+| Feature | Status | Note |
 |---|---|---|
-| BDEF `projection` : `use create/update/delete/action/function/association` | ✅ | |
+| `projection` BDEF: `use create/update/delete/action/function/association` | ✅ | |
 | `use etag` | ✅ | |
-| Éléments renommés ou omis dans la projection | ✅ | |
-| `augment`, precheck et actions propres à la projection | ❌ | Prévu après le MVP. |
+| Elements renamed or omitted in the projection | ✅ | |
+| `augment`, precheck and actions of the projection itself | ❌ | Planned after the MVP. |
 
-## CDS et service
+## CDS and service
 
-| Fonctionnalité | Statut | Note |
+| Feature | Status | Note |
 |---|---|---|
 | `define root view entity`, `define view entity`, `as projection on`, `provider contract` | ✅ | |
 | `composition`, `association to parent`, `redirected to` | ✅ | |
-| Associations vers des entités sans BO (entity sets en lecture seule) | ✅ | Entités exposées sans comportement : lecture seule. |
-| Métadonnées d'extension (DDLX) et fusion des annotations | ✅ | |
-| Entités abstraites (paramètres et résultats d'actions et de fonctions) | ✅ | |
-| Entités custom (`define custom entity`, `@ObjectModel.query.implementedBy`, `if_rap_query_provider`) | ✅ | Lectures OData par la classe de requête : plages et chaîne SQL du filtre, tri, pagination, compte, navigation, `$expand` (D43). |
-| BO `managed with unmanaged save` sur une entité custom | ✅ | Mode `enhanced` seulement (`rapt/config.json`, D45) : instances lues par la classe de requête, écrites par `save_modified` vers l'API (D43). |
-| Vues standards `I_Currency`, `I_UnitOfMeasure`, `I_Country`, `I_Language` et leurs textes | ✅ | Ajoutées quand une source les nomme, avec leurs données de référence (D44). |
-| Value helps (`@Consumption.valueHelpDefinition`) | ✅ | Entité et vue de textes exposées implicitement en lecture seule, `Common.ValueList` (D44) ; `additionalBinding` (filtre, résultat), `useForValidation`, liste déroulante (`sizeCategory: #XS`), paramètres d'action (D56). |
-| Table entities (`define [root] table entity`) | ✅ | Table et view entity ; persistance implicite d'un BO managed ; `null`, clés, associations, compositions (D55). |
-| Types simples CDS (`define type x : abap.char(40);`) | ✅ | Objets DRTY (`.drty.acds`) : type et libellé des éléments (D55). |
-| Types énumérés CDS (`define type x : abap.char(1) enum { … }`) | ✅ | Valeurs de base en base ; constantes utilisables dans le behavior pool. Exposition OData : refusée en mode `standard` comme sur SAP (CDS021), `EnumType` en mode `enhanced` (D55). |
-| Vues standards `I_Region`, `I_CalendarDate`, `I_TimeZone`, `I_BusinessUserBasic`, `I_ExchangeRate` | ✅ | Calendrier généré, utilisateurs de l'IdP enregistrés à la connexion, taux de change à maintenir (D44). |
-| Expressions CDS (CASE, CAST, calculs, littéraux) | ❌ | Prévu après le MVP. |
-| Contrôle d'accès DCL (`define role … grant select on … where …`) | ✅ | Lectures OData filtrées pour l'utilisateur : `aspect pfcg_auth` (filtres `ACTVT = '03'`, n-uplets), `aspect user`, `?=`, comparaisons, `like`, `is [not] null`, `and`/`or`/`not`, chemins `_Assoc.Element` (to-one), `inheriting conditions from entity` (D35). Tests `rap-authorizations.test.ts`, `dcl.test.ts`. |
-| Side effects (`side effects { … }`) | ✅ | `Common.SideEffects` dans le `$metadata` ; l'UI générée ne les exploite pas encore (rechargement de l'objet après sauvegarde). |
+| Associations to entities without a BO (read-only entity sets) | ✅ | Entities exposed without behavior: read-only. |
+| Metadata extensions (DDLX) and merge of the annotations | ✅ | |
+| Abstract entities (parameters and results of actions and functions) | ✅ | |
+| Custom entities (`define custom entity`, `@ObjectModel.query.implementedBy`, `if_rap_query_provider`) | ✅ | OData reads through the query class: ranges and SQL string of the filter, sorting, paging, count, navigation, `$expand` (D43). |
+| `managed with unmanaged save` BO on a custom entity | ✅ | `enhanced` mode only (`rapt/config.json`, D45): instances read by the query class, written by `save_modified` to the API (D43). |
+| Standard views `I_Currency`, `I_UnitOfMeasure`, `I_Country`, `I_Language` and their texts | ✅ | Added when a source names them, with their reference data (D44). |
+| Value helps (`@Consumption.valueHelpDefinition`) | ✅ | Entity and text view exposed implicitly as read-only, `Common.ValueList` (D44); `additionalBinding` (filter, result), `useForValidation`, drop-down list (`sizeCategory: #XS`), action parameters (D56). |
+| Table entities (`define [root] table entity`) | ✅ | Table and view entity; implicit persistence of a managed BO; `null`, keys, associations, compositions (D55). |
+| CDS simple types (`define type x : abap.char(40);`) | ✅ | DRTY objects (`.drty.acds`): type and label of the elements (D55). |
+| CDS enumerated types (`define type x : abap.char(1) enum { … }`) | ✅ | Base values in the database; constants usable in the behavior pool. OData exposure: refused in `standard` mode as on SAP (CDS021), `EnumType` in `enhanced` mode (D55). |
+| Standard views `I_Region`, `I_CalendarDate`, `I_TimeZone`, `I_BusinessUserBasic`, `I_ExchangeRate` | ✅ | Generated calendar, users of the IdP recorded on sign-in, exchange rates to maintain (D44). |
+| CDS expressions (CASE, CAST, calculations, literals) | ❌ | Planned after the MVP. |
+| DCL access control (`define role … grant select on … where …`) | ✅ | OData reads filtered for the user: `aspect pfcg_auth` (filters `ACTVT = '03'`, tuples), `aspect user`, `?=`, comparisons, `like`, `is [not] null`, `and`/`or`/`not`, paths `_Assoc.Element` (to-one), `inheriting conditions from entity` (D35). Tests `rap-authorizations.test.ts`, `dcl.test.ts`. |
+| Side effects (`side effects { … }`) | ✅ | `Common.SideEffects` in the `$metadata`; the generated UI does not use them yet (the object is reloaded after a save). |
 
-## Service OData V4
+## OData V4 service
 
-| Fonctionnalité | Statut | Note |
+| Feature | Status | Note |
 |---|---|---|
-| Document de service, `$metadata` (CSDL avec annotations) | ✅ | |
-| GET collection, GET entité (clé courte et nommée) | ✅ | |
-| Navigation `Entité(…)/_Assoc`, clé sur la navigation, `/$count` | ✅ | |
-| `$filter` : eq, ne, gt, ge, lt, le, and, or, not, in, parenthèses, `null` | ✅ | Requêtes SQL paramétrées. |
-| `$filter` : contains, startswith, endswith, tolower, toupper, trim, length, indexof, substring, concat, year…second, now | ✅ | `%` et `_` sont des caractères littéraux. |
-| `$filter` sur une navigation vers un (`_Travel/Status`) | ✅ | Sous-requête scalaire. |
-| `$filter` avec `any`/`all` sur une collection | ❌ | Réponse 501. |
-| `$orderby`, `$top`, `$skip`, `$count` | ✅ | Les clés complètent le tri : pagination stable. |
-| `$select` | ✅ | Clés et ETag toujours lus. |
-| `$expand` un niveau, avec `$select`, `$orderby`, `$filter`, `$top`, `$skip`, `$count` imbriqués | ✅ | `$top`/`$skip` par parent (`row_number()`). `$expand` imbriqué : 501. |
-| `$search` simple | ✅ | ILIKE sur les champs `@Search.defaultSearchElement`, chaque terme requis. |
-| `IEEE754Compatible=true` (Decimal et Int64 en chaînes) | ✅ | Nombres JSON exacts sinon, en lecture comme en écriture. |
-| ETag (`@odata.etag`, en-tête `ETag`), `If-Match` | ✅ | |
-| POST, PATCH, PUT, DELETE, deep insert, création par navigation | ✅ | `Location`, `Prefer: return=minimal`. |
-| Actions liées et statiques (POST), fonctions (GET) | ✅ | |
-| `$batch` multipart : lectures et change sets | ✅ | Un change set = un LUW, références `$<Content-ID>`, réponses différées (D23). |
-| Feature control d'instance dans les lectures | ✅ | `__EntityControl`, `__OperationControl`, `__FieldControl` (D25). |
-| Jeton CSRF (`X-CSRF-Token: Fetch`) | ✅ | Exigé pour les sessions par cookie (J6). |
-| Erreurs au format OData V4 (`@Common.numericSeverity`, `details`, `target`) | ✅ | Statut selon la cause d'échec (D22). |
-| Paramètres `sap-*` | ✅ | Ignorés. |
-| Authentification : mode dev, Bearer JWT (OIDC, JWKS) | ✅ | Sessions navigateur (PKCE) : J6 ; jetons *client credentials* (utilisateur technique) ; serveur OAuth 2.0 de développement (`/oauth`, client credentials et PKCE) dans `rapt dev` (D60). |
-| Binding *OData V4 - Web API* | ✅ | Sans annotations d'UI, value helps, side effects, feature control ; instances actives d'un BO draft (D60). |
-| `$apply` : `filter`, `groupby`, `aggregate` (`sum`, `min`, `max`, `average`, `countdistinct`, `$count`) | ✅ | Avec le DCL de l'utilisateur ; autres transformations : 501 (D52). |
-| Types énumération (`EnumType`) : JSON par nom de membre, littéraux `Ns.Type'M'` | ✅ | Mode `enhanced`, types énumérés CDS (D55). |
-| JSON batch, `$value`, propriétés seules | ❌ | Hors MVP. |
+| Service document, `$metadata` (CSDL with annotations) | ✅ | |
+| GET collection, GET entity (short and named key) | ✅ | |
+| Navigation `Entity(…)/_Assoc`, key on the navigation, `/$count` | ✅ | |
+| `$filter`: eq, ne, gt, ge, lt, le, and, or, not, in, parentheses, `null` | ✅ | Parameterized SQL queries. |
+| `$filter`: contains, startswith, endswith, tolower, toupper, trim, length, indexof, substring, concat, year…second, now | ✅ | `%` and `_` are literal characters. |
+| `$filter` on a to-one navigation (`_Travel/Status`) | ✅ | Scalar subquery. |
+| `$filter` with `any`/`all` on a collection | ❌ | 501 response. |
+| `$orderby`, `$top`, `$skip`, `$count` | ✅ | The keys complete the sorting: stable paging. |
+| `$select` | ✅ | Keys and ETag always read. |
+| One-level `$expand`, with nested `$select`, `$orderby`, `$filter`, `$top`, `$skip`, `$count` | ✅ | `$top`/`$skip` per parent (`row_number()`). Nested `$expand`: 501. |
+| Simple `$search` | ✅ | ILIKE on the `@Search.defaultSearchElement` fields, each term required. |
+| `IEEE754Compatible=true` (Decimal and Int64 as strings) | ✅ | Exact JSON numbers otherwise, on read and on write. |
+| ETag (`@odata.etag`, `ETag` header), `If-Match` | ✅ | |
+| POST, PATCH, PUT, DELETE, deep insert, creation through a navigation | ✅ | `Location`, `Prefer: return=minimal`. |
+| Bound and static actions (POST), functions (GET) | ✅ | |
+| Multipart `$batch`: reads and change sets | ✅ | One change set = one LUW, `$<Content-ID>` references, deferred responses (D23). |
+| Instance feature control in the reads | ✅ | `__EntityControl`, `__OperationControl`, `__FieldControl` (D25). |
+| CSRF token (`X-CSRF-Token: Fetch`) | ✅ | Required for cookie sessions (M6). |
+| Errors in OData V4 format (`@Common.numericSeverity`, `details`, `target`) | ✅ | Status according to the cause of the failure (D22). |
+| `sap-*` parameters | ✅ | Ignored. |
+| Authentication: dev mode, Bearer JWT (OIDC, JWKS) | ✅ | Browser sessions (PKCE): M6; *client credentials* tokens (technical user); development OAuth 2.0 server (`/oauth`, client credentials and PKCE) in `rapt dev` (D60). |
+| *OData V4 - Web API* binding | ✅ | Without UI annotations, value helps, side effects, feature control; active instances of a draft BO (D60). |
+| `$apply`: `filter`, `groupby`, `aggregate` (`sum`, `min`, `max`, `average`, `countdistinct`, `$count`) | ✅ | With the DCL of the user; other transformations: 501 (D52). |
+| Enumeration types (`EnumType`): JSON by member name, literals `Ns.Type'M'` | ✅ | `enhanced` mode, CDS enumerated types (D55). |
+| JSON batch, `$value`, single properties | ❌ | Not in the MVP. |
 
-## UI générée (OpenUI5)
+## Generated UI (OpenUI5)
 
-| Fonctionnalité | Statut | Note |
+| Feature | Status | Note |
 |---|---|---|
-| List Report : colonnes (`UI.lineItem`), tri (`UI.presentationVariant`), pagination continue | ✅ | `sap.f.DynamicPage`, `sap.m.Table`. |
-| Champs de filtre (`UI.selectionField`), recherche (`@Search.searchable`) | ✅ | Conditions comme SAP Fiori (`=`, `!=`, `>`, `>=`, `<`, `<=`, `a...b`, `*x*`), plusieurs valeurs par champ, NUMC sans zéros de tête, plages de dates ; *Clear*, *Adapt Filters* (colonnes ajoutées comme filtres), résumé « Filtered By » (D51). |
-| Variantes de l'utilisateur (`sap.m.VariantManagement`) | ✅ | Filtres, filtres et colonnes visibles, tri ; enregistrées par utilisateur par le service (`$variants`) ; variante par défaut, favoris (D51). |
-| Paramètres du tableau : colonnes visibles, tri | ✅ | `sap.m.p13n.Popup` ; nombre de lignes dans le titre du tableau. |
-| Aide à la saisie (`@Consumption.valueHelpDefinition`) | ✅ | Entité exposée implicitement, `Common.ValueList`, dialogue avec les descriptions de la vue de textes, dans les filtres et l'Object Page (D44). |
-| Rafraîchissement de la liste après une modification sur l'Object Page, fil d'Ariane | ✅ | D51. |
-| Création non-draft depuis la List Report | ✅ | Object Page en mode création, `POST` à l'enregistrement. |
-| Suppression, actions de la table (`#FOR_ACTION` dans `UI.lineItem`) | ✅ | Sur la ligne sélectionnée. |
-| Object Page : en-tête (`UI.headerInfo`), sections (`UI.facet` : identification, groupes de champs, tables) | ✅ | `sap.uxap.ObjectPageLayout`. |
-| Édition et sauvegarde (PATCH dans un change set, `If-Match`) | ✅ | Annulation par `resetChanges`. |
-| Tables des compositions, création et suppression d'enfants en mode édition | ✅ | Nouvelle ligne en tête de table, création et suppression envoyées dans le même change set à l'enregistrement. |
-| Actions d'en-tête (`UI.identification`), paramètres (dialogue), actions factory | ✅ | Dialogue des paramètres, message d'erreur de l'action, ouverture de l'instance créée par une action factory. |
-| Feature control : actions (`__OperationControl`), Edit/Delete (`__EntityControl`), champs (`__FieldControl`) | ✅ | Instance et global ; testé dans le navigateur (`ui-features.test.ts`). |
-| Champs en lecture seule, obligatoires, modifiables à la création seulement | ✅ | Depuis les caractéristiques de champ de la BDEF. |
-| Messages (erreurs, succès) | ✅ | `MessageBox`, `MessageToast`, `MessagePopover`. |
-| Boutons selon les autorisations de l'utilisateur | ✅ | Create masqué sans autorisation globale de création (`$permissions`) ; Edit, Delete, actions et création d'enfants désactivés par instance (`__EntityControl`, `__OperationControl`, D36). Test `ui-authorizations.test.ts`. |
-| Floorplans Worklist, Analytical List Page, Overview Page, Form entry | ✅ | `ui` de `rapt/config.json`, écrit par `rapt floorplan` ou la commande VS Code (D61) ; graphiques `@UI.chart` en SVG, onglets `@UI.selectionVariant` (D53). |
-| Draft dans l'UI : création et édition en brouillon, enregistrement des champs, Save / Discard, état d'édition dans la liste | ✅ | D54 ; comme Fiori Elements : filtre *Editing Status*, brouillon de l'utilisateur à la place de l'instance active, *Locked by X*, `DraftIndicator`, *Keep Draft* / *Discard Draft* (D58). |
-| Collaborative draft (`with collaborative draft`, `draft action Share`) | ✅ | Utilisateurs du brouillon, invitation, rejoindre par Edit, rafraîchissement toutes les 5 s (D59). |
-| Valeurs d'un type énuméré : libellés, liste de choix en édition et en filtre | ✅ | Mode `enhanced` (D55). |
+| List Report: columns (`UI.lineItem`), sorting (`UI.presentationVariant`), growing | ✅ | `sap.f.DynamicPage`, `sap.m.Table`. |
+| Filter fields (`UI.selectionField`), search (`@Search.searchable`) | ✅ | Conditions as in SAP Fiori (`=`, `!=`, `>`, `>=`, `<`, `<=`, `a...b`, `*x*`), several values per field, NUMC without leading zeros, date ranges; *Clear*, *Adapt Filters* (columns added as filters), "Filtered By" summary (D51). |
+| User variants (`sap.m.VariantManagement`) | ✅ | Filters, filters and visible columns, sorting; saved per user by the service (`$variants`); default variant, favorites (D51). |
+| Table settings: visible columns, sorting | ✅ | `sap.m.p13n.Popup`; number of rows in the title of the table. |
+| Value help (`@Consumption.valueHelpDefinition`) | ✅ | Entity exposed implicitly, `Common.ValueList`, dialog with the descriptions of the text view, in the filters and the Object Page (D44). |
+| Refresh of the list after a change on the Object Page, breadcrumbs | ✅ | D51. |
+| Non-draft creation from the List Report | ✅ | Object Page in create mode, `POST` on save. |
+| Delete, table actions (`#FOR_ACTION` in `UI.lineItem`) | ✅ | On the selected row. |
+| Object Page: header (`UI.headerInfo`), sections (`UI.facet`: identification, field groups, tables) | ✅ | `sap.uxap.ObjectPageLayout`. |
+| Edit and save (PATCH in a change set, `If-Match`) | ✅ | Cancel with `resetChanges`. |
+| Tables of the compositions, creation and deletion of children in edit mode | ✅ | New row at the top of the table, creation and deletion sent in the same change set on save. |
+| Header actions (`UI.identification`), parameters (dialog), factory actions | ✅ | Parameter dialog, error message of the action, opening of the instance created by a factory action. |
+| Feature control: actions (`__OperationControl`), Edit/Delete (`__EntityControl`), fields (`__FieldControl`) | ✅ | Instance and global; tested in the browser (`ui-features.test.ts`). |
+| Read-only fields, mandatory fields, fields editable on create only | ✅ | From the field characteristics of the BDEF. |
+| Messages (errors, success) | ✅ | `MessageBox`, `MessageToast`, `MessagePopover`. |
+| Buttons according to the authorizations of the user | ✅ | Create hidden without the global create authorization (`$permissions`); Edit, Delete, actions and creation of children disabled per instance (`__EntityControl`, `__OperationControl`, D36). Test `ui-authorizations.test.ts`. |
+| Worklist, Analytical List Page, Overview Page, Form entry floorplans | ✅ | `ui` of `rapt/config.json`, written by `rapt floorplan` or the VS Code command (D61); `@UI.chart` charts in SVG, `@UI.selectionVariant` tabs (D53). |
+| Draft in the UI: creation and editing in a draft, fields saved, Save / Discard, editing status in the list | ✅ | D54; as in Fiori Elements: *Editing Status* filter, draft of the user instead of the active instance, *Locked by X*, `DraftIndicator`, *Keep Draft* / *Discard Draft* (D58). |
+| Collaborative draft (`with collaborative draft`, `draft action Share`) | ✅ | Users of the draft, invitation, joining with Edit, refresh every 5 s (D59). |
+| Values of an enumerated type: labels, choice list in edit mode and in the filter | ✅ | `enhanced` mode (D55). |
 
 ## Launchpad (D37)
 
-| Fonctionnalité | Statut | Note |
+| Feature | Status | Note |
 |---|---|---|
-| Groupes et tuiles (`launchpad.json`) : titre, sous-titre, pied, icône | ✅ | `sap.m.GenericTile` ; `rapt launchpad` contrôle le contenu (LPD001 à LPD007). |
-| Tuiles affectées à des rôles de l'IdP (business catalog d'un business role) | ✅ | Filtrées par le serveur ; sans rôle, visibles par tous. |
-| Tuiles dynamiques : `$count` d'un entity set, filtre `$filter` | ✅ | Avec les contrôles d'accès de l'utilisateur (DCL) ; lus au chargement. |
-| Navigation par intent (`/#Objet-action`, `/go/Objet-action?…`) | ✅ | Paramètres transmis à l'application en query string. |
-| Barre shell : accueil, recherche des tuiles, utilisateur, déconnexion | ✅ | `sap.f.ShellBar`, aussi au-dessus des applications ouvertes depuis le launchpad. |
-| Une seule origine : UI des applications sous `/apps/<id>/`, services à leurs chemins | ✅ | Redirections réécrites ; 502 si une application ne répond pas. |
-| Connexion unique : session OIDC du launchpad lue par les applications | ✅ | Autorisations, DCL, CSRF et rôle obligatoire de chaque application conservés ; testé (`launchpad.test.ts`). |
-| Tuiles externes (URL) | ✅ | Ouvertes dans un nouvel onglet. |
-| Docker : launchpad, applications et leurs bases, Keycloak (profil `oidc`) | ✅ | `docker-compose.yml` généré. |
-| Spaces et pages (`spaces` → `pages` → `sections`), affectés à des rôles | ✅ | Onglets des spaces, liste des pages, dernier space mémorisé (D48). |
-| Launchpad de développement (`rapt dev`) : application, documentation, `$metadata`, MCP | ✅ | D49. |
-| Personnalisation par l'utilisateur, notifications, navigation entre applications depuis une application | ❌ | Voir KNOWN_GAPS. |
+| Groups and tiles (`launchpad.json`): title, subtitle, footer, icon | ✅ | `sap.m.GenericTile`; `rapt launchpad` checks the content (LPD001 to LPD007). |
+| Tiles assigned to roles of the IdP (business catalog of a business role) | ✅ | Filtered by the server; without a role, visible to everyone. |
+| Dynamic tiles: `$count` of an entity set, `$filter` | ✅ | With the access controls of the user (DCL); read on load. |
+| Intent navigation (`/#Object-action`, `/go/Object-action?…`) | ✅ | Parameters passed to the application in the query string. |
+| Shell bar: home, tile search, user, sign-out | ✅ | `sap.f.ShellBar`, also above the applications opened from the launchpad. |
+| A single origin: UI of the applications under `/apps/<id>/`, services at their paths | ✅ | Redirects rewritten; 502 when an application does not answer. |
+| Single sign-on: OIDC session of the launchpad read by the applications | ✅ | Authorizations, DCL, CSRF and required role of each application kept; tested (`launchpad.test.ts`). |
+| External tiles (URL) | ✅ | Opened in a new tab. |
+| Docker: launchpad, applications and their databases, Keycloak (`oidc` profile) | ✅ | Generated `docker-compose.yml`. |
+| Spaces and pages (`spaces` → `pages` → `sections`), assigned to roles | ✅ | Space tabs, list of the pages, last space remembered (D48). |
+| Development launchpad (`rapt dev`): application, documentation, `$metadata`, MCP | ✅ | D49. |
+| Personalization by the user, notifications, navigation between applications from an application | ❌ | See KNOWN_GAPS. |
 
-## Application générée et exploitation
+## Generated application and operations
 
-| Fonctionnalité | Statut | Note |
+| Feature | Status | Note |
 |---|---|---|
-| `package.json`, `server.mjs`, runtime embarqué (`vendor/`), `npm install` | ✅ | Test e2e. |
-| Configuration par variables d'environnement (`.env.example`) | ✅ | |
-| PostgreSQL (`DATABASE_URL`), schéma appliqué au démarrage | ✅ | Test e2e sur PostgreSQL 16. |
-| PGlite embarqué (`PGLITE_DIR`) pour le développement | ✅ | Test e2e : démarrage, données conservées après un redémarrage (D33). |
-| Dockerfile multi-étapes, `docker-compose.yml` (app + PostgreSQL) | ✅ | Image construite et `docker compose up` vérifié (service OData, actions, UI) ; job CI `docker`. |
-| Profil Keycloak (realm importé : client `rapt-app`, utilisateur `alice`) | ✅ | `keycloak.test.ts` contre un vrai Keycloak : formulaire de connexion, PKCE, session, CSRF, déconnexion, jetons porteurs (JWKS) ; en CI avec le profil `oidc` du docker-compose généré (D33). |
-| OIDC : jetons porteurs (JWKS), sessions navigateur (code + PKCE), CSRF, déconnexion | ✅ | Déconnexion avec `id_token_hint` : pas de page de confirmation chez le fournisseur (D37). |
-| Rôle obligatoire (`OIDC_REQUIRED_ROLE`) | ✅ | Rôles Keycloak (`realm_access.roles`) ou revendication configurable. |
-| Bundle UI5 optimisé (`ui5 build`) | ❌ | Ressources servies depuis les sources npm (D27). |
-| Cloud Foundry (SAP BTP) : `manifest.yml`, route et PostgreSQL lié lus de `VCAP_*` | ✅ | D50, guide [DEPLOIEMENT.md](DEPLOIEMENT.md). |
-| Serveur MCP du service (`rapt mcp`, `/mcp`) | ✅ | Un outil par opération, descriptions dans `rapt/mcp.json` (D47, guide [MCP.md](MCP.md)). |
-
+| `package.json`, `server.mjs`, bundled runtime (`vendor/`), `npm install` | ✅ | e2e test. |
+| Configuration by environment variables (`.env.example`) | ✅ | |
+| PostgreSQL (`DATABASE_URL`), schema applied on startup | ✅ | e2e test on PostgreSQL 16. |
+| Embedded PGlite (`PGLITE_DIR`) for development | ✅ | e2e test: startup, data kept after a restart (D33). |
+| Multi-stage Dockerfile, `docker-compose.yml` (app + PostgreSQL) | ✅ | Image built and `docker compose up` checked (OData service, actions, UI); `docker` CI job. |
+| Keycloak profile (imported realm: client `rapt-app`, user `alice`) | ✅ | `keycloak.test.ts` against a real Keycloak: sign-in form, PKCE, session, CSRF, sign-out, bearer tokens (JWKS); in CI with the `oidc` profile of the generated docker-compose (D33). |
+| OIDC: bearer tokens (JWKS), browser sessions (code + PKCE), CSRF, sign-out | ✅ | Sign-out with `id_token_hint`: no confirmation page at the provider (D37). |
+| Required role (`OIDC_REQUIRED_ROLE`) | ✅ | Keycloak roles (`realm_access.roles`) or configurable claim. |
+| Optimized UI5 bundle (`ui5 build`) | ❌ | Resources served from the npm sources (D27). |
+| Cloud Foundry (SAP BTP): `manifest.yml`, route and bound PostgreSQL read from `VCAP_*` | ✅ | D50, guide [DEPLOYMENT.md](DEPLOYMENT.md). |
+| MCP server of the service (`rapt mcp`, `/mcp`) | ✅ | One tool per operation, descriptions in `rapt/mcp.json` (D47, guide [MCP.md](MCP.md)). |

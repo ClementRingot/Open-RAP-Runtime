@@ -1,7 +1,7 @@
 /**
  * Authentication (PLAN.md §6.8): development mode (fixed user) or generic OIDC. In OIDC mode an
  * API client sends a bearer JWT, verified against the JWKS of the issuer; browser sessions
- * (authorization code + PKCE) are added on top of the same verification (milestone J6).
+ * (authorization code + PKCE) are added on top of the same verification (milestone M6).
  */
 
 import { createRemoteJWKSet, jwtVerify, type JWTPayload, type JWTVerifyGetKey } from "jose";

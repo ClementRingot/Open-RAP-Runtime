@@ -1,5 +1,5 @@
 /**
- * The "Objets RAP" view (D61): the objects of the RAP projects of the workspace, grouped as in
+ * The "RAP Objects" view (D61): the objects of the RAP projects of the workspace, grouped as in
  * the project explorer of ADT (dictionary, data definitions, behavior definitions, services…);
  * a click opens the source. Its title bar creates an object, checks the project, runs rapt dev.
  */
@@ -39,7 +39,7 @@ export class RapObjectsProvider implements vscode.TreeDataProvider<Node> {
     const item = new vscode.TreeItem(path.basename(node.file).split(".")[0]?.toUpperCase().replace(/#/g, "/") ?? node.file, vscode.TreeItemCollapsibleState.None);
     item.description = path.basename(node.file).split(".").slice(1).join(".");
     item.resourceUri = vscode.Uri.file(node.file);
-    item.command = { command: "vscode.open", title: "Ouvrir", arguments: [vscode.Uri.file(node.file)] };
+    item.command = { command: "vscode.open", title: "Open", arguments: [vscode.Uri.file(node.file)] };
     item.contextValue = "raptObject";
     return item;
   }

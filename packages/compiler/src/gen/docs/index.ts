@@ -7,7 +7,7 @@
 import { existsSync, readdirSync, readFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { headingId, pageId, renderMarkdown } from "./markdown.js";
+import { headingId, pageId, type RenderOptions, renderMarkdown } from "./markdown.js";
 
 export interface DocPage {
   id: string;
@@ -21,7 +21,7 @@ export interface DocPage {
 }
 
 /** The order of the pages; the others follow, by name. */
-const ORDER = ["README.md", "GUIDE.md", "FEATURES.md", "ANNOTATIONS.md", "DIAGNOSTICS.md", "DEPLOIEMENT.md", "MCP.md", "UTILITAIRES.md", "API_DISTANTES.md", "KNOWN_GAPS.md", "AGENTS.md", "DECISIONS.md"];
+const ORDER = ["README.md", "GUIDE.md", "FEATURES.md", "ANNOTATIONS.md", "DIAGNOSTICS.md", "DEPLOYMENT.md", "MCP.md", "UTILITIES.md", "REMOTE_APIS.md", "KNOWN_GAPS.md", "ROADMAP.md", "AGENTS.md", "DECISIONS.md", "PLAN.md"];
 
 /** The folder of the documentation: copied next to the compiled compiler, or that of the repository. */
 export function documentationDir(): string | undefined {
@@ -38,7 +38,7 @@ export function documentationDir(): string | undefined {
 function markdownFiles(dir: string): string[] {
   const files = readdirSync(dir).filter((f) => f.toLowerCase().endsWith(".md")).map((f) => path.join(dir, f));
   const root = path.dirname(dir);
-  for (const name of ["README.md", "KNOWN_GAPS.md", "AGENTS.md"]) {
+  for (const name of ["README.md", "KNOWN_GAPS.md", "AGENTS.md", "PLAN.md"]) {
     if (!files.some((f) => path.basename(f) === name) && existsSync(path.join(root, name)) && existsSync(path.join(root, "pnpm-workspace.yaml"))) {
       files.push(path.join(root, name));
     }
@@ -50,7 +50,7 @@ function markdownFiles(dir: string): string[] {
   return files.sort((a, b) => rank(a) - rank(b) || path.basename(a).localeCompare(path.basename(b)));
 }
 
-export function documentationPages(dir = documentationDir()): DocPage[] {
+export function documentationPages(dir = documentationDir(), options: RenderOptions = {}): DocPage[] {
   if (dir === undefined) {
     return [];
   }
@@ -62,7 +62,7 @@ export function documentationPages(dir = documentationDir()): DocPage[] {
       id: pageId(name),
       title: name === "README.md" ? "rap-transpiler" : (headings[0]?.title ?? name),
       file: name,
-      html: renderMarkdown(markdown),
+      html: renderMarkdown(markdown, options),
       text: markdown.replace(/[#*`|>[\]()_-]+/g, " ").replace(/\s+/g, " "),
       headings: headings.filter((h) => h.level > 1),
     };

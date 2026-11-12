@@ -1,32 +1,32 @@
-# Feuille de route
+# Roadmap
 
-Ce qui est prévu, avec les éléments de conception déjà connus. Les fonctionnalités disponibles sont
-dans [FEATURES.md](FEATURES.md), les écarts assumés dans [KNOWN_GAPS.md](../KNOWN_GAPS.md).
+What is planned, with the design elements already known. The available features are in
+[FEATURES.md](FEATURES.md), the accepted gaps in [KNOWN_GAPS.md](../KNOWN_GAPS.md).
 
-## Draft : compléments
+## Draft: additions
 
-- Déterminations et validations pendant l'édition (`Prepare`, `on modify` sur le brouillon),
-  messages d'état (`%state_area`), actions de l'application sur un brouillon, `SiblingEntity`.
-- Collaborative draft en temps réel (WebSocket), verrous par champ.
+- Determinations and validations during editing (`Prepare`, `on modify` on the draft), state
+  messages (`%state_area`), actions of the application on a draft, `SiblingEntity`.
+- Real-time collaborative draft (WebSocket), field locks.
 
-## Floorplans : compléments
+## Floorplans: additions
 
-- Analytical List Page : filtres visuels, plusieurs graphiques, `@Aggregation`.
-- Overview Page décrite par annotations (`@UI.dataPoint`, `@UI.kpi`) plutôt que par
+- Analytical List Page: visual filters, several charts, `@Aggregation`.
+- Overview Page described by annotations (`@UI.dataPoint`, `@UI.kpi`) rather than by
   `rapt/config.json`.
 
-## Types CDS et table entities : compléments
+## CDS types and table entities: additions
 
-- Expressions CDS : `CAST` vers un type CDS ou un type énuméré, constantes `Type.#CONST` dans les
-  vues.
+- CDS expressions: `CAST` to a CDS type or an enumerated type, `Type.#CONST` constants in the
+  views.
 
-## Autres pistes
+## Other leads
 
-- Value helps : valeurs fixes des domaines, plusieurs value helps qualifiés par élément.
-- Vues standards : textes dans d'autres langues que l'anglais, taux de change d'une source
-  configurable.
-- Variantes partagées entre utilisateurs, ordre des colonnes.
-- Personnalisation du launchpad par l'utilisateur, notifications.
-- MCP : transport stdio, ressources (le `$metadata`, la documentation), autorisation OAuth du
-  protocole.
-- Late numbering (`adjust_numbers`), events RAP (`RAISE ENTITY EVENT`), change documents.
+- Value helps: fixed values of the domains, several qualified value helps per element.
+- Standard views: texts in languages other than English, exchange rates from a configurable
+  source.
+- Variants shared between users, order of the columns.
+- Personalization of the launchpad by the user, notifications.
+- MCP: stdio transport, resources (the `$metadata`, the documentation), OAuth authorization of
+  the protocol.
+- Late numbering (`adjust_numbers`), RAP events (`RAISE ENTITY EVENT`), change documents.

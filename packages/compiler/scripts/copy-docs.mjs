@@ -12,7 +12,7 @@ mkdirSync(target, { recursive: true });
 for (const file of readdirSync(path.join(repo, "docs")).filter((f) => f.endsWith(".md"))) {
   copyFileSync(path.join(repo, "docs", file), path.join(target, file));
 }
-for (const file of ["README.md", "KNOWN_GAPS.md", "AGENTS.md"]) {
+for (const file of ["README.md", "KNOWN_GAPS.md", "AGENTS.md", "PLAN.md"]) {
   if (existsSync(path.join(repo, file))) {
     copyFileSync(path.join(repo, file), path.join(target, file));
   }

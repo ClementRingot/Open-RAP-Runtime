@@ -1,78 +1,89 @@
-# RAP Transpiler pour VS Code
+# RAP Transpiler for VS Code
 
-Vérifier, générer et lancer un business object RAP avec [rap-transpiler](https://github.com/ClementRingot/rap-transpiler),
-sans système SAP. L'extension ne compile rien elle-même : elle appelle la CLI `rapt` (`--json`)
-et en affiche les résultats.
+Check, generate and run a RAP business object with
+[rap-transpiler](https://clementringot.github.io/RAP-Transpiler/), without an SAP system. The
+extension compiles nothing itself: it calls the `rapt` CLI (`--json`) and shows its results.
 
-## Fonctions
+## Features
 
-- **Coloration syntaxique** de l'ABAP (`.abap`, grammaire de
-  [larshp/vscode-abap](https://github.com/larshp/vscode-abap), MIT), des sources CDS (`.asddls`,
-  `.asddlxs`, `.asdcls`, `.srvdsrv`, tables `.astabl`) et des behavior definitions (`.asbdef`).
-- **Problèmes** : les diagnostics de `rapt check` (BDEF, CDS, behavior pool…) à chaque
-  enregistrement, soulignés dans le code.
-- **RAP : Lancer rapt dev** : l'application tourne avec une base PGlite et se reconstruit à
-  chaque enregistrement. La barre d'état indique l'état (construction, prête, erreurs) et ouvre
-  l'application d'un clic.
-- **RAP : Générer l'application** : `rapt build` dans le dossier de son choix.
-- **RAP : Nouveau business object** : `rapt new` demande le nom de l'entité, le préfixe et la
-  description, écrit un BO managed complet (table en source `.tabl.astabl`, CDS, BDEF, behavior
-  pool, service, données initiales `rapt/seed.json`) avec ses fichiers abapGit, puis propose de
-  lancer `rapt dev`.
-- **RAP : Générer les fichiers abapGit** : `rapt abapgit` écrit les XML qui manquent (dont ceux
-  des tables écrites en source) pour importer le dépôt dans un système SAP avec abapGit.
-- Menus contextuels de l'explorateur (dossier du projet, `.abapgit.xml`) et boutons dans la
-  barre de titre des sources RAP.
+- **Syntax highlighting** of ABAP (`.abap`, grammar of
+  [larshp/vscode-abap](https://github.com/larshp/vscode-abap), MIT), of the CDS sources
+  (`.asddls`, `.asddlxs`, `.asdcls`, `.srvdsrv`, tables `.astabl`, types `.acds`) and of the
+  behavior definitions (`.asbdef`).
+- **Problems**: the diagnostics of `rapt check` (BDEF, CDS, behavior pool…) on each save,
+  underlined in the code.
+- **RAP Objects** view: the objects of the project grouped as in the project explorer of ADT
+  (dictionary, data definitions, behavior definitions, services…).
+- **RAP: New RAP object (wizard)…**: the object types of `rapt generate` by category, as in the
+  *New ABAP Repository Object* wizard of ADT, with the objects of the project to derive from.
+- **RAP: Choose the floorplan of the application**: List Report, Worklist, Analytical List Page
+  or Form Entry, with what each one is for.
+- **RAP: Start rapt dev**: the application runs with a PGlite database and is rebuilt on each
+  save. The status bar shows the state (building, ready, errors) and opens the application in one
+  click.
+- **RAP: Build the application**: `rapt build` into the folder of your choice.
+- **RAP: New business object**: `rapt new` asks for the name of the entity, the prefix and the
+  description, writes a complete managed BO (table as a `.tabl.astabl` source, CDS, BDEF,
+  behavior pool, service, initial data `rapt/seed.json`) with its abapGit files, then offers to
+  start `rapt dev`.
+- **RAP: Generate the abapGit files**: `rapt abapgit` writes the missing XML files (including
+  those of the tables written as source) to import the repository into an SAP system with
+  abapGit.
+- Every other command of the CLI: project mode (standard / enhanced), MCP server, intermediate
+  representation, launchpad.
+- Context menus of the explorer (project folder, `.abapgit.xml`) and buttons in the title bar of
+  the RAP sources.
 
-Un projet est un dossier abapGit : le dossier qui contient `.abapgit.xml` (à défaut, le parent
-d'un dossier `src`).
+A project is an abapGit folder: the folder that contains `.abapgit.xml` (otherwise, the parent of
+a `src` folder).
 
 ## Installation
 
-Rien d'autre à installer : le `.vsix` contient rapt (compilateur et runtime), OpenUI5 et PGlite,
-et rapt tourne sur le Node.js intégré à VS Code (1.101 ou plus, Node.js 22).
+Nothing else to install: the `.vsix` contains rapt (compiler and runtime), OpenUI5 and PGlite,
+and rapt runs on the Node.js of VS Code (1.101 or later, Node.js 22).
 
 ```sh
 code --install-extension rap-transpiler-vscode.vsix
 ```
 
-Le `.vsix` est joint à chaque [release GitHub](https://github.com/ClementRingot/rap-transpiler/releases)
-(tag `v*`) et produit par la CI à chaque commit (artefact `rap-transpiler-vscode`).
+The `.vsix` is downloaded from the [project website](https://clementringot.github.io/RAP-Transpiler/),
+attached to each GitHub release (tag `v*`) and produced by the CI on each commit (artifact
+`rap-transpiler-vscode`).
 
-Pour utiliser une autre version de rapt (un clone en cours de développement, par exemple) :
-réglage `rapt.cliPath`. Sans version intégrée (extension construite sans `pnpm run stage`),
-l'extension prend un clone rap-transpiler ou le `node_modules` d'un dossier de l'espace de
-travail, puis la commande `rapt` du PATH.
+To use another version of rapt (a clone under development, for example): setting
+`rapt.cliPath`. Without a bundled version (extension built without `pnpm run stage`), the
+extension takes a rap-transpiler clone or the `node_modules` of a folder of the workspace, then
+the `rapt` command of the PATH.
 
-## Réglages
+## Settings
 
-| Réglage | Défaut | Rôle |
+| Setting | Default | Purpose |
 |---|---|---|
-| `rapt.cliPath` | vide | `cli.js` de rapt ou dossier d'un clone (vide : rapt intégré) |
-| `rapt.nodePath` | vide | Node.js 22+ qui lance rapt (vide : celui de VS Code) |
-| `rapt.checkOnSave` | `true` | vérifier à chaque enregistrement |
-| `rapt.dev.port` | `8080` | port de l'application |
-| `rapt.dev.openUi` | `true` | ouvrir le navigateur au démarrage de rapt dev |
-| `rapt.new.prefix` | `Z` | préfixe proposé pour un nouveau business object |
+| `rapt.cliPath` | empty | `cli.js` of rapt or folder of a clone (empty: bundled rapt) |
+| `rapt.nodePath` | empty | Node.js 22+ that runs rapt (empty: the one of VS Code) |
+| `rapt.checkOnSave` | `true` | check on each save |
+| `rapt.dev.port` | `8080` | port of the application |
+| `rapt.dev.openUi` | `true` | open the browser when rapt dev starts |
+| `rapt.new.prefix` | `Z` | prefix proposed for a new business object |
 
-## Publier une version
+## Publishing a version
 
-Pousser un tag `v1.2.3` : le workflow `release.yml` construit le `.vsix` (version 1.2.3) et le
-joint à la release GitHub du tag. Il le publie aussi sur le Visual Studio Marketplace si le
-secret `VSCE_PAT` est défini (éditeur `clementringot` à créer sur le Marketplace), et sur
-Open VSX (VSCodium, Cursor…) si le secret `OVSX_PAT` est défini.
+Push a `v1.2.3` tag: the `release.yml` workflow builds the `.vsix` (version 1.2.3) and attaches
+it to the GitHub release of the tag. It also publishes it on the Visual Studio Marketplace when
+the `VSCE_PAT` secret is set (publisher `clementringot` to create on the Marketplace), and on
+Open VSX (VSCodium, Cursor…) when the `OVSX_PAT` secret is set.
 
 ```sh
 git tag v0.1.0 && git push origin v0.1.0
 ```
 
-## Construire l'extension
+## Building the extension
 
 ```sh
 pnpm install && pnpm build
-cd packages/vscode && pnpm run package    # rap-transpiler-vscode.vsix (~31 Mo)
+cd packages/vscode && pnpm run package    # rap-transpiler-vscode.vsix (~31 MB)
 ```
 
-`pnpm run package` compile l'extension (esbuild), prépare `rapt/` (`scripts/stage-rapt.mjs` :
-paquets du dépôt et dépendances installés depuis le registre npm, fichiers inutiles retirés),
-puis appelle `vsce package`.
+`pnpm run package` compiles the extension (esbuild), prepares `rapt/`
+(`scripts/stage-rapt.mjs`: packages of the repository and dependencies installed from the npm
+registry, useless files removed), then calls `vsce package`.

@@ -1,75 +1,76 @@
-# Annotations CDS prises en charge
+# Supported CDS annotations
 
-Ce que rap-transpiler fait de chaque annotation : ✅ `$metadata` et UI générée, 🟡 partiel (voir la
-note), 📄 `$metadata` seulement (Fiori Elements l'interprète, l'UI OpenUI5 générée non), ❌ ignorée.
-Une annotation ignorée ne provoque pas d'erreur : la source reste activable sur SAP.
+What rap-transpiler does with each annotation: ✅ `$metadata` and generated UI, 🟡 partial (see
+the note), 📄 `$metadata` only (Fiori Elements interprets it, the generated OpenUI5 UI does not),
+❌ ignored. An ignored annotation does not cause an error: the source stays activatable on SAP.
 
-Décisions : [D10](DECISIONS.md) (UI), [D44](DECISIONS.md), [D56](DECISIONS.md) (value helps),
-[D53](DECISIONS.md) (floorplans), [D57](DECISIONS.md) (annotations d'affichage).
+Decisions: [D10](DECISIONS.md) (UI), [D44](DECISIONS.md), [D56](DECISIONS.md) (value helps),
+[D53](DECISIONS.md) (floorplans), [D57](DECISIONS.md) (display annotations).
 
-## En-tête d'entité
+## Entity header
 
-| Annotation | Statut | Effet |
+| Annotation | Status | Effect |
 |---|---|---|
-| `@EndUserText.label` | ✅ | Libellé de l'entité, des éléments (`Common.Label`), des types CDS et éléments de données |
+| `@EndUserText.label` | ✅ | Label of the entity, of the elements (`Common.Label`), of CDS types and data elements |
 | `@EndUserText.quickInfo` | 📄 | `Common.QuickInfo` |
-| `@AccessControl.authorizationCheck` | 🟡 | Informatif : un rôle DCL s'applique s'il existe (D35) |
-| `@Metadata.allowExtensions`, `@Metadata.layer`, `@Metadata.ignorePropagatedAnnotations` | ✅ | Fusion des metadata extensions par couche, propagation des annotations |
-| `@Search.searchable`, `@Search.defaultSearchElement` | ✅ | `$search`, champ de recherche du List Report |
+| `@AccessControl.authorizationCheck` | 🟡 | Informative: a DCL role applies if it exists (D35) |
+| `@Metadata.allowExtensions`, `@Metadata.layer`, `@Metadata.ignorePropagatedAnnotations` | ✅ | Merge of the metadata extensions by layer, propagation of the annotations |
+| `@Search.searchable`, `@Search.defaultSearchElement` | ✅ | `$search`, search field of the List Report |
 | `@ObjectModel.semanticKey` | 📄 | `Common.SemanticKey` |
-| `@ObjectModel.query.implementedBy` | ✅ | Entité custom (D43) |
-| `@ObjectModel.dataCategory: #TEXT` | ✅ | Vue de textes d'un value help |
-| `@ObjectModel.resultSet.sizeCategory: #XS` | ✅ | Value help en liste déroulante (D56) |
-| `@ObjectModel.usageType`, `@ObjectModel.modelingPattern`, `@ObjectModel.supportedCapabilities` | ❌ | Classification, sans effet à l'exécution |
-| `@ClientHandling.type`, `@AbapCatalog.*` | ❌ | Pas de mandant (D9) ni de catalogue |
-| `@UI.headerInfo` (`typeName`, `typeNamePlural`, `title`, `description`, `imageUrl`) | ✅ | Titre, sous-titre de l'Object Page, titre de la liste ; `imageUrl` : 📄 |
-| `@UI.presentationVariant` (`sortOrder`) | ✅ | Tri par défaut |
+| `@ObjectModel.query.implementedBy` | ✅ | Custom entity (D43) |
+| `@ObjectModel.dataCategory: #TEXT` | ✅ | Text view of a value help |
+| `@ObjectModel.resultSet.sizeCategory: #XS` | ✅ | Value help as a drop-down list (D56) |
+| `@ObjectModel.usageType`, `@ObjectModel.modelingPattern`, `@ObjectModel.supportedCapabilities` | ❌ | Classification, no effect at runtime |
+| `@ClientHandling.type`, `@AbapCatalog.*` | ❌ | No client (D9) nor catalog |
+| `@UI.headerInfo` (`typeName`, `typeNamePlural`, `title`, `description`, `imageUrl`) | ✅ | Title, subtitle of the Object Page, title of the list; `imageUrl`: 📄 |
+| `@UI.presentationVariant` (`sortOrder`) | ✅ | Default sorting |
 | `@UI.presentationVariant` (`groupBy`, `visualizations`, `maxItems`) | ❌ | |
-| `@UI.selectionVariant` (qualifiés) | ✅ | Onglets du Worklist (D53) |
-| `@UI.chart` | ✅ | Analytical List Page, cartes de l'Overview Page (D53) |
+| `@UI.selectionVariant` (qualified) | ✅ | Tabs of the Worklist (D53) |
+| `@UI.chart` | ✅ | Analytical List Page, cards of the Overview Page (D53) |
 | `@UI.selectionPresentationVariant`, `@UI.kpi` | ❌ | |
 
-## Éléments
+## Elements
 
-| Annotation | Statut | Effet |
+| Annotation | Status | Effect |
 |---|---|---|
-| `@UI.lineItem` : `position`, `label`, `importance`, `hidden` | ✅ | Colonnes du List Report et des tables |
-| `@UI.lineItem` : `type: #FOR_ACTION` (`dataAction`, `invocationGrouping`) | ✅ | Boutons de la table |
-| `@UI.lineItem` : `type: #WITH_URL` (`url`) | ✅ | Lien (D57) |
-| `@UI.lineItem` : `type: #AS_DATAPOINT` | 🟡 | `UI.DataFieldForAnnotation` ; l'UI affiche la valeur avec sa criticité |
-| `@UI.lineItem` : `criticality` | ✅ | Couleur de la valeur (D57) |
-| `@UI.lineItem` : `#WITH_INTENT_BASED_NAVIGATION`, `#FOR_INTENT_BASED_NAVIGATION`, `#WITH_NAVIGATION_PATH`, `criticalityRepresentation` | ❌ | |
-| `@UI.identification` (champs, `criticality`, actions) | ✅ | Formulaire et actions d'en-tête de l'Object Page |
-| `@UI.fieldGroup` (qualifiés) | ✅ | Sections de formulaire, en-tête (D57) |
-| `@UI.facet` : `#COLLECTION`, `#IDENTIFICATION_REFERENCE`, `#FIELDGROUP_REFERENCE`, `#LINEITEM_REFERENCE` (`targetElement`) | ✅ | Sections, sous-sections, tables des compositions |
-| `@UI.facet` purpose `#HEADER` : `#DATAPOINT_REFERENCE`, `#FIELDGROUP_REFERENCE`, `#IDENTIFICATION_REFERENCE` | ✅ | En-tête de l'Object Page (D57) |
-| `@UI.facet` : `#PRESENTATIONVARIANT_REFERENCE`, `#CHART_REFERENCE`, `#ADDRESS_REFERENCE`, `#CONTACT_REFERENCE`, purpose `#QUICK_VIEW` | ❌ | |
-| `@UI.dataPoint` (`title`, `description`, `targetValue`, `criticality`, `visualization: #PROGRESS / #RATING`) | ✅ | `UI.DataPoint`, barre de progression, notation, nombre (D57) |
-| `@UI.selectionField` | ✅ | Barre de filtres |
-| `@UI.hidden` | ✅ | `UI.Hidden`, absent de l'UI |
-| `@UI.multiLineText` | ✅ | `UI.MultiLineText`, zone de texte (D57) |
-| `@UI.textArrangement` + `@ObjectModel.text.element` | ✅ | `Common.Text`, « Texte (ID) », « ID (Texte) », texte seul (D57) |
+| `@UI.lineItem`: `position`, `label`, `importance`, `hidden` | ✅ | Columns of the List Report and of the tables |
+| `@UI.lineItem`: `type: #FOR_ACTION` (`dataAction`, `invocationGrouping`) | ✅ | Buttons of the table |
+| `@UI.lineItem`: `type: #WITH_URL` (`url`) | ✅ | Link (D57) |
+| `@UI.lineItem`: `type: #AS_DATAPOINT` | 🟡 | `UI.DataFieldForAnnotation`; the UI shows the value with its criticality |
+| `@UI.lineItem`: `criticality` | ✅ | Color of the value (D57) |
+| `@UI.lineItem`: `#WITH_INTENT_BASED_NAVIGATION`, `#FOR_INTENT_BASED_NAVIGATION`, `#WITH_NAVIGATION_PATH`, `criticalityRepresentation` | ❌ | |
+| `@UI.identification` (fields, `criticality`, actions) | ✅ | Form and header actions of the Object Page |
+| `@UI.fieldGroup` (qualified) | ✅ | Form sections, header (D57) |
+| `@UI.facet`: `#COLLECTION`, `#IDENTIFICATION_REFERENCE`, `#FIELDGROUP_REFERENCE`, `#LINEITEM_REFERENCE` (`targetElement`) | ✅ | Sections, subsections, tables of the compositions |
+| `@UI.facet` purpose `#HEADER`: `#DATAPOINT_REFERENCE`, `#FIELDGROUP_REFERENCE`, `#IDENTIFICATION_REFERENCE` | ✅ | Header of the Object Page (D57) |
+| `@UI.facet`: `#PRESENTATIONVARIANT_REFERENCE`, `#CHART_REFERENCE`, `#ADDRESS_REFERENCE`, `#CONTACT_REFERENCE`, purpose `#QUICK_VIEW` | ❌ | |
+| `@UI.dataPoint` (`title`, `description`, `targetValue`, `criticality`, `visualization: #PROGRESS / #RATING`) | ✅ | `UI.DataPoint`, progress bar, rating, number (D57) |
+| `@UI.selectionField` | ✅ | Filter bar |
+| `@UI.hidden` | ✅ | `UI.Hidden`, absent from the UI |
+| `@UI.multiLineText` | ✅ | `UI.MultiLineText`, text area (D57) |
+| `@UI.textArrangement` + `@ObjectModel.text.element` | ✅ | `Common.Text`, "Text (ID)", "ID (Text)", text only (D57) |
 | `@UI.masked`, `@UI.placeholder`, `@UI.inputMask` | ❌ | |
-| `@Consumption.valueHelpDefinition` (`entity`, `additionalBinding`, `useForValidation`) | ✅ | `Common.ValueList`, dialogue ou liste déroulante (D44, D56) |
-| `@Consumption.valueHelpDefinition` (`qualifier`, `distinctValues`, `presentationVariantQualifier`) | ❌ | Un value help par élément |
-| `@Consumption.filter.defaultValue` | ✅ | `Common.FilterDefaultValue`, filtre initial du List Report (D57) |
-| `@Consumption.filter.mandatory` | ✅ | `Capabilities.FilterRestrictions/RequiredProperties`, filtre obligatoire (D57) |
-| `@Consumption.filter.selectionType`, `multipleSelections` | 🟡 | `FilterExpressionRestrictions` ; l'UI limite à une valeur (`#SINGLE`, `multipleSelections: false`) |
-| `@Consumption.hidden` | ✅ | Élément non exposé (sauf clé ou élément d'une association) (D57) |
-| `@Semantics.amount.currencyCode`, `@Semantics.quantity.unitOfMeasure` | ✅ | `Measures.ISOCurrency` / `Measures.Unit`, montant et devise |
-| `@Semantics.currencyCode`, `@Semantics.unitOfMeasure` | 📄 | `Common.IsCurrency`, `Common.IsUnit` (déduits du type) |
-| `@Semantics.user.*`, `@Semantics.systemDateTime.*` | ✅ | Champs administratifs remplis par le runtime managed |
-| `@Semantics.email.address`, `@Semantics.telephone.type` | ✅ | `Communication.IsEmailAddress` / `IsPhoneNumber`, liens `mailto:` / `tel:` (D57) |
-| `@Semantics.text`, `@Semantics.language` | ✅ | Vues de textes des value helps |
-| `@Semantics.largeObject`, `@Semantics.mimeType` | ❌ | Pas de `Edm.Stream` (pièces jointes) |
-| `@ObjectModel.virtualElement`, `@ObjectModel.virtualElementCalculatedBy` | ❌ | Pas d'éléments virtuels |
+| `@Consumption.valueHelpDefinition` (`entity`, `additionalBinding`, `useForValidation`) | ✅ | `Common.ValueList`, dialog or drop-down list (D44, D56) |
+| `@Consumption.valueHelpDefinition` (`qualifier`, `distinctValues`, `presentationVariantQualifier`) | ❌ | One value help per element |
+| `@Consumption.filter.defaultValue` | ✅ | `Common.FilterDefaultValue`, initial filter of the List Report (D57) |
+| `@Consumption.filter.mandatory` | ✅ | `Capabilities.FilterRestrictions/RequiredProperties`, mandatory filter (D57) |
+| `@Consumption.filter.selectionType`, `multipleSelections` | 🟡 | `FilterExpressionRestrictions`; the UI limits to one value (`#SINGLE`, `multipleSelections: false`) |
+| `@Consumption.hidden` | ✅ | Element not exposed (except a key or an element of an association) (D57) |
+| `@Semantics.amount.currencyCode`, `@Semantics.quantity.unitOfMeasure` | ✅ | `Measures.ISOCurrency` / `Measures.Unit`, amount and currency |
+| `@Semantics.currencyCode`, `@Semantics.unitOfMeasure` | 📄 | `Common.IsCurrency`, `Common.IsUnit` (derived from the type) |
+| `@Semantics.user.*`, `@Semantics.systemDateTime.*` | ✅ | Administrative fields filled by the managed runtime |
+| `@Semantics.email.address`, `@Semantics.telephone.type` | ✅ | `Communication.IsEmailAddress` / `IsPhoneNumber`, `mailto:` / `tel:` links (D57) |
+| `@Semantics.text`, `@Semantics.language` | ✅ | Text views of the value helps |
+| `@Semantics.largeObject`, `@Semantics.mimeType` | ❌ | No `Edm.Stream` (attachments) |
+| `@ObjectModel.virtualElement`, `@ObjectModel.virtualElementCalculatedBy` | ❌ | No virtual elements |
 | `@ObjectModel.foreignKey.association` | ❌ | |
-| `@Aggregation.default` | ✅ | Agrégation des mesures des graphiques (D53) |
+| `@Aggregation.default` | ✅ | Aggregation of the measures of the charts (D53) |
 | `@EndUserText.heading` | ❌ | |
 
-## Hors CDS
+## Outside CDS
 
-Les annotations dérivées de la BDEF sont toujours produites : `Core.Computed`, `Core.Immutable`,
-`Common.FieldControl` (statique et d'instance), `Core.OperationAvailable`,
+The annotations derived from the BDEF are always produced: `Core.Computed`, `Core.Immutable`,
+`Common.FieldControl` (static and instance), `Core.OperationAvailable`,
 `Capabilities.InsertRestrictions` / `UpdateRestrictions` / `DeleteRestrictions` (feature control
-et autorisations), `Common.SideEffects`, `Common.DraftRoot` / `DraftNode`, `Core.OptimisticConcurrency`.
+and authorizations), `Common.SideEffects`, `Common.DraftRoot` / `DraftNode`,
+`Core.OptimisticConcurrency`.

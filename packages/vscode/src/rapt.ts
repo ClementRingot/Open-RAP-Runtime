@@ -77,32 +77,32 @@ export interface GenerateKind {
 const swapLayer = (entity: string, layer: string): string => (/^[ZY][A-Z0-9]*_[A-Z]_/i.test(entity) ? entity.replace(/^([ZY][A-Z0-9]*_)[A-Z]_/i, `$1${layer}_`) : entity);
 
 export const GENERATE_KINDS: GenerateKind[] = [
-  { kind: "table", label: "Table de base de données" },
-  { kind: "tableentity", label: "Table entity CDS (table et entité, persistance d'un BO)" },
-  { kind: "type", label: "Type simple CDS" },
-  { kind: "enum", label: "Type énuméré CDS (enum)" },
+  { kind: "table", label: "Database table" },
+  { kind: "tableentity", label: "CDS table entity (table and entity, persistence of a BO)" },
+  { kind: "type", label: "CDS simple type" },
+  { kind: "enum", label: "CDS enumerated type" },
   {
     kind: "view",
-    label: "Vue CDS (view entity) depuis une table",
-    source: { of: "table", option: "--from", prompt: "Table source" },
+    label: "CDS view entity from a table",
+    source: { of: "table", option: "--from", prompt: "Source table" },
     name: (table) => `ZR_${table.replace(/^[zy][a-z0-9]*?_/i, "").replace(/(^|_)([a-z])/g, (_m, _s: string, c: string) => c.toUpperCase())}`,
   },
-  { kind: "projection", label: "Projection CDS depuis une vue", source: { of: "entity", option: "--from", prompt: "Vue projetée" }, name: (entity) => swapLayer(entity, "C") },
-  { kind: "metadata", label: "Metadata extension (annotations UI)", source: { of: "entity", option: "--from", prompt: "Entité annotée" }, name: (entity) => entity },
-  { kind: "behavior", label: "Behavior definition (BDEF)", source: { of: "entity", option: "--from", prompt: "Entité racine (vue ou projection)" }, name: (entity) => entity },
+  { kind: "projection", label: "CDS projection from a view", source: { of: "entity", option: "--from", prompt: "Projected view" }, name: (entity) => swapLayer(entity, "C") },
+  { kind: "metadata", label: "Metadata extension (UI annotations)", source: { of: "entity", option: "--from", prompt: "Annotated entity" }, name: (entity) => entity },
+  { kind: "behavior", label: "Behavior definition (BDEF)", source: { of: "entity", option: "--from", prompt: "Root entity (view or projection)" }, name: (entity) => entity },
   {
     kind: "pool",
-    label: "Behavior pool (classe d'implémentation)",
+    label: "Behavior pool (implementation class)",
     source: { of: "bdef", option: "--for", prompt: "Behavior definition" },
     name: (bdef) => `ZBP_${bdef.toUpperCase().replace(/^[ZY]_?/, "")}`.slice(0, 30),
   },
-  { kind: "access", label: "Access control (DCL)", source: { of: "entity", option: "--from", prompt: "Entité protégée" }, name: (entity) => entity },
-  { kind: "abstract", label: "Entité abstraite (paramètre d'action)" },
-  { kind: "custom", label: "Entité custom et sa classe de requête" },
-  { kind: "service", label: "Définition de service", source: { of: "entity", option: "--from", prompt: "Entité exposée" }, name: (entity) => `ZUI_${entity.toUpperCase().replace(/^[ZY][A-Z0-9]*?_[A-Z]_/, "")}` },
-  { kind: "binding", label: "Service binding OData V4", source: { of: "srvd", option: "--for", prompt: "Définition de service" }, name: (srvd) => `${srvd.toUpperCase()}_O4` },
-  { kind: "class", label: "Classe ABAP" },
-  { kind: "interface", label: "Interface ABAP" },
+  { kind: "access", label: "Access control (DCL)", source: { of: "entity", option: "--from", prompt: "Protected entity" }, name: (entity) => entity },
+  { kind: "abstract", label: "Abstract entity (action parameter)" },
+  { kind: "custom", label: "Custom entity and its query class" },
+  { kind: "service", label: "Service definition", source: { of: "entity", option: "--from", prompt: "Exposed entity" }, name: (entity) => `ZUI_${entity.toUpperCase().replace(/^[ZY][A-Z0-9]*?_[A-Z]_/, "")}` },
+  { kind: "binding", label: "Service binding OData V4", source: { of: "srvd", option: "--for", prompt: "Service definition" }, name: (srvd) => `${srvd.toUpperCase()}_O4` },
+  { kind: "class", label: "ABAP class" },
+  { kind: "interface", label: "ABAP interface" },
 ];
 
 /** The objects of a project by kind, from the file names of its sources. */
@@ -151,10 +151,10 @@ export interface CatalogEntry {
 /** The answers of the wizard → the arguments of `rapt generate` (or of `rapt new` for a BO); an error message otherwise. */
 export function wizardArgs(root: string, entry: CatalogEntry, name: string, description: string, values: Record<string, string | string[]>): string[] | string {
   if (!/^[A-Za-z][A-Za-z0-9_]*$/.test(name)) {
-    return "Le nom est fait de lettres, de chiffres et de _, en commençant par une lettre";
+    return "The name is made of letters, digits and _, starting with a letter";
   }
   if (name.length > entry.maxLength) {
-    return `Le nom a au plus ${entry.maxLength} caractères`;
+    return `The name has at most ${entry.maxLength} characters`;
   }
   if (entry.kind === "bo") {
     const prefix = typeof values["--prefix"] === "string" && values["--prefix"] !== "" ? ["--prefix", values["--prefix"]] : [];
@@ -165,7 +165,7 @@ export function wizardArgs(root: string, entry: CatalogEntry, name: string, desc
     const value = values[input.option];
     const list = Array.isArray(value) ? value.filter((v) => v !== "") : value === undefined || value === "" ? [] : [value];
     if (list.length === 0) {
-      if (input.required) return `${input.label} : obligatoire`;
+      if (input.required) return `${input.label}: required`;
       continue;
     }
     if (input.option === "--root") {
@@ -180,14 +180,14 @@ export function wizardArgs(root: string, entry: CatalogEntry, name: string, desc
 
 /** The object groups of the "Objets RAP" view, as in the project explorer of ADT. */
 export const OBJECT_GROUPS: Array<{ id: string; label: string; pattern: RegExp }> = [
-  { id: "ddic", label: "Dictionnaire (tables, éléments de données, domaines)", pattern: /\.(tabl\.astabl|tabl\.xml|dtel\.xml|doma\.xml)$/i },
+  { id: "ddic", label: "Dictionary (tables, data elements, domains)", pattern: /\.(tabl\.astabl|tabl\.xml|dtel\.xml|doma\.xml)$/i },
   { id: "cds", label: "Core Data Services (data definitions, types)", pattern: /\.(ddls\.asddls|drty\.acds|drty\.asdrty)$/i },
   { id: "ddlx", label: "Metadata extensions", pattern: /\.ddlx\.asddlxs$/i },
   { id: "dcl", label: "Access controls", pattern: /\.dcls\.asdcls$/i },
   { id: "bdef", label: "Behavior definitions", pattern: /\.bdef\.asbdef$/i },
   { id: "srvd", label: "Service definitions", pattern: /\.srvd\.srvdsrv$/i },
   { id: "srvb", label: "Service bindings", pattern: /\.srvb\.xml$/i },
-  { id: "abap", label: "Classes et interfaces", pattern: /\.(clas|intf)\.abap$/i },
+  { id: "abap", label: "Classes and interfaces", pattern: /\.(clas|intf)\.abap$/i },
 ];
 
 /** The main file of each object of a project, by group; a table written as source hides its XML. */
@@ -406,8 +406,8 @@ export function diagnosticPath(root: string, d: RaptDiagnostic): string | undefi
   return d.file === undefined ? undefined : path.join(root, ...d.file.split("/"));
 }
 
-/** `2 erreurs, 1 avertissement`. */
+/** `2 errors, 1 warning`. */
 export function summary(counts: Counts): string {
   const plural = (n: number, one: string, many: string): string => `${n} ${n > 1 ? many : one}`;
-  return `${plural(counts.error, "erreur", "erreurs")}, ${plural(counts.warning, "avertissement", "avertissements")}`;
+  return `${plural(counts.error, "error", "errors")}, ${plural(counts.warning, "warning", "warnings")}`;
 }

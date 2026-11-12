@@ -1,1250 +1,1256 @@
-# Décisions techniques
+# Technical decisions
 
-Décisions prises le 2026-11-09, après validation du principe par le porteur du projet
-(« prends les décisions techniques que tu penses les meilleures ; toutes les fonctionnalités
-d'un BO RAP non-draft doivent être respectées »). Chaque entrée donne la décision, la raison
-et la conséquence. Les numéros D1 à D13 correspondent aux points 1 à 13 du §11 de PLAN.md.
+Decisions taken on 2026-11-09, after the owner of the project approved the principle ("take the
+technical decisions you think are the best; all the features of a non-draft RAP BO must be
+respected"). Each entry gives the decision, the reason and the consequence. Numbers D1 to D13
+correspond to points 1 to 13 of §11 of PLAN.md. The milestones M1 to M6 are those of PLAN.md §8.
 
-## D1 — Grammaire BDEF écrite avec Chevrotain
+## D1 — BDEF grammar written with Chevrotain
 
-- **Décision** : grammaire Chevrotain pour les BDEF (behavior managed et projection) ;
-  le parser BDEF d'abaplint sert d'oracle dans les tests.
-- **Pourquoi** : AST typé, messages d'erreur positionnés, contrôle total sur le traitement des
-  constructions hors périmètre. Le parser d'abaplint ne produit qu'un arbre générique.
-- **Conséquence** : deux parsers à maintenir alignés ; un test compare les entités, alias et
-  opérations trouvés par chacun.
+- **Decision**: Chevrotain grammar for the BDEFs (managed behavior and projection); the BDEF
+  parser of abaplint is used as an oracle in the tests.
+- **Why**: typed AST, positioned error messages, full control over the handling of the
+  out-of-scope constructs. The parser of abaplint only produces a generic tree.
+- **Consequence**: two parsers to keep aligned; a test compares the entities, aliases and
+  operations each one finds.
 
-## D2 — ABP : types dérivés générés et réécriture source à source
+## D2 — ABP: generated derived types and source-to-source rewrite
 
-- **Décision** : le compilateur génère, pour chaque BDEF managed, une interface ABAP
-  (`ZRAP_DT_<BDEF>`) contenant les types dérivés RAP (`%tky`, `%control`, tables `FOR …`,
-  réponses `FAILED/REPORTED/MAPPED`, demandes et résultats d'autorisation et de feature control),
-  puis réécrit le behavior pool avant de le donner au transpiler :
-  signatures des handlers, références `TYPE TABLE|STRUCTURE|RESPONSE FOR …`, suppression de
-  `FOR BEHAVIOR OF`, et **toutes** les instructions EML (`READ`, `MODIFY`, `COMMIT`, `ROLLBACK
-  ENTITIES`, formes longues et courtes) abaissées en appels de la classe noyau `ZRAP_EML`
-  (`begin`, opérations, `end`). Les `#` des opérandes deviennent le type dérivé attendu ; les
-  déclarations en ligne (`RESULT DATA(x)`) sont remontées en `DATA x TYPE …`.
-- **Ajustement (J4)** : l'EML est analysé par un parser à base de jetons propre au projet
-  (`gen/abap/eml.ts`), et non plus laissé à l'abaissement du transpiler : abaplint ne reconnaît
-  pas toutes les formes (`CREATE AUTO FILL CID SET FIELDS WITH` est une instruction inconnue pour
-  lui), et l'abaissement du transpiler perdait `IN LOCAL MODE`, `BY \_assoc`, `LINK` et
-  `CREATE BY`. Le contrôle ABAP complet (types compris) s'exécute sur les sources réécrites, avec
-  la configuration du transpiler ; chaque remplacement garde le nombre de lignes du texte
-  remplacé, de sorte que les erreurs (ABP004) pointent sur la ligne d'origine.
-- **Pourquoi** : abaplint type ces constructions en `void` et le transpiler refuse alors l'ABP.
-  Le PoC (PLAN.md, V10) a prouvé l'approche avec les paquets publiés ; J4 l'a généralisée.
-- **Conséquence** : on ne patche ni ne monkeypatche jamais le transpiler ou le runtime ; on leur
-  donne de l'ABAP standard. Les méthodes de `ZRAP_EML`, classe « clean-room » du projet, sont
-  remplacées à l'exécution par le noyau JavaScript (`runtime/src/rap/kernel.ts`). Toute
-  construction que la passe ne sait pas traiter produit un diagnostic (ABP005 à ABP007) et une
-  entrée dans KNOWN_GAPS.md. Une contribution upstream (types dérivés dans abaplint) reste
-  souhaitable ; elle est publique et ne sera proposée qu'avec l'accord du porteur du projet.
+- **Decision**: for each managed BDEF, the compiler generates an ABAP interface
+  (`ZRAP_DT_<BDEF>`) containing the RAP derived types (`%tky`, `%control`, `FOR …` tables,
+  `FAILED/REPORTED/MAPPED` responses, authorization and feature control requests and results),
+  then rewrites the behavior pool before giving it to the transpiler: signatures of the handlers,
+  `TYPE TABLE|STRUCTURE|RESPONSE FOR …` references, removal of `FOR BEHAVIOR OF`, and **all** the
+  EML statements (`READ`, `MODIFY`, `COMMIT`, `ROLLBACK ENTITIES`, long and short forms) lowered
+  into calls of the kernel class `ZRAP_EML` (`begin`, operations, `end`). The `#` of the operands
+  become the expected derived type; the inline declarations (`RESULT DATA(x)`) are hoisted as
+  `DATA x TYPE …`.
+- **Adjustment (M4)**: the EML is parsed by a token-based parser of the project
+  (`gen/abap/eml.ts`), and no longer left to the lowering of the transpiler: abaplint does not
+  recognize all the forms (`CREATE AUTO FILL CID SET FIELDS WITH` is an unknown statement for
+  it), and the lowering of the transpiler lost `IN LOCAL MODE`, `BY \_assoc`, `LINK` and
+  `CREATE BY`. The complete ABAP check (types included) runs on the rewritten sources, with the
+  configuration of the transpiler; each replacement keeps the number of lines of the replaced
+  text, so that the errors (ABP004) point to the original line.
+- **Why**: abaplint types these constructs as `void` and the transpiler then refuses the ABP.
+  The PoC (PLAN.md, V10) proved the approach with the published packages; M4 generalized it.
+- **Consequence**: the transpiler and the runtime are never patched nor monkeypatched; they are
+  given standard ABAP. The methods of `ZRAP_EML`, a "clean-room" class of the project, are
+  replaced at runtime by the JavaScript kernel (`runtime/src/rap/kernel.ts`). Any construct the
+  pass cannot handle produces a diagnostic (ABP005 to ABP007) and an entry in KNOWN_GAPS.md. An
+  upstream contribution (derived types in abaplint) remains desirable; it is public and will
+  only be proposed with the agreement of the owner of the project.
 
-## D3 — Fastify plutôt qu'Express
+## D3 — Fastify rather than Express
 
-- **Pourquoi** : `inject()` permet de tester le serveur sans réseau ; plugins encapsulés ;
-  bon typage TypeScript ; performances.
+- **Why**: `inject()` lets the server be tested without a network; encapsulated plugins; good
+  TypeScript typing; performance.
 
-## D4 — Lectures OData via des vues SQL générées
+## D4 — OData reads through generated SQL views
 
-- **Décision** : chaque vue CDS devient une vue PostgreSQL (`zr_*` sur les tables, puis `zc_*`
-  sur `zr_*`). Les lectures OData interrogent les vues `zc_*` ; les écritures passent par le
-  runtime RAP, vers les tables.
-- **Pourquoi** : c'est la séparation de RAP (requête via la projection CDS, transaction via le
-  BO). Les expressions CDS futures (CASE, CAST…) se traduiront directement en SQL.
+- **Decision**: each CDS view becomes a PostgreSQL view (`zr_*` on the tables, then `zc_*` on
+  `zr_*`). The OData reads query the `zc_*` views; the writes go through the RAP runtime, to the
+  tables.
+- **Why**: it is the separation of RAP (query through the CDS projection, transaction through
+  the BO). Future CDS expressions (CASE, CAST…) will translate directly into SQL.
 
-## D5 — Périmètre OData étendu à ce qu'une List Report / Object Page V4 envoie
+## D5 — OData scope extended to what a V4 List Report / Object Page sends
 
-- **Décision** : en plus de la liste initiale : navigation `Entité(…)/_Assoc` (lecture et
-  création), `ge`, `le`, `not`, `startswith`, `endswith`, segment `/$count`, `$search` simple,
-  jeton CSRF, `IEEE754Compatible=true`, deep insert sur un niveau, en-tête `sap-messages`,
-  références `$<Content-ID>` dans un changeset, paramètres `sap-*` ignorés.
-- **Pourquoi** : sans eux, une application Fiori Elements V4 (ou notre UI OpenUI5, qui utilise le
-  même ODataModel) ne fonctionne pas entièrement.
+- **Decision**: in addition to the initial list: navigation `Entity(…)/_Assoc` (read and
+  creation), `ge`, `le`, `not`, `startswith`, `endswith`, `/$count` segment, simple `$search`,
+  CSRF token, `IEEE754Compatible=true`, one-level deep insert, `sap-messages` header,
+  `$<Content-ID>` references in a changeset, `sap-*` parameters ignored.
+- **Why**: without them, a Fiori Elements V4 application (or our OpenUI5 UI, which uses the same
+  ODataModel) does not fully work.
 
-## D6 — Chemin du service calqué sur RAP
+## D6 — Path of the service modeled on RAP
 
-- **Décision** : par défaut `/sap/opu/odata4/sap/<binding>/srvd/sap/<srvd>/0001/`, configurable.
-- **Pourquoi** : une application Fiori Elements existante peut pointer sur le service sans
-  modifier son manifest.
+- **Decision**: by default `/sap/opu/odata4/sap/<binding>/srvd/sap/<srvd>/0001/`, configurable.
+- **Why**: an existing Fiori Elements application can point to the service without changing its
+  manifest.
 
-## D7 — Fixture activable telle quelle sur un vrai système
+## D7 — Fixture activatable as is on a real system
 
-- **Décision** : la fixture `fixtures/travel` est un export abapGit complet et cohérent
-  (strict(2), autorisation globale, numérotation managed…). L'autorisation n'est plus ignorée :
-  elle fait partie des fonctionnalités non-draft prises en charge (D14).
-- **Pourquoi** : le comportement de référence peut être vérifié sur un système SAP.
+- **Decision**: the `fixtures/travel` fixture is a complete and consistent abapGit export
+  (strict(2), global authorization, managed numbering…). The authorization is no longer ignored:
+  it is part of the supported non-draft features (D14).
+- **Why**: the reference behavior can be checked on an SAP system.
 
-## D8 — Horodatages en `timestamptz(6)`
+## D8 — Timestamps as `timestamptz(6)`
 
-- **Décision** : `TIMESTAMPL`/`UTCLONG` → `timestamptz(6)`, `TIMESTAMP` → `timestamptz(0)`.
-- **Pourquoi** : type naturel en SQL et pour les filtres OData. Les horodatages générés par le
-  runtime sont à la microseconde, ce qui garde les ETag stables.
-- **Conséquence** : la septième décimale ABAP est perdue (KNOWN_GAPS.md).
-- **Ajustement (J4)** : `@abaplint/runtime` 2.14.24 stocke les nombres packed sous forme exacte
-  (entier `BigInt` mis à l'échelle). Les conversions entre le buffer et l'ABAP passent par du
-  texte (`toFixed`) : un `TIMESTAMPL` arrive intact dans l'ABP et en revient intact. Seules les
-  opérations arithmétiques du runtime sur des packed passent par des nombres JavaScript
-  (KNOWN_GAPS.md). Les ETag sont des valeurs canoniques du buffer, jamais recalculées par l'ABP.
+- **Decision**: `TIMESTAMPL`/`UTCLONG` → `timestamptz(6)`, `TIMESTAMP` → `timestamptz(0)`.
+- **Why**: natural type in SQL and for the OData filters. The timestamps generated by the runtime
+  are to the microsecond, which keeps the ETags stable.
+- **Consequence**: the seventh ABAP decimal is lost (KNOWN_GAPS.md).
+- **Adjustment (M4)**: `@abaplint/runtime` 2.14.24 stores the packed numbers in an exact form
+  (scaled `BigInt` integer). The conversions between the buffer and ABAP go through text
+  (`toFixed`): a `TIMESTAMPL` reaches the ABP intact and comes back intact. Only the arithmetic
+  operations of the runtime on packed numbers go through JavaScript numbers (KNOWN_GAPS.md). The
+  ETags are canonical values of the buffer, never recomputed by the ABP.
 
-## D9 — Mandant retiré
+## D9 — Client removed
 
-- **Décision** : la colonne `CLNT` (`CLIENT`, `MANDT`) est retirée des tables ; application
-  mono-tenant.
+- **Decision**: the `CLNT` column (`CLIENT`, `MANDT`) is removed from the tables; single-tenant
+  application.
 
-## D10 — UI OpenUI5 1.136 LTS en freestyle
+## D10 — Freestyle OpenUI5 1.136 LTS UI
 
-- **Décision** : contrôles `sap.m`, `sap.f`, `sap.uxap`, `sap.ui.layout`, thème `sap_horizon`,
-  ODataModel V4 avec `autoExpandSelect`. `sap.ui.mdc` est une évolution possible.
-- **Pourquoi** : bibliothèques Apache-2.0 ; le ODataModel V4 est celui de Fiori Elements V4.
-- **Réalisation (J5)** : `rapt build` écrit `ui/` : une vue XML de List Report par entity set
-  racine et une vue d'Object Page par entity set, générées depuis les annotations `@UI` (même
-  dérivation que le CSDL), et des contrôleurs génériques pilotés par `ui/model/layout.json`
-  (filtres, recherche, création non-draft, édition et sauvegarde par `submitBatch`, suppression,
-  actions avec dialogue de paramètres, actions factory, tables de compositions éditables,
-  messages). Le feature control passe par `__OperationControl`, `__EntityControl` et
-  `__FieldControl`, que l'ODataModel sélectionne lui-même.
+- **Decision**: `sap.m`, `sap.f`, `sap.uxap`, `sap.ui.layout` controls, `sap_horizon` theme,
+  ODataModel V4 with `autoExpandSelect`. `sap.ui.mdc` is a possible evolution.
+- **Why**: Apache-2.0 libraries; the ODataModel V4 is the one of Fiori Elements V4.
+- **Implementation (M5)**: `rapt build` writes `ui/`: one List Report XML view per root entity
+  set and one Object Page view per entity set, generated from the `@UI` annotations (same
+  derivation as the CSDL), and generic controllers driven by `ui/model/layout.json` (filters,
+  search, non-draft creation, edit and save with `submitBatch`, deletion, actions with a
+  parameter dialog, factory actions, editable composition tables, messages). The feature control
+  goes through `__OperationControl`, `__EntityControl` and `__FieldControl`, which the ODataModel
+  selects itself.
 
-## D11 — Exécution ABP sérialisée, réentrante dans un même LUW
+## D11 — Serialized ABP execution, reentrant within a LUW
 
-- **Décision** : un verrou par processus encadre les appels ABP ; il est réentrant pour le LUW
-  qui le détient (une détermination qui exécute une action interne ne se bloque pas elle-même).
-- **Pourquoi** : le runtime abaplint a un état global (`sy-*`, attributs statiques).
-- **Conséquence** : montée en charge par processus ou conteneurs.
-- **Réalisation (J4)** : `RapRuntime.transaction` enchaîne les LUW sur une promesse (un LUW à la
-  fois par processus) ; le LUW courant est porté par `AsyncLocalStorage`, ce qui rend réentrants
-  les appels EML des handlers. Entre processus, les verrous sont des verrous de ligne PostgreSQL
-  (`SELECT … FOR UPDATE NOWAIT` sur l'instance du `lock master`, cause `locked` si refusé).
+- **Decision**: a lock per process wraps the ABP calls; it is reentrant for the LUW that holds
+  it (a determination that runs an internal action does not block itself).
+- **Why**: the abaplint runtime has a global state (`sy-*`, static attributes).
+- **Consequence**: scaling with processes or containers.
+- **Implementation (M4)**: `RapRuntime.transaction` chains the LUWs on a promise (one LUW at a
+  time per process); the current LUW is carried by `AsyncLocalStorage`, which makes the EML calls
+  of the handlers reentrant. Between processes, the locks are PostgreSQL row locks
+  (`SELECT … FOR UPDATE NOWAIT` on the instance of the `lock master`, cause `locked` when refused).
 
-## D12 — Nommage et licence
+## D12 — Naming and license
 
-- **Décision** : paquets `@rap-transpiler/model`, `@rap-transpiler/compiler`,
-  `@rap-transpiler/runtime` ; CLI `rapt` ; licence MIT pour ce dépôt.
+- **Decision**: packages `@rap-transpiler/model`, `@rap-transpiler/compiler`,
+  `@rap-transpiler/runtime`; `rapt` CLI; MIT license for this repository.
 
-## D13 — Corpus de test des parsers
+## D13 — Test corpus of the parsers
 
-- **Décision initiale** : un extrait de sources BDEF et CDS des dépôts SAP-samples (Apache-2.0).
-- **Ajustement (J1)** : les dépôts SAP-samples ont été réorganisés et leurs chemins ne sont plus
-  trouvables par la recherche de code. Le corpus est donc écrit pour le projet
-  (`packages/compiler/test/bdef-parser.test.ts`) : noms à namespace, options d'opérations,
-  actions statiques, factory et internes, fonctions, side effects, mappings `control`, et les
-  constructions hors périmètre (draft, late numbering, événements…). Les mêmes sources sont
-  comparées au parser BDEF d'abaplint (D1). Un extrait SAP-samples pourra s'ajouter plus tard.
+- **Initial decision**: an extract of BDEF and CDS sources of the SAP-samples repositories
+  (Apache-2.0).
+- **Adjustment (M1)**: the SAP-samples repositories were reorganized and their paths can no
+  longer be found by code search. The corpus is therefore written for the project
+  (`packages/compiler/test/bdef-parser.test.ts`): namespaced names, operation options, static,
+  factory and internal actions, functions, side effects, `control` mappings, and the
+  out-of-scope constructs (draft, late numbering, events…). The same sources are compared with
+  the BDEF parser of abaplint (D1). An SAP-samples extract may be added later.
 
-## D14 — Périmètre fonctionnel : un BO RAP managed non-draft complet
+## D14 — Functional scope: a complete non-draft managed RAP BO
 
-- **Décision** : la cible est l'ensemble des fonctionnalités d'un BO managed sans draft, suivi
-  dans [FEATURES.md](FEATURES.md). Cela ajoute au MVP initial : autorisations (globales et
-  d'instance), feature control statique et dynamique, numérotation externe, actions statiques,
-  factory, internes et avec paramètre, déterminations on save, precheck, side effects (CSDL),
-  messages T100, lectures et créations par association dans l'ABP.
-- **Restent hors périmètre**, avec leur raison dans FEATURES.md : draft (exclu par le cahier des
-  charges), implémentation unmanaged, late numbering, événements, change documents, extensions,
-  analytique. `with additional save` et `with unmanaged save`, d'abord exclus, sont pris en
-  charge depuis D30.
+- **Decision**: the target is the set of features of a managed BO without draft, tracked in
+  [FEATURES.md](FEATURES.md). It adds to the initial MVP: authorizations (global and instance),
+  static and dynamic feature control, external numbering, static, factory, internal actions and
+  actions with a parameter, on save determinations, precheck, side effects (CSDL), T100 messages,
+  reads and creations by association in the ABP.
+- **Still out of scope**, with their reason in FEATURES.md: draft (excluded by the
+  specification, then added by D54), unmanaged implementation, late numbering, events, change
+  documents, extensions, analytics. `with additional save` and `with unmanaged save`, excluded at
+  first, are supported since D30.
 
-## D15 — Runtime générique piloté par l'IR
+## D15 — Generic runtime driven by the IR
 
-- **Décision** : l'application générée contient un runtime générique (`@rap-transpiler/runtime`)
-  qui lit `model.json`. Seuls le SQL, le CSDL, le JavaScript de l'ABP, l'UI et le packaging sont
-  générés. Le runtime est embarqué sous forme de tarball dans `vendor/`.
-- **Pourquoi** : un seul runtime testé pour tous les BO ; une sortie autonome sans registre privé.
-- **Ajustement (J6)** : plutôt qu'un tarball, `vendor/` contient les paquets `runtime` et `model`
-  compilés (`dist/` et un `package.json` de production) ; leur version porte une empreinte de
-  leur contenu, pour que `npm install` les mette à jour après un nouveau `rapt build`. Le
-  `.npmrc` (`install-links=true`) les installe comme des paquets ordinaires. `server.mjs` appelle
-  `start()` du runtime, configuré par variables d'environnement (`.env.example`).
+- **Decision**: the generated application contains a generic runtime (`@rap-transpiler/runtime`)
+  that reads `model.json`. Only the SQL, the CSDL, the JavaScript of the ABP, the UI and the
+  packaging are generated. The runtime is bundled as a tarball in `vendor/`.
+- **Why**: a single runtime tested for all BOs; a standalone output without a private registry.
+- **Adjustment (M6)**: rather than a tarball, `vendor/` contains the compiled `runtime` and
+  `model` packages (`dist/` and a production `package.json`); their version carries a hash of
+  their content, so that `npm install` updates them after a new `rapt build`. The `.npmrc`
+  (`install-links=true`) installs them as ordinary packages. `server.mjs` calls `start()` of the
+  runtime, configured by environment variables (`.env.example`).
 
-## D16 — Représentation canonique des valeurs
+## D16 — Canonical representation of the values
 
-- **Décision** : dans le buffer transactionnel, les valeurs sont des valeurs JavaScript
-  canoniques : chaînes pour CHAR, NUMC et STRING (blancs finaux supprimés) ; chaînes pour les
-  décimaux et INT8 (pas de perte de précision) ; `AAAA-MM-JJ` pour les dates (initiale = `null`) ;
-  `HH:MM:SS` pour les heures ; ISO 8601 UTC à la microseconde pour les horodatages ; UUID en
-  minuscules avec tirets ; booléens pour `ABAP_BOOLEAN`.
-- **Pourquoi** : une seule forme pivot entre ABAP, SQL et OData ; les conversions sont isolées et
-  testées.
+- **Decision**: in the transactional buffer, the values are canonical JavaScript values: strings
+  for CHAR, NUMC and STRING (trailing blanks removed); strings for decimals and INT8 (no loss of
+  precision); `YYYY-MM-DD` for dates (initial = `null`); `HH:MM:SS` for times; ISO 8601 UTC to
+  the microsecond for timestamps; lower-case UUIDs with dashes; booleans for `ABAP_BOOLEAN`.
+- **Why**: a single pivot form between ABAP, SQL and OData; the conversions are isolated and
+  tested.
 
-## D17 — Chaîne d'outils
+## D17 — Toolchain
 
-- **Décision** : TypeScript 7.0 (`strict`, `noUncheckedIndexedAccess`,
-  `exactOptionalPropertyTypes`, `verbatimModuleSyntax`), ESM `NodeNext` avec spécificateurs
-  `.js`, compilation `tsc` vers `dist/`, Vitest (alias vers les sources), workspaces pnpm.
+- **Decision**: TypeScript 7.0 (`strict`, `noUncheckedIndexedAccess`,
+  `exactOptionalPropertyTypes`, `verbatimModuleSyntax`), ESM `NodeNext` with `.js` specifiers,
+  `tsc` compilation to `dist/`, Vitest (aliases to the sources), pnpm workspaces.
 
-## D18 — Base de données des tests
+## D18 — Database of the tests
 
-- **Décision** : PGlite (PostgreSQL en WASM, en processus) pour les tests d'intégration ; un vrai
-  PostgreSQL pour l'e2e.
+- **Decision**: PGlite (PostgreSQL in WASM, in process) for the integration tests; a real
+  PostgreSQL for the e2e.
 
-## D19 — DDIC « ombre » pour le transpiler
+## D19 — "Shadow" DDIC for the transpiler
 
-- **Décision** : le registre passé au transpiler reçoit les tables du modèle avec des types
-  prédéfinis (DATATYPE, LENG, DECIMALS), les éléments de données du catalogue standard et du
-  projet ; pas de vues CDS.
-- **Pourquoi** : la couche SQL du transpiler échoue sur les associations et ne connaît pas les
-  éléments de données SAP standard ; les types de l'ABP viennent de l'interface dérivée (D2) ;
-  notre SQL vient de l'IR.
-- **Conséquence** : un type `TYPE zr_travel` (vue CDS) n'était pas disponible dans l'ABP ; les
-  types dérivés et les tables l'étaient.
-- **Ajusté (D26)** : les entités CDS sont données comme tables « ombre » de mêmes nom et éléments
-  (types prédéfinis, sans associations), pour l'ABAP SQL ; `TYPE zr_travel` est donc typé. Les
-  tables ombre n'ont plus de colonne mandant (D9). Les vues CDS elles-mêmes restent hors du
-  registre du transpiler.
+- **Decision**: the registry given to the transpiler receives the tables of the model with
+  predefined types (DATATYPE, LENG, DECIMALS), the data elements of the standard catalog and of
+  the project; no CDS views.
+- **Why**: the SQL layer of the transpiler fails on associations and does not know the standard
+  SAP data elements; the types of the ABP come from the derived interface (D2); our SQL comes
+  from the IR.
+- **Consequence**: a `TYPE zr_travel` type (CDS view) was not available in the ABP; the derived
+  types and the tables were.
+- **Adjusted (D26)**: the CDS entities are given as "shadow" tables with the same name and
+  elements (predefined types, without associations), for ABAP SQL; `TYPE zr_travel` is therefore
+  typed. The shadow tables no longer have a client column (D9). The CDS views themselves stay out
+  of the registry of the transpiler.
 
-## D20 — `field ( mandatory )` sans contrôle à l'exécution
+## D20 — `field ( mandatory )` without a check at runtime
 
-- **Décision** : comme RAP, aucun contrôle runtime ; `Common.FieldControl` Mandatory dans le
-  CSDL et champ requis dans l'UI. `mandatory : create`, lui, est contrôlé à la création, comme
-  dans RAP.
+- **Decision**: as in RAP, no runtime check; `Common.FieldControl` Mandatory in the CSDL and
+  required field in the UI. `mandatory : create`, on the other hand, is checked on creation, as
+  in RAP.
 
-## D21 — Déclenchement des déterminations et validations
+## D21 — Triggering of the determinations and validations
 
-- **Décision** : les déterminations on modify s'exécutent à la fin de chaque requête de
-  modification, par tours successifs : un tour traite les instances dont un trigger a été touché
-  depuis le passage précédent de cette détermination ; une détermination n'est pas redéclenchée
-  par ses propres modifications ; la boucle est bornée (erreur au-delà de 20 tours).
-  Les validations et les déterminations on save s'exécutent dans la séquence de sauvegarde, sur
-  les changements cumulés du LUW.
+- **Decision**: the on modify determinations run at the end of each modifying request, in
+  successive rounds: a round handles the instances whose trigger was touched since the previous
+  run of this determination; a determination is not triggered again by its own changes; the loop
+  is bounded (error beyond 20 rounds). The validations and the on save determinations run in the
+  save sequence, on the accumulated changes of the LUW.
 
-## D22 — Causes d'échec RAP et statuts HTTP
+## D22 — RAP failure causes and HTTP statuses
 
-- **Décision** : la première entrée de `failed` donne le statut de l'erreur OData :
-  `unspecific` 400, `unauthorized` 403, `not_found` 404, `locked` et `conflict` 409, `readonly`
-  400, `disabled` 409, `dependency` 424 ; un `If-Match` absent sur PATCH, PUT et DELETE d'une
-  entité à ETag donne 428, un ETag périmé 412. Le message principal est le premier message
-  d'erreur de `reported` ; les autres messages vont dans `details`. Sans message, un texte
-  générique décrit la cause (« Travel(…) is locked by another user »).
-- **Pourquoi** : SAP ne publie pas de table de correspondance ; ces statuts sont ceux du
-  protocole HTTP pour chaque cause, et Fiori elements affiche le message quel que soit le statut.
+- **Decision**: the first entry of `failed` gives the status of the OData error: `unspecific`
+  400, `unauthorized` 403, `not_found` 404, `locked` and `conflict` 409, `readonly` 400,
+  `disabled` 409, `dependency` 424; a missing `If-Match` on PATCH, PUT and DELETE of an entity
+  with an ETag gives 428, a stale ETag 412. The main message is the first error message of
+  `reported`; the other messages go into `details`. Without a message, a generic text describes
+  the cause ("Travel(…) is locked by another user").
+- **Why**: SAP does not publish a mapping table; these statuses are those of the HTTP protocol
+  for each cause, and Fiori elements shows the message whatever the status.
 
-## D23 — Un LUW par requête ou par change set ; réponses rendues après le commit
+## D23 — One LUW per request or per change set; responses rendered after the commit
 
-- **Décision** : une requête de modification (ou un change set de `$batch`) est un LUW : les
-  opérations, les déterminations on modify à la fin de chaque requête (D21), puis la séquence de
-  sauvegarde, dans une transaction PostgreSQL. Les réponses (entité créée, résultat d'action…)
-  sont lues après le commit dans les vues de projection ; dans un change set, elles sont
-  différées jusqu'à la fin du change set. Un échec annule tout le change set, qui reçoit une seule
-  réponse d'erreur.
-- **Pourquoi** : la réponse montre l'état sauvegardé (déterminations, champs d'administration,
-  ETag), comme RAP, et les lectures n'ont jamais à voir le buffer non sauvegardé. Les navigations
-  d'une écriture (`$1/_Booking`, `Travel(…)/_Booking(…)`) sont résolues dans le LUW, qui voit les
-  instances créées plus tôt dans le change set.
+- **Decision**: a modifying request (or a change set of a `$batch`) is a LUW: the operations, the
+  on modify determinations at the end of each request (D21), then the save sequence, in a
+  PostgreSQL transaction. The responses (created entity, result of an action…) are read after the
+  commit in the projection views; in a change set, they are deferred until the end of the change
+  set. A failure rolls back the whole change set, which receives a single error response.
+- **Why**: the response shows the saved state (determinations, administrative fields, ETag), as
+  in RAP, and the reads never have to see the unsaved buffer. The navigations of a write
+  (`$1/_Booking`, `Travel(…)/_Booking(…)`) are resolved in the LUW, which sees the instances
+  created earlier in the change set.
 
-## D24 — Socle ABAP « clean-room » étendu
+## D24 — Extended "clean-room" ABAP base
 
-- **Décision** : en plus de `if_abap_behv`, `cl_abap_behavior_handler` et `cl_abap_context_info`,
-  le compilateur fournit `if_message`, `if_t100_message`, `if_t100_dyn_msg`,
-  `if_abap_behv_message`, `cx_root` (et `cx_static_check`, `cx_dynamic_check`, `cx_no_check`,
-  les classes des erreurs d'exécution), `cl_system_uuid`, la structure `scx_t100key` et les
-  éléments de données standard du catalogue DDIC. Le texte d'une exception est son message T100,
-  ses attributs résolus par nom (méthode native `ZRAP_EML=>exception_text`).
-- **Pourquoi** : les behavior pools réels utilisent des classes d'exception de messages (motif
-  `/DMO/CM_FLIGHT_MESSAGES`), `cl_system_uuid` et ces types. Le transpiler fait de toute classe
-  nommée `CX_ROOT` une sous-classe d'`Error` JavaScript : il suffit de la fournir.
-- **Conséquence** : ces objets sont écrits à partir des signatures publiques de SAP (LICENSES.md) ;
-  un objet du projet de même nom a priorité.
+- **Decision**: in addition to `if_abap_behv`, `cl_abap_behavior_handler` and
+  `cl_abap_context_info`, the compiler provides `if_message`, `if_t100_message`,
+  `if_t100_dyn_msg`, `if_abap_behv_message`, `cx_root` (and `cx_static_check`,
+  `cx_dynamic_check`, `cx_no_check`, the classes of the runtime errors), `cl_system_uuid`, the
+  `scx_t100key` structure and the standard data elements of the DDIC catalog. The text of an
+  exception is its T100 message, its attributes resolved by name (native method
+  `ZRAP_EML=>exception_text`).
+- **Why**: real behavior pools use message exception classes (pattern
+  `/DMO/CM_FLIGHT_MESSAGES`), `cl_system_uuid` and these types. The transpiler turns any class
+  named `CX_ROOT` into a subclass of the JavaScript `Error`: it is enough to provide it.
+- **Consequence**: these objects are written from the public signatures of SAP (LICENSES.md); an
+  object of the project with the same name takes precedence.
 
-## D25 — Contrôles de l'interface OData des écritures
+## D25 — Checks of the OData interface of the writes
 
-- **Décision** : les propriétés `readonly`, de numérotation managed et les champs
-  d'administration envoyés par un client OData sont ignorés (comme `Core.Computed` le prévoit) ;
-  une propriété inconnue donne 400. Les opérations non exposées (`use create` absent, opération
-  `internal`) donnent 405. Les clés d'une entité ne changent pas par PATCH (400).
-  Le feature control (`__EntityControl`, `__OperationControl`, `__FieldControl`) n'est calculé que
-  si la requête sélectionne ces propriétés (ou n'a pas de `$select`). Le feature control global
-  d'`update`, de `delete` et des actions d'instance y figure aussi, avec la même valeur pour toutes
-  les instances : RAP le présente comme le feature control d'instance (« consumer hint »).
-  Dans les vues générées, ces valeurs sont lues par `%{…}` (valeur brute) : `${…}` donnerait le
-  texte formaté par le type OData (`"1"` pour un Edm.Byte), et la comparaison échouerait.
-- **Pourquoi** : c'est le comportement attendu par l'ODataModel V4 de Fiori elements ; le calcul
-  du feature control appelle l'ABP et ne doit pas pénaliser les lectures qui ne l'utilisent pas.
+- **Decision**: the `readonly` properties, the managed numbering properties and the
+  administrative fields sent by an OData client are ignored (as `Core.Computed` provides); an
+  unknown property gives 400. The operations that are not exposed (`use create` missing,
+  `internal` operation) give 405. The keys of an entity do not change with PATCH (400). The
+  feature control (`__EntityControl`, `__OperationControl`, `__FieldControl`) is only computed
+  when the request selects these properties (or has no `$select`). The global feature control of
+  `update`, `delete` and the instance actions is also there, with the same value for all the
+  instances: RAP presents it like the instance feature control ("consumer hint"). In the
+  generated views, these values are read with `%{…}` (raw value): `${…}` would give the text
+  formatted by the OData type (`"1"` for an Edm.Byte), and the comparison would fail.
+- **Why**: it is the behavior the ODataModel V4 of Fiori elements expects; computing the feature
+  control calls the ABP and must not slow down the reads that do not use it.
 
-## D26 — ABAP SQL en lecture dans l'ABP
+## D26 — Read ABAP SQL in the ABP
 
-- **Décision initiale** : toute instruction ABAP SQL dans un behavior pool était une erreur de
-  compilation (ABP007), faute de connexion à la base pour le runtime abaplint.
-- **Décision révisée** : `SELECT` (simple, `SINGLE`, `INTO TABLE`, `FOR ALL ENTRIES`, jointures,
-  agrégats, sous-requêtes, `SELECT … ENDSELECT` avec `SELECT *`) lit les tables et les entités
-  CDS du projet. Les écritures (`INSERT`, `UPDATE`, `MODIFY`, `DELETE` sur une table) sont
-  refusées dans les handlers (ABP007) : un BO managed est écrit par le runtime RAP, le code le
-  modifie par EML. Elles sont permises dans le saver (`save_modified`) d'un BO avec additional ou
-  unmanaged save (D30). Les expressions de table communes (`WITH`) restent refusées.
-- **Réalisation** :
-  - le SQL que génère `@abaplint/transpiler` suppose des colonnes au format ABAP (ses propres
-    schémas stockent les dates en `NCHAR(8)`, les UUID en 32 chiffres hexadécimaux). Le schéma
-    généré ajoute donc un schéma `rapt_abap` de vues, une par table (sans colonne mandant, D9) et
-    par entité CDS, noms de colonnes en minuscules : dates `YYYYMMDD`, heures `HHMMSS`, UUID et
-    binaires en hexadécimal majuscule, booléens `X`/espace, horodatages en nombres packed
-    (`YYYYMMDDhhmmss.fffffff`), valeurs initiales ABAP à la place des `NULL`. Les types caractère
-    de longueur fixe deviennent `bpchar`, dont les comparaisons ignorent les blancs finaux comme
-    ABAP. `abap.dbo.schemaPrefix` (option du runtime abaplint) fait lire ces vues au code transpilé ;
-  - le runtime enregistre un client de base de données en lecture seule (`DatabaseClient` du
-    runtime abaplint) qui exécute la requête dans la transaction de la LUW en cours, après une
-    traduction vers PostgreSQL : `UP TO n ROWS` → `LIMIT`, `ORDER BY PRIMARY KEY`, `ASCENDING`,
-    opérateurs `EQ`/`GE`…, `alias~champ`, identifiants en minuscules. Seules les vues de
-    `rapt_abap` sont lisibles. Chaque requête s'exécute dans un savepoint : une erreur SQL laisse
-    la transaction de la LUW utilisable. `COMMIT WORK`/`ROLLBACK WORK` sont une erreur à
-    l'exécution, comme dans RAP ;
-  - les entités CDS sont données au transpiler comme tables « ombre » de mêmes nom et éléments
-    (D19) : `SELECT FROM zr_travel` et `DATA ls TYPE zr_travel` sont typés ;
-  - abaplint ne type pas la déclaration en ligne du résultat d'un littéral, d'un agrégat autre
-    que `COUNT(*)` ou d'une expression : la méthode transpilée échouerait à son démarrage. La
-    passe de réécriture déclare les deux formes les plus courantes (test d'existence
-    `SELECT SINGLE @abap_true … INTO @DATA(x)` : `abap_boolean` ; `MAX( col )`/`MIN( col )` d'une
-    seule source, motif de numérotation du tutoriel RAP100 : le type de la colonne) ; les autres
-    sont signalées à la compilation (ABP009) ;
-  - `MESSAGE … INTO` prend ses textes dans les classes de messages du projet.
-- **Sémantique** : comme dans RAP, `SELECT` lit la base, pas le buffer transactionnel : les
-  changements non sauvegardés de la LUW n'y sont pas visibles (lire le BO par EML pour cela).
-- **Pourquoi** : la lecture SQL de tables de contrôle, l'unicité d'un identifiant ou la
-  numérotation par `MAX` sont courantes dans les behavior pools réels ; des vues au format ABAP
-  laissent le SQL du transpiler presque intact et donnent la sémantique ABAP des comparaisons.
-  Contrepartie : une condition sur une colonne convertie (date, UUID, horodatage) ne peut pas
-  utiliser d'index (KNOWN_GAPS.md).
-- **Correction associée** : l'échec d'un verrou (`FOR UPDATE NOWAIT`) laissait la transaction
-  PostgreSQL de la LUW en état d'erreur ; il est lui aussi isolé dans un savepoint (test
-  `rap-locks.test.ts` sur un vrai PostgreSQL).
+- **Initial decision**: any ABAP SQL statement in a behavior pool was a compile error (ABP007),
+  for lack of a database connection for the abaplint runtime.
+- **Revised decision**: `SELECT` (simple, `SINGLE`, `INTO TABLE`, `FOR ALL ENTRIES`, joins,
+  aggregates, subqueries, `SELECT … ENDSELECT` with `SELECT *`) reads the tables and the CDS
+  entities of the project. The writes (`INSERT`, `UPDATE`, `MODIFY`, `DELETE` on a table) are
+  refused in the handlers (ABP007): a managed BO is written by the RAP runtime, the code changes
+  it with EML. They are allowed in the saver (`save_modified`) of a BO with additional or
+  unmanaged save (D30). Common table expressions (`WITH`) stay refused.
+- **Implementation**:
+  - the SQL `@abaplint/transpiler` generates assumes columns in ABAP format (its own schemas store
+    dates as `NCHAR(8)`, UUIDs as 32 hexadecimal digits). The generated schema therefore adds a
+    `rapt_abap` schema of views, one per table (without a client column, D9) and per CDS entity,
+    lower-case column names: dates `YYYYMMDD`, times `HHMMSS`, UUIDs and binaries in upper-case
+    hexadecimal, booleans `X`/space, timestamps as packed numbers (`YYYYMMDDhhmmss.fffffff`), ABAP
+    initial values instead of `NULL`s. Fixed-length character types become `bpchar`, whose
+    comparisons ignore trailing blanks like ABAP. `abap.dbo.schemaPrefix` (option of the abaplint
+    runtime) makes the transpiled code read these views;
+  - the runtime registers a read-only database client (`DatabaseClient` of the abaplint runtime)
+    that runs the query in the transaction of the current LUW, after a translation to PostgreSQL:
+    `UP TO n ROWS` → `LIMIT`, `ORDER BY PRIMARY KEY`, `ASCENDING`, operators `EQ`/`GE`…,
+    `alias~field`, lower-case identifiers. Only the views of `rapt_abap` are readable. Each query
+    runs in a savepoint: an SQL error leaves the transaction of the LUW usable.
+    `COMMIT WORK`/`ROLLBACK WORK` are a runtime error, as in RAP;
+  - the CDS entities are given to the transpiler as "shadow" tables with the same name and
+    elements (D19): `SELECT FROM zr_travel` and `DATA ls TYPE zr_travel` are typed;
+  - abaplint does not type the inline declaration of the result of a literal, of an aggregate
+    other than `COUNT(*)` or of an expression: the transpiled method would fail on start. The
+    rewriting pass declares the two most common forms (existence check
+    `SELECT SINGLE @abap_true … INTO @DATA(x)`: `abap_boolean`; `MAX( col )`/`MIN( col )` of a
+    single source, numbering pattern of the RAP100 tutorial: the type of the column); the others
+    are reported at compile time (ABP009);
+  - `MESSAGE … INTO` takes its texts from the message classes of the project.
+- **Semantics**: as in RAP, `SELECT` reads the database, not the transactional buffer: the
+  unsaved changes of the LUW are not visible in it (read the BO with EML for that).
+- **Why**: reading control tables with SQL, the uniqueness of an identifier or numbering with
+  `MAX` are common in real behavior pools; views in ABAP format leave the SQL of the transpiler
+  almost intact and give the ABAP semantics of the comparisons. Trade-off: a condition on a
+  converted column (date, UUID, timestamp) cannot use an index (KNOWN_GAPS.md).
+- **Related fix**: the failure of a lock (`FOR UPDATE NOWAIT`) left the PostgreSQL transaction
+  of the LUW in an error state; it is also isolated in a savepoint (test `rap-locks.test.ts` on a
+  real PostgreSQL).
 
-## D27 — Ressources OpenUI5 servies depuis les paquets npm
+## D27 — OpenUI5 resources served from the npm packages
 
-- **Décision** : le runtime sert `/resources/` à partir des paquets npm d'OpenUI5 (`@openui5/*`
-  1.136, Apache-2.0) : les sources des bibliothèques telles quelles, et les thèmes compilés à la
-  première demande avec `less-openui5` (Apache-2.0), puis gardés en mémoire. `/ui/` sert
-  l'application générée.
-- **Pourquoi** : le CDN d'OpenUI5 n'est pas toujours joignable (il ne l'est pas depuis
-  l'environnement de développement de ce projet) et une application autonome ne doit pas en
-  dépendre ; npm suffit, sans outillage UI5 au démarrage. Le premier chargement demande environ
-  400 modules : un bundle construit par l'outillage UI5 (`ui5 build`) est prévu pour l'image
-  Docker (J6).
+- **Decision**: the runtime serves `/resources/` from the npm packages of OpenUI5 (`@openui5/*`
+  1.136, Apache-2.0): the sources of the libraries as they are, and the themes compiled on the
+  first request with `less-openui5` (Apache-2.0), then kept in memory. `/ui/` serves the
+  generated application.
+- **Why**: the OpenUI5 CDN is not always reachable (it is not from the development environment
+  of this project) and a standalone application must not depend on it; npm is enough, without
+  UI5 tooling on startup. The first load requests about 400 modules: a bundle built by the UI5
+  tooling (`ui5 build`) is planned for the Docker image (M6).
 
-## D28 — Sessions OIDC sans dépendance supplémentaire
+## D28 — OIDC sessions without an additional dependency
 
-- **Décision** : le flux « authorization code » avec PKCE est écrit avec `jose` (déjà utilisé
-  pour les jetons porteurs) : état de connexion et session dans des cookies signés (HMAC-SHA256,
-  HttpOnly, SameSite=Lax), sans stockage côté serveur ; jeton CSRF lié à la session ; découverte
-  possible sur une URL interne (`OIDC_DISCOVERY_URL`) distincte de l'émetteur public. Les tests
-  utilisent un fournisseur OIDC écrit pour eux (découverte, autorisation, jeton, JWKS).
-- **Ajustement du PLAN.md** : `openid-client`, `@fastify/secure-session` et `oauth2-mock-server`
-  ne sont pas ajoutés. `openid-client` exige que l'émetteur soit l'URL de découverte, ce qui ne
-  convient pas à Keycloak dans docker-compose (le navigateur voit `localhost:8180`, le conteneur
-  de l'application `keycloak:8080`).
-- **Conséquence** : la session dure 8 heures (`maxAge`) ; il n'y a ni rafraîchissement de jeton,
-  ni révocation côté serveur avant expiration (KNOWN_GAPS.md).
+- **Decision**: the "authorization code" flow with PKCE is written with `jose` (already used for
+  the bearer tokens): sign-in state and session in signed cookies (HMAC-SHA256, HttpOnly,
+  SameSite=Lax), without storage on the server; CSRF token bound to the session; discovery
+  possible on an internal URL (`OIDC_DISCOVERY_URL`) distinct from the public issuer. The tests
+  use an OIDC provider written for them (discovery, authorization, token, JWKS).
+- **Adjustment of PLAN.md**: `openid-client`, `@fastify/secure-session` and `oauth2-mock-server`
+  are not added. `openid-client` requires the issuer to be the discovery URL, which does not suit
+  Keycloak in docker-compose (the browser sees `localhost:8180`, the container of the
+  application `keycloak:8080`).
+- **Consequence**: the session lasts 8 hours (`maxAge`); there is neither token refresh nor
+  revocation on the server before expiry (KNOWN_GAPS.md).
 
-## D29 — Test de bout en bout et CI
+## D29 — End-to-end test and CI
 
-- **Décision** : le test e2e (`packages/runtime/test/e2e.test.ts`) part de la CLI compilée :
-  `rapt build` de la fixture, `npm install` de l'application générée, `node server.mjs` sur un
-  vrai PostgreSQL (celui de `RAPT_E2E_DATABASE_URL`, sinon un serveur démarré pour le test, sinon
-  PGlite), puis le service OData et l'UI dans Chromium. La CI fournit un service PostgreSQL 16 et
-  Chromium. Un second job construit l'image et démarre le `docker-compose.yml` généré
-  (`--wait`, contrôles HTTP du service et de l'UI). Vérifié aussi dans l'environnement de
-  développement : image construite, PostgreSQL et application démarrés par compose, création,
-  création par association, action et UI servies par le conteneur.
-- **Pourquoi** : c'est l'artefact livré qui est testé, pas les sources du runtime.
-- **Note** : TypeScript 7.0.2 compile `new (x as T).Builder()` sans les parenthèses ; seul le
-  JavaScript compilé (dist) le montre, Vitest compilant les sources autrement. Le test e2e, qui
-  exécute le dist, l'a révélé ; le code évite cette forme.
+- **Decision**: the e2e test (`packages/runtime/test/e2e.test.ts`) starts from the compiled CLI:
+  `rapt build` of the fixture, `npm install` of the generated application, `node server.mjs` on a
+  real PostgreSQL (the one of `RAPT_E2E_DATABASE_URL`, otherwise a server started for the test,
+  otherwise PGlite), then the OData service and the UI in Chromium. The CI provides a
+  PostgreSQL 16 service and Chromium. A second job builds the image and starts the generated
+  `docker-compose.yml` (`--wait`, HTTP checks of the service and of the UI). Also checked in the
+  development environment: image built, PostgreSQL and application started by compose, creation,
+  creation by association, action and UI served by the container.
+- **Why**: it is the delivered artifact that is tested, not the sources of the runtime.
+- **Note**: TypeScript 7.0.2 compiles `new (x as T).Builder()` without the parentheses; only the
+  compiled JavaScript (dist) shows it, Vitest compiling the sources differently. The e2e test,
+  which runs the dist, revealed it; the code avoids this form.
 
-## D30 — Additional et unmanaged save dans un BO managed
+## D30 — Additional and unmanaged save in a managed BO
 
-- **Décision** : `managed with additional save` et `managed with unmanaged save` (en-tête de la
-  BDEF, ou `with additional save` / `with unmanaged save` par entité, `with full data` accepté)
-  sont pris en charge, avec la classe saver locale du behavior pool (`lsc_…` héritant de
-  `cl_abap_behavior_saver` ou `cl_abap_behavior_saver_failed`) : `save_modified` (obligatoire) et
-  `cleanup`. Additional save : le runtime écrit les tables persistantes, puis appelle
-  `save_modified`. Unmanaged save : l'entité n'a pas de table persistante, le runtime lit et
-  verrouille les instances à travers la vue CDS et `save_modified` les écrit.
-- **Réalisation** :
-  - types dérivés `TYPE TABLE FOR CHANGE`, `TYPE REQUEST FOR CHANGE` et `TYPE REQUEST FOR DELETE` ;
-    la passe de réécriture déclare `save_modified` avec ses paramètres (`create`, `update`,
-    `delete`, `reported`, et `failed` pour `cl_abap_behavior_saver_failed`) ; `adjust_numbers`
-    (late numbering) est refusé (ABP007) ;
-  - les écritures ABAP SQL ne sont permises que dans la classe saver (ABP007 ailleurs) et, à
-    l'exécution, pendant `save_modified` seulement. Les formes propres à RAP
-    (`… FROM [TABLE] @source [INDICATORS SET STRUCTURE %control] MAPPING FROM ENTITY`), que le
-    transpiler ne connaît pas, sont abaissées vers le kernel, qui applique le mapping de la BDEF
-    et écrit avec les types de la base, valeurs exactes ;
-  - les autres écritures passent par le transpiler et les vues du schéma `rapt_abap` (D26) : un
-    trigger `INSTEAD OF` par table écrit la table, valeurs reconverties depuis leur forme ABAP
-    (fonctions `rapt_abap.to_date`, `to_uuid`, `to_timestamp`…) ;
-  - les lignes de `update` portent toutes les valeurs (comme `with full data`), `%control` les
-    champs modifiés ; `delete` contient aussi les compositions supprimées en cascade ;
-  - un `failed` du saver (`cl_abap_behavior_saver_failed`) annule la LUW, comme une validation ;
-    les messages de `reported` sont renvoyés au client ;
-  - toutes les tables transparentes du projet entrent dans le modèle (base et types du
-    transpiler), pas seulement celles des vues CDS et des tables persistantes : une table de log
-    ou de contrôle est lisible et inscriptible par l'ABAP SQL. Une table qu'aucune entité
-    n'utilise et qui ne peut être construite est laissée de côté (information DDIC005).
-- **Défaut du transpiler contourné** : `DELETE dbtab FROM @wa` lui fait perdre la ligne, et la
-  requête supprimerait toute la table : refusé à la compilation (ABP007) et, par sécurité, un
-  `DELETE` sans condition est refusé à l'exécution.
-- **Pourquoi** : c'est le moyen RAP d'écrire des tables existantes ou de journaliser les
-  changements d'un BO, fréquent dans les projets réels ; l'ABAP SQL du saver réutilise les vues de
-  D26.
+- **Decision**: `managed with additional save` and `managed with unmanaged save` (header of the
+  BDEF, or `with additional save` / `with unmanaged save` per entity, `with full data` accepted)
+  are supported, with the local saver class of the behavior pool (`lsc_…` inheriting from
+  `cl_abap_behavior_saver` or `cl_abap_behavior_saver_failed`): `save_modified` (mandatory) and
+  `cleanup`. Additional save: the runtime writes the persistent tables, then calls
+  `save_modified`. Unmanaged save: the entity has no persistent table, the runtime reads and
+  locks the instances through the CDS view and `save_modified` writes them.
+- **Implementation**:
+  - derived types `TYPE TABLE FOR CHANGE`, `TYPE REQUEST FOR CHANGE` and
+    `TYPE REQUEST FOR DELETE`; the rewriting pass declares `save_modified` with its parameters
+    (`create`, `update`, `delete`, `reported`, and `failed` for `cl_abap_behavior_saver_failed`);
+    `adjust_numbers` (late numbering) is refused (ABP007);
+  - ABAP SQL writes are only allowed in the saver class (ABP007 elsewhere) and, at runtime,
+    during `save_modified` only. The RAP-specific forms
+    (`… FROM [TABLE] @source [INDICATORS SET STRUCTURE %control] MAPPING FROM ENTITY`), which the
+    transpiler does not know, are lowered to the kernel, which applies the mapping of the BDEF
+    and writes with the types of the database, exact values;
+  - the other writes go through the transpiler and the views of the `rapt_abap` schema (D26): an
+    `INSTEAD OF` trigger per table writes the table, values converted back from their ABAP form
+    (functions `rapt_abap.to_date`, `to_uuid`, `to_timestamp`…);
+  - the rows of `update` carry all the values (like `with full data`), `%control` the changed
+    fields; `delete` also contains the compositions deleted in cascade;
+  - a `failed` of the saver (`cl_abap_behavior_saver_failed`) rolls back the LUW, like a
+    validation; the messages of `reported` are returned to the client;
+  - all the transparent tables of the project enter the model (database and types of the
+    transpiler), not only those of the CDS views and of the persistent tables: a log or control
+    table can be read and written by ABAP SQL. A table no entity uses and that cannot be built is
+    left aside (information DDIC005).
+- **Transpiler defect worked around**: `DELETE dbtab FROM @wa` makes it lose the row, and the
+  query would delete the whole table: refused at compile time (ABP007) and, for safety, a
+  `DELETE` without a condition is refused at runtime.
+- **Why**: it is the RAP way to write existing tables or to log the changes of a BO, frequent in
+  real projects; the ABAP SQL of the saver reuses the views of D26.
 
-## D31 — Consommation d'API distantes dans l'ABP (HTTP, client proxy OData, SCM et SCM2)
+## D31 — Consuming remote APIs in the ABP (HTTP, OData client proxy, SCM and SCM2)
 
-- **Décision** : un behavior pool peut appeler des API distantes avec les API d'ABAP Cloud,
-  réécrites en clean-room d'après leurs signatures publiques :
-  - client HTTP : `cl_http_destination_provider` (`create_by_url`,
+- **Decision**: a behavior pool can call remote APIs with the APIs of ABAP Cloud, rewritten in
+  clean-room from their public signatures:
+  - HTTP client: `cl_http_destination_provider` (`create_by_url`,
     `create_by_comm_arrangement`, `create_by_cloud_destination`), `cl_web_http_client_manager`,
-    `if_web_http_client`, `if_web_http_request` (chemin, requête, en-têtes, corps texte ou
-    binaire, formulaire, authentification basic ou bearer), `if_web_http_response`,
-    `if_web_http_header`, `if_a4c_cp_service` ;
-  - client proxy OData du service consumption model : `/iwbep/cl_cp_factory_remote` et
-    `cl_web_odata_client_factory` (`create_v2_remote_proxy`, `create_v4_remote_proxy`) ;
-    lecture de liste (`create_by_range` des filtres combinés par `and`/`or`/`not`, `$select`,
-    `$orderby`, `$top`, `$skip`, `request_count`, `request_no_business_data`), lecture par clé
-    (`navigate_with_key`), création, mise à jour (`PATCH`/`PUT`, propriétés fournies,
-    `set_if_match`), suppression ;
+    `if_web_http_client`, `if_web_http_request` (path, query, headers, text or binary body, form,
+    basic or bearer authentication), `if_web_http_response`, `if_web_http_header`,
+    `if_a4c_cp_service`;
+  - OData client proxy of the service consumption model: `/iwbep/cl_cp_factory_remote` and
+    `cl_web_odata_client_factory` (`create_v2_remote_proxy`, `create_v4_remote_proxy`); list read
+    (`create_by_range` of the filters combined with `and`/`or`/`not`, `$select`, `$orderby`,
+    `$top`, `$skip`, `request_count`, `request_no_business_data`), read by key
+    (`navigate_with_key`), create, update (`PATCH`/`PUT`, provided properties, `set_if_match`),
+    delete;
   - exceptions `cx_http_dest_provider_error`, `cx_web_http_client_error`,
     `cx_web_message_error`, `/iwbep/cx_gateway`, `/iwbep/cx_cp_remote` (`http_status_code`,
-    `http_error_body`), avec le texte de l'erreur pour `get_text( )`.
-- **Destinations** : sur SAP, elles viennent du destination service de BTP ou d'un
-  communication arrangement ; l'application générée les lit dans son environnement :
-  `DESTINATION_<NOM>_URL`, puis `_USER` et `_PASSWORD` (basic), `_TOKEN` (bearer) ou `_HEADERS`
-  (objet JSON : clé d'API…). `<NOM>` est le nom de `create_by_cloud_destination`, ou
-  `<SCENARIO>_<SERVICE_ID>` puis `<SCENARIO>` pour `create_by_comm_arrangement`
-  (`comm_system_id` ignoré). Les identifiants restent dans le noyau : l'ABAP ne voit que l'URL.
-  `rapt build` liste les destinations nommées par des littéraux dans le `.env.example` et le
-  README de l'application.
-- **Service consumption model** :
-  - SCM2 : la classe de modèle de consommation (`INHERITING FROM
-    /iwbep/cl_v4_abs_pm_model_prov`) est gardée pour ses types (`tys_…`, `tyt_…`) et ses
-    constantes (`gcs_entity_set`, `gcs_entity_type`) ; la passe de réécriture retire la
-    définition du modèle (`define`, `def_…`), écrite avec les interfaces `/iwbep/if_v4_pm_*` de
-    SAP Gateway ;
-  - SCM : les entités abstraites générées (champs `_vc` de value control compris) typent les
-    données ; ce sont des structures pour l'ABAP (DDIC ombre). La définition de service générée
-    pour le client proxy n'a pas de binding : quand il y a plusieurs définitions, celle qui a un
-    binding est construite (SRVD007) ;
-  - le proxy lit le `$metadata` du service distant une fois : entity sets, clés, types des
-    propriétés. Les noms internes de l'ABAP (`TRAVEL_ID`, `'TRAVEL'`) sont rapprochés des noms
-    EDM sans tenir compte de la casse ni des `_` (`TravelID`). Les valeurs sont converties selon
-    le type EDM et le type ABAP : dates, heures, horodatages (`/Date(ms)/` en V2, ISO en V4 avec
-    la précision de la propriété), UUID, décimaux exacts en texte (`IEEE754Compatible=true` en
-    V4), booléens, binaire ; les blancs de fin des champs `c` ne sont pas envoyés ; l'ETag
-    (`@odata.etag`, `__metadata.etag`) remplit le composant `etag` des classes SCM2 ;
-  - requêtes modifiantes : jeton CSRF demandé par `HEAD` sur la racine du service
-    (`X-CSRF-Token: Fetch`, désactivable par `iv_do_fetch_csrf_token`), cookies de session
-    conservés, nouvel essai avec un nouveau jeton après `403` + `X-CSRF-Token: Required`, comme
-    SAP Gateway le demande.
-- **Réalisation** : l'ABAP garde l'état des objets (requête, en-têtes, filtres) ; le noyau
-  (`ZRAP_EML`) fait les appels réseau (`fetch` de Node.js, 60 s par défaut ou `i_timeout`), lit
-  le `$metadata` (fast-xml-parser, déjà utilisé par le compilateur) et convertit les valeurs.
-- **Pourquoi** : appeler une API depuis une action, une détermination ou une validation est un
-  besoin courant (extension side-by-side, enrichissement, contrôle d'un autre système) ; le
-  développeur garde le code qu'il écrit sur SAP. Les classes de SAP Gateway n'existent pas hors
-  d'un système SAP : elles sont réimplémentées, sans code SAP.
-- **Tests** : `rap-variant-remote.test.ts` (API REST : destination avec basic auth, en-têtes,
-  statut, destination absente, connexion refusée ; OData V4 avec une classe SCM2 vers
-  l'application de la fixture servie sur un port : filtre, `$select`, `$orderby`, `$top`,
-  `$count`, lecture par clé ; écritures V4 vers un service simulé : CSRF, cookies, ETags,
-  renouvellement du jeton, erreur 409 ; OData V2 avec l'entité abstraite d'un SCM :
-  `d.results`, `__count`, `/Date()/`), `http-client.test.ts`, `app-scaffold.test.ts`.
+    `http_error_body`), with the text of the error for `get_text( )`.
+- **Destinations**: on SAP, they come from the destination service of BTP or from a
+  communication arrangement; the generated application reads them from its environment:
+  `DESTINATION_<NAME>_URL`, then `_USER` and `_PASSWORD` (basic), `_TOKEN` (bearer) or
+  `_HEADERS` (JSON object: API key…). `<NAME>` is the name of `create_by_cloud_destination`, or
+  `<SCENARIO>_<SERVICE_ID>` then `<SCENARIO>` for `create_by_comm_arrangement`
+  (`comm_system_id` ignored). The credentials stay in the kernel: the ABAP only sees the URL.
+  `rapt build` lists the destinations named by literals in the `.env.example` and the README of
+  the application.
+- **Service consumption model**:
+  - SCM2: the consumption model class (`INHERITING FROM /iwbep/cl_v4_abs_pm_model_prov`) is kept
+    for its types (`tys_…`, `tyt_…`) and its constants (`gcs_entity_set`, `gcs_entity_type`); the
+    rewriting pass removes the definition of the model (`define`, `def_…`), written with the
+    `/iwbep/if_v4_pm_*` interfaces of SAP Gateway;
+  - SCM: the generated abstract entities (`_vc` value control fields included) type the data;
+    they are structures for the ABAP (shadow DDIC). The service definition generated for the
+    client proxy has no binding: when there are several definitions, the one with a binding is
+    built (SRVD007);
+  - the proxy reads the `$metadata` of the remote service once: entity sets, keys, types of the
+    properties. The internal ABAP names (`TRAVEL_ID`, `'TRAVEL'`) are matched with the EDM names
+    ignoring case and `_` (`TravelID`). The values are converted according to the EDM type and
+    the ABAP type: dates, times, timestamps (`/Date(ms)/` in V2, ISO in V4 with the precision of
+    the property), UUIDs, exact decimals as text (`IEEE754Compatible=true` in V4), booleans,
+    binary; the trailing blanks of the `c` fields are not sent; the ETag (`@odata.etag`,
+    `__metadata.etag`) fills the `etag` component of the SCM2 classes;
+  - modifying requests: CSRF token requested with `HEAD` on the root of the service
+    (`X-CSRF-Token: Fetch`, can be disabled with `iv_do_fetch_csrf_token`), session cookies
+    kept, retry with a new token after `403` + `X-CSRF-Token: Required`, as SAP Gateway requires.
+- **Implementation**: the ABAP keeps the state of the objects (request, headers, filters); the
+  kernel (`ZRAP_EML`) makes the network calls (`fetch` of Node.js, 60 s by default or
+  `i_timeout`), reads the `$metadata` (fast-xml-parser, already used by the compiler) and
+  converts the values.
+- **Why**: calling an API from an action, a determination or a validation is a common need
+  (side-by-side extension, enrichment, check against another system); the developer keeps the
+  code they write on SAP. The SAP Gateway classes do not exist outside an SAP system: they are
+  reimplemented, without SAP code.
+- **Tests**: `rap-variant-remote.test.ts` (REST API: destination with basic auth, headers,
+  status, missing destination, refused connection; OData V4 with an SCM2 class to the
+  application of the fixture served on a port: filter, `$select`, `$orderby`, `$top`, `$count`,
+  read by key; V4 writes to a simulated service: CSRF, cookies, ETags, token renewal, 409 error;
+  OData V2 with the abstract entity of an SCM: `d.results`, `__count`, `/Date()/`),
+  `http-client.test.ts`, `app-scaffold.test.ts`.
 
-## D32 — ETag dépendant et ETag dans un change set
+## D32 — Dependent ETag and ETag in a change set
 
-- **Décision** : une entité `etag dependent by _Assoc` a l'ETag de son maître : l'ETag est la
-  valeur du champ ETag de l'instance maître atteinte par les associations `by` (une ou plusieurs,
-  jusqu'à un `etag master`). Le service l'expose (`@odata.etag` des instances, en-tête `ETag`,
-  `Core.OptimisticConcurrency` avec le chemin `_Travel/LocalLastChangedAt`) et contrôle
-  `If-Match` sur les modifications de l'entité dépendante (428 sans en-tête, 412 si périmé).
-- **Le maître change avec ses dépendants** : la règle SAP veut que le champ ETag soit mis à jour
-  à chaque changement de l'instance qu'il couvre ; quand une instance dépendante est créée,
-  modifiée ou supprimée, le runtime met à jour le champ ETag du maître s'il le gère (horodatage
-  administratif `localInstanceLastChangedAt` ou `lastChangedAt`, maître écrit par le runtime),
-  une fois par LUW, au moment de la sauvegarde. Un maître en unmanaged save ou avec un autre
-  champ ETag doit être mis à jour par l'application.
-- **`If-Match` dans un change set** : il est comparé à l'ETag de l'instance au début de la LUW,
-  l'état que le client a lu. Les requêtes d'un change set portent les ETags lus avant lui : une
-  modification antérieure du même change set (la requête précédente, ou une détermination qui
-  recalcule le voyage quand une réservation change) ne les rend pas périmés. Les modifications
-  des autres clients restent détectées : la LUW verrouille les instances qu'elle modifie.
-- **Pourquoi** : sans cela, l'Object Page d'un BO non draft qui enregistre un voyage et ses
-  réservations dans un même change set échouerait en 412 dès qu'une détermination touche le
-  voyage ; et une entité dépendante n'aurait aucune protection de concurrence.
-- **Réalisation** : modèle OData (`etagPath`), CSDL, lecture (sous-requêtes scalaires le long des
-  navigations, dans les listes, les lectures unitaires et `$expand`), contrôle d'écriture
-  (`Transaction.etagValue`), mise à jour du maître (`refreshEtagMasters`, avant l'écriture).
-  Tests : `rap-variant-etag.test.ts`.
+- **Decision**: an `etag dependent by _Assoc` entity has the ETag of its master: the ETag is the
+  value of the ETag field of the master instance reached through the `by` associations (one or
+  several, up to an `etag master`). The service exposes it (`@odata.etag` of the instances,
+  `ETag` header, `Core.OptimisticConcurrency` with the path `_Travel/LocalLastChangedAt`) and
+  checks `If-Match` on the changes of the dependent entity (428 without the header, 412 when
+  stale).
+- **The master changes with its dependents**: the SAP rule is that the ETag field is updated on
+  each change of the instance it covers; when a dependent instance is created, changed or
+  deleted, the runtime updates the ETag field of the master when it manages it (administrative
+  timestamp `localInstanceLastChangedAt` or `lastChangedAt`, master written by the runtime), once
+  per LUW, at save time. A master with unmanaged save or with another ETag field must be updated
+  by the application.
+- **`If-Match` in a change set**: it is compared with the ETag of the instance at the beginning
+  of the LUW, the state the client read. The requests of a change set carry the ETags read before
+  it: an earlier change in the same change set (the previous request, or a determination that
+  recomputes the travel when a booking changes) does not make them stale. The changes of the
+  other clients are still detected: the LUW locks the instances it changes.
+- **Why**: without it, the Object Page of a non-draft BO that saves a travel and its bookings in
+  one change set would fail with 412 as soon as a determination touches the travel; and a
+  dependent entity would have no concurrency protection.
+- **Implementation**: OData model (`etagPath`), CSDL, read (scalar subqueries along the
+  navigations, in the lists, the single reads and `$expand`), write check
+  (`Transaction.etagValue`), update of the master (`refreshEtagMasters`, before the write).
+  Tests: `rap-variant-etag.test.ts`.
 
-## D33 — PGlite et Keycloak éprouvés de bout en bout
+## D33 — PGlite and Keycloak proven end to end
 
-- **PGlite** (`PGLITE_DIR`) : le test e2e démarre l'application générée sur sa base embarquée,
-  crée un voyage, l'arrête et la redémarre : le schéma est réappliqué (idempotent) et les données
-  sont là. Le test a révélé que l'application ne démarrait pas sur PGlite : le schéma était
-  envoyé en une requête de plusieurs instructions, que le protocole étendu de PGlite refuse
-  (`cannot insert multiple commands into a prepared statement`). Il est désormais découpé en
-  instructions (`splitStatements` : littéraux, identifiants, corps `$f$…$f$` et commentaires
-  respectés) et appliqué dans une transaction.
-- **Keycloak** : `keycloak.test.ts` joue le navigateur contre un vrai Keycloak avec le realm
-  généré : redirection vers Keycloak, envoi du formulaire de connexion d'`alice`, retour sur
-  `/auth/callback` (code d'autorisation avec PKCE), session sur l'UI et sur le service OData
-  (jeton CSRF, création attribuée à `ALICE`), déconnexion vers le point de fin de session de
-  Keycloak ; puis un jeton porteur émis par Keycloak (client public créé par l'API
-  d'administration, password grant) vérifié par le JWKS, et un jeton falsifié refusé. Exécuté
-  contre la distribution Keycloak 26.8.2 (Maven Central, Java 21) dans l'environnement de
-  développement, et en CI contre l'image du `docker-compose.yml` généré (`--profile oidc`).
-- **CI** : le contrôle de santé du service PostgreSQL utilise `pg_isready -U postgres`.
+- **PGlite** (`PGLITE_DIR`): the e2e test starts the generated application on its embedded
+  database, creates a travel, stops it and starts it again: the schema is applied again
+  (idempotent) and the data is there. The test revealed that the application did not start on
+  PGlite: the schema was sent as one query of several statements, which the extended protocol of
+  PGlite refuses (`cannot insert multiple commands into a prepared statement`). It is now split
+  into statements (`splitStatements`: literals, identifiers, `$f$…$f$` bodies and comments
+  respected) and applied in a transaction.
+- **Keycloak**: `keycloak.test.ts` plays the browser against a real Keycloak with the generated
+  realm: redirect to Keycloak, submission of the sign-in form of `alice`, return to
+  `/auth/callback` (authorization code with PKCE), session on the UI and on the OData service
+  (CSRF token, creation attributed to `ALICE`), sign-out to the end-session endpoint of Keycloak;
+  then a bearer token issued by Keycloak (public client created through the admin API, password
+  grant) verified by the JWKS, and a forged token refused. Run against the Keycloak 26.8.2
+  distribution (Maven Central, Java 21) in the development environment, and in CI against the
+  image of the generated `docker-compose.yml` (`--profile oidc`).
+- **CI**: the health check of the PostgreSQL service uses `pg_isready -U postgres`.
 
-## D34 — Autorisations : objets d'autorisation, rôles OIDC, AUTHORITY-CHECK
+## D34 — Authorizations: authorization objects, OIDC roles, AUTHORITY-CHECK
 
-- **Problème** : l'ABAP environment répartit les autorisations entre l'IAM (IAM apps, business
-  catalogs, business roles avec leurs restrictions, affectés aux business users) et le code
-  (`AUTHORITY-CHECK` dans les handlers, contrôles d'accès DCL). Hors SAP, il n'y a pas d'IAM ;
-  OIDC authentifie et transporte des rôles, mais ne dit pas quelles valeurs d'objets
-  d'autorisation un rôle accorde. Le transpiler, lui, traduit `AUTHORITY-CHECK` en un appel à
-  une classe noyau `KERNEL_AUTHORITY_CHECK` que l'application ne fournissait pas : l'instruction
-  compilait mais échouait à l'exécution (500).
-- **Décision** :
-  - les objets d'autorisation viennent des sources abapGit (SUSO : champs `FIEL1…`, activités
-    `TACTZ`), ou de la section `objects` du fichier des rôles ;
-  - les rôles sont dans `rapt/authorizations.json`, à la racine du projet abapGit, versionné avec
-    les sources (hors du dossier `src/`, abapGit l'ignore) : nom du rôle de l'IdP → autorisations,
-    instances d'objets avec leurs valeurs, comme une business role et ses restrictions ;
-  - valeurs à la manière de PFCG : valeur, motif `07*`, `*`, plage `{ "from", "to" }`, et valeurs
-    issues d'un claim du jeton (`{claim:agency}` : l'agence de l'utilisateur, attribut de l'IdP),
-    pour ne pas créer un rôle par valeur ;
-  - `AUTHORITY-CHECK` est évalué par le noyau sur les rôles de l'utilisateur de la requête :
-    `sy-subrc` 0 quand une autorisation de l'objet accepte tous les champs vérifiés (`DUMMY` n'est
-    pas vérifié), 4 sinon, 12 sans autorisation pour l'objet, 40 pour `FOR USER` d'un autre
-    utilisateur ; le code ABAP reste celui de SAP ;
-  - l'IdP (Keycloak, Entra ID, SAP Cloud Identity Services…) affecte les rôles aux utilisateurs
-    (`OIDC_ROLES_CLAIM`) et porte les attributs ; l'application garde les claims lus par les rôles
-    (session comprise) ; `OIDC_REQUIRED_ROLE` reste le droit d'accès à l'application ;
-  - en développement (`AUTH_MODE=none`), l'utilisateur a toutes les autorisations (comme SAP_ALL
-    dans un système de développement), sauf si `DEV_ROLES` (et `DEV_ATTRIBUTES`) sont donnés ;
-    `AUTHORIZATIONS_FILE` remplace les rôles au déploiement ;
-  - le compilateur contrôle les rôles contre les objets (AUTH001…AUTH004) et les
-    `AUTHORITY-CHECK` du code (ABP010, ABP011) ; le realm Keycloak généré contient les rôles
-    (donnés à `alice`), un attribut utilisateur déclaré dans le profil et un mapper vers le jeton
-    pour chaque claim lu.
-- **Pourquoi** : le même behavior pool tourne sur SAP et ici ; la définition des rôles reste
-  revue et versionnée comme les objets IAM ; l'administration des utilisateurs reste dans l'IdP.
-- **Fixture** : le BO de référence vérifie l'objet `ZAO_TRAVL` (activité, agence) dans ses
-  autorisations globale et d'instance, comme le scénario de référence /DMO/ de SAP ; rôles
-  `travel_manager`, `travel_agent` (agence du claim `agency`), `travel_viewer`.
-- **Tests** : `rap-authorizations.test.ts` (jetons signés localement), `authorizations.test.ts`
-  (sémantique de `sy-subrc`), `authorizations.test.ts` du compilateur (diagnostics),
-  `keycloak.test.ts` (un agent créé dans Keycloak avec son attribut d'agence).
+- **Problem**: the ABAP environment splits the authorizations between the IAM (IAM apps,
+  business catalogs, business roles with their restrictions, assigned to business users) and the
+  code (`AUTHORITY-CHECK` in the handlers, DCL access controls). Outside SAP, there is no IAM;
+  OIDC authenticates and carries roles, but does not say which values of authorization objects a
+  role grants. The transpiler translates `AUTHORITY-CHECK` into a call to a kernel class
+  `KERNEL_AUTHORITY_CHECK` the application did not provide: the statement compiled but failed at
+  runtime (500).
+- **Decision**:
+  - the authorization objects come from the abapGit sources (SUSO: fields `FIEL1…`, activities
+    `TACTZ`), or from the `objects` section of the roles file;
+  - the roles are in `rapt/authorizations.json`, at the root of the abapGit project, versioned
+    with the sources (outside the `src/` folder, abapGit ignores it): name of the role of the
+    IdP → authorizations, instances of objects with their values, like a business role and its
+    restrictions;
+  - values in the PFCG way: value, pattern `07*`, `*`, range `{ "from", "to" }`, and values from
+    a claim of the token (`{claim:agency}`: the agency of the user, attribute of the IdP), so as
+    not to create one role per value;
+  - `AUTHORITY-CHECK` is evaluated by the kernel on the roles of the user of the request:
+    `sy-subrc` 0 when an authorization of the object accepts all the checked fields (`DUMMY` is
+    not checked), 4 otherwise, 12 without an authorization for the object, 40 for `FOR USER` of
+    another user; the ABAP code stays the one of SAP;
+  - the IdP (Keycloak, Entra ID, SAP Cloud Identity Services…) assigns the roles to the users
+    (`OIDC_ROLES_CLAIM`) and carries the attributes; the application keeps the claims read by the
+    roles (session included); `OIDC_REQUIRED_ROLE` stays the right to access the application;
+  - in development (`AUTH_MODE=none`), the user has all the authorizations (like SAP_ALL in a
+    development system), unless `DEV_ROLES` (and `DEV_ATTRIBUTES`) are given;
+    `AUTHORIZATIONS_FILE` replaces the roles on deployment;
+  - the compiler checks the roles against the objects (AUTH001…AUTH004) and the
+    `AUTHORITY-CHECK`s of the code (ABP010, ABP011); the generated Keycloak realm contains the
+    roles (given to `alice`), a user attribute declared in the profile and a mapper to the token
+    for each claim read.
+- **Why**: the same behavior pool runs on SAP and here; the definition of the roles stays
+  reviewed and versioned like the IAM objects; the administration of the users stays in the IdP.
+- **Fixture**: the reference BO checks the `ZAO_TRAVL` object (activity, agency) in its global
+  and instance authorizations, like the /DMO/ reference scenario of SAP; roles `travel_manager`,
+  `travel_agent` (agency from the `agency` claim), `travel_viewer`.
+- **Tests**: `rap-authorizations.test.ts` (locally signed tokens), `authorizations.test.ts`
+  (semantics of `sy-subrc`), `authorizations.test.ts` of the compiler (diagnostics),
+  `keycloak.test.ts` (an agent created in Keycloak with their agency attribute).
 
-## D35 — Contrôles d'accès (DCL) sur les lectures
+## D35 — Access controls (DCL) on the reads
 
-- **Décision** : les rôles CDS des sources abapGit (objets DCLS : `define role R { grant select
-  on E where … ; }`) restreignent les lignes que le service OData renvoie à l'utilisateur de la
-  requête, dans les listes, `$count`, les lectures unitaires, `$expand` et les navigations. Une
-  ligne est accordée quand une condition d'un rôle de l'entité est vraie ; une entité sans rôle
-  est lisible entièrement (comme en ABAP CDS).
-- **Conditions évaluées** : `( E1, E2 ) = aspect pfcg_auth( OBJ, F1, F2, ACTVT = '03' )` sur les
-  autorisations de l'utilisateur (D34 : valeurs, motifs, plages, claims ; aucune autorisation →
-  aucune ligne), `E ?= aspect user` / `= aspect user` (nom ABAP de l'utilisateur), comparaisons à
-  des littéraux (format ABAP : dates `YYYYMMDD`), `like`, `is [not] null`, `and`, `or`, `not`,
-  parenthèses, chemins d'une association to-one (`_Travel.AgencyID`, lu par une sous-requête sur
-  la vue cible) et `inheriting conditions from entity B` : une projection reprend les
-  conditions de sa vue de base, ses éléments renommés comme elle les expose.
-- **Sécurité** : ce qui n'est pas évaluable (autres aspects, chemins plus longs, élément non
-  exposé par la projection) n'accorde rien (refus par défaut), avec un diagnostic (DCL002,
-  DCL003). Une lecture hors requête n'accorde rien. L'utilisateur de développement sans
-  `DEV_ROLES` n'est pas restreint.
-- **Ce qui n'est pas filtré** : l'EML et l'ABAP SQL du behavior pool (comme `WITH PRIVILEGED
-  ACCESS`) ; les modifications passent par l'autorisation d'instance, comme dans RAP.
-- **Réalisation** : parseur DCL (`dcl/parser.ts`), résolution pour les entités exposées
-  (`ir/access-controls.ts`, conditions dans `model.accessControls`), condition SQL calculée par
-  requête (`odata/access.ts`, utilisateur porté par un `AsyncLocalStorage`) et ajoutée au `WHERE`
-  du moteur de lecture.
-- **Fixture** : rôles `ZRT_R_TRAVEL` (agence par `pfcg_auth( ZAO_TRAVL, ZAGENCY, ACTVT = '03' )`),
-  `ZRT_C_TRAVEL` (hérite de la vue de base), `ZRT_C_BOOKING` (agence du voyage,
-  `_Travel.AgencyID`).
+- **Decision**: the CDS roles of the abapGit sources (DCLS objects: `define role R { grant select
+  on E where … ; }`) restrict the rows the OData service returns to the user of the request, in
+  the lists, `$count`, the single reads, `$expand` and the navigations. A row is granted when a
+  condition of a role of the entity is true; an entity without a role is fully readable (as in
+  ABAP CDS).
+- **Evaluated conditions**: `( E1, E2 ) = aspect pfcg_auth( OBJ, F1, F2, ACTVT = '03' )` on the
+  authorizations of the user (D34: values, patterns, ranges, claims; no authorization → no row),
+  `E ?= aspect user` / `= aspect user` (ABAP name of the user), comparisons with literals (ABAP
+  format: dates `YYYYMMDD`), `like`, `is [not] null`, `and`, `or`, `not`, parentheses, paths of a
+  to-one association (`_Travel.AgencyID`, read by a subquery on the target view) and
+  `inheriting conditions from entity B`: a projection takes the conditions of its base view, its
+  elements renamed as it exposes them.
+- **Security**: what cannot be evaluated (other aspects, longer paths, element not exposed by the
+  projection) grants nothing (deny by default), with a diagnostic (DCL002, DCL003). A read outside
+  a request grants nothing. The development user without `DEV_ROLES` is not restricted.
+- **What is not filtered**: the EML and the ABAP SQL of the behavior pool (like
+  `WITH PRIVILEGED ACCESS`); the changes go through the instance authorization, as in RAP.
+- **Implementation**: DCL parser (`dcl/parser.ts`), resolution for the exposed entities
+  (`ir/access-controls.ts`, conditions in `model.accessControls`), SQL condition computed per
+  request (`odata/access.ts`, user carried by an `AsyncLocalStorage`) and added to the `WHERE` of
+  the read engine.
+- **Fixture**: roles `ZRT_R_TRAVEL` (agency through
+  `pfcg_auth( ZAO_TRAVL, ZAGENCY, ACTVT = '03' )`), `ZRT_C_TRAVEL` (inherits from the base view),
+  `ZRT_C_BOOKING` (agency of the travel, `_Travel.AgencyID`).
 
-## D36 — Autorisations dans les indications aux consommateurs (UI)
+## D36 — Authorizations in the consumer hints (UI)
 
-- **Décision** : comme RAP, qui présente le feature control et le contrôle d'autorisation sous
-  forme d'indications aux consommateurs, les entités dont le BO a des handlers d'autorisation
-  (maître avec handler global ou d'instance, ou entité dépendante d'un tel maître) exposent
-  `__EntityControl` (`Updatable`, `Deletable`) et `__OperationControl` (actions d'instance,
-  création par association) ; leurs valeurs combinent, pour l'utilisateur de la requête, les
-  feature controls et les autorisations globale et d'instance. Le `$metadata` les annonce
-  (`UpdateRestrictions`, `DeleteRestrictions`, `NavigationRestrictions` par chemin,
-  `Core.OperationAvailable`), utilisables aussi par une application Fiori elements.
-- **Création** : elle ne dépend d'aucune instance ; le service répond à `GET <racine>$permissions`
-  (créations permises par entity set : autorisation globale et feature control global) et l'UI
-  générée masque Create quand elle est refusée.
-- **Création par association** : pour l'entité maître, elle a son propre indicateur
-  (`%assoc-_Booking`), comme sur SAP ; pour une entité dépendante, l'autorisation d'update du
-  maître s'applique. La fixture accorde la création des réservations avec l'update du voyage.
-- **Tests** : `rap-authorizations.test.ts` (contrôles par profil, `$permissions`, création de
-  réservations), `ui-authorizations.test.ts` (navigateur : un viewer ne voit pas Create, Edit,
-  Delete et l'action sont désactivés).
+- **Decision**: like RAP, which presents the feature control and the authorization check as
+  consumer hints, the entities whose BO has authorization handlers (master with a global or
+  instance handler, or entity dependent on such a master) expose `__EntityControl` (`Updatable`,
+  `Deletable`) and `__OperationControl` (instance actions, create by association); their values
+  combine, for the user of the request, the feature controls and the global and instance
+  authorizations. The `$metadata` announces them (`UpdateRestrictions`, `DeleteRestrictions`,
+  `NavigationRestrictions` per path, `Core.OperationAvailable`), usable by a Fiori elements
+  application as well.
+- **Creation**: it depends on no instance; the service answers `GET <root>$permissions` (creations
+  allowed per entity set: global authorization and global feature control) and the generated UI
+  hides Create when it is refused.
+- **Create by association**: for the master entity, it has its own indicator
+  (`%assoc-_Booking`), as on SAP; for a dependent entity, the update authorization of the master
+  applies. The fixture grants the creation of bookings with the update of the travel.
+- **Tests**: `rap-authorizations.test.ts` (checks per profile, `$permissions`, creation of
+  bookings), `ui-authorizations.test.ts` (browser: a viewer does not see Create, Edit, Delete and
+  the action are disabled).
 
-## D37 — Launchpad des applications (OpenUI5)
+## D37 — Launchpad of the applications (OpenUI5)
 
-- **Décision** : `rapt launchpad <launchpad.json> --out <dossier>` génère un launchpad,
-  l'équivalent du SAP Fiori launchpad construit avec OpenUI5. Le shell de SAP (`sap.ushell`)
-  n'existe que dans SAPUI5, sous licence SAP, et la règle du projet l'exclut. Le launchpad est
-  fait de `sap.f.ShellBar` (accueil, recherche des tuiles, menu utilisateur avec déconnexion) et
-  de groupes de `sap.m.GenericTile`. Une tuile dynamique (`NumericContent`) affiche le `$count`
-  d'un entity set, avec un filtre éventuel. La navigation se fait par intent (`/#Travel-manage`,
-  `/go/Travel-manage?…`).
-- **Contenu** : `launchpad.json` est versionné avec les sources, comme le contenu du launchpad
-  (catalogues, groupes, tuiles, target mappings). Il liste les applications (dossier généré par
-  `rapt build`, URL interne) et les groupes de tuiles. Une tuile est affectée à des rôles de
-  l'IdP, l'équivalent du business catalog d'un business role ; sans rôle, tout utilisateur la
-  voit. Le compilateur résout les chemins de service et contrôle les entity sets des compteurs,
-  les intents et les rôles (`LPD001` à `LPD007`) ; il reprend les rôles et les claims des
-  applications pour le realm et la session.
-- **Architecture, une seule origine** : le serveur front-end de SAP sert le launchpad, les
-  applications et leurs services sous un même domaine. Ici, le serveur du launchpad monte l'UI de
-  chaque application sous `/apps/<id>/` et relaie ses services à leurs propres chemins
-  (`/sap/opu/odata4/…`, uniques par service) ; les redirections des applications sont réécrites
-  sous leur point de montage. Le navigateur ne voit qu'une origine : pas de CORS, l'UI lit les
-  compteurs directement, les cookies sont partagés.
-- **Connexion unique** : le launchpad ouvre la session OIDC (code + PKCE). Les applications
-  derrière lui ont le même `SESSION_SECRET` (et le client et `PUBLIC_URL` du launchpad) et lisent
-  cette session : utilisateur, rôles, claims lus par leurs autorisations. Chaque application garde
-  ses autorisations (D34), ses contrôles d'accès (D35) et son rôle obligatoire, désormais vérifié
-  à chaque requête : une session ouverte par le launchpad pour un utilisateur sans ce rôle reçoit
-  un 403. Les jetons porteurs des clients d'API sont relayés tels quels.
-- **Déconnexion** : l'ID token de la connexion est gardé dans un cookie HttpOnly séparé
-  (`rapt_idt`) et passé en `id_token_hint` au point de fin de session. Le fournisseur termine
-  alors sa session sans page de confirmation, même avec un jeton expiré, comme le prévoit OIDC
-  RP-Initiated Logout (vérifié avec Keycloak). Cela vaut aussi pour une application seule.
-- **Pourquoi pas le jeton relayé (BFF)** : relayer le jeton d'accès de l'utilisateur aurait
-  demandé de conserver les jetons côté serveur et de les rafraîchir (5 minutes par défaut chez
-  Keycloak). La session signée partagée reste sans état, comme celle des applications (D28).
-- **Dans les applications** : l'UI générée, servie derrière un launchpad (`/launchpad/config`
-  répond), affiche la barre shell du launchpad au-dessus de ses pages (accueil, utilisateur,
-  déconnexion). Seule, elle est inchangée. Chaque application reste déployable seule.
-- **Exploitation** : le dossier généré contient `server.mjs`, un Dockerfile et un
-  `docker-compose.yml` : le launchpad, chaque application construite depuis son dossier avec sa
-  base PostgreSQL, et Keycloak dans le profil `oidc` (client `rapt-launchpad`). S'y ajoutent
-  `.env.example` (`APP_<ID>_URL`) et un README.
-- **Tests** : `runtime/test/launchpad.test.ts` couvre les tuiles par rôle et la connexion contre
-  un fournisseur OIDC de test, puis la lecture de la session par l'application. Il vérifie aussi,
-  à travers la passerelle, le DCL, les autorisations, le CSRF et les jetons porteurs, ainsi que
-  les intents, la réécriture des redirections, le 502 et le rôle obligatoire.
-  `runtime/test/launchpad-ui.test.ts` teste dans le navigateur les tuiles d'un viewer, le
-  compteur, la recherche, l'application ouverte avec la barre shell, le retour et l'intent.
-  `compiler/test/launchpad.test.ts` couvre les diagnostics, les fichiers générés et la CLI.
+- **Decision**: `rapt launchpad <launchpad.json> --out <folder>` generates a launchpad, the
+  equivalent of the SAP Fiori launchpad built with OpenUI5. The SAP shell (`sap.ushell`) only
+  exists in SAPUI5, under an SAP license, and the rule of the project excludes it. The launchpad
+  is made of a `sap.f.ShellBar` (home, tile search, user menu with sign-out) and of groups of
+  `sap.m.GenericTile`. A dynamic tile (`NumericContent`) shows the `$count` of an entity set,
+  with an optional filter. Navigation is by intent (`/#Travel-manage`, `/go/Travel-manage?…`).
+- **Content**: `launchpad.json` is versioned with the sources, like the content of the launchpad
+  (catalogs, groups, tiles, target mappings). It lists the applications (folder generated by
+  `rapt build`, internal URL) and the groups of tiles. A tile is assigned to roles of the IdP, the
+  equivalent of the business catalog of a business role; without a role, every user sees it. The
+  compiler resolves the service paths and checks the entity sets of the counters, the intents and
+  the roles (`LPD001` to `LPD007`); it takes the roles and the claims of the applications for the
+  realm and the session.
+- **Architecture, a single origin**: the SAP front-end server serves the launchpad, the
+  applications and their services under one domain. Here, the server of the launchpad mounts the
+  UI of each application under `/apps/<id>/` and relays its services at their own paths
+  (`/sap/opu/odata4/…`, unique per service); the redirects of the applications are rewritten
+  under their mount point. The browser sees a single origin: no CORS, the UI reads the counters
+  directly, the cookies are shared.
+- **Single sign-on**: the launchpad opens the OIDC session (code + PKCE). The applications behind
+  it have the same `SESSION_SECRET` (and the client and `PUBLIC_URL` of the launchpad) and read
+  this session: user, roles, claims read by their authorizations. Each application keeps its
+  authorizations (D34), its access controls (D35) and its required role, now checked on each
+  request: a session opened by the launchpad for a user without this role receives a 403. The
+  bearer tokens of the API clients are relayed as is.
+- **Sign-out**: the ID token of the sign-in is kept in a separate HttpOnly cookie (`rapt_idt`)
+  and passed as `id_token_hint` to the end-session endpoint. The provider then ends its session
+  without a confirmation page, even with an expired token, as OIDC RP-Initiated Logout provides
+  (checked with Keycloak). This also applies to a standalone application.
+- **Why not the relayed token (BFF)**: relaying the access token of the user would have required
+  keeping the tokens on the server and refreshing them (5 minutes by default with Keycloak). The
+  shared signed session stays stateless, like the one of the applications (D28).
+- **In the applications**: the generated UI, served behind a launchpad (`/launchpad/config`
+  answers), shows the shell bar of the launchpad above its pages (home, user, sign-out). Alone,
+  it is unchanged. Each application stays deployable on its own.
+- **Operations**: the generated folder contains `server.mjs`, a Dockerfile and a
+  `docker-compose.yml`: the launchpad, each application built from its folder with its PostgreSQL
+  database, and Keycloak in the `oidc` profile (client `rapt-launchpad`). Plus `.env.example`
+  (`APP_<ID>_URL`) and a README.
+- **Tests**: `runtime/test/launchpad.test.ts` covers the tiles per role and the sign-in against a
+  test OIDC provider, then the reading of the session by the application. It also checks,
+  through the gateway, the DCL, the authorizations, the CSRF and the bearer tokens, as well as
+  the intents, the rewriting of the redirects, the 502 and the required role.
+  `runtime/test/launchpad-ui.test.ts` tests in the browser the tiles of a viewer, the counter,
+  the search, the application opened with the shell bar, the way back and the intent.
+  `compiler/test/launchpad.test.ts` covers the diagnostics, the generated files and the CLI.
 
-## D38 — Boucle de développement (`rapt dev`)
+## D38 — Development loop (`rapt dev`)
 
-- **Contexte** : construire, installer et lancer l'application générée prend quatre commandes
-  (`rapt build`, `npm install`, une base PostgreSQL, `npm start`) à chaque modification d'une
-  source. L'application autonome est la cible : la boucle d'édition doit être immédiate.
-- **Décision** : `rapt dev <src>` construit l'application sans son scaffold (ni `vendor/`, ni
-  `package.json`, ni Docker) dans `<src>/.rapt/dev`, la démarre, surveille les sources et
-  recommence à chaque modification (regroupées sur 150 ms, une construction à la fois).
-  - **Dépendances** : le `node_modules` de la construction est un lien (une jonction sous
-    Windows) vers celui du paquet `@rap-transpiler/runtime`, qui contient le runtime abaplint,
-    PGlite et OpenUI5. Le module ABAP transpilé et le runtime chargent ainsi le même
-    `@abaplint/runtime`. Aucune installation npm.
-  - **Processus enfant** : le serveur tourne dans un processus séparé (`dev-server.mjs`), arrêté
-    par un message IPC (PGlite ferme ses fichiers) puis relancé. Le code ABAP transpilé pose un
-    état global (l'objet `abap`) et les modules ES ne se déchargent pas : un redémarrage dans le
-    même processus garderait l'ancien behavior pool.
-  - **Erreurs** : une construction en erreur ne touche pas à l'application qui tourne ; les
-    diagnostics gardent le format de `rapt check`.
-  - **Base** : PGlite dans `.rapt/dev/data`, gardée entre les constructions. Le schéma appliqué
-    est mémorisé ; s'il change, la base est supprimée et recréée (données de développement,
-    pas de migration). Avec `DATABASE_URL`, la base donnée est utilisée telle quelle.
-  - **Surveillance** : un `fs.watch` par dossier, pas le mode récursif. Sous Linux, le mode
-    récursif de Node.js perd les fichiers remplacés par un renommage, ce que font la plupart des
-    éditeurs à l'enregistrement. Les dossiers commençant par un point et `node_modules` sont
-    ignorés, sauf `.abapgit.xml`.
-  - **Valeurs par défaut** : `AUTH_MODE=none`, `HOST=127.0.0.1`, `LOG_LEVEL=warn` ; chaque
-    variable de l'environnement les remplace.
-- **Tests** : `compiler/test/dev.test.ts` couvre la construction, le behavior pool exécuté, la
-  conservation des données, la construction en erreur, la réinitialisation sur changement de
-  schéma et la surveillance d'un fichier remplacé par un renommage.
+- **Context**: building, installing and starting the generated application takes four commands
+  (`rapt build`, `npm install`, a PostgreSQL database, `npm start`) at each change of a source.
+  The standalone application is the target: the editing loop must be immediate.
+- **Decision**: `rapt dev <src>` builds the application without its scaffold (no `vendor/`, no
+  `package.json`, no Docker) into `<src>/.rapt/dev`, starts it, watches the sources and starts
+  again on each change (grouped over 150 ms, one build at a time).
+  - **Dependencies**: the `node_modules` of the build is a link (a junction on Windows) to the one
+    of the `@rap-transpiler/runtime` package, which contains the abaplint runtime, PGlite and
+    OpenUI5. The transpiled ABAP module and the runtime thus load the same `@abaplint/runtime`. No
+    npm installation.
+  - **Child process**: the server runs in a separate process (`dev-server.mjs`), stopped by an
+    IPC message (PGlite closes its files) then started again. The transpiled ABAP code sets a
+    global state (the `abap` object) and ES modules cannot be unloaded: a restart in the same
+    process would keep the old behavior pool.
+  - **Errors**: a build in error does not touch the running application; the diagnostics keep the
+    format of `rapt check`.
+  - **Database**: PGlite in `.rapt/dev/data`, kept between builds. The applied schema is
+    remembered; when it changes, the database is deleted and created again (development data, no
+    migration). With `DATABASE_URL`, the given database is used as is.
+  - **Watching**: one `fs.watch` per folder, not the recursive mode. On Linux, the recursive mode
+    of Node.js loses the files replaced by a rename, which most editors do on save. Folders
+    starting with a dot and `node_modules` are ignored, except `.abapgit.xml`.
+  - **Defaults**: `AUTH_MODE=none`, `HOST=127.0.0.1`, `LOG_LEVEL=warn`; each environment
+    variable overrides them.
+- **Tests**: `compiler/test/dev.test.ts` covers the build, the behavior pool run, the data kept,
+  the build in error, the reset on a schema change and the watching of a file replaced by a
+  rename.
 
-## D39 — Sortie JSON de la CLI et extension VS Code
+## D39 — JSON output of the CLI and VS Code extension
 
-- **Contexte** : tout doit pouvoir se faire en ligne de commande, ou visuellement dans VS Code.
-  Deux implémentations du compilateur divergeraient.
-- **Décision** : la CLI reste le seul moteur ; l'extension VS Code ([packages/vscode](../packages/vscode))
-  l'appelle et affiche ses résultats.
-  - **`--json`** : `rapt check` et `rapt build` écrivent un objet JSON (`command`, `ok`, `root`,
-    `counts`, `diagnostics` avec, en plus de `file`, le chemin absolu `path`) ; `rapt build`
-    ajoute `out` et `files`. `rapt dev` écrit un événement JSON par ligne (`building`,
-    `changed`, `diagnostics`, `ready`, `failed`, `database-reset`, `server-failed`,
-    `server-stopped`, `error`, `log` pour les journaux du serveur). Le texte de `rapt dev` est
-    dérivé des mêmes événements (`formatDevEvent`).
-  - **Extension** : diagnostics dans l'onglet Problèmes (à chaque enregistrement, ou par
-    `rapt dev` quand il tourne sur le projet), commandes *Vérifier le BO*, *Générer
-    l'application*, *Lancer / Arrêter rapt dev*, *Ouvrir l'application*, état dans la barre
-    d'état, menus de l'explorateur et de la barre de titre. Un projet est le dossier de
-    `.abapgit.xml` (à défaut, le parent de `src`).
-  - **Extension autonome** : le `.vsix` (~31 Mo, ~9 100 fichiers) contient `rapt/` : les paquets
-    du dépôt (`pnpm pack`) installés par npm, à plat, avec leurs dépendances de production et ce
-    que `rapt dev` sert (OpenUI5, `less-openui5`, PGlite, aux versions du runtime), sans cartes
-    de sources, types, documentation, tests des paquets, design time OpenUI5 ni extensions
-    PGlite (`scripts/stage-rapt.mjs`). Un téléchargement au premier lancement aurait allégé le
-    `.vsix`, mais demandé l'accès au registre npm (souvent filtré en entreprise) et du code de
-    cache ; le `.vsix` passe par VS Code, hors ligne une fois installé, et rapt y a toujours la
-    version de l'extension.
-  - **Node.js de VS Code** : rapt tourne sur l'exécutable de VS Code avec
-    `ELECTRON_RUN_AS_NODE=1` (Node.js 22 depuis VS Code 1.101, version minimale de
-    l'extension) ; le serveur de `rapt dev` hérite de la variable. Vérifié avec Electron 37 :
-    `check`, `dev`, PGlite, behavior pool, arrêt du serveur quand `rapt dev` est tué.
-  - **`rapt dev` installé à plat** : le `node_modules` lié dans `.rapt/dev` est le premier
-    dossier, du runtime vers la racine, qui contient `@abaplint/runtime` (celui du runtime dans
-    le dépôt pnpm, celui de `rapt/` dans l'extension).
-  - **CLI trouvée** : réglage `rapt.cliPath`, sinon le rapt intégré, sinon un clone
-    rap-transpiler ou un `node_modules` de l'espace de travail, sinon `rapt` du PATH ; Node.js
-    par `rapt.nodePath`, sinon celui de VS Code.
-  - **CI** : le job `test` construit le `.vsix`, vérifie la fixture avec le rapt intégré et
-    publie le `.vsix` en artefact (`rap-transpiler-vscode`).
-  - **Arrêt de `rapt dev`** : SIGINT. Sous Windows, où ce signal termine le processus, le
-    serveur s'arrête quand son canal IPC avec `rapt dev` se ferme (D38).
-  - **Construction** : sources ESM vérifiées par `tsc`, livrées en un fichier CommonJS par
-    esbuild (`dist/extension.cjs`, `vscode` externe), sans dépendance à l'exécution ; `.vsix`
-    par `vsce package`.
-- **Tests** : `vscode/test/rapt.test.ts` couvre la recherche du projet et de la CLI, la lecture
-  des lignes JSON, `rapt check --json` et `rapt dev --json` lancés réellement.
-  `compiler/test/cli.test.ts` et `dev.test.ts` couvrent la sortie JSON et les événements.
-  L'interface de l'extension (commandes, barre d'état) n'est pas testée dans VS Code.
+- **Context**: everything must be possible on the command line, or visually in VS Code. Two
+  implementations of the compiler would diverge.
+- **Decision**: the CLI stays the only engine; the VS Code extension
+  ([packages/vscode](../packages/vscode)) calls it and shows its results.
+  - **`--json`**: `rapt check` and `rapt build` write a JSON object (`command`, `ok`, `root`,
+    `counts`, `diagnostics` with, in addition to `file`, the absolute path `path`); `rapt build`
+    adds `out` and `files`. `rapt dev` writes one JSON event per line (`building`, `changed`,
+    `diagnostics`, `ready`, `failed`, `database-reset`, `server-failed`, `server-stopped`,
+    `error`, `log` for the logs of the server). The text of `rapt dev` is derived from the same
+    events (`formatDevEvent`).
+  - **Extension**: diagnostics in the Problems tab (on each save, or from `rapt dev` when it runs
+    on the project), commands *Check the BO*, *Build the application*, *Start / Stop rapt dev*,
+    *Open the application*, state in the status bar, menus of the explorer and of the title bar.
+    A project is the folder of `.abapgit.xml` (otherwise, the parent of `src`).
+  - **Standalone extension**: the `.vsix` (~31 MB, ~9,100 files) contains `rapt/`: the packages
+    of the repository (`pnpm pack`) installed by npm, flat, with their production dependencies
+    and what `rapt dev` serves (OpenUI5, `less-openui5`, PGlite, at the versions of the runtime),
+    without source maps, types, documentation, tests of the packages, OpenUI5 design time nor
+    PGlite extensions (`scripts/stage-rapt.mjs`). A download on first start would have made the
+    `.vsix` lighter, but required access to the npm registry (often filtered in companies) and
+    cache code; the `.vsix` goes through VS Code, offline once installed, and rapt always has the
+    version of the extension.
+  - **Node.js of VS Code**: rapt runs on the executable of VS Code with `ELECTRON_RUN_AS_NODE=1`
+    (Node.js 22 since VS Code 1.101, minimum version of the extension); the server of `rapt dev`
+    inherits the variable. Checked with Electron 37: `check`, `dev`, PGlite, behavior pool, stop
+    of the server when `rapt dev` is killed.
+  - **`rapt dev` installed flat**: the `node_modules` linked in `.rapt/dev` is the first folder,
+    from the runtime to the root, that contains `@abaplint/runtime` (the one of the runtime in
+    the pnpm repository, the one of `rapt/` in the extension).
+  - **CLI found**: `rapt.cliPath` setting, otherwise the bundled rapt, otherwise a rap-transpiler
+    clone or a `node_modules` of the workspace, otherwise `rapt` from the PATH; Node.js from
+    `rapt.nodePath`, otherwise the one of VS Code.
+  - **CI**: the `test` job builds the `.vsix`, checks the fixture with the bundled rapt and
+    publishes the `.vsix` as an artifact (`rap-transpiler-vscode`).
+  - **Stopping `rapt dev`**: SIGINT. On Windows, where this signal terminates the process, the
+    server stops when its IPC channel with `rapt dev` closes (D38).
+  - **Build**: ESM sources checked by `tsc`, delivered as one CommonJS file by esbuild
+    (`dist/extension.cjs`, `vscode` external), without a runtime dependency; `.vsix` by
+    `vsce package`.
+- **Tests**: `vscode/test/rapt.test.ts` covers the search of the project and of the CLI, the
+  reading of the JSON lines, `rapt check --json` and `rapt dev --json` really started.
+  `compiler/test/cli.test.ts` and `dev.test.ts` cover the JSON output and the events. The
+  interface of the extension (commands, status bar) is not tested in VS Code.
 
-## D40 — Classes utilitaires d'ABAP Cloud dans le behavior pool
+## D40 — ABAP Cloud utility classes in the behavior pool
 
-- **Contexte** : après le client HTTP (D31), les behavior pools ont besoin des autres classes
-  libérées d'usage courant : JSON pour les API, encodages, numérotation, dates, journal
-  applicatif, hachage, aléatoire, expressions régulières, RTTS. Sans elles, du code ABAP Cloud
-  ordinaire ne passe pas la vérification.
-- **Décision** : une implémentation clean-room en ABAP de ces classes
-  (`gen/abap/framework-utils.ts`), écrite à partir des signatures publiques documentées par SAP,
-  avec des méthodes du noyau `ZRAP_EML` pour ce que l'ABAP ne peut pas faire seul
-  (`runtime/src/abap/utils.ts`). Guide : [UTILITAIRES.md](UTILITAIRES.md).
-  - **Fermeture** : seuls les objets nommés par les sources du projet, puis ceux qu'ils nomment,
-    sont donnés au transpiler. Un projet qui n'en utilise aucun garde la même construction et le
-    même temps de vérification ; un objet du projet de même nom l'emporte.
-  - **Le noyau** : JSON (analyseur qui garde les nombres tels qu'écrits, parcours des données
-    de `@abaplint/runtime` par type, noms des membres selon le mode), pages de codes, base64,
-    gzip (zlib), hachage et HMAC (crypto), graine aléatoire, expressions régulières (RegExp avec
-    `d` pour les sous-correspondances, mode étendu et classes POSIX traduits), calendrier et
-    horodatages en dixièmes de microseconde (BigInt), description d'une donnée pour les RTTS.
-    Les RTTS se construisent en ABAP, un niveau à la fois : `ASSIGN COMPONENT` pour les
-    structures, `CREATE DATA … LIKE LINE OF` pour les tables.
-  - **Numérotation** : intervalles de `rapt/number-ranges.json` (diagnostic NR001), insérés par
-    `db/schema.sql` sans toucher au numéro courant ; table `rapt_number_range`, écrite dans la LUW
-    (les LUW sont sérialisées : pas de conflit). Un intervalle non configuré commence à 1, pour
-    développer sans configuration.
-  - **Journal applicatif** : tables `rapt_application_log` et `rapt_application_log_item`, dans la
-    LUW ; lecture par filtre.
-  - **Tables** : générées seulement quand le code utilise `cl_numberrange_runtime` ou
-    `cl_bali_*` (`model.services`), pour ne pas changer le schéma des autres applications.
-  - **Types globaux** : `string_table`, `xstring_table`, `match_result(_tab)`,
-    `submatch_result(_tab)` comme objets DDIC (TABL, TTYP), et un type-pool `ABAP`
-    (`abap_compdescr_tab`, `abap_component_tab`…), que l'analyse d'abaplint résout.
-  - **Constructeurs de classe** : ils s'exécutent au chargement des modules, avant le noyau ;
-    ceux des utilitaires n'appellent donc pas `ZRAP_EML` (`cl_abap_char_utilities` écrit ses
-    caractères de contrôle en littéraux).
-- **Tests** : `runtime/test/utilities.test.ts` exécute un auto-test écrit en ABAP dans un behavior
-  pool (`test/utilities/selftest.abap` : plus de soixante-dix vérifications sur toutes les classes,
-  dont les valeurs de référence de SHA-256, MD5 et HMAC), tire des numéros jusqu'à épuisement d'un
-  intervalle et écrit puis relit un journal. `compiler/test/utilities.test.ts` couvre la
-  fermeture, la vérification de toutes les classes et `rapt/number-ranges.json`.
+- **Context**: after the HTTP client (D31), the behavior pools need the other commonly used
+  released classes: JSON for the APIs, encodings, numbering, dates, application log, hashing,
+  random numbers, regular expressions, RTTS. Without them, ordinary ABAP Cloud code does not pass
+  the check.
+- **Decision**: a clean-room implementation in ABAP of these classes
+  (`gen/abap/framework-utils.ts`), written from the public signatures documented by SAP, with
+  methods of the `ZRAP_EML` kernel for what ABAP cannot do alone (`runtime/src/abap/utils.ts`).
+  Guide: [UTILITIES.md](UTILITIES.md).
+  - **Closure**: only the objects named by the sources of the project, then those they name, are
+    given to the transpiler. A project that uses none of them keeps the same build and the same
+    check time; an object of the project with the same name wins.
+  - **The kernel**: JSON (parser that keeps the numbers as written, traversal of the data of
+    `@abaplint/runtime` by type, names of the members according to the mode), code pages, base64,
+    gzip (zlib), hashing and HMAC (crypto), random seed, regular expressions (RegExp with `d` for
+    the submatches, extended mode and POSIX classes translated), calendar and timestamps in
+    tenths of a microsecond (BigInt), description of a data object for the RTTS. The RTTS are
+    built in ABAP, one level at a time: `ASSIGN COMPONENT` for the structures,
+    `CREATE DATA … LIKE LINE OF` for the tables.
+  - **Numbering**: intervals of `rapt/number-ranges.json` (diagnostic NR001), inserted by
+    `db/schema.sql` without touching the current number; table `rapt_number_range`, written in the
+    LUW (the LUWs are serialized: no conflict). An interval that is not configured starts at 1, to
+    develop without configuration.
+  - **Application log**: tables `rapt_application_log` and `rapt_application_log_item`, in the
+    LUW; read by filter.
+  - **Tables**: generated only when the code uses `cl_numberrange_runtime` or `cl_bali_*`
+    (`model.services`), so as not to change the schema of the other applications.
+  - **Global types**: `string_table`, `xstring_table`, `match_result(_tab)`,
+    `submatch_result(_tab)` as DDIC objects (TABL, TTYP), and an `ABAP` type pool
+    (`abap_compdescr_tab`, `abap_component_tab`…), which the analysis of abaplint resolves.
+  - **Class constructors**: they run when the modules are loaded, before the kernel; those of the
+    utilities therefore do not call `ZRAP_EML` (`cl_abap_char_utilities` writes its control
+    characters as literals).
+- **Tests**: `runtime/test/utilities.test.ts` runs a self-test written in ABAP in a behavior pool
+  (`test/utilities/selftest.abap`: more than seventy checks on all the classes, including the
+  reference values of SHA-256, MD5 and HMAC), draws numbers until an interval is exhausted and
+  writes then reads a log. `compiler/test/utilities.test.ts` covers the closure, the check of all
+  the classes and `rapt/number-ranges.json`.
 
-## D41 — Traitement en arrière-plan (bgPF) et e-mail
+## D41 — Background processing (bgPF) and e-mail
 
-- **Contexte** : `cl_bgmc_process_factory` et `cl_bcs_mail_message` sont d'usage courant dans les
-  BO RAP (travail différé après la sauvegarde, notifications). Les deux s'appuient sur la LUW : le
-  processus ne démarre et le mail ne part qu'après le `COMMIT WORK`.
-- **Décision** : le runtime garde, pour chaque LUW, le travail à faire après sa validation
-  (`LuwContext.afterCommit`). Une LUW annulée l'oublie ; une LUW validée le démarre après la
-  réponse (`setImmediate`), chaque élément dans une LUW à lui, sérialisée avec les autres.
-  - **bgPF** : `save_for_execution` écrit le processus (`rapt_background_process`, `NEW`) dans la
-    LUW et garde la référence de l'opération ABAP. L'exécution appelle `execute` dans une LUW
-    marquée « arrière-plan » : contrôlée (`if_bgmc_op_single`), l'EML est sauvegardé à la fin et
-    l'ABAP SQL écrit après `cl_abap_tx=>save( )` ; non contrôlée, l'ABAP SQL écrit toujours,
-    `COMMIT ENTITIES` lance la séquence de sauvegarde (une fois) et `ROLLBACK ENTITIES` annule la
-    LUW. Hors arrière-plan, `COMMIT ENTITIES` reste refusé dans un behavior pool. L'état final
-    (`SUCCESSFUL`, `ERRONEOUS` avec le texte de l'exception) est écrit dans une LUW séparée, pour
-    survivre à l'annulation de celle de l'opération.
-  - **Pourquoi en mémoire** : SAP sérialise l'objet opération pour l'exécuter plus tard, ailleurs.
-    Sérialiser un objet du runtime d'abaplint (références, objets imbriqués) demanderait un
-    mécanisme général ; l'application étant un seul processus, la référence suffit. Limite : un
-    processus non exécuté à l'arrêt n'est pas repris.
-  - **E-mail** : `send( )` compose le message MIME avec nodemailer (MIT-0), le garde dans
-    `rapt_mail` (`WAITING`), puis l'envoie après la validation par le serveur de `MAIL_SMTP_URL`
-    (`SENT` / `ERROR`). Sans serveur, le mail reste dans la table (`STORED`) avec son message
-    complet : le développement n'a besoin d'aucun serveur. `MAIL_FROM` donne l'expéditeur par
-    défaut ; les deux variables sont dans le `.env.example` des applications qui envoient des
-    mails.
-  - **Tables** : générées seulement si le code utilise `cl_bgmc_process_factory` ou
+- **Context**: `cl_bgmc_process_factory` and `cl_bcs_mail_message` are commonly used in RAP BOs
+  (deferred work after the save, notifications). Both rely on the LUW: the process only starts
+  and the mail only leaves after the `COMMIT WORK`.
+- **Decision**: the runtime keeps, for each LUW, the work to do after its commit
+  (`LuwContext.afterCommit`). A rolled-back LUW forgets it; a committed LUW starts it after the
+  response (`setImmediate`), each item in a LUW of its own, serialized with the others.
+  - **bgPF**: `save_for_execution` writes the process (`rapt_background_process`, `NEW`) in the
+    LUW and keeps the reference of the ABAP operation. The execution calls `execute` in a LUW
+    marked "background": controlled (`if_bgmc_op_single`), the EML is saved at the end and ABAP
+    SQL writes after `cl_abap_tx=>save( )`; uncontrolled, ABAP SQL always writes,
+    `COMMIT ENTITIES` starts the save sequence (once) and `ROLLBACK ENTITIES` rolls back the LUW.
+    Outside the background, `COMMIT ENTITIES` stays refused in a behavior pool. The final state
+    (`SUCCESSFUL`, `ERRONEOUS` with the text of the exception) is written in a separate LUW, to
+    survive the rollback of the one of the operation.
+  - **Why in memory**: SAP serializes the operation object to run it later, elsewhere.
+    Serializing an object of the abaplint runtime (references, nested objects) would require a
+    general mechanism; the application being a single process, the reference is enough. Limit: a
+    process not run at shutdown is not resumed.
+  - **E-mail**: `send( )` composes the MIME message with nodemailer (MIT-0), keeps it in
+    `rapt_mail` (`WAITING`), then sends it after the commit through the server of
+    `MAIL_SMTP_URL` (`SENT` / `ERROR`). Without a server, the mail stays in the table (`STORED`)
+    with its complete message: development needs no server. `MAIL_FROM` gives the default sender;
+    both variables are in the `.env.example` of the applications that send mails.
+  - **Tables**: generated only if the code uses `cl_bgmc_process_factory` or
     `cl_bcs_mail_message` (`model.services`, D40).
-- **Tests** : `runtime/test/background.test.ts` : une action lance trois processus (contrôlé avec
-  EML, non contrôlé avec `COMMIT ENTITIES`, en échec) et vérifie leurs états et leurs effets ; une
-  autre envoie un mail (HTML, copie, pièces jointes texte et binaire), gardé sans serveur, envoyé
-  à un serveur SMTP de test avec `MAIL_SMTP_URL`, et rien n'est envoyé quand la LUW est annulée.
+- **Tests**: `runtime/test/background.test.ts`: an action starts three processes (controlled
+  with EML, uncontrolled with `COMMIT ENTITIES`, failing) and checks their states and effects;
+  another sends a mail (HTML, copy, text and binary attachments), kept without a server, sent to
+  a test SMTP server with `MAIL_SMTP_URL`, and nothing is sent when the LUW is rolled back.
 
-## D42 — Écrire seulement de l'ABAP : tables en source, `rapt abapgit`, `rapt new`, données initiales
+## D42 — Writing only ABAP: tables as source, `rapt abapgit`, `rapt new`, initial data
 
-- **Contexte** : un export abapGit demande, pour chaque objet, un fichier XML de métadonnées, et
-  les tables n'existent qu'en XML (DD02V, DD09L, DD03P). Écrire ces fichiers à la main décourage un
-  développeur qui veut écrire son BO dans VS Code sans système SAP.
-- **Décision** :
-  - **Tables en source** : `nom.tabl.astabl`, avec la syntaxe de l'éditeur de tables des ABAP
+- **Context**: an abapGit export requires, for each object, an XML metadata file, and the tables
+  only exist as XML (DD02V, DD09L, DD03P). Writing these files by hand discourages a developer
+  who wants to write their BO in VS Code without an SAP system.
+- **Decision**:
+  - **Tables as source**: `name.tabl.astabl`, with the syntax of the table editor of the ABAP
     Development Tools (`define table … { key client : abap.clnt not null; … }`, annotations
     `@EndUserText.label`, `@AbapCatalog.*`, `@Semantics.amount.currencyCode` /
-    `@Semantics.quantity.unitOfMeasure` pour les références, `include`, `define structure`).
-    `loadProject` en tire le XML abapGit en mémoire : le reste du compilateur ne lit que le XML, et
-    les diagnostics des tables portent la ligne du champ dans la source. La source l'emporte sur un
-    XML présent à côté. Les clés étrangères (`with foreign key`) sont signalées (TABL002) et non
-    transférées.
-  - **`rapt abapgit <src>`** écrit ce qui manque pour qu'abapGit puisse importer le dépôt dans un
-    système SAP : `.abapgit.xml` (qui ignore `*.astabl`, inconnu d'abapGit), `package.devc.xml`, le
-    XML des tables en source (régénéré à chaque fois), et le XML absent des entités CDS (type de
-    source déduit : vue, projection, entité abstraite, custom entity…), metadata extensions,
-    access controls, BDEF, SRVD, classes et interfaces (description de `@EndUserText.label` ou du
-    texte court ABAP Doc). Un XML présent n'est jamais modifié. `--check` ne fait que signaler ce
-    qui manque (code retour 1), pour la CI.
-  - **`rapt new <src> <Entité> [--prefix ZRT] [--description …]`** écrit un BO managed complet et
-    activable sur SAP : table en source, vue racine et projection, metadata extension (List Report
-    et Object Page), BDEF et projection, behavior pool (autorisation globale, une détermination),
-    SRVD et SRVB OData V4, `rapt/seed.json`, `.gitignore` (`.rapt/`, `node_modules/`), puis les XML
-    de `rapt abapgit`. Les fichiers existants ne sont jamais écrasés. Commande *RAP : Nouveau
-    business object* dans l'extension.
-  - **Données initiales** : `rapt/seed.json` (table → lignes, noms de champs du dictionnaire, en
-    minuscules, sans le mandant) et `rapt/seed.sql`, vérifiés à la compilation (SEED001, SEED002)
-    et copiés dans `db/` de l'application. Avec `SEED=auto` (valeur par défaut de `rapt dev`),
-    l'application les charge à son premier démarrage, quand toutes ses tables sont vides : une
-    clé UUID absente est tirée au hasard, un NUMC reçoit ses zéros de tête. Sans `SEED=auto` (en
-    production par défaut), rien n'est chargé.
-- **Pourquoi pas un XML « sans source »** : abapGit ne sait sérialiser les tables qu'en XML ; la
-  source `.astabl` est ce qu'un développeur ADT lit et écrit déjà, et la conversion vers le XML
-  est déterministe. Garder les deux fichiers dans le dépôt (le XML régénéré par `rapt abapgit`)
-  permet l'import dans SAP sans outil.
-- **Tests** : `compiler/test/authoring.test.ts` (la source de `zrt_booking` donne le même XML et le
-  même modèle que la fixture ; erreurs positionnées ; `rapt abapgit` recrée les XML retirés de la
-  fixture à l'identique ; `rapt new` produit un BO qui compile sans diagnostic) et
-  `runtime/test/seed.test.ts`.
+    `@Semantics.quantity.unitOfMeasure` for the references, `include`, `define structure`).
+    `loadProject` derives the abapGit XML from it in memory: the rest of the compiler only reads
+    the XML, and the diagnostics of the tables carry the line of the field in the source. The
+    source wins over an XML next to it. Foreign keys (`with foreign key`) are reported (TABL002)
+    and not carried over.
+  - **`rapt abapgit <src>`** writes what is missing for abapGit to import the repository into an
+    SAP system: `.abapgit.xml` (which ignores `*.astabl`, unknown to abapGit),
+    `package.devc.xml`, the XML of the tables written as source (regenerated each time), and the
+    missing XML of the CDS entities (source type derived: view, projection, abstract entity,
+    custom entity…), metadata extensions, access controls, BDEF, SRVD, classes and interfaces
+    (description from `@EndUserText.label` or from the ABAP Doc short text). An existing XML is
+    never changed. `--check` only reports what is missing (exit code 1), for the CI.
+  - **`rapt new <src> <Entity> [--prefix ZRT] [--description …]`** writes a complete managed BO,
+    activatable on SAP: table as source, root view and projection, metadata extension (List
+    Report and Object Page), BDEF and projection, behavior pool (global authorization, one
+    determination), SRVD and SRVB OData V4, `rapt/seed.json`, `.gitignore` (`.rapt/`,
+    `node_modules/`), then the XML files of `rapt abapgit`. Existing files are never overwritten.
+    Command *RAP: New business object* in the extension.
+  - **Initial data**: `rapt/seed.json` (table → rows, field names of the dictionary, in lower
+    case, without the client) and `rapt/seed.sql`, checked at compile time (SEED001, SEED002) and
+    copied into `db/` of the application. With `SEED=auto` (default of `rapt dev`), the
+    application loads them on its first start, when all its tables are empty: a missing UUID key
+    is drawn at random, a NUMC receives its leading zeros. Without `SEED=auto` (in production by
+    default), nothing is loaded.
+- **Why not a "source-less" XML**: abapGit can only serialize tables as XML; the `.astabl` source
+  is what an ADT developer already reads and writes, and the conversion to XML is deterministic.
+  Keeping both files in the repository (the XML regenerated by `rapt abapgit`) allows the import
+  into SAP without a tool.
+- **Tests**: `compiler/test/authoring.test.ts` (the source of `zrt_booking` gives the same XML
+  and the same model as the fixture; positioned errors; `rapt abapgit` recreates the XML files
+  removed from the fixture identically; `rapt new` produces a BO that compiles without a
+  diagnostic) and `runtime/test/seed.test.ts`.
 
-## D43 — Entités custom (unmanaged query) et BO managed sur une entité custom
+## D43 — Custom entities (unmanaged query) and managed BO on a custom entity
 
-- **Contexte** : les données d'un BO viennent parfois d'API, pas de tables. ABAP Cloud les expose
-  avec une entité custom (`define custom entity`) dont une classe de requête
-  (`@ObjectModel.query.implementedBy: 'ABAP:<classe>'`, interface `if_rap_query_provider`) fournit
-  les lignes.
-- **Décision** :
-  - **Entité custom** (activable sur SAP) : le modèle la garde sans vue SQL, avec sa classe de
-    requête, ses éléments typés et ses associations (`_X : association … to … on …`). Les lectures
-    OData (collection, instance, navigation, `$count`, `$expand` d'un niveau, vers ou depuis une
-    entité custom) appellent `select` avec la requête d'ABAP Cloud : filtre en chaîne ABAP SQL
-    (`get_as_sql_string`) et en plages (`get_as_ranges`, `cx_rap_query_filter_no_range` quand le
-    filtre ne s'y prête pas), tri, pagination (`get_paging`), éléments demandés,
-    `is_total_numb_of_rec_requested`, `is_data_requested`, recherche. `set_data` et
-    `set_total_number_of_records` rendent le résultat au runtime (kernel `zrap_eml=>query_data`,
-    `query_total`). Comme dans SAP, la classe applique elle-même filtre, tri et pagination ; le
-    runtime garantit seulement les clés et les conditions de navigation (lignes en trop
-    écartées) et coupe la page à `$top`. Les interfaces et classes de la requête sont écrites
-    d'après leurs signatures publiques (D24).
-  - **BO managed with unmanaged save sur une entité custom** (propre à rap-transpiler,
-    avertissement BDEF027) : le runtime RAP lit les instances (READ ENTITIES, contrôle de
-    l'existence, ETag, associations) par la classe de requête, avec un filtre sur les clés, dans
-    la LUW en cours ; `save_modified` écrit les changements vers l'API. Pas de verrou en base : les
-    LUW de l'application sont sérialisées. Sur SAP, le même besoin se traite par un BO unmanaged.
-- **Pourquoi** : c'est la manière d'ABAP Cloud de lire une API ; le BO managed sur l'entité custom
-  évite d'écrire à la main le buffer transactionnel d'un BO unmanaged, au prix d'un écart
-  assumé et signalé.
-- **Tests** : fixture `fixtures/custom-entity` (produits lus depuis une « API » simulée par une
-  table, avis en constantes) ; `runtime/test/custom-entity.test.ts` (plages, tri, pagination,
-  compte, navigation, `$expand`, filtre refusé, création, doublon, validation, modification,
-  suppression) et `compiler/test/custom-entity.test.ts`.
+- **Context**: the data of a BO sometimes comes from APIs, not tables. ABAP Cloud exposes it with
+  a custom entity (`define custom entity`) whose query class
+  (`@ObjectModel.query.implementedBy: 'ABAP:<class>'`, interface `if_rap_query_provider`)
+  provides the rows.
+- **Decision**:
+  - **Custom entity** (activatable on SAP): the model keeps it without an SQL view, with its
+    query class, its typed elements and its associations (`_X : association … to … on …`). The
+    OData reads (collection, instance, navigation, `$count`, one-level `$expand`, to or from a
+    custom entity) call `select` with the request of ABAP Cloud: filter as an ABAP SQL string
+    (`get_as_sql_string`) and as ranges (`get_as_ranges`, `cx_rap_query_filter_no_range` when the
+    filter does not fit), sorting, paging (`get_paging`), requested elements,
+    `is_total_numb_of_rec_requested`, `is_data_requested`, search. `set_data` and
+    `set_total_number_of_records` give the result back to the runtime (kernel
+    `zrap_eml=>query_data`, `query_total`). As in SAP, the class applies the filter, the sorting
+    and the paging itself; the runtime only guarantees the keys and the navigation conditions
+    (extra rows dropped) and cuts the page at `$top`. The interfaces and classes of the query are
+    written from their public signatures (D24).
+  - **Managed BO with unmanaged save on a custom entity** (specific to rap-transpiler, warning
+    BDEF027): the RAP runtime reads the instances (READ ENTITIES, existence check, ETag,
+    associations) through the query class, with a filter on the keys, in the current LUW;
+    `save_modified` writes the changes to the API. No database lock: the LUWs of the application
+    are serialized. On SAP, the same need is handled by an unmanaged BO.
+- **Why**: it is the ABAP Cloud way to read an API; the managed BO on the custom entity avoids
+  writing by hand the transactional buffer of an unmanaged BO, at the price of an accepted and
+  reported gap.
+- **Tests**: fixture `fixtures/custom-entity` (products read from an "API" simulated by a table,
+  reviews as constants); `runtime/test/custom-entity.test.ts` (ranges, sorting, paging, count,
+  navigation, `$expand`, refused filter, creation, duplicate, validation, change, deletion) and
+  `compiler/test/custom-entity.test.ts`.
 
+## D44 — SAP standard views (I_Currency…) and value helps
 
-## D44 — Vues standards de SAP (I_Currency…) et value helps
+- **Context**: on SAP (ABAP Cloud as well as S/4HANA), the released CDS views `I_Currency`,
+  `I_UnitOfMeasure`, `I_Country`, `I_Language` and their text views exist in every system, with
+  content delivered and maintained by SAP (ISO currencies, units, countries, languages). A RAP BO
+  uses them for its value helps (`@Consumption.valueHelpDefinition`) and its associations.
+  Without them, a source activatable on SAP failed here (CDS005) and the value help was ignored.
+- **Decision**:
+  - **Standard views**: a source of the project that names one of these views without defining
+    it receives it, with its text view (`_Text`, category `#TEXT`) and its tables
+    (`rapt_currency`, `rapt_currencyt`, `rapt_uom`, `rapt_uomt`, `rapt_country`,
+    `rapt_countryt`, `rapt_language`, `rapt_languaget`). The elements have the SAP names; the
+    tables are specific to rap-transpiler (ABAP Cloud code does not read the SAP tables). A view
+    defined by the project wins. The files are virtual (`<standard>/…`): `rapt abapgit` never
+    writes them.
+  - **Reference data**: ISO 4217 currencies (with their decimals), ISO 3166 countries
+    (three-letter code, currency, EU membership), common units (SAP code, ISO code, dimension),
+    languages (one-character SAP key, ISO code); texts in English. `db/schema.sql` inserts them
+    (`ON CONFLICT DO NOTHING`): a row added or changed by the application stays. The standard
+    tables do not count for "all the tables are empty" of the initial data (D42).
+  - **Value helps**: as in RAP, the entity of a value help and its text view are exposed
+    implicitly by the service, read-only, without a page in the UI. `$metadata` carries
+    `Common.ValueList` (`CollectionPath`, `InOut` parameter, `DisplayOnly` columns). The UI opens
+    a selection dialog (search on the text columns and on the descriptions) from the fields of the
+    Object Page and the filters of the List Report.
+- **Answer to the question "must the currencies be maintained as on BTP?"**: on BTP, the content
+  of these views is delivered by SAP and is not to be entered; here it is delivered with
+  rap-transpiler the same way. The other released views useful next: `I_Region`,
+  `I_CalendarDate` (calendar), `I_Timezone`, `I_BusinessUserBasic` (users, to link to the IdP),
+  `I_ExchangeRate` (exchange rates, to link to a source of rates).
+- **Views added afterwards**: `I_Region` and `I_RegionText` (regions of the United States,
+  Canada, Germany and Australia), `I_CalendarDate` (calendar from 1990 to 2060 computed by
+  `generate_series`: year, quarter, month, ISO week, day of the week), `I_TimeZone` and
+  `I_TimeZoneText` (common IANA time zones), `I_BusinessUserBasic` (a user of the IdP is recorded
+  in it on each authenticated request: identifier, name, e-mail) and `I_ExchangeRate` (empty
+  table `rapt_exchrate`: the rates are data of the application). A service definition that
+  exposes a standard view receives it too.
+- **Tests**: `compiler/test/standard.test.ts`, `runtime/test/standard-views.test.ts` (read,
+  texts, read-only, value help in the browser, calendar, users).
 
-- **Contexte** : sur SAP (ABAP Cloud comme S/4HANA), les vues CDS libérées `I_Currency`,
-  `I_UnitOfMeasure`, `I_Country`, `I_Language` et leurs vues de textes existent dans tout système,
-  avec un contenu livré et maintenu par SAP (devises ISO, unités, pays, langues). Un BO RAP s'en
-  sert pour ses value helps (`@Consumption.valueHelpDefinition`) et ses associations. Sans elles,
-  une source activable sur SAP échouait ici (CDS005) et le value help était ignoré.
-- **Décision** :
-  - **Vues standards** : une source du projet qui nomme une de ces vues sans la définir la reçoit,
-    avec sa vue de textes (`_Text`, catégorie `#TEXT`) et ses tables (`rapt_currency`,
-    `rapt_currencyt`, `rapt_uom`, `rapt_uomt`, `rapt_country`, `rapt_countryt`, `rapt_language`,
-    `rapt_languaget`). Les éléments ont les noms de SAP ; les tables sont propres à rap-transpiler
-    (le code ABAP Cloud ne lit pas les tables de SAP). Une vue définie par le projet l'emporte.
-    Les fichiers sont virtuels (`<standard>/…`) : `rapt abapgit` ne les écrit jamais.
-  - **Données de référence** : devises ISO 4217 (avec leurs décimales), pays ISO 3166 (code à trois
-    lettres, devise, appartenance à l'UE), unités courantes (code SAP, code ISO, dimension),
-    langues (clé SAP d'un caractère, code ISO) ; textes en anglais. `db/schema.sql` les insère
-    (`ON CONFLICT DO NOTHING`) : une ligne ajoutée ou changée par l'application reste. Les tables
-    standards ne comptent pas pour « toutes les tables sont vides » des données initiales (D42).
-  - **Value helps** : comme RAP, l'entité d'un value help et sa vue de textes sont exposées
-    implicitement par le service, en lecture seule, sans page dans l'UI. `$metadata` porte
-    `Common.ValueList` (`CollectionPath`, paramètre `InOut`, colonnes `DisplayOnly`). L'UI ouvre
-    un dialogue de sélection (recherche sur les colonnes texte et sur les descriptions) depuis
-    les champs de l'Object Page et les filtres du List Report.
-- **Réponse à la question « faut-il maintenir les devises comme sur BTP ? »** : sur BTP, le
-  contenu de ces vues est livré par SAP et n'est pas à saisir ; ici il est livré avec
-  rap-transpiler de la même façon. Les autres vues libérées utiles ensuite : `I_Region`,
-  `I_CalendarDate` (calendrier), `I_Timezone`, `I_BusinessUserBasic` (utilisateurs, à relier à
-  l'IdP), `I_ExchangeRate` (taux de change, à relier à une source de taux).
-- **Vues ajoutées ensuite** : `I_Region` et `I_RegionText` (régions des États-Unis, du Canada, de
-  l'Allemagne et de l'Australie), `I_CalendarDate` (calendrier de 1990 à 2060 calculé par
-  `generate_series` : année, trimestre, mois, semaine ISO, jour de la semaine), `I_TimeZone` et
-  `I_TimeZoneText` (fuseaux IANA courants), `I_BusinessUserBasic` (un utilisateur de l'IdP y est
-  enregistré à chaque requête authentifiée : identifiant, nom, e-mail) et `I_ExchangeRate`
-  (table vide `rapt_exchrate` : les taux sont des données de l'application). Une définition de
-  service qui expose une vue standard la reçoit aussi.
-- **Tests** : `compiler/test/standard.test.ts`, `runtime/test/standard-views.test.ts` (lecture,
-  textes, lecture seule, value help dans le navigateur, calendrier, utilisateurs).
+## D45 — `standard` and `enhanced` modes
 
-## D45 — Modes `standard` et `enhanced`
+- **Decision**: `rapt/config.json` (`{ "mode": "enhanced" }`) or `--mode` chooses the mode of
+  the project. `standard` (default): the sources behave as on SAP and what SAP refuses is
+  refused; a project that builds in this mode imports and activates on SAP. `enhanced`: the
+  extensions of rap-transpiler, which do not exist on SAP:
+  - managed BO with unmanaged save on a custom entity (D43): error BDEF027 in `standard`,
+    information in `enhanced`;
+  - `field ( mandatory )` checked on save without a validation: each created or changed instance
+    with an initial mandatory field fails, with one message per field (`%element`). In
+    `standard`, as in RAP (D20), only `mandatory : create` is checked.
+- **Why a file**: the mode is a property of the project, versioned with its sources; the CLI,
+  `rapt dev` and the VS Code extension (command *Choose the project mode*) read it.
+- **Tests**: `compiler/test/config.test.ts`, `runtime/test/custom-entity.test.ts`.
 
-- **Décision** : `rapt/config.json` (`{ "mode": "enhanced" }`) ou `--mode` choisit le mode du
-  projet. `standard` (par défaut) : les sources se comportent comme sur SAP et ce que SAP refuse
-  est refusé ; un projet qui se construit dans ce mode s'importe et s'active sur SAP.
-  `enhanced` : les extensions de rap-transpiler, qui n'existent pas sur SAP :
-  - BO managed avec unmanaged save sur une entité custom (D43) : erreur BDEF027 en `standard`,
-    information en `enhanced` ;
-  - `field ( mandatory )` contrôlé à la sauvegarde sans validation : chaque instance créée ou
-    modifiée dont un champ obligatoire est initial échoue, avec un message par champ (`%element`).
-    En `standard`, comme RAP (D20), seul `mandatory : create` est contrôlé.
-- **Pourquoi un fichier** : le mode est une propriété du projet, versionnée avec ses sources ; la
-  CLI, `rapt dev` et l'extension VS Code (commande *Choisir le mode du projet*) le lisent.
-- **Tests** : `compiler/test/config.test.ts`, `runtime/test/custom-entity.test.ts`.
+## D46 — `rapt generate`: one object at a time, derived from the existing objects
 
-## D46 — `rapt generate` : un objet à la fois, dérivé des objets existants
+- **Decision**: `rapt generate <src> <type> <name> [--from X] [--for Y] [--expose A,B] [--root]`
+  writes an object with the file names of abapGit, then its XML: table, view (from a table,
+  elements in CamelCase, administrative annotations), projection (associations redirected by the
+  same renaming: `ZC_Travel ← ZR_Travel` gives `ZC_Booking`), metadata extension, access control,
+  BDEF (managed with its compositions: locks, authorizations and ETag of the children, UUID
+  numbering, read-only administrative fields, mapping; or projection BDEF), behavior pool (one
+  handler per entity, global authorization), abstract entity, custom entity and its query class,
+  class, interface, service definition and binding. An existing file is never overwritten.
+- **Why**: the creation wizards of ADT derive an object from the previous one; `rapt new` writes
+  a whole BO, `rapt generate` accompanies the construction step by step.
+- **VS Code**: *New RAP object…* (type, source object picked in a list, proposed name).
+- **Tests**: `compiler/test/generate.test.ts` (a complete BO built command by command, without a
+  diagnostic), `vscode/test/rapt.test.ts`.
 
-- **Décision** : `rapt generate <src> <type> <nom> [--from X] [--for Y] [--expose A,B] [--root]`
-  écrit un objet avec les noms de fichiers d'abapGit, puis son XML : table, vue (depuis une table,
-  éléments en CamelCase, annotations administratives), projection (associations redirigées par le
-  même renommage : `ZC_Travel ← ZR_Travel` donne `ZC_Booking`), metadata extension, access
-  control, BDEF (managed avec ses compositions : verrous, autorisations et ETag des enfants,
-  numérotation UUID, champs administratifs en lecture seule, mapping ; ou BDEF de projection),
-  behavior pool (un handler par entité, autorisation globale), entité abstraite, entité custom et
-  sa classe de requête, classe, interface, définition et binding de service. Un fichier existant
-  n'est jamais écrasé.
-- **Pourquoi** : les assistants de création d'ADT dérivent un objet du précédent ; `rapt new`
-  écrit un BO entier, `rapt generate` accompagne la construction pas à pas.
-- **VS Code** : *Nouvel objet RAP…* (type, objet source choisi dans une liste, nom proposé).
-- **Tests** : `compiler/test/generate.test.ts` (un BO complet construit commande par commande,
-  sans diagnostic), `vscode/test/rapt.test.ts`.
+## D47 — MCP server of the service
 
-## D47 — Serveur MCP du service
-
-- **Décision** : `rapt mcp <src>` écrit `rapt/mcp.json`, un outil par opération du service
+- **Decision**: `rapt mcp <src>` writes `rapt/mcp.json`, one tool per operation of the service
   (`<Set>_list`, `_get`, `_create`, `_update`, `_delete`, `_create<_Composition>`, `_<action>`),
-  chacun avec une description à compléter pour expliquer à un agent ce que fait l'outil et quand
-  s'en servir ; `false` retire un outil. Relancer la commande garde les descriptions écrites,
-  ajoute les nouveaux outils et retire ceux que le service n'a plus. L'application construite avec
-  ce fichier sert les outils sur `/mcp` (Model Context Protocol, transport « Streamable HTTP »,
-  réponses JSON, sans flux SSE).
-- **Exécution** : chaque appel est une requête OData exécutée par le service, pour l'utilisateur
-  de la requête MCP : autorisations, DCL, feature control, validations et messages sont ceux de
-  l'OData. Les erreurs du BO reviennent en texte (`isError`), le résultat en `structuredContent`.
-- **Authentification** : jeton porteur (OIDC) ou utilisateur de développement ; jamais le cookie de
-  session du navigateur (une page web pourrait sinon appeler les outils au nom de l'utilisateur).
-- **Tests** : `compiler/test/mcp.test.ts`, `runtime/test/mcp.test.ts` (protocole, lecture,
-  écriture avec messages, actions, création par composition).
+  each with a description to complete to explain to an agent what the tool does and when to use
+  it; `false` removes a tool. Running the command again keeps the written descriptions, adds the
+  new tools and removes those the service no longer has. The application built with this file
+  serves the tools on `/mcp` (Model Context Protocol, "Streamable HTTP" transport, JSON
+  responses, without an SSE stream).
+- **Execution**: each call is an OData request run by the service, for the user of the MCP
+  request: authorizations, DCL, feature control, validations and messages are those of the
+  OData. The errors of the BO come back as text (`isError`), the result as `structuredContent`.
+- **Authentication**: bearer token (OIDC) or development user; never the session cookie of the
+  browser (a web page could otherwise call the tools on behalf of the user).
+- **Tests**: `compiler/test/mcp.test.ts`, `runtime/test/mcp.test.ts` (protocol, read, write with
+  messages, actions, create by composition).
 
-## D48 — Spaces et pages du launchpad
+## D48 — Spaces and pages of the launchpad
 
-- **Décision** : `launchpad.json` accepte `spaces` (titre, rôles) → `pages` → `sections` de tuiles,
-  comme le SAP Fiori launchpad en mode spaces. Un utilisateur voit les spaces de ses rôles en
-  onglets, les pages d'un space dans une liste ; le dernier space est mémorisé (stockage local du
-  navigateur) ; la recherche couvre tous les spaces. Un fichier avec `groups` seulement donne un
-  space d'une page. `groups` du modèle reste la liste de toutes les sections (intents, recherche).
-- **Tests** : `compiler/test/launchpad.test.ts`, `runtime/test/launchpad-ui.test.ts`.
+- **Decision**: `launchpad.json` accepts `spaces` (title, roles) → `pages` → `sections` of tiles,
+  like the SAP Fiori launchpad in spaces mode. A user sees the spaces of their roles as tabs, the
+  pages of a space in a list; the last space is remembered (local storage of the browser); the
+  search covers all the spaces. A file with `groups` only gives a space of one page. `groups` of
+  the model stays the list of all the sections (intents, search).
+- **Tests**: `compiler/test/launchpad.test.ts`, `runtime/test/launchpad-ui.test.ts`.
 
-## D49 — Launchpad de développement et application de documentation
+## D49 — Development launchpad and documentation application
 
-- **Décision** : `rapt dev` sert à `/` un launchpad de développement : l'application (avec le
-  nombre d'instances de sa liste), la documentation de rap-transpiler, le `$metadata` et, avec
-  `rapt/mcp.json`, le serveur MCP. L'application et la documentation y affichent la barre shell.
-  La documentation est une application OpenUI5 (liste des pages, recherche, liens entre pages)
-  dont les pages sont rendues depuis le Markdown du dépôt à la construction (rendu propre, sans
-  dépendance) ; elle est copiée à côté du compilateur (`packages/compiler/docs`) pour que le rapt
-  empaqueté (npm, extension VS Code) l'ait aussi. Rien de cela n'est dans `rapt build` : c'est un
-  outil de développement.
-- **Tests** : `compiler/test/docs.test.ts`, `compiler/test/dev.test.ts`.
+- **Decision**: `rapt dev` serves at `/` a development launchpad: the application (with the
+  number of instances of its list), the documentation of rap-transpiler, the `$metadata` and,
+  with `rapt/mcp.json`, the MCP server. The application and the documentation show the shell bar
+  there. The documentation is an OpenUI5 application (list of the pages, search, links between
+  pages) whose pages are rendered from the Markdown of the repository at build time (our own
+  renderer, without a dependency); it is copied next to the compiler (`packages/compiler/docs`)
+  so that the packaged rapt (npm, VS Code extension) has it too. None of this is in
+  `rapt build`: it is a development tool.
+- **Tests**: `compiler/test/docs.test.ts`, `compiler/test/dev.test.ts`.
 
-## D50 — Déploiement hors de localhost
+## D50 — Deployment outside localhost
 
-- **Décision** : l'application et le launchpad générés se déploient tels quels partout où Node.js
-  22 ou un conteneur tourne. En plus du Dockerfile, ils ont un `manifest.yml` Cloud Foundry (SAP
-  BTP) et un `.cfignore`. Le runtime lit l'environnement de Cloud Foundry : `PUBLIC_URL` depuis la
-  route (`VCAP_APPLICATION`), `DATABASE_URL` et `DATABASE_CA` depuis un service PostgreSQL lié
-  (`VCAP_SERVICES`) ; une variable donnée explicitement l'emporte. `DATABASE_CA` donne le
-  certificat du serveur PostgreSQL (connexion TLS vérifiée). `rapt dev --host 0.0.0.0` ouvre le
-  serveur de développement au réseau. Guide : [DEPLOIEMENT.md](DEPLOIEMENT.md).
-- **Tests** : `runtime/test/platform.test.ts`, `compiler/test/app-scaffold.test.ts`.
+- **Decision**: the generated application and launchpad deploy as is anywhere Node.js 22 or a
+  container runs. In addition to the Dockerfile, they have a Cloud Foundry `manifest.yml` (SAP
+  BTP) and a `.cfignore`. The runtime reads the environment of Cloud Foundry: `PUBLIC_URL` from
+  the route (`VCAP_APPLICATION`), `DATABASE_URL` and `DATABASE_CA` from a bound PostgreSQL
+  service (`VCAP_SERVICES`); a variable given explicitly wins. `DATABASE_CA` gives the
+  certificate of the PostgreSQL server (verified TLS connection). `rapt dev --host 0.0.0.0` opens
+  the development server to the network. Guide: [DEPLOYMENT.md](DEPLOYMENT.md).
+- **Tests**: `runtime/test/platform.test.ts`, `compiler/test/app-scaffold.test.ts`.
 
-## D51 — UI : barre de filtres, variantes de l'utilisateur, rafraîchissement
+## D51 — UI: filter bar, user variants, refresh
 
-- **Barre de filtres** : les boutons *Go*, *Clear* et *Adapt Filters* sont alignés sur les champs.
-  Chaque filtre accepte des conditions comme SAP Fiori (`=x`, `!=x`, `>x`, `>=x`, `<x`, `<=x`,
-  `a...b`, `*x*`, `x*`, `*x` ; une valeur seule : « contient » pour un texte, « égal » sinon),
-  plusieurs par champ (jetons : valeurs incluses en OU, exclusions en ET) ; une suite de chiffres
-  (NUMC) se saisit sans ses zéros de tête ; dates en plage, date-heure par jours entiers (UTC).
-  *Adapt Filters* ajoute les colonnes de la liste comme filtres. Le résumé « Filtered By » s'affiche
-  quand l'en-tête est replié.
-- **Variantes** : `sap.m.VariantManagement` (OpenUI5) : filtres, filtres visibles, colonnes
-  visibles et tri (*paramètres du tableau*) enregistrés par utilisateur par le service
-  (`$variants?page=…`, table `rapt_ui_variant` créée au premier usage), variante par défaut,
-  favoris, renommage et suppression ; dans le stockage local du navigateur si le service ne les
-  garde pas.
-- **Rafraîchissement** : la liste se recharge quand on y revient après une modification
-  enregistrée sur une Object Page (suppression, sauvegarde, action) ; le titre du tableau donne le
-  nombre de lignes.
-- **Object Page** : fil d'Ariane vers la liste ; les modifications non enregistrées sont
-  abandonnées (avec confirmation) en quittant la page, et ne partent plus avec la sauvegarde
-  suivante.
-- **Tests** : `compiler/test/ui.test.ts` (conditions), `runtime/test/ui.test.ts` (dans le navigateur).
+- **Filter bar**: the *Go*, *Clear* and *Adapt Filters* buttons are aligned with the fields. Each
+  filter accepts conditions as in SAP Fiori (`=x`, `!=x`, `>x`, `>=x`, `<x`, `<=x`, `a...b`,
+  `*x*`, `x*`, `*x`; a single value: "contains" for a text, "equal" otherwise), several per field
+  (tokens: included values combined with OR, exclusions with AND); a string of digits (NUMC) is
+  entered without its leading zeros; dates as ranges, date-times by whole days (UTC). *Adapt
+  Filters* adds the columns of the list as filters. The "Filtered By" summary shows when the
+  header is collapsed.
+- **Variants**: `sap.m.VariantManagement` (OpenUI5): filters, visible filters, visible columns
+  and sorting (*table settings*) saved per user by the service (`$variants?page=…`, table
+  `rapt_ui_variant` created on first use), default variant, favorites, renaming and deletion; in
+  the local storage of the browser when the service does not keep them.
+- **Refresh**: the list reloads when you come back to it after a change saved on an Object Page
+  (deletion, save, action); the title of the table gives the number of rows.
+- **Object Page**: breadcrumbs to the list; unsaved changes are discarded (with a confirmation)
+  when leaving the page, and are no longer sent with the next save.
+- **Tests**: `compiler/test/ui.test.ts` (conditions), `runtime/test/ui.test.ts` (in the browser).
 
-## D52 — `$apply` : agrégation dans le runtime OData
+## D52 — `$apply`: aggregation in the OData runtime
 
-- **Contexte** : l'Analytical List Page et l'Overview Page (D53) ont besoin de totaux et de
-  groupes ; Fiori Elements les demande par `$apply` (OData Data Aggregation).
-- **Décision** : le runtime lit `$apply` avec `filter(…)`, puis une transformation
-  `groupby((P,…))`, `groupby((P,…),aggregate(…))` ou `aggregate(…)` ; méthodes `sum`, `min`,
-  `max`, `average`, `countdistinct` et `$count as Alias`. La requête SQL est un `GROUP BY` sur la
-  vue de l'entité, avec les contrôles d'accès (DCL) de l'utilisateur ; `$orderby` sur les
-  dimensions et les alias, `$top`, `$skip`, `$count`. Les autres transformations (`topcount`,
-  `compute`, une transformation après le groupement…) répondent 501.
-- **Pourquoi** : c'est la partie d'OData Data Aggregation que les floorplans utilisent ; le reste
-  demande l'annotation `@Aggregation` que les BO transactionnels n'ont pas.
-- **Tests** : `runtime/test/odata-apply.test.ts`.
+- **Context**: the Analytical List Page and the Overview Page (D53) need totals and groups;
+  Fiori Elements requests them with `$apply` (OData Data Aggregation).
+- **Decision**: the runtime reads `$apply` with `filter(…)`, then a `groupby((P,…))`,
+  `groupby((P,…),aggregate(…))` or `aggregate(…)` transformation; methods `sum`, `min`, `max`,
+  `average`, `countdistinct` and `$count as Alias`. The SQL query is a `GROUP BY` on the view of
+  the entity, with the access controls (DCL) of the user; `$orderby` on the dimensions and the
+  aliases, `$top`, `$skip`, `$count`. The other transformations (`topcount`, `compute`, a
+  transformation after the grouping…) answer 501.
+- **Why**: it is the part of OData Data Aggregation the floorplans use; the rest requires the
+  `@Aggregation` annotation transactional BOs do not have.
+- **Tests**: `runtime/test/odata-apply.test.ts`.
 
-## D53 — Floorplans : Worklist, Analytical List Page, Overview Page, Form entry
+## D53 — Floorplans: Worklist, Analytical List Page, Overview Page, Form entry
 
-- **Contexte** : Fiori Elements choisit le floorplan dans le descripteur de l'application ; les
-  sources RAP n'en disent rien. Le floorplan est donc un réglage du projet.
-- **Décision** : `ui` de `rapt/config.json` :
+- **Context**: Fiori Elements chooses the floorplan in the descriptor of the application; the
+  RAP sources say nothing about it. The floorplan is therefore a setting of the project.
+- **Decision**: `ui` of `rapt/config.json`:
   `{ "floorplans": { "<EntitySet>": "listReport" | "worklist" | "analyticalListPage" | "formEntry" },
   "overview": { "title": "…", "cards": [ … ] } }`.
-  - *Worklist* : liste sans barre de filtres, un onglet par `@UI.selectionVariant` qualifié de
-    l'entité, avec le nombre d'instances de chaque onglet ;
-  - *Analytical List Page* : le premier `@UI.chart` de l'entité (dimension, mesures, `#COLUMN`,
-    `#BAR`, `#LINE`, `#PIE`, `#DONUT`) au-dessus du tableau, lu par `$apply` (D52) ; une valeur choisie
-    dans le graphique filtre le tableau ; vue graphique, tableau ou les deux ;
-  - *Form entry* : l'Object Page en création seule ; après l'enregistrement, un nouveau
-    formulaire vide ;
-  - *Overview Page* : page d'accueil de cartes (`kpi` : agrégat d'une mesure ou compte ; `list`,
-    `table` : instances filtrées et triées ; `chart` : un `@UI.chart`), chaque carte ouvre la liste
-    ou l'instance.
-  Le graphique est un contrôle OpenUI5 propre en SVG (`sap.viz` n'existe que dans SAPUI5).
-- **Pourquoi** : mêmes annotations que Fiori Elements (`UI.chart`, `UI.selectionVariant`), sans
-  bibliothèque propriétaire ; un réglage contrôlé (CFG003) plutôt qu'un descripteur à écrire.
-- **Tests** : `compiler/test/config.test.ts`, `compiler/test/ui.test.ts`,
-  `runtime/test/ui-floorplans.test.ts` (navigateur).
+  - *Worklist*: list without a filter bar, one tab per qualified `@UI.selectionVariant` of the
+    entity, with the number of instances of each tab;
+  - *Analytical List Page*: the first `@UI.chart` of the entity (dimension, measures, `#COLUMN`,
+    `#BAR`, `#LINE`, `#PIE`, `#DONUT`) above the table, read with `$apply` (D52); a value chosen
+    in the chart filters the table; chart view, table view or both;
+  - *Form entry*: the Object Page for creation only; after the save, a new empty form;
+  - *Overview Page*: home page of cards (`kpi`: aggregate of a measure or count; `list`,
+    `table`: filtered and sorted instances; `chart`: a `@UI.chart`), each card opens the list or
+    the instance.
+  The chart is our own OpenUI5 control in SVG (`sap.viz` only exists in SAPUI5).
+- **Why**: the same annotations as Fiori Elements (`UI.chart`, `UI.selectionVariant`), without a
+  proprietary library; a checked setting (CFG003) rather than a descriptor to write.
+- **Tests**: `compiler/test/config.test.ts`, `compiler/test/ui.test.ts`,
+  `runtime/test/ui-floorplans.test.ts` (browser).
 
 ## D54 — Draft (`with draft`)
 
-- **Contexte** : le draft est la façon standard d'éditer dans Fiori Elements V4 ; un BO RAP
-  managed le déclare par `with draft;` et une `draft table` par entité.
-- **Décision** :
-  - **BDEF** : `with draft`, `draft table`, `total etag`, `draft action Edit`, `Activate
-    optimized`, `Discard`, `Resume`, `draft determine action Prepare` ; une entité sans `draft
-    table` : BDEF028.
-  - **Base** : une table de brouillons par entité (les éléments de l'entité, `DraftUUID`,
-    `HasActiveEntity`, dates du brouillon) et `rapt_draft_admin` (utilisateur, création, dernière
-    modification) ; une vue `<projection>_all` réunit instances actives et brouillons.
-  - **OData** : clé `IsActiveEntity`, propriétés `HasActiveEntity`, `HasDraftEntity`, navigation
+- **Context**: draft is the standard way to edit in Fiori Elements V4; a managed RAP BO declares
+  it with `with draft;` and one `draft table` per entity.
+- **Decision**:
+  - **BDEF**: `with draft`, `draft table`, `total etag`, `draft action Edit`, `Activate
+    optimized`, `Discard`, `Resume`, `draft determine action Prepare`; an entity without a
+    `draft table`: BDEF028.
+  - **Database**: one draft table per entity (the elements of the entity, `DraftUUID`,
+    `HasActiveEntity`, dates of the draft) and `rapt_draft_admin` (user, creation, last change);
+    a `<projection>_all` view combines active instances and drafts.
+  - **OData**: `IsActiveEntity` key, properties `HasActiveEntity`, `HasDraftEntity`, navigation
     `DraftAdministrativeData`, actions `Edit`, `Activate`, `Prepare`, `Resume`, `Discard`,
-    `Common.DraftRoot` / `DraftNode`. Un utilisateur ne lit que ses propres brouillons.
-  - **Runtime** : création, modification et suppression dans le brouillon sans détermination ni
-    validation ; `Edit` copie l'instance et ses compositions (un brouillon par instance, verrou
-    exclusif de 15 minutes comme SAP) ; `Activate` rejoue le brouillon dans le runtime managed dans
-    le LUW de la requête (déterminations, validations, saver), clés conservées, puis supprime le
-    brouillon ; une instance active qui a un brouillon n'est pas modifiable directement (409).
-  - **UI** : Create ouvre un brouillon, chaque champ y est enregistré à la sortie, Save active,
-    Cancel et *Discard Draft* abandonnent ; la liste montre l'état d'édition.
-- **Pourquoi** : le comportement observable de SAP (URL, clés, actions, verrou) pour que les
-  sources et les clients restent ceux d'un système SAP.
-- **Tests** : `runtime/test/draft.test.ts`, `runtime/test/ui-draft.test.ts` (navigateur),
+    `Common.DraftRoot` / `DraftNode`. A user only reads their own drafts.
+  - **Runtime**: creation, change and deletion in the draft without determinations nor
+    validations; `Edit` copies the instance and its compositions (one draft per instance,
+    exclusive lock of 15 minutes as SAP); `Activate` replays the draft in the managed runtime in
+    the LUW of the request (determinations, validations, saver), keys kept, then deletes the
+    draft; an active instance that has a draft cannot be changed directly (409).
+  - **UI**: Create opens a draft, each field is saved in it when leaving it, Save activates,
+    Cancel and *Discard Draft* discard; the list shows the editing status.
+- **Why**: the observable behavior of SAP (URLs, keys, actions, lock) so that the sources and the
+  clients stay those of an SAP system.
+- **Tests**: `runtime/test/draft.test.ts`, `runtime/test/ui-draft.test.ts` (browser),
   `compiler/test/ir.test.ts` (BDEF028).
 
-## D55 — Table entities, types simples et types énumérés CDS
+## D55 — Table entities, CDS simple types and enumerated types
 
-- **Contexte** : ABAP Cloud récent ajoute les CDS table entities (`define table entity` : une
-  table et son entité en un objet, persistance d'un BO RAP) et les types CDS (`define type`, objets
-  DRTY) : types simples et types énumérés (`enum`). SAP n'expose pas les types énumérés dans les
-  services OData RAP (« Development Constraints » de RAP).
-- **Décision** :
-  - **Types CDS** (`<nom>.drty.acds`, lus par rap-transpiler : abaplint connaît l'objet sans
-    l'analyser) : un type simple vaut son type de base (type intégré, élément de données ou autre
-    type CDS), avec son libellé ; un type énuméré a un type de base (`abap.int1`, `int2`, `int4`,
-    `char(1..8)`, `numc(1..8)`), exactement une constante `initial`, des constantes et des
-    valeurs uniques (TYPE001 à TYPE003). Un type typé par un type énuméré en reprend les constantes.
-    Ils typent les éléments des table entities, des entités abstraites et custom.
-  - **Table entity** : une table du même nom (éléments en minuscules ; `NOT NULL` sauf `null` ;
-    clés en tête ; `abap.string` déclaré `null`, CDS019-CDS020) et une view entity sur cette table.
-    Une BDEF managed sur la table entity n'écrit pas `persistent table` : la table entity est sa
-    persistance. Les vues et projections la lisent comme une entité ; l'ABAP SQL du behavior pool
-    lit et écrit sa table.
-  - **Valeurs énumérées** : stockées en base avec leur valeur de base. Dans le behavior pool, le
-    type est donné au transpiler comme un élément de données de son type de base et chaque
-    constante `type-constante` devient le littéral de sa valeur (même ligne, même sens).
-  - **OData** : en mode `standard`, un élément énuméré dans une entité exposée est une erreur
-    (CDS021), comme sur SAP. En mode `enhanced`, il devient un `EnumType` du `$metadata` : membres
-    nommés comme les constantes, valeur entière (la valeur de base si elle est entière, la position
-    sinon), libellé en `Core.Description`. Le JSON porte le nom du membre (`"Status": "OPEN"`) ;
-    `$filter` accepte `Status eq 'OPEN'`, `Ns.Type'OPEN'` et la valeur entière ; une valeur hors
-    du type est refusée (400). L'UI affiche les libellés et propose une liste de choix (OpenUI5 ne
-    sait pas écrire les littéraux d'énumération : le filtre passe par `$filter`).
-  - `rapt generate tableentity|type|enum`, DDLS de type `T` pour `rapt abapgit`. Un type CDS est
-    un objet au format AFF d'abapGit (dépôt SAP/abap-file-formats) : la source `<nom>.drty.acds`
-    et ses métadonnées `<nom>.drty.json` (`formatVersion`, description, langue), écrites par
-    `rapt abapgit` (`.drty.asdrty` reste lu).
-- **Pourquoi** : la table entity est un BO complet en deux fichiers ; les types énumérés donnent
-  des valeurs nommées à l'API sans changer le stockage. Le mode `standard` reste activable sur SAP,
-  l'exposition en énumération est une extension (D45).
-- **Tests** : `compiler/test/table-entity.test.ts`, `runtime/test/table-entity.test.ts`
-  (OData, ABAP, navigateur), fixture `fixtures/table-entity`.
+- **Context**: recent ABAP Cloud adds CDS table entities (`define table entity`: a table and its
+  entity in one object, persistence of a RAP BO) and CDS types (`define type`, DRTY objects):
+  simple types and enumerated types (`enum`). SAP does not expose enumerated types in RAP OData
+  services ("Development Constraints" of RAP).
+- **Decision**:
+  - **CDS types** (`<name>.drty.acds`, read by rap-transpiler: abaplint knows the object without
+    parsing it): a simple type is worth its base type (built-in type, data element or another CDS
+    type), with its label; an enumerated type has a base type (`abap.int1`, `int2`, `int4`,
+    `char(1..8)`, `numc(1..8)`), exactly one `initial` constant, unique constants and values
+    (TYPE001 to TYPE003). A type typed by an enumerated type takes its constants. They type the
+    elements of the table entities, of the abstract and custom entities.
+  - **Table entity**: a table with the same name (elements in lower case; `NOT NULL` unless
+    `null`; keys first; `abap.string` declared `null`, CDS019-CDS020) and a view entity on this
+    table. A managed BDEF on the table entity does not write `persistent table`: the table entity
+    is its persistence. Views and projections read it as an entity; the ABAP SQL of the behavior
+    pool reads and writes its table.
+  - **Enumerated values**: stored in the database with their base value. In the behavior pool,
+    the type is given to the transpiler as a data element of its base type and each
+    `type-constant` constant becomes the literal of its value (same line, same meaning).
+  - **OData**: in `standard` mode, an enumerated element in an exposed entity is an error
+    (CDS021), as on SAP. In `enhanced` mode, it becomes an `EnumType` of the `$metadata`: members
+    named like the constants, integer value (the base value when it is an integer, the position
+    otherwise), label as `Core.Description`. The JSON carries the name of the member
+    (`"Status": "OPEN"`); `$filter` accepts `Status eq 'OPEN'`, `Ns.Type'OPEN'` and the integer
+    value; a value outside the type is refused (400). The UI shows the labels and offers a choice
+    list (OpenUI5 cannot write enumeration literals: the filter goes through `$filter`).
+  - `rapt generate tableentity|type|enum`, DDLS of type `T` for `rapt abapgit`. A CDS type is an
+    object in the AFF format of abapGit (SAP/abap-file-formats repository): the source
+    `<name>.drty.acds` and its metadata `<name>.drty.json` (`formatVersion`, description,
+    language), written by `rapt abapgit` (`.drty.asdrty` is still read).
+- **Why**: the table entity is a complete BO in two files; enumerated types give named values to
+  the API without changing the storage. The `standard` mode stays activatable on SAP, the
+  exposure as an enumeration is an extension (D45).
+- **Tests**: `compiler/test/table-entity.test.ts`, `runtime/test/table-entity.test.ts` (OData,
+  ABAP, browser), fixture `fixtures/table-entity`.
 
-## D56 — Value helps : liaisons, validation, valeurs fixes, paramètres d'action
+## D56 — Value helps: bindings, validation, fixed values, action parameters
 
-- **Contexte** : D44 donnait le value help simple (`entity: { name, element }`) ; les BO RAP
-  utilisent aussi `additionalBinding`, `useForValidation` et des listes déroulantes.
-- **Décision** :
-  - `additionalBinding: [{ localElement, element, usage }]` : `#FILTER` restreint la liste par la
-    valeur locale (`Common.ValueListParameterIn`), `#RESULT` copie l'élément de la ligne choisie
-    dans l'élément local (`ValueListParameterOut`), sans usage les deux (`InOut`) ;
-  - `useForValidation: true` : `Common.ValueListForValidation` ; l'UI signale une valeur saisie
-    absente de la liste (état d'erreur du champ) ;
-  - `@ObjectModel.resultSet.sizeCategory: #XS` sur l'entité du value help :
-    `Common.ValueListWithFixedValues`, et une liste déroulante (valeur et description) dans l'UI ;
-  - les paramètres d'action (entité abstraite) ont leur value help dans le dialogue, si son
-    entité est exposée par le service (comme RAP, qui ne l'ajoute pas implicitement).
-- **Pourquoi** : ce sont les formes de value help des BO RAP courants, et Fiori Elements les
-  interprète depuis le `$metadata`.
-- **Tests** : `compiler/test/table-entity.test.ts` (CSDL), `runtime/test/table-entity.test.ts`
-  (liste déroulante qui remplit la devise, validation, dans le navigateur),
+- **Context**: D44 gave the simple value help (`entity: { name, element }`); RAP BOs also use
+  `additionalBinding`, `useForValidation` and drop-down lists.
+- **Decision**:
+  - `additionalBinding: [{ localElement, element, usage }]`: `#FILTER` restricts the list by the
+    local value (`Common.ValueListParameterIn`), `#RESULT` copies the element of the chosen row
+    into the local element (`ValueListParameterOut`), without a usage both (`InOut`);
+  - `useForValidation: true`: `Common.ValueListForValidation`; the UI reports an entered value
+    missing from the list (error state of the field);
+  - `@ObjectModel.resultSet.sizeCategory: #XS` on the entity of the value help:
+    `Common.ValueListWithFixedValues`, and a drop-down list (value and description) in the UI;
+  - the action parameters (abstract entity) have their value help in the dialog, if its entity is
+    exposed by the service (as in RAP, which does not add it implicitly).
+- **Why**: they are the value help forms of common RAP BOs, and Fiori Elements interprets them
+  from the `$metadata`.
+- **Tests**: `compiler/test/table-entity.test.ts` (CSDL), `runtime/test/table-entity.test.ts`
+  (drop-down list that fills the currency, validation, in the browser),
   `runtime/test/standard-views.test.ts`.
 
-## D57 — Annotations d'affichage : criticité, textes, en-tête, liens, filtres
+## D57 — Display annotations: criticality, texts, header, links, filters
 
-- **Contexte** : l'UI générée suivait les annotations de structure (`lineItem`, `identification`,
-  `facet`…) mais pas celles d'affichage courantes des BO RAP ; la table complète est dans
-  [ANNOTATIONS.md](ANNOTATIONS.md).
-- **Décision** :
-  - `criticality` (line item, identification, data point) : `ObjectStatus` ou `ObjectNumber`
-    coloré (1 négatif, 2 critique, 3 positif) ;
-  - `@ObjectModel.text.element` + `@UI.textArrangement` : « Texte (ID) » (défaut, comme Fiori
-    Elements), « ID (Texte) », texte seul, séparé ;
-  - `@UI.dataPoint` (`UI.DataPoint`, qualifié par son `qualifier` ou le nom de l'élément) et
-    `@UI.facet` purpose `#HEADER` (`#DATAPOINT_REFERENCE`, `#FIELDGROUP_REFERENCE`) : en-tête de
-    l'Object Page, barre de progression (`#PROGRESS`, `targetValue`), notation (`#RATING`), nombre ;
-  - `@UI.multiLineText` : zone de texte ; `@Semantics.email.address`, `@Semantics.telephone.type` :
-    liens `mailto:` / `tel:` (vocabulaire `Communication`) ; line item `#WITH_URL` : lien ;
-  - `@Consumption.filter.defaultValue` (filtre initial, appliqué par la variante standard),
-    `mandatory` (filtre obligatoire, `FilterRestrictions`), `selectionType` /
-    `multipleSelections` (une valeur) ;
-  - `@Consumption.hidden` : élément non exposé, sauf une clé ou l'élément d'une association.
-  - Correctif : `@UI.facet: […]` puis `@UI: { … }` sur le même élément gardent les deux (la
-    seconde annotation remplaçait la première).
-- **Pourquoi** : ce sont les annotations que les exemples SAP (RAP100, Flight) utilisent sur
-  chaque BO ; elles changent ce que voit l'utilisateur sans changer le BO.
-- **Tests** : `compiler/test/table-entity.test.ts` (CSDL), `runtime/test/table-entity.test.ts`
-  (navigateur), fixture `fixtures/table-entity`.
+- **Context**: the generated UI followed the structure annotations (`lineItem`,
+  `identification`, `facet`…) but not the common display annotations of RAP BOs; the complete
+  table is in [ANNOTATIONS.md](ANNOTATIONS.md).
+- **Decision**:
+  - `criticality` (line item, identification, data point): colored `ObjectStatus` or
+    `ObjectNumber` (1 negative, 2 critical, 3 positive);
+  - `@ObjectModel.text.element` + `@UI.textArrangement`: "Text (ID)" (default, as in Fiori
+    Elements), "ID (Text)", text only, separate;
+  - `@UI.dataPoint` (`UI.DataPoint`, qualified by its `qualifier` or the name of the element) and
+    `@UI.facet` purpose `#HEADER` (`#DATAPOINT_REFERENCE`, `#FIELDGROUP_REFERENCE`): header of
+    the Object Page, progress bar (`#PROGRESS`, `targetValue`), rating (`#RATING`), number;
+  - `@UI.multiLineText`: text area; `@Semantics.email.address`, `@Semantics.telephone.type`:
+    `mailto:` / `tel:` links (`Communication` vocabulary); `#WITH_URL` line item: link;
+  - `@Consumption.filter.defaultValue` (initial filter, applied by the standard variant),
+    `mandatory` (mandatory filter, `FilterRestrictions`), `selectionType` /
+    `multipleSelections` (one value);
+  - `@Consumption.hidden`: element not exposed, except a key or the element of an association.
+  - Fix: `@UI.facet: […]` then `@UI: { … }` on the same element keep both (the second
+    annotation replaced the first one).
+- **Why**: they are the annotations the SAP examples (RAP100, Flight) use on each BO; they change
+  what the user sees without changing the BO.
+- **Tests**: `compiler/test/table-entity.test.ts` (CSDL), `runtime/test/table-entity.test.ts`
+  (browser), fixture `fixtures/table-entity`.
 
-## D58 — UI du draft comme Fiori Elements
+## D58 — Draft UI as in Fiori Elements
 
-- **Contexte** : la première UI du draft (D54) éditait et activait, mais sans les repères de
-  Fiori Elements : la liste montrait l'instance active même quand l'utilisateur avait un
-  brouillon, sans filtre d'état d'édition ni indicateur d'enregistrement.
-- **Décision** :
-  - **List Report** : filtre *Editing Status* (*All*, *Own Draft*, *Locked by Another User*,
-    *No Changes*) ; *All* montre les brouillons de l'utilisateur à la place de leurs instances
-    actives (`IsActiveEntity eq false or HasDraftEntity eq false or
-    DraftAdministrativeData/InProcessByUser ne '<utilisateur>'`, comme `SiblingEntity` chez SAP) ;
-    marqueurs *Draft* et *Locked by X* (`ObjectMarker`). L'instance active pointe vers les
-    données d'administration de son brouillon (`DraftUUID`), comme SAP.
-  - **Object Page** : marqueur *Draft* dans l'en-tête, *Locked by X* sur une instance qu'un autre
-    utilisateur édite, `DraftIndicator` dans le pied (« Saving draft… », « Draft updated ») ;
-    *Discard Draft* demande « Discard all changes? » ; quitter la page en brouillon propose
-    *Keep Draft* / *Discard Draft* (le brouillon reste dans la liste).
-  - L'utilisateur courant est donné à l'UI par `$permissions` (`$user`).
-- **Pourquoi** : un utilisateur de Fiori Elements retrouve les mêmes gestes ; aucune bibliothèque
-  SAP (contrôles OpenUI5 `ObjectMarker`, `DraftIndicator`).
-- **Tests** : `runtime/test/ui-draft.test.ts` (navigateur).
+- **Context**: the first draft UI (D54) edited and activated, but without the landmarks of Fiori
+  Elements: the list showed the active instance even when the user had a draft, without an
+  editing status filter nor a saving indicator.
+- **Decision**:
+  - **List Report**: *Editing Status* filter (*All*, *Own Draft*, *Locked by Another User*,
+    *No Changes*); *All* shows the drafts of the user instead of their active instances
+    (`IsActiveEntity eq false or HasDraftEntity eq false or
+    DraftAdministrativeData/InProcessByUser ne '<user>'`, like `SiblingEntity` at SAP); *Draft*
+    and *Locked by X* markers (`ObjectMarker`). The active instance points to the administrative
+    data of its draft (`DraftUUID`), as at SAP.
+  - **Object Page**: *Draft* marker in the header, *Locked by X* on an instance another user is
+    editing, `DraftIndicator` in the footer ("Saving draft…", "Draft updated"); *Discard Draft*
+    asks "Discard all changes?"; leaving the page in draft offers *Keep Draft* / *Discard Draft*
+    (the draft stays in the list).
+  - The current user is given to the UI by `$permissions` (`$user`).
+- **Why**: a Fiori Elements user finds the same gestures; no SAP library (OpenUI5 controls
+  `ObjectMarker`, `DraftIndicator`).
+- **Tests**: `runtime/test/ui-draft.test.ts` (browser).
 
 ## D59 — Collaborative draft
 
-- **Contexte** : `with collaborative draft;` et `draft action Share;` (ABAP Cloud) permettent à
-  plusieurs utilisateurs d'éditer le même brouillon ; les utilisateurs invités par `Share` ou qui
-  rejoignent le brouillon le modifient, l'activent ou l'abandonnent.
-- **Décision** :
-  - BDEF : `with collaborative draft;` dans l'en-tête, `draft action Share;` obligatoire (BDEF029),
-    `use action Share;` dans la projection.
-  - Base : `rapt_draft_user` (brouillon, utilisateur, rôle `O` propriétaire / `E` éditeur).
-  - OData : action `Share(Users: Collection(DraftAdministrativeUserInput{UserID, UserAccessRole}),
-    ShareAll)`, `Common.DraftRoot/ShareAction`, entité `DraftAdministrativeUser`
-    (navigation `DraftAdministrativeData/DraftAdministrativeUser`).
-  - Runtime : le créateur est propriétaire ; `Edit` d'une instance dont un autre utilisateur a le
-    brouillon fait rejoindre le brouillon (au lieu de 409) ; tout utilisateur du brouillon le
-    lit, le modifie, l'active, l'abandonne ; les autres reçoivent 409 / 404 comme pour un brouillon
-    exclusif.
-  - UI : en brouillon, les utilisateurs (avatars) et *Invite* (`Share`) ; la page relit le
-    brouillon toutes les 5 secondes pour montrer les changements des autres.
-- **Pourquoi** : le comportement de SAP (actions, entités, annotation) pour que Fiori Elements et
-  les clients OData s'y retrouvent ; le rafraîchissement périodique remplace les WebSockets
-  (ABAP Channels) de SAP.
-- **Tests** : `runtime/test/draft-collaborative.test.ts` (OData, navigateur, BDEF029).
+- **Context**: `with collaborative draft;` and `draft action Share;` (ABAP Cloud) let several
+  users edit the same draft; the users invited with `Share` or who join the draft change it,
+  activate it or discard it.
+- **Decision**:
+  - BDEF: `with collaborative draft;` in the header, `draft action Share;` mandatory (BDEF029),
+    `use action Share;` in the projection.
+  - Database: `rapt_draft_user` (draft, user, role `O` owner / `E` editor).
+  - OData: action `Share(Users: Collection(DraftAdministrativeUserInput{UserID, UserAccessRole}),
+    ShareAll)`, `Common.DraftRoot/ShareAction`, entity `DraftAdministrativeUser` (navigation
+    `DraftAdministrativeData/DraftAdministrativeUser`).
+  - Runtime: the creator is the owner; `Edit` of an instance whose draft another user has makes
+    the user join the draft (instead of 409); every user of the draft reads it, changes it,
+    activates it, discards it; the others receive 409 / 404 as for an exclusive draft.
+  - UI: in draft, the users (avatars) and *Invite* (`Share`); the page reads the draft again
+    every 5 seconds to show the changes of the others.
+- **Why**: the behavior of SAP (actions, entities, annotation) so that Fiori Elements and the
+  OData clients find their way; the periodic refresh replaces the WebSockets (ABAP Channels) of
+  SAP.
+- **Tests**: `runtime/test/draft-collaborative.test.ts` (OData, browser, BDEF029).
 
-## D60 — API Web : binding OData V4 - Web API, OAuth 2.0 (client credentials, PKCE)
+## D60 — Web APIs: OData V4 - Web API binding, OAuth 2.0 (client credentials, PKCE)
 
-- **Contexte** : un service RAP s'expose aussi en API pour d'autres systèmes (binding *OData V4 -
-  Web API*). Les appelants s'authentifient par OAuth 2.0 : *client credentials* (machine à
-  machine) ou *authorization code* avec PKCE (application au nom d'un utilisateur).
-- **Décision** :
-  - **Binding** : `BINDING_TYPE_CATEGORY` 1 du SRVB, ou `--binding-type webapi`, ou
-    `rapt generate binding … --binding-type webapi`. Comme SAP : pas d'annotation `UI.*`, ni value
-    help, ni side effects, ni feature control (`__EntityControl`…) dans le service (les contrôles
-    restent appliqués par le runtime) ; pas d'UI générée ; un BO draft n'expose que ses instances
-    actives (écritures directes, sans `IsActiveEntity`).
-  - **Production** (`AUTH_MODE=oidc`) : le service accepte les jetons de l'IdP (Keycloak, SAP Cloud
-    Identity Services, Entra ID…) obtenus par l'un ou l'autre flux ; un jeton *client credentials*
-    sans `preferred_username` désigne son client (`client_id`) comme utilisateur technique ; ses
-    rôles peuvent venir de `scope` (`OIDC_ROLES_CLAIM=scope`). Les sessions du navigateur
-    utilisaient déjà le flux PKCE.
-  - **Développement** : `rapt dev` (et une application démarrée avec `AUTH_MODE=none` et
-    `DEV_OAUTH=on`) sert un serveur d'autorisation de développement sous `/oauth` : découverte
-    OIDC, JWKS, `/oauth/token` (`client_credentials` avec `rapt-client` / `rapt-secret`,
-    `authorization_code` avec vérification PKCE S256), `/oauth/authorize` (page de choix de
-    l'utilisateur et de ses rôles) ; clients configurables (`DEV_OAUTH_CLIENTS`). Ses jetons
-    (RS256, clé générée au démarrage) donnent un utilisateur de développement.
-- **Pourquoi** : tester une API exactement comme ses clients l'appelleront (Postman, Bruno, un
-  autre système) sans installer d'IdP ; en production, l'IdP reste la seule source de jetons.
-- **Tests** : `runtime/test/web-api.test.ts` (binding, client credentials, PKCE),
-  `runtime/test/auth.test.ts` (jeton de client).
+- **Context**: a RAP service is also exposed as an API for other systems (*OData V4 - Web API*
+  binding). The callers authenticate with OAuth 2.0: *client credentials* (machine to machine)
+  or *authorization code* with PKCE (application on behalf of a user).
+- **Decision**:
+  - **Binding**: `BINDING_TYPE_CATEGORY` 1 of the SRVB, or `--binding-type webapi`, or
+    `rapt generate binding … --binding-type webapi`. As at SAP: no `UI.*` annotation, nor value
+    help, nor side effects, nor feature control (`__EntityControl`…) in the service (the checks
+    are still applied by the runtime); no generated UI; a draft BO only exposes its active
+    instances (direct writes, without `IsActiveEntity`).
+  - **Production** (`AUTH_MODE=oidc`): the service accepts the tokens of the IdP (Keycloak, SAP
+    Cloud Identity Services, Entra ID…) obtained with either flow; a *client credentials* token
+    without `preferred_username` designates its client (`client_id`) as a technical user; its
+    roles can come from `scope` (`OIDC_ROLES_CLAIM=scope`). The browser sessions already used the
+    PKCE flow.
+  - **Development**: `rapt dev` (and an application started with `AUTH_MODE=none` and
+    `DEV_OAUTH=on`) serves a development authorization server under `/oauth`: OIDC discovery,
+    JWKS, `/oauth/token` (`client_credentials` with `rapt-client` / `rapt-secret`,
+    `authorization_code` with S256 PKCE verification), `/oauth/authorize` (page to choose the user
+    and their roles); configurable clients (`DEV_OAUTH_CLIENTS`). Its tokens (RS256, key generated
+    on start) give a development user.
+- **Why**: test an API exactly as its clients will call it (Postman, Bruno, another system)
+  without installing an IdP; in production, the IdP stays the only source of tokens.
+- **Tests**: `runtime/test/web-api.test.ts` (binding, client credentials, PKCE),
+  `runtime/test/auth.test.ts` (client token).
 
-## D61 — Création guidée des objets, floorplan, parité CLI / extension
+## D61 — Guided creation of the objects, floorplan, CLI / extension parity
 
-- **Contexte** : ADT guide la création d'un objet (*New ABAP Repository Object* : types par
-  catégorie, description, objet de référence) ; l'extension n'offrait qu'une suite de listes
-  rapides, et le floorplan de l'UI ne se choisissait qu'en éditant `rapt/config.json`.
-- **Décision** :
-  - **Catalogue** : `authoring/catalog.ts` décrit chaque type d'objet (catégorie, libellé,
-    description, fichiers, longueur du nom, champs : objet source, entités exposées, type de
-    binding, type intégré) ; `rapt generate <src> --json` sans type le renvoie. L'extension en
-    construit son assistant : la CLI reste la seule source.
-  - **Assistant** (webview *Nouvel objet RAP*) : filtre, types par catégorie, formulaire du type
-    (les objets du projet proposés comme source), *Créer* lance `rapt generate` (ou `rapt new` pour
-    un BO complet) et ouvre le fichier. Nouveaux types : élément de données et domaine (`--type`).
-  - **Vue *Objets RAP*** : les objets du projet groupés comme l'explorateur de projet d'ADT.
-  - **Floorplan** : `rapt floorplan <src> [<EntitySet> <floorplan>]` lit et écrit
-    `ui.floorplans` de `rapt/config.json` ; la commande VS Code décrit chaque floorplan (usage,
-    annotations nécessaires).
-  - **Parité** : chaque commande de la CLI a sa commande VS Code (`check`, `ir`, `build`,
+- **Context**: ADT guides the creation of an object (*New ABAP Repository Object*: types by
+  category, description, reference object); the extension only offered a series of quick picks,
+  and the floorplan of the UI could only be chosen by editing `rapt/config.json`.
+- **Decision**:
+  - **Catalog**: `authoring/catalog.ts` describes each object type (category, label,
+    description, files, length of the name, fields: source object, exposed entities, binding type,
+    built-in type); `rapt generate <src> --json` without a type returns it. The extension builds
+    its wizard from it: the CLI stays the only source.
+  - **Wizard** (*New RAP object* webview): filter, types by category, form of the type (the
+    objects of the project offered as source), *Create* runs `rapt generate` (or `rapt new` for a
+    complete BO) and opens the file. New types: data element and domain (`--type`).
+  - ***RAP Objects* view**: the objects of the project grouped like the project explorer of ADT.
+  - **Floorplan**: `rapt floorplan <src> [<EntitySet> <floorplan>]` reads and writes
+    `ui.floorplans` of `rapt/config.json`; the VS Code command describes each floorplan (use,
+    required annotations).
+  - **Parity**: each command of the CLI has its VS Code command (`check`, `ir`, `build`,
     `launchpad`, `dev`, `new`, `abapgit`, `mcp`, `generate`, `floorplan`).
-- **Pourquoi** : un développeur ABAP retrouve les gestes d'ADT ; le choix du floorplan devient
-  explicite et documenté au moment de le faire.
-- **Tests** : `vscode/test/rapt.test.ts` (catalogue, arguments de l'assistant, `rapt floorplan`,
-  groupes), assistant vérifié dans Chromium.
+- **Why**: an ABAP developer finds the gestures of ADT; the choice of the floorplan becomes
+  explicit and documented at the moment it is made.
+- **Tests**: `vscode/test/rapt.test.ts` (catalog, arguments of the wizard, `rapt floorplan`,
+  groups), wizard checked in Chromium.
 
-## D62 — Site du projet et téléchargement de l'extension
+## D62 — Website of the project and download of the extension
 
-- **Décision** : `site/` (HTML et CSS statiques, sans dépendance ni outil de construction) présente
-  le projet ; le workflow `site.yml` le publie sur GitHub Pages avec les captures de `docs/images`
-  et le `.vsix` construit depuis le même commit (bouton *Télécharger*). Les versions taguées
-  restent publiées par `release.yml` (GitHub Release, Marketplace et Open VSX si leurs jetons sont
-  configurés). À activer une fois : *Settings → Pages → Source : GitHub Actions*.
-- **Pourquoi** : une adresse à partager, toujours à jour, sans serveur à maintenir.
-- **Tests** : rendu vérifié dans Chromium (bureau, mobile sans défilement horizontal, mode sombre).
+- **Decision**: `site/` (static HTML and CSS, without a dependency nor a build tool) presents the
+  project; the `site.yml` workflow publishes it on GitHub Pages with the screenshots of
+  `docs/images` and the `.vsix` built from the same commit (*Download* button). The tagged
+  versions are still published by `release.yml` (GitHub Release, Marketplace and Open VSX when
+  their tokens are configured). To enable once: *Settings → Pages → Source: GitHub Actions*.
+- **Why**: one address to share, always up to date, without a server to maintain.
+- **Tests**: rendering checked in Chromium (desktop, mobile without horizontal scrolling, dark
+  mode).
+
+## D63 — English everywhere; documentation pages on the website
+
+- **Context**: the project was documented in French, and the website linked to pages of the
+  GitHub repository, which is private: visitors could not read the guide.
+- **Decision**:
+  - **English**: documentation, website, VS Code extension (commands, wizard, settings), object
+    and floorplan catalog, messages and comments are in English (AGENTS.md rule 8). The documents
+    with French names were renamed (`DEPLOYMENT.md`, `UTILITIES.md`, `REMOTE_APIS.md`).
+  - **Documentation on the website**: `scripts/build-site.mjs` renders each Markdown document of
+    the documentation app (same list and order as `rapt dev`, D49) into a static page
+    `docs/<name>.html` of the website, with the Markdown renderer of the compiler, a navigation
+    between the pages and the style of the website. Links between documents point to the rendered
+    pages; links to files of the repository that are not published (sources, fixtures) are shown
+    as plain text. The `site.yml` workflow runs the script after `pnpm build`. The website no
+    longer links to GitHub.
+- **Why**: a private repository cannot be the documentation of a public website; rendering from
+  the same Markdown keeps a single source, already shown in `rapt dev`.
+- **Tests**: `compiler/test/docs.test.ts` (rendering of the links for the website), website
+  checked in Chromium (pages, navigation, mobile, dark mode).

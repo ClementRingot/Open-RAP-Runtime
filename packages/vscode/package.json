@@ -1,7 +1,7 @@
 {
   "name": "rap-transpiler-vscode",
   "displayName": "RAP Transpiler",
-  "description": "Vérifier, générer et lancer un business object RAP sans système SAP : rap-transpiler, OpenUI5 et PGlite sont intégrés, rien d'autre à installer.",
+  "description": "Check, generate and run a RAP business object without an SAP system: rap-transpiler, OpenUI5 and PGlite are bundled, nothing else to install.",
   "version": "0.1.0",
   "publisher": "clementringot",
   "private": true,
@@ -93,91 +93,91 @@
     "commands": [
       {
         "command": "rapt.check",
-        "title": "Vérifier le BO",
+        "title": "Check the BO",
         "category": "RAP",
         "icon": "$(check)"
       },
       {
         "command": "rapt.build",
-        "title": "Générer l'application",
+        "title": "Build the application",
         "category": "RAP",
         "icon": "$(package)"
       },
       {
         "command": "rapt.devStart",
-        "title": "Lancer rapt dev",
+        "title": "Start rapt dev",
         "category": "RAP",
         "icon": "$(play)"
       },
       {
         "command": "rapt.devStop",
-        "title": "Arrêter rapt dev",
+        "title": "Stop rapt dev",
         "category": "RAP",
         "icon": "$(debug-stop)"
       },
       {
         "command": "rapt.openUi",
-        "title": "Ouvrir l'application",
+        "title": "Open the application",
         "category": "RAP",
         "icon": "$(globe)"
       },
       {
         "command": "rapt.showLog",
-        "title": "Afficher le journal",
+        "title": "Show the log",
         "category": "RAP"
       },
       {
         "command": "rapt.newBo",
-        "title": "Nouveau business object",
+        "title": "New business object",
         "category": "RAP",
         "icon": "$(add)"
       },
       {
         "command": "rapt.abapgit",
-        "title": "Générer les fichiers abapGit",
+        "title": "Generate the abapGit files",
         "category": "RAP",
         "icon": "$(repo)"
       },
       {
         "command": "rapt.generate",
-        "title": "Nouvel objet RAP… (table, vue, BDEF, behavior pool, service…)",
+        "title": "New RAP object… (table, view, BDEF, behavior pool, service…)",
         "category": "RAP",
         "icon": "$(new-file)"
       },
       {
         "command": "rapt.setMode",
-        "title": "Choisir le mode du projet (standard / enhanced)",
+        "title": "Choose the project mode (standard / enhanced)",
         "category": "RAP"
       },
       {
         "command": "rapt.mcp",
-        "title": "Générer le serveur MCP du service",
+        "title": "Generate the MCP server of the service",
         "category": "RAP"
       },
       {
         "command": "rapt.newObject",
-        "title": "Nouvel objet RAP (assistant)…",
+        "title": "New RAP object (wizard)…",
         "category": "RAP",
         "icon": "$(add)"
       },
       {
         "command": "rapt.floorplan",
-        "title": "Choisir le floorplan de l'application (List Report, Worklist…)",
+        "title": "Choose the floorplan of the application (List Report, Worklist…)",
         "category": "RAP"
       },
       {
         "command": "rapt.ir",
-        "title": "Afficher la représentation intermédiaire (rapt ir)",
+        "title": "Show the intermediate representation (rapt ir)",
         "category": "RAP"
       },
       {
         "command": "rapt.launchpad",
-        "title": "Générer un launchpad (rapt launchpad)",
+        "title": "Generate a launchpad (rapt launchpad)",
         "category": "RAP"
       },
       {
         "command": "rapt.refreshObjects",
-        "title": "Rafraîchir",
+        "title": "Refresh",
         "category": "RAP",
         "icon": "$(refresh)"
       }
@@ -298,32 +298,32 @@
         "rapt.cliPath": {
           "type": "string",
           "default": "",
-          "markdownDescription": "Chemin du `cli.js` de rapt, ou du dossier d'un clone rap-transpiler. Vide : la version de rapt intégrée à l'extension."
+          "markdownDescription": "Path of the `cli.js` of rapt, or of the folder of a rap-transpiler clone. Empty: the rapt bundled with the extension."
         },
         "rapt.nodePath": {
           "type": "string",
           "default": "",
-          "markdownDescription": "Exécutable Node.js (22 ou plus) qui lance rapt. Vide : le Node.js intégré à VS Code."
+          "markdownDescription": "Node.js executable (22 or later) that runs rapt. Empty: the Node.js of VS Code."
         },
         "rapt.checkOnSave": {
           "type": "boolean",
           "default": true,
-          "description": "Vérifier le projet à chaque enregistrement (sauf quand rapt dev tourne déjà sur ce projet)."
+          "description": "Check the project on each save (except when rapt dev already runs on this project)."
         },
         "rapt.dev.port": {
           "type": "number",
           "default": 8080,
-          "description": "Port de l'application lancée par rapt dev."
+          "description": "Port of the application started by rapt dev."
         },
         "rapt.dev.openUi": {
           "type": "boolean",
           "default": true,
-          "description": "Ouvrir l'application dans le navigateur au premier démarrage de rapt dev."
+          "description": "Open the application in the browser when rapt dev first starts."
         },
         "rapt.new.prefix": {
           "type": "string",
           "default": "Z",
-          "description": "Préfixe proposé pour les objets d'un nouveau business object (Z ou Y…)."
+          "description": "Prefix proposed for the objects of a new business object (Z or Y…)."
         }
       }
     },
@@ -331,7 +331,7 @@
       "explorer": [
         {
           "id": "raptObjects",
-          "name": "Objets RAP",
+          "name": "RAP Objects",
           "icon": "$(package)"
         }
       ]

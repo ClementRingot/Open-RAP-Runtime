@@ -1,202 +1,207 @@
-# Écarts connus
+# Known gaps
 
-Ce fichier recense ce qui n'est pas (encore) pris en charge, en particulier les fonctionnalités
-ABAP que `@abaplint/transpiler` ne traite pas : la règle du projet est de les documenter ici
-plutôt que de contourner le transpiler. La couverture fonctionnelle globale est suivie dans
+This file lists what is not (yet) supported, in particular the ABAP features
+`@abaplint/transpiler` does not handle: the rule of the project is to document them here rather
+than to work around the transpiler. The overall feature coverage is tracked in
 [docs/FEATURES.md](docs/FEATURES.md).
 
-Versions de référence : `@abaplint/core` 2.120.98, `@abaplint/transpiler` 2.14.24,
+Reference versions: `@abaplint/core` 2.120.98, `@abaplint/transpiler` 2.14.24,
 `@abaplint/runtime` 2.14.24.
 
-## Transpiler et runtime abaplint
+## abaplint transpiler and runtime
 
-| Écart | Effet | Contournement | Suivi |
+| Gap | Effect | Workaround | Tracking |
 |---|---|---|---|
-| Les types dérivés RAP (`TYPE TABLE FOR …`, `keys`, `failed`, `reported`, `result`) sont typés `void` par abaplint. | Le transpiler refuse l'ABP (`TypeNameOrInfer, type not found: #`). | Le compilateur génère les types et réécrit l'ABP avant transpilation (D2). | Résolu (J4) |
-| abaplint n'analyse pas toutes les formes EML (`CREATE AUTO FILL CID SET FIELDS WITH`, `CREATE BY \_assoc SET FIELDS WITH` sont des instructions inconnues pour lui), et l'abaissement EML du transpiler ne traite ni `BY \_assoc`, ni `LINK`, ni `CREATE BY`, ni `IN LOCAL MODE`. | Erreur de syntaxe ou « not supported » à l'exécution. | Parser EML propre et abaissement vers `ZRAP_EML` par la passe de réécriture (D2). | Résolu (J4) |
-| Les opérations arithmétiques du runtime sur des nombres packed (`p`) passent par des nombres JavaScript (le stockage, lui, est exact). | Un calcul au-delà d'environ 15 chiffres significatifs peut perdre des décimales. | Les valeurs passent en texte exact entre le buffer et l'ABP (D8) ; les montants usuels ne sont pas concernés. | — |
-| La couche SQL du transpiler échoue sur les associations CDS. | Transpilation impossible avec les DDLS d'origine. | DDIC « ombre » sans vues CDS (D19). | Résolu (J4) |
-| Les méthodes privées des classes locales ne sont accessibles qu'à travers `FRIENDS_ACCESS_INSTANCE`, un détail interne du code généré. | Peut changer avec une version du transpiler. | Versions épinglées ; les tests de J4 appellent tous les handlers par ce chemin. | — |
-| Les objets à namespace (`/DMO/…`) donnent des modules nommés avec `#`, importés en `%23`. | Le chargeur de modules de Vitest ne les trouve pas. | Les modules sont renommés (`#` → `_`) à la génération. | Résolu (J4) |
-| abaplint ne type pas la déclaration en ligne du résultat d'un `SELECT` avec un littéral, un agrégat autre que `COUNT(*)` ou une expression (type `void` « SELECT_todo »). | La méthode transpilée échoue dès son appel. | La passe de réécriture déclare le test d'existence (`@abap_true` : `abap_boolean`) et `MAX`/`MIN` d'une seule source (type de la colonne) ; diagnostic ABP009 pour les autres formes (D26). | Contourné |
-| Le transpiler lit un hôte à composant (`@ls-comp`) comme une soustraction (`ls - comp`) quand le `SELECT` utilise des champs préfixés par un alias (`t~col`). | SQL invalide ou ambigu à l'exécution. | La passe de réécriture l'écrit `@( ls-comp )` (expression hôte équivalente) dans ces `SELECT`. | Contourné |
-| `SELECT … ENDSELECT` lit des lignes entières de la table puis les affecte à la cible. | Avec une liste de champs, cible élémentaire en échec, structure plus courte remplie par position. | Diagnostic ABP007 : `SELECT *`, ou `INTO TABLE` puis `LOOP AT`. | — |
-| Une valeur `int8` (`get_offset( )`, `get_page_size( )` de la pagination d'une requête) dans `LOOP AT … FROM`/`TO` | Le runtime mélange BigInt et nombres : l'exception « Cannot mix BigInt » | `CONV i( … )` avant le `LOOP`, comme dans la fixture `custom-entity`. | — |
-| `OPEN CURSOR … ORDER BY` : le transpiler écrit deux fois `ORDER BY` ; `FETCH NEXT CURSOR … INTO TABLE @DATA(…)` le fait échouer (« InlineDeclarations »). | — | Le doublon est retiré à la traduction SQL ; déclarer la cible du `FETCH`. Les curseurs ne font de toute façon pas partie d'ABAP Cloud (refusés par la vérification). | — |
+| The RAP derived types (`TYPE TABLE FOR …`, `keys`, `failed`, `reported`, `result`) are typed `void` by abaplint. | The transpiler refuses the ABP (`TypeNameOrInfer, type not found: #`). | The compiler generates the types and rewrites the ABP before transpilation (D2). | Solved (M4) |
+| abaplint does not parse all the EML forms (`CREATE AUTO FILL CID SET FIELDS WITH`, `CREATE BY \_assoc SET FIELDS WITH` are unknown statements for it), and the EML lowering of the transpiler handles neither `BY \_assoc`, nor `LINK`, nor `CREATE BY`, nor `IN LOCAL MODE`. | Syntax error or "not supported" at runtime. | Our own EML parser and lowering to `ZRAP_EML` by the rewriting pass (D2). | Solved (M4) |
+| The arithmetic operations of the runtime on packed numbers (`p`) go through JavaScript numbers (the storage itself is exact). | A calculation beyond about 15 significant digits can lose decimals. | The values travel as exact text between the buffer and the ABP (D8); usual amounts are not affected. | — |
+| The SQL layer of the transpiler fails on CDS associations. | Transpilation impossible with the original DDLS. | "Shadow" DDIC without CDS views (D19). | Solved (M4) |
+| The private methods of the local classes are only reachable through `FRIENDS_ACCESS_INSTANCE`, an internal detail of the generated code. | May change with a version of the transpiler. | Pinned versions; the tests of M4 call all the handlers through this path. | — |
+| Namespaced objects (`/DMO/…`) give modules named with `#`, imported as `%23`. | The module loader of Vitest does not find them. | The modules are renamed (`#` → `_`) on generation. | Solved (M4) |
+| abaplint does not type the inline declaration of the result of a `SELECT` with a literal, an aggregate other than `COUNT(*)` or an expression (`void` type "SELECT_todo"). | The transpiled method fails as soon as it is called. | The rewriting pass declares the existence check (`@abap_true`: `abap_boolean`) and `MAX`/`MIN` of a single source (type of the column); diagnostic ABP009 for the other forms (D26). | Worked around |
+| The transpiler reads a component host (`@ls-comp`) as a subtraction (`ls - comp`) when the `SELECT` uses fields prefixed by an alias (`t~col`). | Invalid or ambiguous SQL at runtime. | The rewriting pass writes it `@( ls-comp )` (equivalent host expression) in these `SELECT`s. | Worked around |
+| `SELECT … ENDSELECT` reads whole rows of the table then assigns them to the target. | With a field list, elementary target failing, shorter structure filled by position. | Diagnostic ABP007: `SELECT *`, or `INTO TABLE` then `LOOP AT`. | — |
+| An `int8` value (`get_offset( )`, `get_page_size( )` of the paging of a query) in `LOOP AT … FROM`/`TO` | The runtime mixes BigInt and numbers: exception "Cannot mix BigInt" | `CONV i( … )` before the `LOOP`, as in the `custom-entity` fixture. | — |
+| `OPEN CURSOR … ORDER BY`: the transpiler writes `ORDER BY` twice; `FETCH NEXT CURSOR … INTO TABLE @DATA(…)` makes it fail ("InlineDeclarations"). | — | The duplicate is removed on SQL translation; declare the target of the `FETCH`. Cursors are not part of ABAP Cloud anyway (refused by the check). | — |
 
 ## Behavior pool (ABAP)
 
-| Écart | Statut |
+| Gap | Status |
 |---|---|
-| Écriture ABAP SQL (`INSERT`, `UPDATE`, `MODIFY`, `DELETE` sur une table) hors du saver, `WITH` | Diagnostic ABP007 (D26) : le runtime RAP écrit le BO, le modifier par EML. Permise dans `save_modified` (D30). |
-| Écritures ABAP SQL classiques de nombres packed (dont `TIMESTAMPL`) | Le runtime abaplint passe les valeurs par des nombres JavaScript : environ 15 chiffres significatifs, les microsecondes d'un horodatage sont perdues. `MAPPING FROM ENTITY` (kernel) est exact. |
-| `DELETE dbtab FROM @wa` | Le transpiler perd la ligne (la requête viderait la table) : diagnostic ABP007 ; `DELETE FROM dbtab WHERE …`, `FROM TABLE` ou `MAPPING FROM ENTITY`. Un `DELETE` sans condition est refusé à l'exécution. |
-| Tables et vues hors du projet dans un `SELECT` (`/dmo/agency`, tables SAP) | Erreur ABP004 : seules les tables et entités CDS du projet existent dans la base générée. |
-| `SELECT` et changements non sauvegardés de la LUW | Non visibles, comme dans RAP : `SELECT` lit la base (lire le BO par EML pour voir le buffer). |
-| Conditions `SELECT` sur une date, un UUID, un horodatage ou un booléen | Évaluées sur la forme ABAP calculée par la vue : pas d'index utilisable, lecture séquentielle de la table (D26). |
-| Fonctions SQL ABAP (`concat`, `division`, `dats_days_between`, `tstmp_*`…) | Transmises telles quelles : seules celles qui existent sous le même nom en PostgreSQL fonctionnent. |
-| Erreur SQL à l'exécution | Erreur d'exécution (500), pas d'exception `CX_SY_OPEN_SQL_DB` capturable ; la transaction de la LUW reste utilisable (savepoint). |
-| `SELECT … FOR UPDATE`, `OFFSET`, `CLIENT SPECIFIED`, `USING CLIENT`, connexions secondaires | Non pris en charge par le transpiler ou sans objet (mono-tenant, D9). |
-| Classe saver (`lsc_…`) | `save_modified` et `cleanup` pour additional et unmanaged save (D30). `adjust_numbers` (late numbering) : ABP007 ; les autres méthodes ne sont pas appelées (ABP003). Les lignes de `update` portent toujours toutes les valeurs. |
-| Unmanaged save : contraintes de la base | Pas de clé étrangère enfant → parent (la BDEF n'a pas de table persistante) : `save_modified` supprime les enfants (`delete` les contient). |
-| EML sur une BDEF de projection (`MODIFY ENTITIES OF zc_travel`) | Diagnostic ABP007 : utiliser la BDEF de base. |
-| `MODIFY ENTITIES OPERATIONS` (EML dynamique), `RELATING TO`, `AUGMENTING`, `COMMIT ENTITIES RESPONSES`, `GET PERMISSIONS`, `SET LOCKS`, `RAISE ENTITY EVENT` | Diagnostics ABP005/ABP007. |
-| Late numbering (`adjust_numbers`) | Non pris en charge (ABP007). La numérotation anticipée, directe ou par association, l'est. |
-| `COMMIT ENTITIES` et `ROLLBACK ENTITIES` dans un handler | Erreur à l'exécution, comme dans RAP. |
-| Réponses d'une instruction EML | Remplacent le contenu des cibles `FAILED`/`REPORTED`/`MAPPED` données ; `sy-subrc` vaut 4 quand `failed` n'est pas vide (convention, non documentée par SAP). |
-| Septième décimale des `TIMESTAMPL` générés | Le runtime les génère à la microseconde (D8). |
+| ABAP SQL writes (`INSERT`, `UPDATE`, `MODIFY`, `DELETE` on a table) outside the saver, `WITH` | Diagnostic ABP007 (D26): the RAP runtime writes the BO, change it with EML. Allowed in `save_modified` (D30). |
+| Classic ABAP SQL writes of packed numbers (including `TIMESTAMPL`) | The abaplint runtime passes the values through JavaScript numbers: about 15 significant digits, the microseconds of a timestamp are lost. `MAPPING FROM ENTITY` (kernel) is exact. |
+| `DELETE dbtab FROM @wa` | The transpiler loses the row (the query would empty the table): diagnostic ABP007; `DELETE FROM dbtab WHERE …`, `FROM TABLE` or `MAPPING FROM ENTITY`. A `DELETE` without a condition is refused at runtime. |
+| Tables and views outside the project in a `SELECT` (`/dmo/agency`, SAP tables) | Error ABP004: only the tables and CDS entities of the project exist in the generated database. |
+| `SELECT` and unsaved changes of the LUW | Not visible, as in RAP: `SELECT` reads the database (read the BO with EML to see the buffer). |
+| `SELECT` conditions on a date, a UUID, a timestamp or a boolean | Evaluated on the ABAP form computed by the view: no usable index, sequential read of the table (D26). |
+| ABAP SQL functions (`concat`, `division`, `dats_days_between`, `tstmp_*`…) | Passed as is: only those that exist under the same name in PostgreSQL work. |
+| SQL error at runtime | Runtime error (500), no catchable `CX_SY_OPEN_SQL_DB` exception; the transaction of the LUW stays usable (savepoint). |
+| `SELECT … FOR UPDATE`, `OFFSET`, `CLIENT SPECIFIED`, `USING CLIENT`, secondary connections | Not supported by the transpiler or irrelevant (single tenant, D9). |
+| Saver class (`lsc_…`) | `save_modified` and `cleanup` for additional and unmanaged save (D30). `adjust_numbers` (late numbering): ABP007; the other methods are not called (ABP003). The rows of `update` always carry all the values. |
+| Unmanaged save: database constraints | No child → parent foreign key (the BDEF has no persistent table): `save_modified` deletes the children (`delete` contains them). |
+| EML on a projection BDEF (`MODIFY ENTITIES OF zc_travel`) | Diagnostic ABP007: use the base BDEF. |
+| `MODIFY ENTITIES OPERATIONS` (dynamic EML), `RELATING TO`, `AUGMENTING`, `COMMIT ENTITIES RESPONSES`, `GET PERMISSIONS`, `SET LOCKS`, `RAISE ENTITY EVENT` | Diagnostics ABP005/ABP007. |
+| Late numbering (`adjust_numbers`) | Not supported (ABP007). Early numbering, direct or by association, is. |
+| `COMMIT ENTITIES` and `ROLLBACK ENTITIES` in a handler | Runtime error, as in RAP. |
+| Responses of an EML statement | Replace the content of the given `FAILED`/`REPORTED`/`MAPPED` targets; `sy-subrc` is 4 when `failed` is not empty (convention, not documented by SAP). |
+| Seventh decimal of the generated `TIMESTAMPL`s | The runtime generates them to the microsecond (D8). |
 
-## API distantes (D31)
+## Remote APIs (D31)
 
-| Écart | Statut |
+| Gap | Status |
 |---|---|
-| Client proxy : `$batch` (`create_request_for_batch`), `$expand`, deep insert, navigation par association (`navigate_to_many`…), actions et fonctions du service distant, `$search`, delta | Non pris en charge : méthodes absentes du socle (erreur de vérification ABAP). |
-| Value controls (`value_controls` des classes SCM2, champs `_vc` des entités abstraites) | Ni lus ni remplis : une valeur `null` du service donne la valeur initiale ; la mise à jour d'une valeur à `null` n'est pas possible. |
-| `comm_system_id`, `i_service_instance_name`, `i_authn_mode` | Ignorés : une destination est un jeu de variables d'environnement. Pas de propagation de l'utilisateur (principal propagation) ni d'OAuth client credentials : un jeton fixe peut être donné par `_TOKEN`. |
-| Paramètres `is_proxy_model_key`, `iv_service_definition_name` | Ignorés : le proxy lit le `$metadata` du service distant (un appel de plus par proxy). |
-| Destination nommée par une variable | Fonctionne, mais n'est pas listée dans le `.env.example` généré (seuls les littéraux le sont). |
-| Communication targets (COTA), SOAP (`cl_soap_destination_provider`), RFC | Non pris en charge. |
-| Proxy HTTP sortant | `fetch` de Node.js ne lit `HTTPS_PROXY` qu'avec `NODE_USE_ENV_PROXY=1` (ou `--use-env-proxy`). |
-| Appels distants et LUW | L'appel part pendant l'interaction (action, détermination…) : un rollback de la LUW n'annule pas ce qui a été écrit à distance, comme sur SAP. |
+| Client proxy: `$batch` (`create_request_for_batch`), `$expand`, deep insert, navigation by association (`navigate_to_many`…), actions and functions of the remote service, `$search`, delta | Not supported: methods missing from the base (ABAP check error). |
+| Value controls (`value_controls` of the SCM2 classes, `_vc` fields of the abstract entities) | Neither read nor filled: a `null` value of the service gives the initial value; updating a value to `null` is not possible. |
+| `comm_system_id`, `i_service_instance_name`, `i_authn_mode` | Ignored: a destination is a set of environment variables. No user propagation (principal propagation) nor OAuth client credentials: a fixed token can be given with `_TOKEN`. |
+| Parameters `is_proxy_model_key`, `iv_service_definition_name` | Ignored: the proxy reads the `$metadata` of the remote service (one more call per proxy). |
+| Destination named by a variable | Works, but is not listed in the generated `.env.example` (only literals are). |
+| Communication targets (COTA), SOAP (`cl_soap_destination_provider`), RFC | Not supported. |
+| Outgoing HTTP proxy | The `fetch` of Node.js only reads `HTTPS_PROXY` with `NODE_USE_ENV_PROXY=1` (or `--use-env-proxy`). |
+| Remote calls and LUW | The call goes out during the interaction (action, determination…): a rollback of the LUW does not undo what was written remotely, as on SAP. |
 
 ## CDS
 
-| Écart | Statut |
+| Gap | Status |
 |---|---|
-| Expressions dans la liste de sélection (CAST, CASE, calculs, littéraux) | Diagnostic CDS002 |
-| Chemins d'association dans la liste de sélection (`_Agency.Name`) | Diagnostic CDS002 |
-| Jointures, clause WHERE | Diagnostic CDS002 (WHERE ignoré avec avertissement) |
-| Vues avec paramètres, unions, hiérarchies | Diagnostic CDS002 |
-| Entités custom (D43) : paramètres, agrégation (`get_aggregation`), `$expand` imbriqué ; DCL non appliqué (la classe de requête filtre elle-même) | Non gérés |
-| Entités custom : un `$filter` hors plages (OU entre éléments, fonctions autres que `contains`/`startswith`/`endswith`, comparaison entre éléments) | `get_as_ranges` lève `cx_rap_query_filter_no_range`, comme dans SAP ; `get_as_sql_string` reste disponible. Les fonctions et expressions non traduisibles : 501. |
-| BO managed avec unmanaged save sur une entité custom (D43) | Propre à rap-transpiler (avertissement BDEF027) ; pas de verrou en base : les LUW de l'application sont sérialisées, l'API cible garde ses propres contrôles. |
-| Contrôle d'accès DCL : EML et ABAP SQL du behavior pool | Non filtrés (comme `WITH PRIVILEGED ACCESS`) ; seules les lectures OData le sont (D35). Comme dans RAP, les modifications passent par l'autorisation d'instance, pas par le DCL. |
-| Contrôle d'accès DCL : autres aspects (`bypass when`, aspects définis par l'utilisateur), chemins de plusieurs associations, `$filter` sur une navigation | Une condition non évaluée n'accorde aucune ligne (DCL002) ; la sous-requête d'un `$filter` sur `_Travel/…` lit la cible sans son DCL. |
-| `@AccessControl.authorizationCheck` | Informatif : un rôle s'applique s'il existe, quelle que soit la valeur. |
-| Structures incluses (`.INCLUDE`) dans les tables | Diagnostic DDIC003 |
-| Table entities (D55) : `@ClientHandling.type` | Lu, sans effet : pas de colonne mandant (D9). |
-| Table entities : colonnes `null` | La colonne PostgreSQL garde sa valeur par défaut (valeur initiale ABAP) comme les autres ; `null` n'est un état distinct que pour les types sans valeur initiale. |
-| Table entities : `SOURCE_TYPE` du XML abapGit écrit par `rapt abapgit` | `T`, déduit de la documentation : à vérifier à la première importation ; ADT réécrit le XML à l'activation. |
-| Types énumérés : `CAST( x AS enum )`, constante `Type.#CONST` dans une vue, `CONV string( enum )` (nom de la constante) dans le behavior pool, `cl_abap_enumdescr` | Non gérés : les expressions CDS sont refusées (CDS002) ; dans le behavior pool, une valeur énumérée est sa valeur de base. |
-| Types énumérés dans le behavior pool : constante dans un modèle de chaîne (`|{ type-const }|`) | Non remplacée : le transpiler signale le nom inconnu (ABP004) ; passer par une variable. |
-| Types énumérés exposés en OData | Refusés en mode `standard` comme sur SAP (CDS021) ; `EnumType` en mode `enhanced` seulement. |
-| Conversion exits (ALPHA…), conversion ISO des langues | Non gérés |
+| Expressions in the select list (CAST, CASE, calculations, literals) | Diagnostic CDS002 |
+| Association paths in the select list (`_Agency.Name`) | Diagnostic CDS002 |
+| Joins, WHERE clause | Diagnostic CDS002 (WHERE ignored with a warning) |
+| Views with parameters, unions, hierarchies | Diagnostic CDS002 |
+| Custom entities (D43): parameters, aggregation (`get_aggregation`), nested `$expand`; DCL not applied (the query class filters itself) | Not handled |
+| Custom entities: a `$filter` outside ranges (OR between elements, functions other than `contains`/`startswith`/`endswith`, comparison between elements) | `get_as_ranges` raises `cx_rap_query_filter_no_range`, as in SAP; `get_as_sql_string` stays available. Functions and expressions that cannot be translated: 501. |
+| Managed BO with unmanaged save on a custom entity (D43) | Specific to rap-transpiler (BDEF027 warning); no database lock: the LUWs of the application are serialized, the target API keeps its own checks. |
+| DCL access control: EML and ABAP SQL of the behavior pool | Not filtered (like `WITH PRIVILEGED ACCESS`); only the OData reads are (D35). As in RAP, changes go through the instance authorization, not through the DCL. |
+| DCL access control: other aspects (`bypass when`, user-defined aspects), paths of several associations, `$filter` on a navigation | A condition that is not evaluated grants no row (DCL002); the subquery of a `$filter` on `_Travel/…` reads the target without its DCL. |
+| `@AccessControl.authorizationCheck` | Informative: a role applies if it exists, whatever the value. |
+| Included structures (`.INCLUDE`) in the tables | Diagnostic DDIC003 |
+| Table entities (D55): `@ClientHandling.type` | Read, without effect: no client column (D9). |
+| Table entities: `null` columns | The PostgreSQL column keeps its default value (ABAP initial value) like the others; `null` is a distinct state only for the types without an initial value. |
+| Table entities: `SOURCE_TYPE` of the abapGit XML written by `rapt abapgit` | `T`, derived from the documentation: to check on the first import; ADT rewrites the XML on activation. |
+| Enumerated types: `CAST( x AS enum )`, constant `Type.#CONST` in a view, `CONV string( enum )` (name of the constant) in the behavior pool, `cl_abap_enumdescr` | Not handled: CDS expressions are refused (CDS002); in the behavior pool, an enumerated value is its base value. |
+| Enumerated types in the behavior pool: constant in a string template (`|{ type-const }|`) | Not replaced: the transpiler reports the unknown name (ABP004); go through a variable. |
+| Enumerated types exposed in OData | Refused in `standard` mode as on SAP (CDS021); `EnumType` in `enhanced` mode only. |
+| Conversion exits (ALPHA…), ISO conversion of the languages | Not handled |
 
-## Base de données
+## Database
 
-| Écart | Statut |
+| Gap | Status |
 |---|---|
-| Colonne mandant (`CLNT`) | Retirée : applications mono-tenant (D9) |
-| Septième décimale des `TIMESTAMPL` | Perdue : `timestamptz(6)` (D8) |
+| Client column (`CLNT`) | Removed: single-tenant applications (D9) |
+| Seventh decimal of the `TIMESTAMPL`s | Lost: `timestamptz(6)` (D8) |
 
 ## OData
 
-| Écart | Statut |
+| Gap | Status |
 |---|---|
-| Comparaisons `lt`/`le` sur une date initiale : en ABAP `00000000` est inférieure à toute date ; ici la valeur initiale est `NULL` et n'est retenue par aucune comparaison (sémantique OData de `null`). | Assumé |
-| `$filter` avec `any`/`all`, `$expand` imbriqué, JSON batch, `$value` | Réponse 501 ou 400 |
-| `$apply` (D52) : transformations autres que `filter`, `groupby`, `aggregate` (`topcount`, `compute`, `concat`…), transformation après un groupement, annotation `@Aggregation` | Réponse 501 ; les agrégats portent sur les propriétés du type, sans hiérarchie. |
-| Littéraux d'énumération (D55) : un seul membre (`Ns.Type'A'`, pas de drapeaux `'A,B'`), opérateur `has` | Le premier membre est pris ; `has` : 400. |
-| `etag dependent by` : maître en unmanaged save, ou champ ETag du maître qui n'est pas un horodatage administratif | Le runtime ne change pas l'ETag du maître quand une entité dépendante change : `save_modified` ou l'application doit le faire (D32). |
-| `etag dependent by` à travers une projection qui n'expose pas l'association | Pas d'ETag pour l'entité dépendante (ni `@odata.etag`, ni contrôle de `If-Match`). |
-| Feature control global (`features : global`) dans les lectures | Exposé comme le feature control d'instance (`__EntityControl`, `__OperationControl` : même valeur pour toutes les instances), recalculé à chaque requête, sans cache. Action statique : contrôlé à l'exécution seulement (pas d'instance pour `Core.OperationAvailable`). |
+| `lt`/`le` comparisons on an initial date: in ABAP `00000000` is lower than any date; here the initial value is `NULL` and no comparison keeps it (OData semantics of `null`). | Accepted |
+| `$filter` with `any`/`all`, nested `$expand`, JSON batch, `$value` | 501 or 400 response |
+| `$apply` (D52): transformations other than `filter`, `groupby`, `aggregate` (`topcount`, `compute`, `concat`…), transformation after a grouping, `@Aggregation` annotation | 501 response; the aggregates are on the properties of the type, without hierarchy. |
+| Enumeration literals (D55): a single member (`Ns.Type'A'`, no `'A,B'` flags), `has` operator | The first member is taken; `has`: 400. |
+| `etag dependent by`: master with unmanaged save, or ETag field of the master that is not an administrative timestamp | The runtime does not change the ETag of the master when a dependent entity changes: `save_modified` or the application must do it (D32). |
+| `etag dependent by` through a projection that does not expose the association | No ETag for the dependent entity (neither `@odata.etag`, nor `If-Match` check). |
+| Global feature control (`features : global`) in the reads | Exposed like the instance feature control (`__EntityControl`, `__OperationControl`: same value for all the instances), computed again on each request, without a cache. Static action: checked at runtime only (no instance for `Core.OperationAvailable`). |
 
-## Application générée
+## Generated application
 
-| Écart | Statut |
+| Gap | Status |
 |---|---|
-| Premier chargement de l'UI : environ 400 modules OpenUI5 servis un par un (pas de bundle `ui5 build`) | Assumé (D27) ; mise en cache HTTP d'une heure. |
-| Sessions : ni rafraîchissement de jeton, ni révocation avant l'expiration du cookie (8 h) | Assumé (D28). |
-| Verrous entre plusieurs instances de l'application | Verrous de ligne PostgreSQL (`NOWAIT`), testés contre une autre transaction (`rap-locks.test.ts`) ; pas de test de charge. |
-| TypeScript 7.0.2 compile `new (x as T).Y()` sans parenthèses | Forme évitée dans le code (D29). |
+| First load of the UI: about 400 OpenUI5 modules served one by one (no `ui5 build` bundle) | Accepted (D27); one-hour HTTP caching. |
+| Sessions: neither token refresh, nor revocation before the expiry of the cookie (8 h) | Accepted (D28). |
+| Locks between several instances of the application | PostgreSQL row locks (`NOWAIT`), tested against another transaction (`rap-locks.test.ts`); no load test. |
+| TypeScript 7.0.2 compiles `new (x as T).Y()` without parentheses | Form avoided in the code (D29). |
 
 ## Launchpad (D37)
 
-| Écart | Statut |
+| Gap | Status |
 |---|---|
-| Navigation entre applications depuis une application (CrossApplicationNavigation, liens d'intent dans une Object Page) | Non prévu : les intents s'ouvrent depuis le launchpad (`/#…`, `/go/…`). |
-| Paramètres d'intent transmis en query string, que l'UI générée n'exploite pas (pas d'ouverture directe d'une instance) | Écart. |
-| Application chargée en pleine page, pas dans un conteneur du shell | Assumé : une application par page ; la barre shell est affichée par l'application. |
-| Personnalisation (groupes et tuiles de l'utilisateur), notifications, recherche d'entreprise | Non prévu. Les spaces et pages sont pris en charge (D48). |
-| Pages d'un space : liste déroulante au-dessus des sections | Assumé : SAP les montre dans le menu de l'onglet du space. |
-| Compteurs des tuiles lus au chargement seulement | Écart : pas d'intervalle de rafraîchissement. |
-| Session partagée : même `SESSION_SECRET` pour le launchpad et ses applications, pas de révocation avant l'expiration | Assumé : une même confiance, comme les sessions (D28). |
-| Applications derrière le launchpad en `AUTH_MODE=none` : leur utilisateur de développement, indépendant de celui du launchpad | Développement seulement. |
-| Ressources OpenUI5 servies par chaque application (`/apps/<id>/resources/`) | Assumé : pas de cache commun aux applications. |
+| Navigation between applications from an application (CrossApplicationNavigation, intent links in an Object Page) | Not planned: intents are opened from the launchpad (`/#…`, `/go/…`). |
+| Intent parameters passed in the query string, which the generated UI does not use (no direct opening of an instance) | Gap. |
+| Application loaded full page, not in a container of the shell | Accepted: one application per page; the shell bar is shown by the application. |
+| Personalization (groups and tiles of the user), notifications, enterprise search | Not planned. Spaces and pages are supported (D48). |
+| Pages of a space: drop-down list above the sections | Accepted: SAP shows them in the menu of the tab of the space. |
+| Tile counters read on load only | Gap: no refresh interval. |
+| Shared session: same `SESSION_SECRET` for the launchpad and its applications, no revocation before expiry | Accepted: one level of trust, like the sessions (D28). |
+| Applications behind the launchpad in `AUTH_MODE=none`: their development user, independent of the one of the launchpad | Development only. |
+| OpenUI5 resources served by each application (`/apps/<id>/resources/`) | Accepted: no cache shared between the applications. |
 
-## Utilitaires d'ABAP Cloud (D40)
+## ABAP Cloud utilities (D40)
 
-| Écart | Statut |
+| Gap | Status |
 |---|---|
-| Fuseau horaire de l'utilisateur | UTC : `xco_cp_time=>time_zone->user` et `->utc` donnent les mêmes valeurs, `systemtstmp_*` ne convertit pas. |
-| Numérotation et journal applicatif | Écrits dans la LUW de la requête : annulés si elle échoue (sur SAP, un numéro tiré est consommé). `use_2nd_db_connection` est ignoré. |
-| Intervalle de numérotation non configuré | Créé à la première demande, de 1 à 99999999999999999999 (sur SAP : `cx_nr_object_not_found`). Numérotation externe et intervalles alphanumériques non pris en charge. |
-| `/ui2/cl_json` | Pas de `generate` (données dynamiques), ni `assoc_arrays`, ni `conversion_exits`, ni `type_descr` ; les références d'objets sont écrites `null`. Un JSON invalide laisse les données inchangées. |
-| `xco_cp_json` | `from_abap` écrit les `abap_bool` en `"X"`/`""` ; les noms des membres sont rapprochés sans tenir compte de la casse ni des `_` à la lecture. |
-| `cl_abap_regex`, `cl_abap_matcher` | Moteur d'expressions régulières de JavaScript : les constructions propres à PCRE (quantificateurs possessifs, `\K`, récursion…) ne sont pas prises en charge (`cx_sy_regex`, ou un autre sens) ; la syntaxe POSIX est approchée (classes `[:alpha:]`…, `\<`, `\>`). `FIND … REGEX objet` avec un objet `cl_abap_regex` n'est pas pris en charge. |
-| RTTS | `describe_by_name` lève `cx_sy_rtti_type_not_released` ; pas de création de types (`cl_abap_structdescr=>create`, `CREATE DATA … TYPE HANDLE`), pas d'attributs ni de méthodes dans `cl_abap_classdescr`. `absolute_name` vient du nom qualifié du transpiler. |
-| `cl_abap_random*` | Générateur de Park-Miller (non cryptographique) : les suites diffèrent de celles de SAP pour une même graine. Pas de `cl_abap_random_packed*` ni `decfloat16`. |
-| `cl_abap_char_utilities=>minchar` | Absent (caractère nul). |
-| Traitement en arrière-plan (D41) | Les opérations restent en mémoire jusqu'à leur exécution : un processus pas encore exécuté quand l'application s'arrête ne l'est jamais (il reste `NEW`). Pas de reprise ni de nouvel essai d'un processus `ERRONEOUS`, pas de file par nom (`set_name` sert au suivi), pas de vérification de la phase transactionnelle d'appel (sur SAP, `save_for_execution` d'une opération contrôlée se fait en phase de sauvegarde). `if_bgmc_process_monitor` : états `NEW`, `SUCCESSFUL`, `ERRONEOUS` (noms propres à rap-transpiler). Un seul `COMMIT ENTITIES` par opération. |
-| E-mail (D41) | Envoyé après la validation de la LUW, sans nouvel essai ; `send( )` rend toujours l'état `W` (en attente). Pas de modèles d'e-mail (`cl_bcs_mail_message=>create_instance_by_template`), ni de signature, ni de chiffrement. |
+| Time zone of the user | UTC: `xco_cp_time=>time_zone->user` and `->utc` give the same values, `systemtstmp_*` does not convert. |
+| Numbering and application log | Written in the LUW of the request: rolled back if it fails (on SAP, a drawn number is consumed). `use_2nd_db_connection` is ignored. |
+| Number range interval not configured | Created on the first request, from 1 to 99999999999999999999 (on SAP: `cx_nr_object_not_found`). External numbering and alphanumeric intervals not supported. |
+| `/ui2/cl_json` | No `generate` (dynamic data), nor `assoc_arrays`, nor `conversion_exits`, nor `type_descr`; object references are written `null`. Invalid JSON leaves the data unchanged. |
+| `xco_cp_json` | `from_abap` writes the `abap_bool`s as `"X"`/`""`; the names of the members are matched ignoring case and `_` on read. |
+| `cl_abap_regex`, `cl_abap_matcher` | Regular expression engine of JavaScript: the constructs specific to PCRE (possessive quantifiers, `\K`, recursion…) are not supported (`cx_sy_regex`, or another meaning); the POSIX syntax is approximated (classes `[:alpha:]`…, `\<`, `\>`). `FIND … REGEX object` with a `cl_abap_regex` object is not supported. |
+| RTTS | `describe_by_name` raises `cx_sy_rtti_type_not_released`; no creation of types (`cl_abap_structdescr=>create`, `CREATE DATA … TYPE HANDLE`), no attributes nor methods in `cl_abap_classdescr`. `absolute_name` comes from the qualified name of the transpiler. |
+| `cl_abap_random*` | Park-Miller generator (not cryptographic): the sequences differ from those of SAP for the same seed. No `cl_abap_random_packed*` nor `decfloat16`. |
+| `cl_abap_char_utilities=>minchar` | Missing (null character). |
+| Background processing (D41) | The operations stay in memory until they run: a process not yet run when the application stops never is (it stays `NEW`). No restart nor retry of an `ERRONEOUS` process, no queue by name (`set_name` is used for tracking), no check of the transactional phase of the call (on SAP, `save_for_execution` of a controlled operation happens in the save phase). `if_bgmc_process_monitor`: states `NEW`, `SUCCESSFUL`, `ERRONEOUS` (names specific to rap-transpiler). A single `COMMIT ENTITIES` per operation. |
+| E-mail (D41) | Sent after the commit of the LUW, without retry; `send( )` always returns the state `W` (waiting). No e-mail templates (`cl_bcs_mail_message=>create_instance_by_template`), nor signature, nor encryption. |
 
+## Standard views and value helps (D44)
 
-## Vues standards et value helps (D44)
-
-| Écart | Statut |
+| Gap | Status |
 |---|---|
-| Vues standards disponibles | `I_Currency`, `I_UnitOfMeasure`, `I_Country`, `I_Language`, `I_Region`, `I_TimeZone` et leurs vues de textes, `I_CalendarDate`, `I_BusinessUserBasic`, `I_ExchangeRate`. Les autres vues libérées ne sont pas fournies : CDS005. |
-| `I_Region` | Régions des États-Unis, du Canada, de l'Allemagne et de l'Australie seulement. |
-| `I_ExchangeRate` | Aucun taux livré (table `rapt_exchrate` vide) : à charger par l'application ou `rapt/seed.json`. Pas de conversion de devises (`CURRENCY_CONVERSION`). |
-| `I_BusinessUserBasic` | Un utilisateur n'y figure qu'après sa première requête ; pas de synchronisation avec l'IdP (départs, changements de nom). |
-| Données de référence | Textes en anglais seulement ; unités : une trentaine d'unités courantes (le contenu de SAP en compte bien plus) ; pas de décalage des décimales (`TCURX`) : `Decimals` est une information. |
-| Éléments des vues standards | Ceux d'usage courant ; les autres éléments des vues de SAP (et leurs associations) n'existent pas. |
-| Value help | Un seul value help par élément (le premier si plusieurs, sans `qualifier`) ; `useForValidation` contrôlé dans l'UI, pas par le service (comme RAP) ; pas de `distinctValues`, ni de `presentationVariantQualifier`. |
+| Available standard views | `I_Currency`, `I_UnitOfMeasure`, `I_Country`, `I_Language`, `I_Region`, `I_TimeZone` and their text views, `I_CalendarDate`, `I_BusinessUserBasic`, `I_ExchangeRate`. The other released views are not provided: CDS005. |
+| `I_Region` | Regions of the United States, Canada, Germany and Australia only. |
+| `I_ExchangeRate` | No rate delivered (empty table `rapt_exchrate`): to load by the application or `rapt/seed.json`. No currency conversion (`CURRENCY_CONVERSION`). |
+| `I_BusinessUserBasic` | A user only appears after their first request; no synchronization with the IdP (departures, name changes). |
+| Reference data | Texts in English only; units: about thirty common units (the content of SAP has many more); no shift of the decimals (`TCURX`): `Decimals` is informative. |
+| Elements of the standard views | The commonly used ones; the other elements of the SAP views (and their associations) do not exist. |
+| Value help | A single value help per element (the first one if several, without `qualifier`); `useForValidation` checked in the UI, not by the service (as in RAP); no `distinctValues`, nor `presentationVariantQualifier`. |
 
 ## Draft (D54)
 
-| Écart | Statut |
+| Gap | Status |
 |---|---|
-| Déterminations et validations pendant l'édition du brouillon (`on modify` sur le brouillon, `Prepare` qui valide) | Non exécutées dans le brouillon : elles s'exécutent à l'activation ; `Prepare` renvoie le brouillon sans contrôle. |
-| Actions de l'application sur un brouillon | Réponse 501 : activer d'abord. |
-| `SiblingEntity`, `draft query view`, `with draft` sur un BO à unmanaged save | Non pris en charge (la liste obtient l'effet de `SiblingEntity` par `DraftAdministrativeData/InProcessByUser`, D58). |
-| Collaborative draft (D59) | Pas de temps réel (WebSocket) : l'Object Page relit le brouillon toutes les 5 s ; pas de verrou par champ ; `ShareAll` ignoré ; rejoindre un brouillon ne contrôle que l'autorisation d'Edit ; navigation `DraftAdministrativeData/DraftAdministrativeUser` en deux segments : lire `DraftAdministrativeUser?$filter=DraftUUID eq …`. |
-| Messages d'état (`%state_area`) | Renvoyés comme messages de transition à l'activation. |
-| Verrou exclusif | Repris par un autre utilisateur après 15 minutes sans modification, comme SAP ; pas de durée réglable. |
+| Determinations and validations while editing the draft (`on modify` on the draft, `Prepare` that validates) | Not run in the draft: they run on activation; `Prepare` returns the draft without a check. |
+| Actions of the application on a draft | 501 response: activate first. |
+| `SiblingEntity`, `draft query view`, `with draft` on a BO with unmanaged save | Not supported (the list gets the effect of `SiblingEntity` through `DraftAdministrativeData/InProcessByUser`, D58). |
+| Collaborative draft (D59) | No real time (WebSocket): the Object Page reads the draft again every 5 s; no field lock; `ShareAll` ignored; joining a draft only checks the Edit authorization; two-segment navigation `DraftAdministrativeData/DraftAdministrativeUser`: read `DraftAdministrativeUser?$filter=DraftUUID eq …`. |
+| State messages (`%state_area`) | Returned as transition messages on activation. |
+| Exclusive lock | Taken over by another user after 15 minutes without a change, as on SAP; no adjustable duration. |
 
 ## Floorplans (D53)
 
-| Écart | Statut |
+| Gap | Status |
 |---|---|
-| Analytical List Page | Un graphique (le premier `@UI.chart`) et une dimension ; pas de barre de filtres visuels, ni de graphiques multiples, ni de mesures de `@Aggregation`. |
-| Overview Page | Cartes `kpi`, `list`, `table`, `chart` décrites dans `rapt/config.json` (pas d'annotations `@UI.dataPoint` / `@UI.kpi`), sans filtre global. |
-| Graphiques | Contrôle SVG propre : colonnes, barres, lignes, secteurs, anneau ; pas de zoom, d'infobulle riche ni d'export. |
+| Analytical List Page | One chart (the first `@UI.chart`) and one dimension; no visual filter bar, nor multiple charts, nor `@Aggregation` measures. |
+| Overview Page | `kpi`, `list`, `table`, `chart` cards described in `rapt/config.json` (no `@UI.dataPoint` / `@UI.kpi` annotations), without a global filter. |
+| Charts | Our own SVG control: columns, bars, lines, pie, donut; no zoom, rich tooltip nor export. |
 
-## API Web et OAuth 2.0 (D60)
+## Web APIs and OAuth 2.0 (D60)
 
-| Écart | Statut |
+| Gap | Status |
 |---|---|
-| Serveur OAuth de développement | Développement seulement : pas de refresh token, ni de consentement, ni de révocation ; clé de signature régénérée à chaque démarrage. |
-| Web API d'un BO draft | Instances actives seulement (le draft n'est pas exposé). |
-| OData V2 | Non pris en charge : le service généré est toujours OData V4 (SRVD003). |
+| Development OAuth server | Development only: no refresh token, nor consent, nor revocation; signing key regenerated on each start. |
+| Web API of a draft BO | Active instances only (the draft is not exposed). |
+| OData V2 | Not supported: the generated service is always OData V4 (SRVD003). |
 
-## Mode enhanced (D45)
+## Enhanced mode (D45)
 
-| Écart | Statut |
+| Gap | Status |
 |---|---|
-| Contrôle des champs obligatoires | À la sauvegarde seulement (pas pendant la saisie) ; champs sous feature control dynamique (`fc-mandatory` d'instance) non contrôlés. |
+| Check of the mandatory fields | On save only (not while typing); fields under dynamic feature control (instance `fc-mandatory`) not checked. |
 
 ## MCP (D47)
 
-| Écart | Statut |
+| Gap | Status |
 |---|---|
-| Transport | HTTP, réponses JSON ; pas de flux SSE, ni de session MCP, ni de notifications du serveur. Pas de transport stdio (un client qui ne parle que stdio passe par un relais HTTP). |
-| Authentification | Jeton porteur ou utilisateur de développement ; pas d'autorisation OAuth intégrée au protocole MCP (découverte des métadonnées OAuth). |
-| Outils | Pas de ressources ni de prompts MCP ; `$expand` non proposé dans `_list`. |
+| Transport | HTTP, JSON responses; no SSE stream, nor MCP session, nor server notifications. No stdio transport (a client that only speaks stdio goes through an HTTP relay). |
+| Authentication | Bearer token or development user; no OAuth authorization built into the MCP protocol (OAuth metadata discovery). |
+| Tools | No MCP resources nor prompts; `$expand` not offered in `_list`. |
 
-## Variantes de l'UI (D51)
+## UI variants (D51)
 
-| Écart | Statut |
+| Gap | Status |
 |---|---|
-| Variantes partagées (publiques), variante appliquée automatiquement, contextes | Non pris en charge : variantes personnelles. |
-| Ordre des colonnes, groupement | Non pris en charge (visibilité et tri seulement). |
+| Shared (public) variants, variant applied automatically, contexts | Not supported: personal variants. |
+| Order of the columns, grouping | Not supported (visibility and sorting only). |
+
+## Website (D63)
+
+| Gap | Status |
+|---|---|
+| Documentation of the website | Rendered at each publication from `docs/`: the website shows the documentation of the `main` branch, not of each version. |

@@ -10,3 +10,4 @@ playwright-report/
 packages/*/test/.generated/
 .rapt/
 packages/compiler/docs/
+_site/

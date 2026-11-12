@@ -1,154 +1,154 @@
-# Guide de rap-transpiler
+# rap-transpiler guide
 
-Ce guide décrit tout ce que rap-transpiler sait faire et comment s'en servir. Il s'adresse aux
-développeurs ABAP et aux agents IA qui écrivent un business object (BO) RAP avec lui : chaque
-section donne la commande, le fichier à écrire et le comportement obtenu, avec un lien vers la
-décision technique (`Dxx`, dans [DECISIONS.md](DECISIONS.md)) qui en donne les détails.
+This guide describes everything rap-transpiler can do and how to use it. It is written for ABAP
+developers and for AI agents who write a RAP business object (BO) with it: each section gives the
+command, the file to write and the resulting behavior, with a link to the technical decision
+(`Dxx`, in [DECISIONS.md](DECISIONS.md)) that gives the details.
 
-- Statut fonctionnalité par fonctionnalité : [FEATURES.md](FEATURES.md)
-- Codes de diagnostic : [DIAGNOSTICS.md](DIAGNOSTICS.md)
-- Écarts connus : [KNOWN_GAPS.md](../KNOWN_GAPS.md) · Feuille de route : [ROADMAP.md](ROADMAP.md)
+- Status, feature by feature: [FEATURES.md](FEATURES.md)
+- Diagnostic codes: [DIAGNOSTICS.md](DIAGNOSTICS.md)
+- Known gaps: [KNOWN_GAPS.md](../KNOWN_GAPS.md) · Roadmap: [ROADMAP.md](ROADMAP.md)
 
-## 1. Le principe
+## 1. The principle
 
-Vous écrivez un BO RAP comme dans les ABAP Development Tools (ADT) : tables, vues CDS, metadata
-extensions, behavior definition (BDEF), behavior pool en ABAP, définition et binding de service.
-rap-transpiler compile ces sources (format abapGit) en une application Node.js autonome :
+You write a RAP BO as in the ABAP Development Tools (ADT): tables, CDS views, metadata
+extensions, behavior definition (BDEF), behavior pool in ABAP, service definition and binding.
+rap-transpiler compiles these sources (abapGit format) into a standalone Node.js application:
 
-- un service **OData V4** identique à celui de SAP (mêmes chemins, `$metadata`, `$batch`, ETags) ;
-- le **runtime RAP managed** : verrous, numérotation, autorisations, feature control,
-  déterminations, validations, actions, messages, EML ;
-- le **behavior pool ABAP transpilé** en JavaScript (abaplint), exécuté tel quel ;
-- une base **PostgreSQL** (ou PGlite embarqué en développement) ;
-- une **UI OpenUI5** List Report / Object Page générée depuis les annotations `@UI` ;
-- un **launchpad**, un **serveur MCP** pour les agents IA, des fichiers de **déploiement**.
+- an **OData V4** service identical to the one of SAP (same paths, `$metadata`, `$batch`, ETags);
+- the **RAP managed runtime**: locks, numbering, authorizations, feature control,
+  determinations, validations, actions, messages, EML;
+- the **ABAP behavior pool transpiled** to JavaScript (abaplint), run as is;
+- a **PostgreSQL** database (or embedded PGlite in development);
+- an **OpenUI5 UI** List Report / Object Page generated from the `@UI` annotations;
+- a **launchpad**, an **MCP server** for AI agents, **deployment** files.
 
-Les sources restent activables sur SAP : le même dépôt abapGit s'importe dans un système ABAP
-Cloud ou S/4HANA (en mode `standard`, voir §4).
+The sources stay activatable on SAP: the same abapGit repository is imported into an ABAP Cloud
+or S/4HANA system (in `standard` mode, see §4).
 
-## 2. Démarrer
+## 2. Getting started
 
-### Avec VS Code (recommandé)
+### With VS Code (recommended)
 
-Installer l'extension `rap-transpiler-vscode.vsix` (elle contient rapt, OpenUI5 et PGlite : rien
-d'autre à installer), puis dans la palette de commandes (`Ctrl+Shift+P`) :
+Install the `rap-transpiler-vscode.vsix` extension (it contains rapt, OpenUI5 and PGlite:
+nothing else to install), then in the command palette (`Ctrl+Shift+P`):
 
-| Commande | Effet |
+| Command | Effect |
 |---|---|
-| *RAP : Nouveau business object* | `rapt new` : un BO managed complet, avec données initiales |
-| *RAP : Nouvel objet RAP (assistant)…* | l'assistant de création, comme *New ABAP Repository Object* d'ADT : les types par catégorie (Dictionary, Core Data Services, Behavior, Business Services, Source Code Library), un filtre, une description, les champs du type (objet source, entités exposées, type de binding…) |
-| *RAP : Nouvel objet RAP…* | `rapt generate` en listes rapides : une table, une vue, une BDEF, un behavior pool… |
-| *RAP : Choisir le floorplan de l'application* | `rapt floorplan` : List Report, Worklist, Analytical List Page ou Form Entry, avec ce que chacun demande |
-| *RAP : Afficher la représentation intermédiaire* | `rapt ir` : le modèle (`model.json`) dans un éditeur |
-| *RAP : Générer un launchpad* | `rapt launchpad` : le launchpad de plusieurs applications |
-| *RAP : Lancer rapt dev* | construit, lance et ouvre le launchpad de développement ; relance à chaque enregistrement |
-| *RAP : Vérifier le BO* | `rapt check` : diagnostics dans l'onglet Problèmes (aussi à chaque enregistrement) |
-| *RAP : Générer l'application* | `rapt build` : l'application déployable |
-| *RAP : Générer les fichiers abapGit* | `rapt abapgit` : les XML qui manquent pour l'import dans SAP |
-| *RAP : Générer le serveur MCP du service* | `rapt mcp` : les outils pour les agents IA |
-| *RAP : Choisir le mode du projet* | `standard` ou `enhanced` (`rapt/config.json`) |
+| *RAP: New business object* | `rapt new`: a complete managed BO, with initial data |
+| *RAP: New RAP object (wizard)…* | the creation wizard, like *New ABAP Repository Object* of ADT: the types by category (Dictionary, Core Data Services, Behavior, Business Services, Source Code Library), a filter, a description, the fields of the type (source object, exposed entities, binding type…) |
+| *RAP: New RAP object…* | `rapt generate` with quick picks: a table, a view, a BDEF, a behavior pool… |
+| *RAP: Choose the floorplan of the application* | `rapt floorplan`: List Report, Worklist, Analytical List Page or Form Entry, with what each one needs |
+| *RAP: Show the intermediate representation* | `rapt ir`: the model (`model.json`) in an editor |
+| *RAP: Generate a launchpad* | `rapt launchpad`: the launchpad of several applications |
+| *RAP: Start rapt dev* | builds, starts and opens the development launchpad; restarts on each save |
+| *RAP: Check the BO* | `rapt check`: diagnostics in the Problems tab (also on each save) |
+| *RAP: Build the application* | `rapt build`: the deployable application |
+| *RAP: Generate the abapGit files* | `rapt abapgit`: the missing XML files for the import into SAP |
+| *RAP: Generate the MCP server of the service* | `rapt mcp`: the tools for AI agents |
+| *RAP: Choose the project mode* | `standard` or `enhanced` (`rapt/config.json`) |
 
-La vue **Objets RAP** de l'explorateur range les objets du projet comme l'explorateur de projet
-d'ADT (dictionnaire, data definitions, metadata extensions, access controls, behavior
-definitions, services, classes) ; sa barre de titre crée un objet, vérifie le projet et lance
+The **RAP Objects** view of the explorer arranges the objects of the project like the project
+explorer of ADT (dictionary, data definitions, metadata extensions, access controls, behavior
+definitions, services, classes); its title bar creates an object, checks the project and starts
 `rapt dev` ([D61](DECISIONS.md)).
 
-La coloration syntaxique couvre ABAP, CDS (DDLS, DDLX, DCL, SRVD, tables, types) et BDEF.
+Syntax highlighting covers ABAP, CDS (DDLS, DDLX, DCL, SRVD, tables, types) and BDEF.
 
-### En ligne de commande
+### On the command line
 
 ```sh
-rapt new mon-projet Travel --prefix ZRT    # un BO managed complet
-rapt dev mon-projet                         # http://localhost:8080/ : launchpad de développement
+rapt new my-project Travel --prefix ZRT    # a complete managed BO
+rapt dev my-project                         # http://localhost:8080/: development launchpad
 ```
 
-Depuis un clone du dépôt : `pnpm install && pnpm build`, puis `node packages/compiler/dist/cli.js`
-à la place de `rapt`.
+From a clone of the repository: `pnpm install && pnpm build`, then
+`node packages/compiler/dist/cli.js` instead of `rapt`.
 
-## 3. Le projet
+## 3. The project
 
 ```
-mon-projet/
-  .abapgit.xml                 dossier des sources (STARTING_FOLDER), écrit par rapt abapgit
-  src/                         les objets, au format abapGit
-    zrt_travel.tabl.astabl     table écrite en source (syntaxe ADT « define table »)
-    zrt_r_travel.ddls.asddls   vue CDS racine
+my-project/
+  .abapgit.xml                 folder of the sources (STARTING_FOLDER), written by rapt abapgit
+  src/                         the objects, in abapGit format
+    zrt_travel.tabl.astabl     table written as source (ADT "define table" syntax)
+    zrt_r_travel.ddls.asddls   root CDS view
     zrt_c_travel.ddls.asddls   projection
     zrt_c_travel.ddlx.asddlxs  metadata extension (UI)
     zrt_r_travel.bdef.asbdef   behavior definition
     zbp_rt_r_travel.clas.*     behavior pool
-    zrt_ui_travel.srvd.srvdsrv définition de service
-    *.xml                      métadonnées abapGit (générées par rapt abapgit)
-  rapt/                        configuration propre à rap-transpiler (jamais importée dans SAP)
-    config.json                mode du projet (standard / enhanced)
-    seed.json, seed.sql        données initiales de rapt dev
-    authorizations.json        rôles → autorisations (objets d'autorisation)
-    number-ranges.json         intervalles de numérotation
-    mcp.json                   outils MCP et leurs descriptions
-  .rapt/                       construction de rapt dev (ignorée par git)
+    zrt_ui_travel.srvd.srvdsrv service definition
+    *.xml                      abapGit metadata (generated by rapt abapgit)
+  rapt/                        configuration of rap-transpiler (never imported into SAP)
+    config.json                mode of the project (standard / enhanced)
+    seed.json, seed.sql        initial data of rapt dev
+    authorizations.json        roles → authorizations (authorization objects)
+    number-ranges.json         number range intervals
+    mcp.json                   MCP tools and their descriptions
+  .rapt/                       build of rapt dev (ignored by git)
 ```
 
-Les tables s'écrivent en source (`.tabl.astabl`) : `rapt abapgit` en tire le XML qu'abapGit
-attend ([D42](DECISIONS.md)). Les autres XML sont générés quand ils manquent ; un XML présent n'est
-jamais modifié.
+Tables are written as source (`.tabl.astabl`): `rapt abapgit` derives the XML abapGit expects
+from them ([D42](DECISIONS.md)). The other XML files are generated when they are missing; an
+existing XML file is never changed.
 
-## 4. Modes `standard` et `enhanced`
+## 4. `standard` and `enhanced` modes
 
-`rapt/config.json` ([D45](DECISIONS.md)) :
+`rapt/config.json` ([D45](DECISIONS.md)):
 
 ```json
 { "mode": "enhanced" }
 ```
 
-| | `standard` (par défaut) | `enhanced` |
+| | `standard` (default) | `enhanced` |
 |---|---|---|
-| Objectif | Comme sur SAP : ce qui se construit s'active sur SAP | Extensions de rap-transpiler |
-| BO managed + unmanaged save sur une entité custom | refusé (BDEF027) | permis ([D43](DECISIONS.md)) |
-| `field ( mandatory )` | indication pour l'UI, comme RAP | contrôlé à la sauvegarde, un message par champ, sans validation à écrire |
-| Élément d'un type énuméré CDS exposé | refusé comme sur SAP (CDS021) | `EnumType` OData : `"Status": "OPEN"`, libellés et liste de choix dans l'UI ([D55](DECISIONS.md)) |
+| Goal | As on SAP: what builds activates on SAP | Extensions of rap-transpiler |
+| Managed BO + unmanaged save on a custom entity | refused (BDEF027) | allowed ([D43](DECISIONS.md)) |
+| `field ( mandatory )` | a hint for the UI, as in RAP | checked on save, one message per field, without a validation to write |
+| Exposed element of a CDS enumerated type | refused as on SAP (CDS021) | OData `EnumType`: `"Status": "OPEN"`, labels and choice list in the UI ([D55](DECISIONS.md)) |
 
-`rapt check --mode enhanced` (ou `build`, `dev`) remplace le mode du fichier.
+`rapt check --mode enhanced` (or `build`, `dev`) overrides the mode of the file.
 
-## 5. Écrire les objets
+## 5. Writing the objects
 
-### Créer un objet : `rapt generate`
+### Creating an object: `rapt generate`
 
 ```sh
 rapt generate . table zshop_order
 rapt generate . view ZR_ShopOrder --from zshop_order --root
 rapt generate . projection ZC_ShopOrder --from ZR_ShopOrder
 rapt generate . metadata ZC_ShopOrder
-rapt generate . behavior ZR_ShopOrder          # BDEF managed, avec les compositions
-rapt generate . pool ZBP_R_SHOPORDER           # handlers de la BDEF qui nomme la classe
-rapt generate . behavior ZC_ShopOrder          # BDEF de projection
+rapt generate . behavior ZR_ShopOrder          # managed BDEF, with the compositions
+rapt generate . pool ZBP_R_SHOPORDER           # handlers of the BDEF that names the class
+rapt generate . behavior ZC_ShopOrder          # projection BDEF
 rapt generate . access ZC_ShopOrder            # DCL
 rapt generate . service ZUI_SHOPORDER --expose ZC_ShopOrder,ZC_ShopItem
 rapt generate . binding ZUI_SHOPORDER_O4 --for ZUI_SHOPORDER
 rapt generate . dataelement ZSHOP_ORDER_NO --type abap.numc(8)
 rapt generate . domain ZSHOP_STATUS --type abap.char(1)
-rapt generate . tableentity ZSHOP_ITEM --root   # table entity : table et entité en un objet
-rapt generate . type ZSHOP_NAME                 # type simple CDS
-rapt generate . enum ZSHOP_STATUS               # type énuméré CDS
+rapt generate . tableentity ZSHOP_ITEM --root   # table entity: table and entity in one object
+rapt generate . type ZSHOP_NAME                 # CDS simple type
+rapt generate . enum ZSHOP_STATUS               # CDS enumerated type
 ```
 
-`rapt generate . ` sans type liste les types. Chaque objet est dérivé du précédent comme dans les
-assistants d'ADT ; le XML abapGit est écrit avec ([D46](DECISIONS.md)).
+`rapt generate . ` without a type lists the types. Each object is derived from the previous one as
+in the wizards of ADT; the abapGit XML is written with it ([D46](DECISIONS.md)).
 
 ### CDS
 
 - `define [root] view entity … as select from <table>`, `as projection on`, `provider contract
   transactional_query`, `composition`, `association to parent`, associations, `redirected to`.
-- Metadata extensions (`@Metadata.allowExtensions: true`) fusionnées avec la vue.
-- Entités abstraites (paramètres d'actions), entités custom (`@ObjectModel.query.implementedBy`,
-  classe `if_rap_query_provider`).
-- Contrôles d'accès (DCL) : `grant select … where`, `aspect pfcg_auth`, `aspect user`
+- Metadata extensions (`@Metadata.allowExtensions: true`) merged with the view.
+- Abstract entities (action parameters), custom entities (`@ObjectModel.query.implementedBy`,
+  `if_rap_query_provider` class).
+- Access controls (DCL): `grant select … where`, `aspect pfcg_auth`, `aspect user`
   ([D35](DECISIONS.md)).
-- Pas d'expressions dans la liste de sélection (CASE, CAST, calculs, chemins) : CDS002.
+- No expressions in the select list (CASE, CAST, calculations, paths): CDS002.
 
-#### Table entities et types CDS ([D55](DECISIONS.md))
+#### Table entities and CDS types ([D55](DECISIONS.md))
 
-Une table entity réunit la table et l'entité ; un BO managed s'écrit directement dessus, sans
-`persistent table` :
+A table entity combines the table and the entity; a managed BO is written directly on it, without
+a `persistent table`:
 
 ```cds
 @ClientHandling.type: #CLIENT_DEPENDENT
@@ -158,13 +158,14 @@ Une table entity réunit la table et l'entité ; un BO managed s'écrit directem
 define root table entity ZRT_ORDER
 {
   key OrderId  : abap.numc(8);
-      Name     : zrt_order_name;     // type simple CDS
-      Status   : zrt_order_status;   // type énuméré CDS
+      Name     : zrt_order_name;     // CDS simple type
+      Status   : zrt_order_status;   // CDS enumerated type
       Note     : abap.string null;
 }
 ```
 
-Les types CDS sont des sources `<nom>.drty.acds` (format AFF d'abapGit, métadonnées `<nom>.drty.json` écrites par `rapt abapgit`) :
+CDS types are `<name>.drty.acds` sources (AFF format of abapGit, metadata `<name>.drty.json`
+written by `rapt abapgit`):
 
 ```cds
 @EndUserText.label: 'Order status'
@@ -177,109 +178,109 @@ define type ZRT_ORDER_STATUS : abap.char(1) enum
 }
 ```
 
-La base garde la valeur de base (`'O'`) ; le behavior pool écrit les constantes comme sur SAP
-(`Status = zrt_order_status-open`). SAP n'expose pas les types énumérés dans un service OData
-RAP : en mode `standard`, CDS021 ; en mode `enhanced`, le `$metadata` a un `EnumType`, le JSON
-porte le nom du membre (`"Status": "OPEN"`) et `$filter=Status eq 'OPEN'` fonctionne. Exemple
-complet : `fixtures/table-entity`.
+The database keeps the base value (`'O'`); the behavior pool writes the constants as on SAP
+(`Status = zrt_order_status-open`). SAP does not expose enumerated types in a RAP OData service:
+in `standard` mode, CDS021; in `enhanced` mode, the `$metadata` has an `EnumType`, the JSON
+carries the name of the member (`"Status": "OPEN"`) and `$filter=Status eq 'OPEN'` works.
+Complete example: `fixtures/table-entity`.
 
-### Vues standards de SAP
+### SAP standard views
 
-`I_Currency`, `I_UnitOfMeasure`, `I_Country`, `I_Language`, `I_Region`, `I_TimeZone` et leurs vues
-de textes, `I_CalendarDate` (calendrier 1990-2060), `I_BusinessUserBasic` (les utilisateurs de
-l'IdP, enregistrés à leur première requête) et `I_ExchangeRate` (taux à charger) existent comme
-sur SAP, avec leurs données : il suffit de les nommer ([D44](DECISIONS.md)).
+`I_Currency`, `I_UnitOfMeasure`, `I_Country`, `I_Language`, `I_Region`, `I_TimeZone` and their
+text views, `I_CalendarDate` (calendar 1990-2060), `I_BusinessUserBasic` (the users of the IdP,
+recorded on their first request) and `I_ExchangeRate` (rates to load) exist as on SAP, with their
+data: just name them ([D44](DECISIONS.md)).
 
 ```cds
 @Consumption.valueHelpDefinition: [{ entity: { name: 'I_Currency', element: 'Currency' } }]
 CurrencyCode,
 ```
 
-L'entité du value help est exposée automatiquement (comme RAP) ; l'UI ouvre un dialogue de
-sélection avec les descriptions. `additionalBinding` (`#FILTER`, `#RESULT`), `useForValidation:
-true` et une entité `@ObjectModel.resultSet.sizeCategory: #XS` (liste déroulante) sont pris en
-charge ([D56](DECISIONS.md)).
+The entity of the value help is exposed automatically (as in RAP); the UI opens a selection
+dialog with the descriptions. `additionalBinding` (`#FILTER`, `#RESULT`),
+`useForValidation: true` and an entity with `@ObjectModel.resultSet.sizeCategory: #XS`
+(drop-down list) are supported ([D56](DECISIONS.md)).
 
 ### Behavior definition
 
-Tout un BO RAP managed, avec ou sans draft : `strict ( 2 )`, `lock master` / `dependent`, `etag master` /
-`dependent`, autorisations `global` / `instance`, numérotation managed, externe ou anticipée,
-`create`/`update`/`delete` (internes, `precheck`, `features`), champs `readonly`, `mandatory`,
-`readonly : update`, `features : instance`, déterminations `on modify` / `on save`, validations,
-actions (instance, statiques, factory, internes, avec paramètres et résultats), fonctions,
-`with additional save`, `with unmanaged save`, `with privileged mode`, projections (`use …`),
-side effects. Détails et exceptions : [FEATURES.md](FEATURES.md).
+A complete managed RAP BO, with or without draft: `strict ( 2 )`, `lock master` / `dependent`,
+`etag master` / `dependent`, `global` / `instance` authorizations, managed, external or early
+numbering, `create`/`update`/`delete` (internal, `precheck`, `features`), `readonly`,
+`mandatory`, `readonly : update`, `features : instance` fields, `on modify` / `on save`
+determinations, validations, actions (instance, static, factory, internal, with parameters and
+results), functions, `with additional save`, `with unmanaged save`, `with privileged mode`,
+projections (`use …`), side effects. Details and exceptions: [FEATURES.md](FEATURES.md).
 
-**Draft** ([D54](DECISIONS.md)) : `with draft;`, une `draft table` par entité (BDEF028 sinon),
-`total etag`, `draft action Edit; draft action Activate optimized; draft action Discard; draft
-action Resume; draft determine action Prepare;`. La table de brouillons n'a pas à exister : elle
-est générée. Le service a la clé `IsActiveEntity`, `HasDraftEntity`, `DraftAdministrativeData` et
-les actions de SAP ; déterminations et validations s'exécutent à l'activation. L'UI suit Fiori
-Elements : filtre *Editing Status*, *Locked by X*, « Draft updated », *Keep Draft* en quittant
-la page ([D58](DECISIONS.md)).
+**Draft** ([D54](DECISIONS.md)): `with draft;`, one `draft table` per entity (BDEF028
+otherwise), `total etag`, `draft action Edit; draft action Activate optimized; draft action
+Discard; draft action Resume; draft determine action Prepare;`. The draft table does not have to
+exist: it is generated. The service has the `IsActiveEntity` key, `HasDraftEntity`,
+`DraftAdministrativeData` and the actions of SAP; determinations and validations run on
+activation. The UI follows Fiori Elements: *Editing Status* filter, *Locked by X*,
+"Draft updated", *Keep Draft* when leaving the page ([D58](DECISIONS.md)).
 
-**Collaborative draft** ([D59](DECISIONS.md)) : `with collaborative draft;` et `draft action
-Share;` ; plusieurs utilisateurs éditent le même brouillon (bouton *Invite*, ou *Edit* sur une
-instance déjà en brouillon).
+**Collaborative draft** ([D59](DECISIONS.md)): `with collaborative draft;` and `draft action
+Share;`; several users edit the same draft (*Invite* button, or *Edit* on an instance already in
+draft).
 
 ### Behavior pool (ABAP)
 
-Le code ABAP Cloud des handlers et du saver est transpilé tel quel : EML complet (`READ`/`MODIFY
-ENTITIES`, `IN LOCAL MODE`, `BY \_assoc`, `EXECUTE`), `failed`/`reported`/`mapped`, messages
-(`new_message_with_text`, classes de messages, classes d'exception), `AUTHORITY-CHECK`, ABAP SQL en
-lecture sur les tables et entités du projet, écritures dans `save_modified`.
+The ABAP Cloud code of the handlers and of the saver is transpiled as is: complete EML
+(`READ`/`MODIFY ENTITIES`, `IN LOCAL MODE`, `BY \_assoc`, `EXECUTE`), `failed`/`reported`/`mapped`,
+messages (`new_message_with_text`, message classes, exception classes), `AUTHORITY-CHECK`, ABAP
+SQL reads on the tables and entities of the project, writes in `save_modified`.
 
-Classes libérées disponibles : JSON (`/ui2/cl_json`, `xco_cp_json`), encodages, dates
-(`cl_abap_tstmp`, `xco_cp_time`), numérotation (`cl_numberrange_runtime`), journal applicatif
-(`cl_bali_*`), hachage, aléatoire, expressions régulières, RTTS ([UTILITAIRES.md](UTILITAIRES.md)),
-traitement en arrière-plan (`cl_bgmc_process_factory`) et e-mail (`cl_bcs_mail_message`)
-([D41](DECISIONS.md)), client HTTP et client proxy OData ([API_DISTANTES.md](API_DISTANTES.md)).
+Available released classes: JSON (`/ui2/cl_json`, `xco_cp_json`), encodings, dates
+(`cl_abap_tstmp`, `xco_cp_time`), numbering (`cl_numberrange_runtime`), application log
+(`cl_bali_*`), hashing, random numbers, regular expressions, RTTS ([UTILITIES.md](UTILITIES.md)),
+background processing (`cl_bgmc_process_factory`) and e-mail (`cl_bcs_mail_message`)
+([D41](DECISIONS.md)), HTTP client and OData client proxy ([REMOTE_APIS.md](REMOTE_APIS.md)).
 
-### Configuration `rapt/`
+### The `rapt/` configuration
 
-| Fichier | Contenu | Décision |
+| File | Content | Decision |
 |---|---|---|
 | `config.json` | `{ "mode": "standard" \| "enhanced", "ui": { "floorplans": …, "overview": … } }` | [D45](DECISIONS.md), [D53](DECISIONS.md) |
-| `seed.json` | `{ "table": [ { "champ": "valeur" } ] }` : données chargées au premier démarrage de `rapt dev` (`SEED=auto`) ; clés UUID tirées au hasard | [D42](DECISIONS.md) |
-| `seed.sql` | données en SQL | [D42](DECISIONS.md) |
-| `authorizations.json` | rôles de l'IdP → objets d'autorisation et valeurs (`{claim:agency}` : valeur lue du jeton) | [D34](DECISIONS.md) |
-| `number-ranges.json` | intervalles de `cl_numberrange_runtime` | [D40](DECISIONS.md) |
-| `mcp.json` | outils MCP et leurs descriptions | [D47](DECISIONS.md) |
+| `seed.json` | `{ "table": [ { "field": "value" } ] }`: data loaded on the first start of `rapt dev` (`SEED=auto`); random UUID keys | [D42](DECISIONS.md) |
+| `seed.sql` | data in SQL | [D42](DECISIONS.md) |
+| `authorizations.json` | roles of the IdP → authorization objects and values (`{claim:agency}`: value read from the token) | [D34](DECISIONS.md) |
+| `number-ranges.json` | intervals of `cl_numberrange_runtime` | [D40](DECISIONS.md) |
+| `mcp.json` | MCP tools and their descriptions | [D47](DECISIONS.md) |
 
-## 6. L'interface générée
+## 6. The generated UI
 
-Le List Report et l'Object Page suivent les annotations `@UI` : `headerInfo`, `lineItem` (colonnes
-et actions de table), `selectionField`, `identification` (champs et actions d'en-tête),
-`fieldGroup`, `facet` (sections, tables des compositions, en-tête), `dataPoint`, `presentationVariant`
-(tri), `hidden`, `multiLineText`, `textArrangement`, la criticité, `@Consumption.filter`. La liste
-complète, annotation par annotation : [ANNOTATIONS.md](ANNOTATIONS.md).
+The List Report and the Object Page follow the `@UI` annotations: `headerInfo`, `lineItem`
+(columns and table actions), `selectionField`, `identification` (header fields and actions),
+`fieldGroup`, `facet` (sections, tables of the compositions, header), `dataPoint`,
+`presentationVariant` (sorting), `hidden`, `multiLineText`, `textArrangement`, criticality,
+`@Consumption.filter`. The complete list, annotation by annotation: [ANNOTATIONS.md](ANNOTATIONS.md).
 
-- **Filtres** : conditions comme SAP Fiori, plusieurs par champ :
+- **Filters**: conditions as in SAP Fiori, several per field:
 
-  | Saisie | Signification |
+  | Input | Meaning |
   |---|---|
-  | `Rome` | texte : contient « Rome » (sans la casse) ; autre type : égal |
-  | `=Rome`, `!=Rome` | égal, différent |
-  | `>100`, `>=100`, `<100`, `<=100` | comparaisons |
-  | `1...5` | intervalle (bornes comprises) |
-  | `Ro*`, `*me`, `*om*` | commence par, finit par, contient |
+  | `Rome` | text: contains "Rome" (case-insensitive); other types: equal |
+  | `=Rome`, `!=Rome` | equal, not equal |
+  | `>100`, `>=100`, `<100`, `<=100` | comparisons |
+  | `1...5` | range (bounds included) |
+  | `Ro*`, `*me`, `*om*` | starts with, ends with, contains |
 
-  Une suite de chiffres (NUMC) se saisit sans ses zéros de tête (`3` cherche `00000003`) ; les dates
-  se filtrent par plage. *Adapt Filters* ajoute les colonnes comme filtres ; *Clear* vide tout.
-- **Vues de l'utilisateur** (variantes) : le titre du List Report ouvre la gestion des vues :
-  enregistrer les filtres, les colonnes visibles et le tri sous un nom, choisir la vue par défaut.
-  Elles sont enregistrées par utilisateur dans la base de l'application ([D51](DECISIONS.md)).
-- **Paramètres du tableau** (roue dentée) : colonnes visibles, tri.
-- **Object Page** : édition, création, suppression, actions (dialogue des paramètres), tables des
-  compositions éditables, value helps, fil d'Ariane, messages du BO.
-- Les boutons suivent les autorisations et le feature control de l'utilisateur.
-- **Draft** : Create et Edit ouvrent un brouillon, chaque champ y est enregistré, Save active,
-  Cancel abandonne ; la liste montre les instances en cours d'édition.
+  A string of digits (NUMC) is entered without its leading zeros (`3` finds `00000003`); dates are
+  filtered by range. *Adapt Filters* adds the columns as filters; *Clear* empties everything.
+- **User views** (variants): the title of the List Report opens the view management: save the
+  filters, the visible columns and the sorting under a name, choose the default view. They are
+  saved per user in the database of the application ([D51](DECISIONS.md)).
+- **Table settings** (gear icon): visible columns, sorting.
+- **Object Page**: edit, create, delete, actions (parameter dialog), editable tables of the
+  compositions, value helps, breadcrumbs, messages of the BO.
+- The buttons follow the authorizations and the feature control of the user.
+- **Draft**: Create and Edit open a draft, each field is saved in it, Save activates, Cancel
+  discards; the list shows the instances being edited.
 
-**Floorplans** ([D53](DECISIONS.md)) : le List Report est le défaut. Pour en choisir un autre :
-*RAP : Choisir le floorplan de l'application* dans VS Code (chaque floorplan est décrit avec les
-annotations qu'il lit), ou `rapt floorplan . Travel worklist` ; sans arguments, `rapt floorplan .`
-liste les entity sets et leur floorplan. Les deux écrivent `rapt/config.json` :
+**Floorplans** ([D53](DECISIONS.md)): the List Report is the default. To choose another one:
+*RAP: Choose the floorplan of the application* in VS Code (each floorplan is described with the
+annotations it reads), or `rapt floorplan . Travel worklist`; without arguments,
+`rapt floorplan .` lists the entity sets and their floorplan. Both write `rapt/config.json`:
 
 ```json
 {
@@ -297,49 +298,49 @@ liste les entity sets et leur floorplan. Les deux écrivent `rapt/config.json` :
 }
 ```
 
-| Floorplan | Annotations lues |
+| Floorplan | Annotations read |
 |---|---|
 | `listReport` | `lineItem`, `selectionField`, `presentationVariant` |
-| `worklist` | un onglet par `@UI.selectionVariant` qualifié (`filter: 'OverallStatus EQ ''O'''`) |
-| `analyticalListPage` | le premier `@UI.chart` (dimension, mesures, `#COLUMN`, `#BAR`, `#LINE`, `#PIE`, `#DONUT`), lu par `$apply` |
-| `formEntry` | l'Object Page, en création seule |
-| `overview` | cartes `kpi`, `list`, `table`, `chart` de `rapt/config.json` |
+| `worklist` | one tab per qualified `@UI.selectionVariant` (`filter: 'OverallStatus EQ ''O'''`) |
+| `analyticalListPage` | the first `@UI.chart` (dimension, measures, `#COLUMN`, `#BAR`, `#LINE`, `#PIE`, `#DONUT`), read with `$apply` |
+| `formEntry` | the Object Page, for creation only |
+| `overview` | `kpi`, `list`, `table`, `chart` cards of `rapt/config.json` |
 
-## 7. Développer : `rapt dev`
+## 7. Developing: `rapt dev`
 
 ```sh
-rapt dev mon-projet [--port 8080] [--host 0.0.0.0] [--mode enhanced]
+rapt dev my-project [--port 8080] [--host 0.0.0.0] [--mode enhanced]
 ```
 
-- Construit l'application, la lance avec une base PGlite embarquée (`.rapt/dev/data`), la
-  reconstruit à chaque enregistrement ; une construction en erreur laisse tourner la précédente.
-- `http://localhost:8080/` : le **launchpad de développement** — l'application (avec le nombre de
-  ses instances), la **documentation** (cette documentation, avec recherche), le `$metadata` et,
-  avec `rapt/mcp.json`, le serveur MCP ([D49](DECISIONS.md)).
-- Données conservées entre les constructions ; base réinitialisée quand le schéma change.
-- Pas de connexion (`AUTH_MODE=none`) ; `DEV_ROLES` et `DEV_ATTRIBUTES` simulent un utilisateur
-  et ses autorisations.
+- Builds the application, starts it with an embedded PGlite database (`.rapt/dev/data`),
+  rebuilds it on each save; a build in error keeps the previous one running.
+- `http://localhost:8080/`: the **development launchpad** — the application (with the number of
+  its instances), the **documentation** (this documentation, with search), the `$metadata` and,
+  with `rapt/mcp.json`, the MCP server ([D49](DECISIONS.md)).
+- Data kept between builds; database reset when the schema changes.
+- No sign-in (`AUTH_MODE=none`); `DEV_ROLES` and `DEV_ATTRIBUTES` simulate a user and their
+  authorizations.
 
-## 8. Agents IA : serveur MCP
+## 8. AI agents: MCP server
 
-`rapt mcp` écrit `rapt/mcp.json` ; l'application sert alors `/mcp` : un outil par opération du
-service (lister, lire, créer, modifier, supprimer, actions), exécuté avec les contrôles du BO.
-Guide : [MCP.md](MCP.md).
+`rapt mcp` writes `rapt/mcp.json`; the application then serves `/mcp`: one tool per operation of
+the service (list, read, create, update, delete, actions), run with the checks of the BO. Guide:
+[MCP.md](MCP.md).
 
 ## 9. Launchpad
 
-`rapt launchpad launchpad.json --out out/launchpad` construit un launchpad OpenUI5 devant
-plusieurs applications : une seule origine, une seule connexion OIDC, tuiles par rôle, compteurs,
-navigation par intent ([D37](DECISIONS.md)). Contenu en groupes, ou en **spaces et pages**
-([D48](DECISIONS.md)) :
+`rapt launchpad launchpad.json --out out/launchpad` builds an OpenUI5 launchpad in front of
+several applications: a single origin, a single OIDC sign-in, tiles by role, counters, intent
+navigation ([D37](DECISIONS.md)). Content in groups, or in **spaces and pages**
+([D48](DECISIONS.md)):
 
 ```json
 {
   "title": "Travel Agency",
   "apps": [{ "id": "travel", "build": "out/travel", "url": "http://localhost:8080/" }],
   "spaces": [{
-    "title": "Voyages", "roles": ["travel_agent"],
-    "pages": [{ "title": "Gestion", "sections": [{
+    "title": "Travels", "roles": ["travel_agent"],
+    "pages": [{ "title": "Management", "sections": [{
       "title": "Travel Management",
       "tiles": [{ "title": "Manage Travels", "app": "travel", "intent": "Travel-manage",
                   "icon": "sap-icon://flight", "count": "Travel" }]
@@ -348,99 +349,99 @@ navigation par intent ([D37](DECISIONS.md)). Contenu en groupes, ou en **spaces 
 }
 ```
 
-## 10. Livrer
+## 10. Shipping
 
-- `rapt build mon-projet --out out/travel` : l'application (Node.js, Docker, Cloud Foundry).
-- `rapt abapgit mon-projet` : les XML pour importer le dépôt dans SAP avec abapGit
-  (`--check` en CI).
-- Déploiement (Docker, SAP BTP Cloud Foundry, réseau local, HTTPS) : [DEPLOIEMENT.md](DEPLOIEMENT.md).
+- `rapt build my-project --out out/travel`: the application (Node.js, Docker, Cloud Foundry).
+- `rapt abapgit my-project`: the XML files to import the repository into SAP with abapGit
+  (`--check` in CI).
+- Deployment (Docker, SAP BTP Cloud Foundry, local network, HTTPS): [DEPLOYMENT.md](DEPLOYMENT.md).
 
-Le dossier d'une application générée :
+The folder of a generated application:
 
 ```
-model/model.json     représentation intermédiaire lue par le runtime
-db/schema.sql        tables et vues PostgreSQL (données de référence des vues standards comprises)
-odata/metadata.xml   $metadata (CSDL avec les annotations UI)
-abap/                behavior pool transpilé ; abap/src/ : l'ABAP donné au transpiler
-ui/                  UI OpenUI5 (List Report, Object Pages)
-mcp/tools.json       outils MCP (avec rapt/mcp.json)
-package.json, server.mjs, vendor/   démarrage ; vendor/ embarque le runtime
-Dockerfile, docker-compose.yml, keycloak/, manifest.yml   conteneur, PostgreSQL, Keycloak, Cloud Foundry
+model/model.json     intermediate representation read by the runtime
+db/schema.sql        PostgreSQL tables and views (reference data of the standard views included)
+odata/metadata.xml   $metadata (CSDL with the UI annotations)
+abap/                transpiled behavior pool; abap/src/: the ABAP given to the transpiler
+ui/                  OpenUI5 UI (List Report, Object Pages)
+mcp/tools.json       MCP tools (with rapt/mcp.json)
+package.json, server.mjs, vendor/   startup; vendor/ bundles the runtime
+Dockerfile, docker-compose.yml, keycloak/, manifest.yml   container, PostgreSQL, Keycloak, Cloud Foundry
 ```
 
-## 11. Référence de la CLI
+## 11. CLI reference
 
-| Commande | Rôle |
+| Command | Purpose |
 |---|---|
-| `rapt check <src>` | diagnostics (`fichier:ligne:colonne: sévérité CODE message`), code retour 1 en cas d'erreur |
-| `rapt build <src> --out <dir>` | application générée |
-| `rapt dev <src>` | boucle de développement |
-| `rapt new <src> <Entité> [--prefix ZRT] [--description …]` | BO complet |
-| `rapt generate <src> <type> <nom> [--from X] [--for Y] [--expose A,B] [--root]` | un objet |
-| `rapt abapgit <src> [--check]` | XML abapGit manquants |
-| `rapt mcp <src>` | outils MCP (`rapt/mcp.json`) |
+| `rapt check <src>` | diagnostics (`file:line:column: severity CODE message`), exit code 1 on error |
+| `rapt build <src> --out <dir>` | generated application |
+| `rapt dev <src>` | development loop |
+| `rapt new <src> <Entity> [--prefix ZRT] [--description …]` | complete BO |
+| `rapt generate <src> <type> <name> [--from X] [--for Y] [--expose A,B] [--root]` | one object |
+| `rapt floorplan <src> [<EntitySet> <floorplan>]` | floorplan of the application |
+| `rapt abapgit <src> [--check]` | missing abapGit XML files |
+| `rapt mcp <src>` | MCP tools (`rapt/mcp.json`) |
 | `rapt launchpad <launchpad.json> --out <dir>` | launchpad |
-| `rapt ir <src> [--out f]` | représentation intermédiaire (JSON) |
+| `rapt ir <src> [--out f]` | intermediate representation (JSON) |
 
-Options communes : `--service <SRVD>` (plusieurs définitions de service), `--mode`, `--json`
-(sortie pour les outils : un objet JSON ; un événement par ligne pour `rapt dev`),
-`--warnings-as-errors`.
+Common options: `--service <SRVD>` (several service definitions), `--mode`, `--json` (output for
+tools: one JSON object; one event per line for `rapt dev`), `--warnings-as-errors`.
 
-## 12. Variables d'environnement de l'application
+## 12. Environment variables of the application
 
-| Variable | Défaut | Rôle |
+| Variable | Default | Purpose |
 |---|---|---|
-| `PORT`, `HOST` | 8080, 0.0.0.0 | écoute |
-| `PUBLIC_URL` | `http://localhost:<PORT>/` | adresse publique (OIDC) ; route Cloud Foundry |
-| `DATABASE_URL`, `DATABASE_CA` | — | PostgreSQL et certificat ; service lié Cloud Foundry |
-| `PGLITE_DIR` | — | base embarquée (développement) |
-| `SCHEMA` | `apply` | `skip` : schéma géré à part |
-| `SEED` | — | `auto` : données initiales au premier démarrage |
-| `AUTH_MODE` | `none` | `oidc` : jetons porteurs et sessions navigateur |
-| `DEV_USER`, `DEV_ROLES`, `DEV_ATTRIBUTES` | — | utilisateur de développement |
-| `DEV_OAUTH`, `DEV_OAUTH_CLIENTS` | `on` dans `rapt dev` | serveur OAuth 2.0 de développement sous `/oauth` (D60) |
-| `OIDC_ISSUER`, `OIDC_CLIENT_ID`, `OIDC_CLIENT_SECRET`, `OIDC_AUDIENCE`, `OIDC_REQUIRED_ROLE` | — | fournisseur d'identité |
-| `SESSION_SECRET` | — | signature des sessions (partagé avec le launchpad) |
-| `AUTHORIZATIONS_FILE` | — | rôles remplaçant `rapt/authorizations.json` |
-| `DESTINATION_<NOM>_URL`, `_USER`, `_PASSWORD`, `_TOKEN`, `_HEADERS` | — | API distantes |
+| `PORT`, `HOST` | 8080, 0.0.0.0 | listening |
+| `PUBLIC_URL` | `http://localhost:<PORT>/` | public address (OIDC); Cloud Foundry route |
+| `DATABASE_URL`, `DATABASE_CA` | — | PostgreSQL and certificate; bound Cloud Foundry service |
+| `PGLITE_DIR` | — | embedded database (development) |
+| `SCHEMA` | `apply` | `skip`: schema managed separately |
+| `SEED` | — | `auto`: initial data on the first start |
+| `AUTH_MODE` | `none` | `oidc`: bearer tokens and browser sessions |
+| `DEV_USER`, `DEV_ROLES`, `DEV_ATTRIBUTES` | — | development user |
+| `DEV_OAUTH`, `DEV_OAUTH_CLIENTS` | `on` in `rapt dev` | development OAuth 2.0 server under `/oauth` (D60) |
+| `OIDC_ISSUER`, `OIDC_CLIENT_ID`, `OIDC_CLIENT_SECRET`, `OIDC_AUDIENCE`, `OIDC_REQUIRED_ROLE` | — | identity provider |
+| `SESSION_SECRET` | — | signature of the sessions (shared with the launchpad) |
+| `AUTHORIZATIONS_FILE` | — | roles replacing `rapt/authorizations.json` |
+| `DESTINATION_<NAME>_URL`, `_USER`, `_PASSWORD`, `_TOKEN`, `_HEADERS` | — | remote APIs |
 | `MAIL_SMTP_URL`, `MAIL_FROM` | — | e-mails |
-| `MCP` | — | `off` : pas de serveur MCP |
-| `UI` | — | `off` : pas d'UI |
-| `LOG_LEVEL` | `info` | journal |
+| `MCP` | — | `off`: no MCP server |
+| `UI` | — | `off`: no UI |
+| `LOG_LEVEL` | `info` | log |
 
-## 12 bis. API Web et OAuth 2.0
+## 12b. Web APIs and OAuth 2.0
 
-Un service lié en *OData V4 - Web API* (`BINDING_TYPE_CATEGORY` 1 dans le SRVB, ou
-`rapt generate . binding ZAPI_TRAVEL_O4 --for ZUI_TRAVEL --binding-type webapi`) n'a ni UI ni
-annotations d'UI ; un BO draft n'y expose que ses instances actives ([D60](DECISIONS.md)).
+A service bound as *OData V4 - Web API* (`BINDING_TYPE_CATEGORY` 1 in the SRVB, or
+`rapt generate . binding ZAPI_TRAVEL_O4 --for ZUI_TRAVEL --binding-type webapi`) has neither UI
+nor UI annotations; a draft BO only exposes its active instances there ([D60](DECISIONS.md)).
 
-En développement, `rapt dev` sert un serveur OAuth 2.0 sous `/oauth` :
+In development, `rapt dev` serves an OAuth 2.0 server under `/oauth`:
 
 ```sh
-# client credentials (machine à machine)
+# client credentials (machine to machine)
 curl -u rapt-client:rapt-secret -d grant_type=client_credentials http://localhost:8080/oauth/token
 curl -H "Authorization: Bearer <access_token>" http://localhost:8080/sap/opu/odata4/…/Travel
 
-# authorization code + PKCE (Postman, Bruno…) : client rapt-pkce, sans secret
+# authorization code + PKCE (Postman, Bruno…): client rapt-pkce, without a secret
 #   Auth URL  http://localhost:8080/oauth/authorize   Token URL  http://localhost:8080/oauth/token
-#   Code challenge method SHA-256 ; la page de connexion demande l'utilisateur et ses rôles
+#   Code challenge method SHA-256; the sign-in page asks for the user and their roles
 ```
 
-En production (`AUTH_MODE=oidc`), les jetons viennent de l'IdP, par l'un ou l'autre flux ; un
-jeton *client credentials* agit au nom de son client (utilisateur technique), avec les rôles du
-jeton (`OIDC_ROLES_CLAIM=scope` pour lire les scopes).
+In production (`AUTH_MODE=oidc`), the tokens come from the IdP, with either flow; a *client
+credentials* token acts on behalf of its client (technical user), with the roles of the token
+(`OIDC_ROLES_CLAIM=scope` to read the scopes).
 
-## 13. Pour un agent IA qui écrit un BO
+## 13. For an AI agent writing a BO
 
-1. Lire le projet (`src/`, `rapt/`) ; `rapt check <src> --json` donne les diagnostics avec chemins
-   absolus, ligne et colonne.
-2. Écrire les sources comme dans ADT ; pour un nouvel objet, préférer `rapt generate` (noms de
-   fichiers et XML corrects) ; pour un nouveau BO, `rapt new`.
-3. Après chaque modification : `rapt check` jusqu'à zéro erreur ; les codes sont expliqués dans
-   [DIAGNOSTICS.md](DIAGNOSTICS.md) ; ce qui n'est pas pris en charge est dans
-   [KNOWN_GAPS.md](../KNOWN_GAPS.md) avec le contournement.
-4. Vérifier le comportement : `rapt dev <src> --json` (événement `ready`), puis l'OData
-   (`/sap/opu/odata4/…`) ou le serveur MCP (`/mcp`).
-5. Rester en mode `standard` si le BO doit s'activer sur SAP ; ne passer en `enhanced` que pour
-   ses extensions, explicitement.
-6. Ne jamais éditer `.rapt/` ni les fichiers `<standard>/…` (générés).
+1. Read the project (`src/`, `rapt/`); `rapt check <src> --json` gives the diagnostics with
+   absolute paths, line and column.
+2. Write the sources as in ADT; for a new object, prefer `rapt generate` (right file names and
+   XML); for a new BO, `rapt new`.
+3. After each change: `rapt check` until there are zero errors; the codes are explained in
+   [DIAGNOSTICS.md](DIAGNOSTICS.md); what is not supported is in
+   [KNOWN_GAPS.md](../KNOWN_GAPS.md) with the workaround.
+4. Check the behavior: `rapt dev <src> --json` (`ready` event), then the OData
+   (`/sap/opu/odata4/…`) or the MCP server (`/mcp`).
+5. Stay in `standard` mode if the BO must activate on SAP; only switch to `enhanced` for its
+   extensions, explicitly.
+6. Never edit `.rapt/` nor the `<standard>/…` files (generated).

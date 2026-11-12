@@ -1,5 +1,5 @@
 /**
- * "Nouvel objet RAP" (D61): a wizard like "New ABAP Repository Object" of ADT, in a webview. The
+ * "New RAP object" (D61): a wizard like "New ABAP Repository Object" of ADT, in a webview. The
  * object types come from the catalog of the command line (`rapt generate <src> --json`): a
  * filter, the types by category, then the name, the description and the inputs of the chosen
  * type (the object it derives from is picked among the objects of the project). Finish runs

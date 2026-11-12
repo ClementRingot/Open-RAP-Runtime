@@ -1,12 +1,13 @@
 name: Site
 
-# The website of the project (site/) on GitHub Pages, with the VS Code extension built from the
-# same commit: the "Télécharger" button serves rap-transpiler-vscode.vsix from the site itself.
+# The website of the project (site/) on GitHub Pages, with the documentation rendered from docs/
+# (scripts/build-site.mjs, D63) and the VS Code extension built from the same commit: the
+# "Download" button serves rap-transpiler-vscode.vsix from the site itself.
 # Enable it once in the repository: Settings → Pages → Source: GitHub Actions.
 on:
   push:
     branches: [main]
-    paths: ["site/**", "packages/**", "docs/images/**", ".github/workflows/site.yml"]
+    paths: ["site/**", "packages/**", "docs/**", "scripts/build-site.mjs", "*.md", ".github/workflows/site.yml"]
   release:
     types: [published]
   workflow_dispatch:
@@ -34,11 +35,9 @@ jobs:
       - run: pnpm build
       - name: VS Code extension (.vsix)
         run: pnpm --filter rap-transpiler-vscode run package
-      - name: Site with the extension and the screenshots
+      - name: Site with the documentation, the screenshots and the extension
         run: |
-          mkdir -p _site/images
-          cp -r site/. _site/
-          cp docs/images/*.png _site/images/
+          node scripts/build-site.mjs _site
           cp packages/vscode/rap-transpiler-vscode.vsix _site/
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3

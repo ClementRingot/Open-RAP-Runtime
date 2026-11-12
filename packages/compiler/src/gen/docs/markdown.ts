@@ -2,8 +2,15 @@
  * A small Markdown renderer for the documentation app of `rapt dev` (D49): the subset the
  * documentation of rap-transpiler uses — headings, paragraphs, lists (nested), code blocks and
  * inline code, tables, block quotes, links, emphasis. Text is escaped; links to other pages
- * (`FILE.md`, `FILE.md#anchor`) become routes of the app (`#/page/file`).
+ * (`FILE.md`, `FILE.md#anchor`) become routes of the app (`#/page/file`). The website renders the
+ * same Markdown with its own links and images (`RenderOptions`, D63).
  */
+
+/** Where a link or an image of the Markdown goes; `null`: the link is shown as plain text. */
+export interface RenderOptions {
+  link?: (href: string) => { href: string; external: boolean } | null;
+  image?: (src: string) => string | undefined;
+}
 
 const escape = (s: string): string => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 
@@ -22,7 +29,7 @@ export function pageId(file: string): string {
   return (file.split("/").pop() ?? file).replace(/\.md$/i, "").toLowerCase();
 }
 
-function link(href: string): { href: string; external: boolean } {
+function appLink(href: string): { href: string; external: boolean } {
   if (/^[a-z]+:/i.test(href)) {
     return { href, external: true };
   }
@@ -37,7 +44,7 @@ function link(href: string): { href: string; external: boolean } {
 }
 
 /** Inline Markdown: code spans first (their content stays as written), then links and emphasis. */
-export function inline(text: string): string {
+export function inline(text: string, options: RenderOptions = {}): string {
   const codes: string[] = [];
   let s = text.replace(/`([^`]+)`/g, (_m, code: string) => {
     codes.push(`<code>${escape(code)}</code>`);
@@ -45,10 +52,14 @@ export function inline(text: string): string {
   });
   s = escape(s);
   // images: shown from an absolute URL; the images of the repository are left out of the app
-  s = s.replace(/!\[([^\]]*)\]\(([^)\s]+)\)/g, (_m, alt: string, src: string) => (/^https?:\/\//i.test(src) ? `<img src="${src}" alt="${alt}" style="max-width:100%">` : ""));
+  s = s.replace(/!\[([^\]]*)\]\(([^)\s]+)\)/g, (_m, alt: string, src: string) => {
+    const url = /^https?:\/\//i.test(src) ? src : options.image?.(src.replace(/&amp;/g, "&"));
+    return url === undefined ? "" : `<img src="${escape(url)}" alt="${alt}" style="max-width:100%">`;
+  });
   s = s.replace(/\[([^\]]+)\]\(([^)\s]+)\)/g, (_m, label: string, href: string) => {
-    const target = link(href.replace(/&amp;/g, "&"));
-    return `<a href="${escape(target.href)}"${target.external ? ' target="_blank" rel="noopener"' : ""}>${label}</a>`;
+    const raw = href.replace(/&amp;/g, "&");
+    const target = options.link === undefined ? appLink(raw) : options.link(raw);
+    return target === null ? label : `<a href="${escape(target.href)}"${target.external ? ' target="_blank" rel="noopener"' : ""}>${label}</a>`;
   });
   s = s.replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>").replace(/(^|[^*\w])\*([^*\s][^*]*)\*(?!\w)/g, "$1<em>$2</em>");
   return s.replace(/\u0000(\d+)\u0000/g, (_m, i: string) => codes[Number(i)] ?? "");
@@ -79,7 +90,7 @@ function splitRow(line: string): string[] {
 }
 
 /** Renders a Markdown document as HTML. */
-export function renderMarkdown(markdown: string): string {
+export function renderMarkdown(markdown: string, options: RenderOptions = {}): string {
   const lines = markdown.replace(/\r\n/g, "\n").split("\n");
   const out: string[] = [];
   let i = 0;
@@ -94,7 +105,7 @@ export function renderMarkdown(markdown: string): string {
     if (heading !== null) {
       const level = heading[1]?.length ?? 1;
       const text = heading[2] ?? "";
-      out.push(`<h${level} id="anchor-${escape(headingId(text))}">${inline(text)}</h${level}>`);
+      out.push(`<h${level} id="anchor-${escape(headingId(text))}">${inline(text, options)}</h${level}>`);
       i++;
       continue;
     }
@@ -116,7 +127,7 @@ export function renderMarkdown(markdown: string): string {
         quote.push((lines[i] ?? "").replace(/^>\s?/, ""));
         i++;
       }
-      out.push(`<blockquote>${renderMarkdown(quote.join("\n"))}</blockquote>`);
+      out.push(`<blockquote>${renderMarkdown(quote.join("\n"), options)}</blockquote>`);
       continue;
     }
     if (line.trim().startsWith("|") && /^\s*\|?\s*:?-{3,}/.test(lines[i + 1] ?? "")) {
@@ -128,7 +139,7 @@ export function renderMarkdown(markdown: string): string {
         rows.push(splitRow(lines[i] ?? ""));
         i++;
       }
-      const cell = (tag: string, text: string, index: number): string => `<${tag}${align[index] ? ` style="text-align:${align[index]}"` : ""}>${inline(text)}</${tag}>`;
+      const cell = (tag: string, text: string, index: number): string => `<${tag}${align[index] ? ` style="text-align:${align[index]}"` : ""}>${inline(text, options)}</${tag}>`;
       out.push(`<table><thead><tr>${header.map((h, k) => cell("th", h, k)).join("")}</tr></thead><tbody>${rows.map((r) => `<tr>${r.map((c, k) => cell("td", c, k)).join("")}</tr>`).join("")}</tbody></table>`);
       continue;
     }
@@ -145,7 +156,7 @@ export function renderMarkdown(markdown: string): string {
         block.push(current);
         i++;
       }
-      out.push(renderList(block));
+      out.push(renderList(block, options));
       continue;
     }
     const paragraph: string[] = [];
@@ -157,13 +168,13 @@ export function renderMarkdown(markdown: string): string {
       paragraph.push(line.trim());
       i++;
     }
-    out.push(`<p>${inline(paragraph.join(" "))}</p>`);
+    out.push(`<p>${inline(paragraph.join(" "), options)}</p>`);
   }
   return out.join("\n");
 }
 
 /** A list and its nested lists (by indentation). */
-function renderList(block: string[]): string {
+function renderList(block: string[], options: RenderOptions): string {
   const indentOf = (l: string): number => l.length - l.trimStart().length;
   const base = indentOf(block.find((l) => l.trim() !== "") ?? "");
   const ordered = /^\s*\d+\./.test(block[0] ?? "");
@@ -179,8 +190,8 @@ function renderList(block: string[]): string {
   const html = items.map(([first = "", ...rest]) => {
     const nested = rest.filter((l) => /^\s*([-*]|\d+\.)\s/.test(l));
     const text = [first, ...rest.filter((l) => !/^\s*([-*]|\d+\.)\s/.test(l)).map((l) => l.trim())].join(" ");
-    const sub = nested.length === 0 ? "" : renderList(rest.slice(rest.findIndex((l) => /^\s*([-*]|\d+\.)\s/.test(l))));
-    return `<li>${inline(text)}${sub}</li>`;
+    const sub = nested.length === 0 ? "" : renderList(rest.slice(rest.findIndex((l) => /^\s*([-*]|\d+\.)\s/.test(l))), options);
+    return `<li>${inline(text, options)}${sub}</li>`;
   });
   return ordered ? `<ol>${html.join("")}</ol>` : `<ul>${html.join("")}</ul>`;
 }

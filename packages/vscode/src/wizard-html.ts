@@ -2,7 +2,7 @@
 
 export function wizardHtml(nonce: string, cspSource: string): string {
   return `<!doctype html>
-<html lang="fr"><head><meta charset="utf-8">
+<html lang="en"><head><meta charset="utf-8">
 <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src ${cspSource} 'nonce-${nonce}'; script-src 'nonce-${nonce}';">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <style nonce="${nonce}">
@@ -28,14 +28,14 @@ export function wizardHtml(nonce: string, cspSource: string): string {
   button:disabled { opacity: .5; cursor: default; }
 </style></head>
 <body>
-<h1>Nouvel objet RAP</h1>
-<div class="sub">Choisissez le type d'objet, comme dans ADT (New ABAP Repository Object). Les fichiers abapGit sont écrits avec l'objet.</div>
+<h1>New RAP object</h1>
+<div class="sub">Choose the type of object, as in ADT (New ABAP Repository Object). The abapGit files are written with the object.</div>
 <div class="layout">
   <div>
-    <input id="filter" placeholder="Filtrer les types (vue, BDEF, service…)" aria-label="Filtrer">
-    <div id="list" class="list" role="listbox" aria-label="Types d'objets"></div>
+    <input id="filter" placeholder="Filter the types (view, BDEF, service…)" aria-label="Filter">
+    <div id="list" class="list" role="listbox" aria-label="Object types"></div>
   </div>
-  <div id="form"><div class="hint">Sélectionnez un type d'objet à gauche.</div></div>
+  <div id="form"><div class="hint">Select a type of object on the left.</div></div>
 </div>
 <script nonce="${nonce}">
   const vscode = acquireVsCodeApi();
@@ -50,7 +50,7 @@ export function wizardHtml(nonce: string, cspSource: string): string {
       if (e.category !== last) { html += '<div class="cat">' + esc(e.category) + "</div>"; last = e.category; }
       html += '<div class="item' + (current && current.kind === e.kind ? " sel" : "") + '" role="option" data-kind="' + e.kind + '">' + esc(e.label) + "</div>";
     }
-    $("list").innerHTML = html || '<div class="hint" style="padding:8px">Aucun type</div>';
+    $("list").innerHTML = html || '<div class="hint" style="padding:8px">No type</div>';
     for (const el of document.querySelectorAll(".item")) el.addEventListener("click", () => select(el.dataset.kind));
   }
   function inputHtml(input) {
@@ -59,9 +59,9 @@ export function wizardHtml(nonce: string, cspSource: string): string {
     if (input.of) {
       const options = (objects[input.of] || []).map((o) => '<option value="' + esc(o) + '">' + esc(o) + "</option>").join("");
       control = '<select id="' + id + '"' + (input.multiple ? " multiple" : "") + ">" + (input.multiple || input.required ? "" : '<option value=""></option>') + options + "</select>";
-      if (!(objects[input.of] || []).length) control += '<div class="hint">Aucun objet de ce type dans le projet.</div>';
+      if (!(objects[input.of] || []).length) control += '<div class="hint">No object of this type in the project.</div>';
     } else if (input.values) {
-      control = '<select id="' + id + '">' + input.values.map((v) => '<option value="' + esc(v) + '"' + (v === input.default ? " selected" : "") + ">" + esc(v === "true" ? "oui" : v === "false" ? "non" : v) + "</option>").join("") + "</select>";
+      control = '<select id="' + id + '">' + input.values.map((v) => '<option value="' + esc(v) + '"' + (v === input.default ? " selected" : "") + ">" + esc(v === "true" ? "yes" : v === "false" ? "no" : v) + "</option>").join("") + "</select>";
     } else {
       control = '<input id="' + id + '" value="' + esc(input.default || "") + '">';
     }
@@ -70,13 +70,13 @@ export function wizardHtml(nonce: string, cspSource: string): string {
   function select(kind) {
     current = catalog.find((e) => e.kind === kind);
     renderList();
-    const prefix = current.kind === "bo" ? '<label for="in_prefix">Préfixe des objets</label><input id="in_prefix" value="Z"><div class="hint">ZRT donne zrt_travel, ZRT_R_Travel…</div>' : "";
+    const prefix = current.kind === "bo" ? '<label for="in_prefix">Object prefix</label><input id="in_prefix" value="Z"><div class="hint">ZRT gives zrt_travel, ZRT_R_Travel…</div>' : "";
     $("form").innerHTML =
       '<h2 style="margin:0">' + esc(current.label) + '</h2><div class="desc">' + esc(current.description) + '</div><div class="files">' + esc(current.files) + "</div>" +
-      '<label for="name">Nom *</label><input id="name" value="' + esc(current.namePattern) + '" maxlength="' + current.maxLength + '"><div class="hint">' + current.maxLength + " caractères au plus ; lettres, chiffres et _.</div>" +
-      '<label for="description">Description</label><input id="description" placeholder="Libellé (EndUserText.label)">' +
+      '<label for="name">Name *</label><input id="name" value="' + esc(current.namePattern) + '" maxlength="' + current.maxLength + '"><div class="hint">' + current.maxLength + " characters at most; letters, digits and _.</div>" +
+      '<label for="description">Description</label><input id="description" placeholder="Label (EndUserText.label)">' +
       prefix + current.inputs.map(inputHtml).join("") +
-      '<div id="error" class="error"></div><div class="buttons"><button id="finish">Créer</button><button id="cancel" class="secondary">Annuler</button></div>';
+      '<div id="error" class="error"></div><div class="buttons"><button id="finish">Create</button><button id="cancel" class="secondary">Cancel</button></div>';
     $("finish").addEventListener("click", finish);
     $("cancel").addEventListener("click", () => vscode.postMessage({ type: "cancel" }));
     $("name").focus();
