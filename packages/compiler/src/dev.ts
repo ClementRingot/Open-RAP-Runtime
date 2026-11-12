@@ -3,7 +3,7 @@
  * with an embedded PGlite database, then rebuilds and restarts it on every change of the sources.
  *
  * The application is written without its scaffold (no vendor/, no npm install): its node_modules
- * is a link to the node_modules of the @open-rap-runtime/runtime package, which holds the transpiler
+ * is a link to the node_modules of the @open-rap/runtime package, which holds the transpiler
  * runtime, PGlite and OpenUI5. The server runs in a child process, because the transpiled ABAP
  * sets global state (the `abap` object) and ES modules cannot be unloaded.
  */
@@ -19,7 +19,7 @@ import { loadProject } from "./input/project.js";
 import { generateDocsApp } from "./gen/docs/index.js";
 import { generateLaunchpadUi } from "./gen/launchpad/index.js";
 import { buildUiLayout } from "./gen/ui/index.js";
-import type { LaunchpadModel, LaunchpadTile, Model } from "@open-rap-runtime/model";
+import type { LaunchpadModel, LaunchpadTile, Model } from "@open-rap/model";
 
 export interface DevOptions extends Omit<GenerateOptions, "scaffold" | "transpile"> {
   /** Folder of the development build (default: `<src>/.rapt/dev`). */
@@ -114,7 +114,7 @@ export class DevSession {
     this.port = options.port ?? Number(this.env["PORT"] ?? 8080);
     this.out = options.out ?? ((line) => process.stdout.write(`${line}\n`));
     this.err = options.err ?? ((line) => process.stderr.write(`${line}\n`));
-    this.runtimeDir = packageDir("@open-rap-runtime/runtime", "runtime", options.runtimeDir);
+    this.runtimeDir = packageDir("@open-rap/runtime", "runtime", options.runtimeDir);
   }
 
   /** The URL of the development launchpad (the application, the documentation). */
@@ -127,7 +127,7 @@ export class DevSession {
     this.emit({ type: "building", root: this.root });
     const runtimeNodeModules = this.runtimeDir === undefined ? undefined : runtimeDependencies(this.runtimeDir);
     if (runtimeNodeModules === undefined) {
-      this.emit({ type: "error", message: "the @open-rap-runtime/runtime package (built, with its node_modules) is needed: run pnpm install and pnpm build, or give --runtime <dir>" });
+      this.emit({ type: "error", message: "the @open-rap/runtime package (built, with its node_modules) is needed: run pnpm install and pnpm build, or give --runtime <dir>" });
       return this.failed();
     }
     let result: Awaited<ReturnType<typeof generateApplication>>;

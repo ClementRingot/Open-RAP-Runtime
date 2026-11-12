@@ -6,7 +6,7 @@
  * application cannot evaluate grants nothing (fail closed) and is reported.
  */
 
-import { findEntity, projectedFieldName, same, type AccessCondition, type AccessControlModel, type AuthorizationsModel, type EntityModel, type Model } from "@open-rap-runtime/model";
+import { findEntity, projectedFieldName, same, type AccessCondition, type AccessControlModel, type AuthorizationsModel, type EntityModel, type Model } from "@open-rap/model";
 import { parseDcl, type DclCondition, type DclGrant } from "../dcl/parser.js";
 import type { Diagnostics, Location } from "../diagnostics.js";
 import { filesOfType, type Project } from "../input/project.js";

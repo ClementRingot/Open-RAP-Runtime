@@ -1,5 +1,5 @@
 {
-  "name": "@open-rap-runtime/compiler",
+  "name": "@open-rap/compiler",
   "version": "0.1.0",
   "description": "Compiles SAP RAP sources (abapGit format) into a standalone Node.js OData V4 application.",
   "type": "module",
@@ -45,7 +45,7 @@
   "dependencies": {
     "@abaplint/core": "2.120.98",
     "@abaplint/transpiler": "2.14.24",
-    "@open-rap-runtime/model": "workspace:*",
+    "@open-rap/model": "workspace:*",
     "chevrotain": "13.2.0",
     "fast-xml-parser": "5.12.0"
   }

@@ -10,7 +10,7 @@ import { existsSync, readFileSync } from "node:fs";
 import path from "node:path";
 import * as abaplint from "@abaplint/core";
 import { XMLParser } from "fast-xml-parser";
-import type { AuthorizationObjectModel, AuthorizationsModel, AuthorizationValue, RoleModel } from "@open-rap-runtime/model";
+import type { AuthorizationObjectModel, AuthorizationsModel, AuthorizationValue, RoleModel } from "@open-rap/model";
 import type { Diagnostics } from "../diagnostics.js";
 import { filesOfType, type Project } from "../input/project.js";
 

@@ -15,7 +15,7 @@
 
 import { existsSync, readFileSync } from "node:fs";
 import path from "node:path";
-import type { Floorplan, OverviewCardModel, ProjectMode, UiConfigModel } from "@open-rap-runtime/model";
+import type { Floorplan, OverviewCardModel, ProjectMode, UiConfigModel } from "@open-rap/model";
 import type { Diagnostics } from "../diagnostics.js";
 import type { Project } from "../input/project.js";
 

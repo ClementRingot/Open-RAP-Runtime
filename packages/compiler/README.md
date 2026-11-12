@@ -1,4 +1,4 @@
-# @open-rap-runtime/compiler
+# @open-rap/compiler
 
 The compiler of [Open RAP Runtime](https://clementringot.github.io/RAP-Transpiler/): CDS, BDEF,
 SRVD and DCL parsers, intermediate representation, generators (SQL, OData V4 `$metadata`,
@@ -15,7 +15,7 @@ npm install -g open-rap-runtime
 As a library:
 
 ```js
-import { buildModel, loadProject } from "@open-rap-runtime/compiler";
+import { buildModel, loadProject } from "@open-rap/compiler";
 const { model, diagnostics } = buildModel(loadProject("my-project"));
 ```
 

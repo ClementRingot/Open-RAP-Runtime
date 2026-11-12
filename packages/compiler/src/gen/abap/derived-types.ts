@@ -18,7 +18,7 @@ import {
   type EntityModel,
   type FeatureControl,
   type Model,
-} from "@open-rap-runtime/model";
+} from "@open-rap/model";
 
 /** ABAP type of a dictionary type, with built-in types only. */
 export function abapTypeText(t: AbapType): string {

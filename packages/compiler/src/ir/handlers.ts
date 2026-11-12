@@ -4,7 +4,7 @@
  */
 
 import * as abaplint from "@abaplint/core";
-import { same, type BehaviorModel, type EntityBehaviorModel, type EntityModel, type HandlerParamRole, type HandlerRef, type SaverModel } from "@open-rap-runtime/model";
+import { same, type BehaviorModel, type EntityBehaviorModel, type EntityModel, type HandlerParamRole, type HandlerRef, type SaverModel } from "@open-rap/model";
 import type { Diagnostics } from "../diagnostics.js";
 import type { Project } from "../input/project.js";
 

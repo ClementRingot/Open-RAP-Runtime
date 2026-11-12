@@ -12,7 +12,7 @@
 
 import { randomUUID } from "node:crypto";
 import { sql } from "kysely";
-import { same } from "@open-rap-runtime/model";
+import { same } from "@open-rap/model";
 import type { AfterCommit, RapRuntime } from "../rap/runtime.js";
 import { RapRuntimeError } from "../rap/types.js";
 import { setSubrc } from "./bridge.js";

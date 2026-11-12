@@ -14,7 +14,7 @@ import {
   type ODataOperation,
   type ODataProperty,
   type ODataService,
-} from "@open-rap-runtime/model";
+} from "@open-rap/model";
 import { literalToCanonical, type CanonicalValue } from "../values.js";
 import { badRequest, notFound } from "./errors.js";
 import type { Expr, KeyPredicate } from "./uri/ast.js";

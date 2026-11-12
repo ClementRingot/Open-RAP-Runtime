@@ -16,7 +16,7 @@ import {
   type SideEffectModel,
   type TriggerModel,
   type ValidationModel,
-} from "@open-rap-runtime/model";
+} from "@open-rap/model";
 import type { BdefAst, BehaviorAst, BodyItemAst, Loc, OperationOptionAst, TriggerAst } from "../bdef/ast.js";
 import type { Diagnostics } from "../diagnostics.js";
 import type { SourceFile } from "../input/project.js";

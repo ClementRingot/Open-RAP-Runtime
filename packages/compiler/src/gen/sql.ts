@@ -19,7 +19,7 @@ import {
   type FieldModel,
   type Model,
   type TableModel,
-} from "@open-rap-runtime/model";
+} from "@open-rap/model";
 import { standardRows, standardSql } from "../standard/index.js";
 import { calculatedColumn, type SqlRefs } from "./sql-expressions.js";
 

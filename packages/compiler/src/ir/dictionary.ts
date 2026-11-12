@@ -1,6 +1,6 @@
 /** ABAP dictionary of the project: tables, data elements and domains, with type resolution. */
 
-import { sqlName, type AbapType, type ColumnModel, type EnumTypeModel, type TableModel } from "@open-rap-runtime/model";
+import { sqlName, type AbapType, type ColumnModel, type EnumTypeModel, type TableModel } from "@open-rap/model";
 import { catalogDataElement, ddicTypeKind, parseBuiltInType } from "../ddic/catalog.js";
 import { parseCdsTypeSource, type CdsTypeSource } from "../ddic/cds-types.js";
 import { readDomaXml, readDtelXml, readTablXml, type DomaXml, type DtelXml, type TablXml } from "../ddic/xml.js";

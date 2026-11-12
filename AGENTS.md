@@ -39,7 +39,7 @@ node packages/compiler/dist/cli.js dev fixtures/travel --port 8081
 node scripts/build-site.mjs _site                     # the website, with the documentation pages
 ```
 
-The runtime tests import the built `@open-rap-runtime/compiler`: run `pnpm build` before running them
+The runtime tests import the built `@open-rap/compiler`: run `pnpm build` before running them
 after a change to the compiler.
 
 ## Rules

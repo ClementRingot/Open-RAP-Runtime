@@ -8,7 +8,7 @@ import { randomUUID } from "node:crypto";
 import { existsSync, readFileSync } from "node:fs";
 import path from "node:path";
 import { sql } from "kysely";
-import { isUuid, type Model } from "@open-rap-runtime/model";
+import { isUuid, type Model } from "@open-rap/model";
 import { splitStatements, type Database } from "./database.js";
 
 /** Loads the seed of the application folder `dir`; returns the number of rows inserted, or undefined when not loaded. */

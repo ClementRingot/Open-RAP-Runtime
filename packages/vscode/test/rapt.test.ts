@@ -36,7 +36,7 @@ describe("rapt from the extension", () => {
 
   it("resolves the CLI", () => {
     const repo = path.resolve("/repo/packages/compiler/dist/cli.js");
-    const bundled = path.resolve("/ext/rapt/node_modules/@open-rap-runtime/compiler/dist/cli.js");
+    const bundled = path.resolve("/ext/rapt/node_modules/@open-rap/compiler/dist/cli.js");
     const vscodeNode = { command: "/vscode/code", env: { ELECTRON_RUN_AS_NODE: "1" } };
     const base = { workspaceFolders: ["/repo"], execPath: "/vscode/code" };
     // the rapt of the extension, on the Node.js of VS Code

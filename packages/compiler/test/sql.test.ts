@@ -1,5 +1,5 @@
 import { PGlite } from "@electric-sql/pglite";
-import type { Model } from "@open-rap-runtime/model";
+import type { Model } from "@open-rap/model";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { generateSql, sqlType } from "../src/gen/sql.js";
 import { loadProject } from "../src/input/project.js";

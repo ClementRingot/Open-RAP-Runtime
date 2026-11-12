@@ -3,7 +3,7 @@ name: Release
 # A tag v1.2.3 publishes the VS Code extension: the .vsix is attached to the GitHub release of
 # the tag, and published to the Visual Studio Marketplace and Open VSX when their tokens are set
 # (repository secrets VSCE_PAT and OVSX_PAT). It also publishes the rapt command line to npm
-# (open-rap-runtime and @open-rap-runtime/model, compiler, runtime, D65) when NPM_TOKEN is set.
+# (open-rap-runtime and @open-rap/model, compiler, runtime, D65) when NPM_TOKEN is set.
 # It also runs by hand (Actions → Release → Run workflow, or the API) with a version: the release
 # then creates the tag v<version> on the commit of the run.
 on:
@@ -44,7 +44,7 @@ jobs:
       - name: Package the extension (.vsix)
         run: pnpm --filter open-rap-runtime-vscode run package
       - name: Embedded rapt works
-        run: node packages/vscode/rapt/node_modules/@open-rap-runtime/compiler/dist/cli.js check fixtures/travel --warnings-as-errors
+        run: node packages/vscode/rapt/node_modules/@open-rap/compiler/dist/cli.js check fixtures/travel --warnings-as-errors
       - name: GitHub release with the .vsix
         env:
           GH_TOKEN: ${{ github.token }}
@@ -63,7 +63,7 @@ jobs:
 
   npm:
     # rapt on npm (D65): npm install -g open-rap-runtime. Skipped when the NPM_TOKEN secret is not set;
-    # the @open-rap-runtime organization must exist on npmjs.com.
+    # the @open-rap organization must exist on npmjs.com.
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -102,9 +102,9 @@ jobs:
             "private": true,
             "dependencies": { "open-rap-runtime": "file:$P/cli/open-rap-runtime-$V.tgz" },
             "overrides": {
-              "@open-rap-runtime/model": "file:$P/model/open-rap-runtime-model-$V.tgz",
-              "@open-rap-runtime/compiler": "file:$P/compiler/open-rap-runtime-compiler-$V.tgz",
-              "@open-rap-runtime/runtime": "file:$P/runtime/open-rap-runtime-runtime-$V.tgz"
+              "@open-rap/model": "file:$P/model/open-rap-model-$V.tgz",
+              "@open-rap/compiler": "file:$P/compiler/open-rap-compiler-$V.tgz",
+              "@open-rap/runtime": "file:$P/runtime/open-rap-runtime-$V.tgz"
             }
           }
           JSON

@@ -14,7 +14,7 @@ import {
   type EntityModel,
   type FieldModel,
   type TableModel,
-} from "@open-rap-runtime/model";
+} from "@open-rap/model";
 import { parseCds, type CdsElementAst, type CdsEntityAst, type CdsMetadataExtensionAst } from "../cds/adapter.js";
 import { parseBuiltInType } from "../ddic/catalog.js";
 import type { Diagnostics } from "../diagnostics.js";

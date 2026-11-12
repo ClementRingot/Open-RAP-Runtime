@@ -13,8 +13,8 @@ describe("open-rap-runtime package (D65)", () => {
     expect(served.length).toBeGreaterThan(0);
     expect(manifest("cli").dependencies).toEqual({
       ...Object.fromEntries(served),
-      "@open-rap-runtime/compiler": "workspace:*",
-      "@open-rap-runtime/runtime": "workspace:*",
+      "@open-rap/compiler": "workspace:*",
+      "@open-rap/runtime": "workspace:*",
     });
   });
 

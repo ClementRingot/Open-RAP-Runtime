@@ -3,7 +3,7 @@
  * resolved against the data source, and typed.
  */
 
-import { isCharacterLike, isNumeric, type AbapType, type CdsCondition, type CdsExpression, type CdsFunctionName } from "@open-rap-runtime/model";
+import { isCharacterLike, isNumeric, type AbapType, type CdsCondition, type CdsExpression, type CdsFunctionName } from "@open-rap/model";
 import { isCondition, type CdsCondAst, type CdsExprAst } from "../cds/expression-ast.js";
 import { parseBuiltInType } from "../ddic/catalog.js";
 import type { Dictionary } from "./dictionary.js";

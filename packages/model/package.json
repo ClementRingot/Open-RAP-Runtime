@@ -1,5 +1,5 @@
 {
-  "name": "@open-rap-runtime/model",
+  "name": "@open-rap/model",
   "version": "0.1.0",
   "description": "Intermediate representation (IR) shared by the Open RAP Runtime compiler and runtime.",
   "type": "module",

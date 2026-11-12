@@ -9,7 +9,7 @@
 
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
-import { getAnnotation, isUuid, type AbapType, type EntityModel, type FieldModel, type TableModel } from "@open-rap-runtime/model";
+import { getAnnotation, isUuid, type AbapType, type EntityModel, type FieldModel, type TableModel } from "@open-rap/model";
 import { parseBuiltInType } from "../ddic/catalog.js";
 import { parseBdef } from "../bdef/parser.js";
 import { abapGitXml, xmlElement } from "../ddic/table-source.js";

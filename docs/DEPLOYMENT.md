@@ -88,15 +88,15 @@ HTTPS address.
 
 A tag `v1.2.3` runs `release.yml`: the VS Code extension (GitHub release, Marketplace with the
 `VSCE_PAT` secret, Open VSX with `OVSX_PAT`) and the CLI on npm ([D65](DECISIONS.md)):
-`open-rap-runtime` (the `rapt` command), `@open-rap-runtime/model`, `@open-rap-runtime/compiler` and
-`@open-rap-runtime/runtime`, all in version 1.2.3.
+`open-rap-runtime` (the `rapt` command), `@open-rap/model`, `@open-rap/compiler` and
+`@open-rap/runtime`, all in version 1.2.3.
 
 Once, for npm:
 
-1. Create the organization **`open-rap-runtime`** on npmjs.com (free for public packages): it
-   holds the `@open-rap-runtime` scope.
+1. Create the organization **`open-rap`** on npmjs.com (free for public packages): it
+   holds the `@open-rap` scope.
 2. Create a *Granular Access Token* (*Read and write*, packages `open-rap-runtime` and scope
-   `@open-rap-runtime`, or the whole organization) and save it as the **`NPM_TOKEN`** secret of the
+   `@open-rap`, or the whole organization) and save it as the **`NPM_TOKEN`** secret of the
    repository (*Settings → Secrets and variables → Actions*).
 
 Without `NPM_TOKEN`, the `npm` job builds and checks the packages (archives of `pnpm pack`

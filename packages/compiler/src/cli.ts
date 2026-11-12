@@ -52,7 +52,7 @@ Options:
   --binding <name>   service binding name (default: the SRVB of the service, else <SRVD>_O4)
   --binding-type <t> ui or webapi (OData V4 - Web API: no UI information, no draft; default: the SRVB)
   --path <path>      service root path (default: /sap/opu/odata4/sap/<binding>/srvd/sap/<srvd>/0001/)
-  --runtime <dir>    @open-rap-runtime/runtime package to embed in the application (default: next to rapt)
+  --runtime <dir>    @open-rap/runtime package to embed in the application (default: next to rapt)
   --out <path>       output file (rapt ir) or folder (rapt build, rapt launchpad, rapt dev: <src>/.rapt/dev)
   --port <n>         port of the application (rapt dev, default: PORT, else 8080)
   --host <address>   interface of rapt dev (default 127.0.0.1; 0.0.0.0 to open it to the network)

@@ -26,10 +26,10 @@ importers:
       '@electric-sql/pglite':
         specifier: 0.5.16
         version: 0.5.16
-      '@open-rap-runtime/compiler':
+      '@open-rap/compiler':
         specifier: workspace:*
         version: link:../compiler
-      '@open-rap-runtime/runtime':
+      '@open-rap/runtime':
         specifier: workspace:*
         version: link:../runtime
       '@openui5/sap.f':
@@ -65,7 +65,7 @@ importers:
       '@abaplint/transpiler':
         specifier: 2.14.24
         version: 2.14.24
-      '@open-rap-runtime/model':
+      '@open-rap/model':
         specifier: workspace:*
         version: link:../model
       chevrotain:
@@ -82,7 +82,7 @@ importers:
       '@abaplint/runtime':
         specifier: 2.14.24
         version: 2.14.24
-      '@open-rap-runtime/model':
+      '@open-rap/model':
         specifier: workspace:*
         version: link:../model
       chevrotain:
@@ -110,7 +110,7 @@ importers:
       '@electric-sql/pglite':
         specifier: 0.5.16
         version: 0.5.16
-      '@open-rap-runtime/compiler':
+      '@open-rap/compiler':
         specifier: workspace:*
         version: link:../compiler
       '@openui5/sap.f':

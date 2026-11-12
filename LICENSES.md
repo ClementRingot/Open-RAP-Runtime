@@ -9,7 +9,7 @@ Check command: `pnpm licenses list --prod` (and `--dev`).
 
 ## Distributed dependencies
 
-### `@open-rap-runtime/compiler`
+### `@open-rap/compiler`
 
 | Package | Version | License | Use | Checked on |
 |---|---|---|---|---|
@@ -22,11 +22,11 @@ Transitive dependencies (production): `@chevrotain/*` (Apache-2.0), `source-map`
 (BSD-3-Clause), `json5`, `vscode-languageserver-types`, `fast-xml-builder`, `strnum`, `anynum`,
 `@nodable/entities`, `is-unsafe`, `path-expression-matcher`, `xml-naming` (MIT).
 
-### `@open-rap-runtime/model`
+### `@open-rap/model`
 
 No external dependency.
 
-### `@open-rap-runtime/runtime`
+### `@open-rap/runtime`
 
 | Package | Version | License | Use | Checked on |
 |---|---|---|---|---|
@@ -54,7 +54,7 @@ license of the repository.
 
 ### Generated UI (OpenUI5)
 
-Dependencies of the generated applications (M6); devDependencies of `@open-rap-runtime/runtime`
+Dependencies of the generated applications (M6); devDependencies of `@open-rap/runtime`
 for its tests.
 
 | Package | Version | License | Use | Checked on |

@@ -94,7 +94,7 @@ function cli(): Cli {
   return resolveCli({
     ...(cliPath === undefined ? {} : { cliPath }),
     ...(nodePath === undefined ? {} : { nodePath }),
-    bundledCli: path.join(extensionPath, "rapt", "node_modules", "@open-rap-runtime", "compiler", "dist", "cli.js"),
+    bundledCli: path.join(extensionPath, "rapt", "node_modules", "@open-rap", "compiler", "dist", "cli.js"),
     workspaceFolders: (vscode.workspace.workspaceFolders ?? []).map((f) => f.uri.fsPath),
     execPath: process.execPath,
   });

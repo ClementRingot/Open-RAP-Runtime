@@ -126,8 +126,8 @@ correspond to points 1 to 13 of §11 of PLAN.md. The milestones M1 to M6 are tho
 
 ## D12 — Naming and license
 
-- **Decision**: packages `@open-rap-runtime/model`, `@open-rap-runtime/compiler`,
-  `@open-rap-runtime/runtime`; `rapt` CLI; MIT license for this repository.
+- **Decision**: packages `@open-rap/model`, `@open-rap/compiler`,
+  `@open-rap/runtime`; `rapt` CLI; MIT license for this repository.
 
 ## D13 — Test corpus of the parsers
 
@@ -154,7 +154,7 @@ correspond to points 1 to 13 of §11 of PLAN.md. The milestones M1 to M6 are tho
 
 ## D15 — Generic runtime driven by the IR
 
-- **Decision**: the generated application contains a generic runtime (`@open-rap-runtime/runtime`)
+- **Decision**: the generated application contains a generic runtime (`@open-rap/runtime`)
   that reads `model.json`. Only the SQL, the CSDL, the JavaScript of the ABP, the UI and the
   packaging are generated. The runtime is bundled as a tarball in `vendor/`.
 - **Why**: a single runtime tested for all BOs; a standalone output without a private registry.
@@ -639,7 +639,7 @@ correspond to points 1 to 13 of §11 of PLAN.md. The milestones M1 to M6 are tho
   `package.json`, no Docker) into `<src>/.rapt/dev`, starts it, watches the sources and starts
   again on each change (grouped over 150 ms, one build at a time).
   - **Dependencies**: the `node_modules` of the build is a link (a junction on Windows) to the one
-    of the `@open-rap-runtime/runtime` package, which contains the abaplint runtime, PGlite and
+    of the `@open-rap/runtime` package, which contains the abaplint runtime, PGlite and
     OpenUI5. The transpiled ABAP module and the runtime thus load the same `@abaplint/runtime`. No
     npm installation.
   - **Child process**: the server runs in a separate process (`dev-server.mjs`), stopped by an
@@ -1287,7 +1287,7 @@ correspond to points 1 to 13 of §11 of PLAN.md. The milestones M1 to M6 are tho
     `rapt.cmd` (Windows) in the storage of the extension start the CLI the extension uses, with
     the Node.js of VS Code (setting `rapt.terminal.addToPath`). An agent of the terminal (Claude
     Code) then runs `rapt` or `claude mcp add rapt -- rapt agent .` without installing anything.
-  - **Documentation in the `.vsix`**: the staging keeps `@open-rap-runtime/compiler/docs` and fails
+  - **Documentation in the `.vsix`**: the staging keeps `@open-rap/compiler/docs` and fails
     when it is missing; the documentation app shows "Documentation not found" instead of an empty
     list if the documentation is ever missing.
 - **Why an MCP server and not only the CLI**: the CLI with `--json` and the AGENTS.md of the
@@ -1307,14 +1307,14 @@ correspond to points 1 to 13 of §11 of PLAN.md. The milestones M1 to M6 are tho
   clone of the repository.
 - **Decision**: the package `open-rap-runtime` (`packages/cli`) gives the `rapt` command
   (`npm install -g open-rap-runtime`, `npx open-rap-runtime check .`, or a `devDependency` of the
-  project and `npx rapt …`). It depends on `@open-rap-runtime/compiler` and
-  `@open-rap-runtime/runtime` and on what `rapt dev` serves (OpenUI5, PGlite, less-openui5, at the
+  project and `npx rapt …`). It depends on `@open-rap/compiler` and
+  `@open-rap/runtime` and on what `rapt dev` serves (OpenUI5, PGlite, less-openui5, at the
   versions of the runtime, checked by a test), like the `rapt/` of the extension (D39). Its
-  `dist/rapt.js` calls `main` of `@open-rap-runtime/compiler/cli` (new export); `cli.js` runs
+  `dist/rapt.js` calls `main` of `@open-rap/compiler/cli` (new export); `cli.js` runs
   itself only when it is the program (`isEntryPoint`: real paths compared, symbolic links and
   Windows paths included), so the command runs once. The compiler no longer declares a `bin`:
   one package gives `rapt`. `COMPILER_VERSION` is read from the `package.json` of the compiler.
-  Each package has a README for npm; `@open-rap-runtime/model`, `compiler` and `runtime` are also
+  Each package has a README for npm; `@open-rap/model`, `compiler` and `runtime` are also
   usable as libraries.
 - **Release**: the `npm` job of `release.yml` sets the version of the tag on the four packages,
   builds them, packs them (`pnpm pack`), installs the archives with npm in an empty folder and
@@ -1492,8 +1492,8 @@ correspond to points 1 to 13 of §11 of PLAN.md. The milestones M1 to M6 are tho
   the project is a runtime for RAP business objects outside SAP (OData V4, RAP managed runtime,
   UI, launchpad, MCP), with a compiler and a VS Code extension around it.
 - **Decision**: the project is named **Open RAP Runtime**. The npm package of the command line is
-  `open-rap-runtime`, the libraries `@open-rap-runtime/model`, `@open-rap-runtime/compiler`, `@open-rap-runtime/runtime`
-  (npm organization `open-rap-runtime`), the VS Code extension `open-rap-runtime-vscode` ("Open RAP
+  `open-rap-runtime`, the libraries `@open-rap/model`, `@open-rap/compiler`, `@open-rap/runtime`
+  (npm organization `open-rap`), the VS Code extension `open-rap-runtime-vscode` ("Open RAP
   Runtime"). Unchanged, so that existing projects keep working: the `rapt` command, the `rapt/`
   folder of the projects, the `.rapt/` build folder, the `rapt_*` tables, the `ZRAP_*` ABAP
   objects. The URL of the website follows the name of the GitHub repository

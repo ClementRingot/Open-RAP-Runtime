@@ -46,7 +46,7 @@ jobs:
       - name: VS Code extension (.vsix)
         run: pnpm --filter open-rap-runtime-vscode run package
       - name: Embedded rapt
-        run: node packages/vscode/rapt/node_modules/@open-rap-runtime/compiler/dist/cli.js check fixtures/travel --warnings-as-errors
+        run: node packages/vscode/rapt/node_modules/@open-rap/compiler/dist/cli.js check fixtures/travel --warnings-as-errors
       - uses: actions/upload-artifact@v4
         with:
           name: open-rap-runtime-vscode

@@ -40,8 +40,8 @@
     "@openui5/sap.ui.unified": "1.136.22",
     "@openui5/sap.uxap": "1.136.22",
     "@openui5/themelib_sap_horizon": "1.136.22",
-    "@open-rap-runtime/compiler": "workspace:*",
-    "@open-rap-runtime/runtime": "workspace:*",
+    "@open-rap/compiler": "workspace:*",
+    "@open-rap/runtime": "workspace:*",
     "less-openui5": "0.12.0"
   }
 }

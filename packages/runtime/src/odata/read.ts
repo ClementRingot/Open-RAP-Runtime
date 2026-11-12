@@ -4,7 +4,7 @@
  */
 
 import { sql, type RawBuilder } from "kysely";
-import type { AbapType, EdmType, FieldModel } from "@open-rap-runtime/model";
+import type { AbapType, EdmType, FieldModel } from "@open-rap/model";
 import type { Database } from "../db/database.js";
 import { fromSql, literalToCanonical, toSql, type CanonicalValue, type UrlLiteral } from "../values.js";
 import { badRequest, notImplemented, ODataError } from "./errors.js";

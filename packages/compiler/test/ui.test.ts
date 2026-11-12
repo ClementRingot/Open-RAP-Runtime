@@ -1,7 +1,7 @@
 import { XMLValidator } from "fast-xml-parser";
 import { describe, expect, it } from "vitest";
 import { buildUiLayout, generateUi, type UiLayout } from "../src/gen/ui/index.js";
-import type { Model } from "@open-rap-runtime/model";
+import type { Model } from "@open-rap/model";
 import { loadProject } from "../src/input/project.js";
 import { buildModel } from "../src/ir/builder.js";
 import { FIXTURE_DIR, fixtureVariant } from "./helpers.js";

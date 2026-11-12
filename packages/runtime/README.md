@@ -1,4 +1,4 @@
-# @open-rap-runtime/runtime
+# @open-rap/runtime
 
 The generic runtime of the applications produced by
 [Open RAP Runtime](https://clementringot.github.io/RAP-Transpiler/): Fastify server, OData V4
