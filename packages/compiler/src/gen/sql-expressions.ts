@@ -1,6 +1,6 @@
 /** PostgreSQL of the calculated elements (D67). */
 
-import { isCharacterLike, isNumeric, type AbapType, type CdsCondition, type CdsExpression } from "@open-rap/model";
+import { isCharacterLike, isNumeric, type AbapType, type CdsCondition, type CdsExpression } from "@open-rap-runtime/model";
 
 export interface SqlRefs {
   /** A column of the data source (`column` of the expression). */

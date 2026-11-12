@@ -23,7 +23,7 @@ import {
   type ODataOperation,
   type ODataService,
   type ValueHelp,
-} from "@open-rap/model";
+} from "@open-rap-runtime/model";
 import { allowedFilterExpressions } from "../csdl.js";
 
 export type FieldKind = "text" | "digits" | "integer" | "decimal" | "amount" | "boolean" | "date" | "time" | "datetime" | "uuid" | "enum";

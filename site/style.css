@@ -136,6 +136,23 @@ pre { background: var(--code-bg); color: var(--code-text); padding: 16px 18px; b
 .doc th { background: var(--band); }
 .doc blockquote { margin: 1rem 0; padding: 4px 16px; border-left: 4px solid var(--accent); background: var(--band); border-radius: 0 8px 8px 0; }
 
+/* feedback form */
+.feedback h1 { font-size: clamp(1.9rem, 4vw, 2.6rem); margin: 0 0 .5rem; }
+.feedback-form { max-width: 46rem; background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 20px 22px; }
+.feedback-form label { display: block; font-weight: 600; margin: 16px 0 6px; }
+.feedback-form fieldset { border: 0; padding: 0; margin: 0; display: flex; gap: 20px; flex-wrap: wrap; }
+.feedback-form legend { font-weight: 600; margin-bottom: 6px; }
+.feedback-form fieldset label { display: inline-flex; gap: 6px; align-items: center; margin: 0; font-weight: 400; }
+.feedback-form input:not([type=radio]), .feedback-form select, .feedback-form textarea { width: 100%; font: inherit; color: var(--text); background: var(--bg); border: 1px solid var(--border); border-radius: 8px; padding: 9px 11px; }
+.feedback-form textarea { resize: vertical; }
+.feedback-form .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: .9rem; }
+.feedback-form :focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+.feedback-form .hint { color: var(--muted); font-size: .9rem; margin: 6px 0 0; }
+.feedback-form .error { color: #d0302f; min-height: 1.2em; margin: 12px 0 0; }
+.feedback-form button { cursor: pointer; font: inherit; }
+.two-fields { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 0 16px; }
+@media (max-width: 800px) { .two-fields { grid-template-columns: minmax(0, 1fr); } }
+
 footer { border-top: 1px solid var(--border); padding: 24px 0; color: var(--muted); font-size: .9rem; }
 .foot { display: flex; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
 

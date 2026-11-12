@@ -21,7 +21,7 @@ import {
   type EdmType,
   type FieldModel,
   type ODataOperation,
-} from "@open-rap/model";
+} from "@open-rap-runtime/model";
 import type { Kysely } from "kysely";
 import type { BoEntity } from "../rap/bo.js";
 import type { RapRuntime } from "../rap/runtime.js";

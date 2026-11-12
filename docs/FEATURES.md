@@ -284,3 +284,4 @@ dependent ETag, remote APIs.
 | MCP server of rapt for AI coding agents (`rapt agent`), registered in the agent mode of VS Code | ✅ | Check, objects, floorplans, abapGit, documentation (D64). |
 | npm package `open-rap-runtime` (`rapt`, `npx open-rap-runtime`) | ✅ | D65; archives of `pnpm pack` checked on each tag before publication with `NPM_TOKEN`. |
 | Website with the documentation | ✅ | D62, D63. |
+| Feedback form (website, *RAP: Report a bug or request a feature…*) to the public feedback repository | ✅ | D71. |

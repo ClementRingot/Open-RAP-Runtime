@@ -9,7 +9,7 @@ writes an `AGENTS.md` in the projects it creates.
 A TypeScript compiler (pnpm monorepo) that turns the sources of a RAP BO (abapGit format) into a
 Node.js application: OData V4, RAP managed runtime, ABAP transpiled by abaplint, PostgreSQL,
 OpenUI5 UI. Read [README.md](README.md), [docs/GUIDE.md](docs/GUIDE.md) and the list of decisions
-[docs/DECISIONS.md](docs/DECISIONS.md) (D1 to D70) first.
+[docs/DECISIONS.md](docs/DECISIONS.md) (D1 to D71) first.
 
 ```
 packages/model/      types of the IR (model.json) and shared derivations (OData, value helps, MCP)
@@ -39,7 +39,7 @@ node packages/compiler/dist/cli.js dev fixtures/travel --port 8081
 node scripts/build-site.mjs _site                     # the website, with the documentation pages
 ```
 
-The runtime tests import the built `@open-rap/compiler`: run `pnpm build` before running them
+The runtime tests import the built `@open-rap-runtime/compiler`: run `pnpm build` before running them
 after a change to the compiler.
 
 ## Rules

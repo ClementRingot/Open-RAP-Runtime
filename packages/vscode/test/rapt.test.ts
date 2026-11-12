@@ -4,7 +4,7 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { afterEach, describe, expect, it } from "vitest";
-import { agentServers, terminalShims, DevProcess, GENERATE_KINDS, groupObjects, launchpadNotice, launchpadSources, menuContext, projectObjects, unchosenFloorplans, wizardArgs, workspaceLaunchpad, type CatalogEntry, type LaunchpadAddResult, diagnosticPath, findProjectRoot, LineSplitter, parseDevEvent, position, resolveCli, runJson, summary, type DevEvent } from "../src/rapt.js";
+import { agentServers, feedbackUrl, terminalShims, DevProcess, GENERATE_KINDS, groupObjects, launchpadNotice, launchpadSources, menuContext, projectObjects, unchosenFloorplans, wizardArgs, workspaceLaunchpad, type CatalogEntry, type LaunchpadAddResult, diagnosticPath, findProjectRoot, LineSplitter, parseDevEvent, position, resolveCli, runJson, summary, type DevEvent } from "../src/rapt.js";
 
 const REPO = fileURLToPath(new URL("../../../", import.meta.url));
 const FIXTURE = path.join(REPO, "fixtures", "travel");
@@ -36,7 +36,7 @@ describe("rapt from the extension", () => {
 
   it("resolves the CLI", () => {
     const repo = path.resolve("/repo/packages/compiler/dist/cli.js");
-    const bundled = path.resolve("/ext/rapt/node_modules/@open-rap/compiler/dist/cli.js");
+    const bundled = path.resolve("/ext/rapt/node_modules/@open-rap-runtime/compiler/dist/cli.js");
     const vscodeNode = { command: "/vscode/code", env: { ELECTRON_RUN_AS_NODE: "1" } };
     const base = { workspaceFolders: ["/repo"], execPath: "/vscode/code" };
     // the rapt of the extension, on the Node.js of VS Code
@@ -210,5 +210,11 @@ describe("the creation wizard and the objects view (D61)", () => {
       { label: "rapt (Open RAP Runtime)", command: "/vscode/code", args: ["/ext/cli.js", "agent", "/w/shop"], env: { ELECTRON_RUN_AS_NODE: "1" }, cwd: "/w/shop" },
     ]);
     expect(agentServers(cli, [{ name: "a", path: "/a" }, { name: "b", path: "/b" }]).map((s) => s.label)).toEqual(["rapt (Open RAP Runtime): a", "rapt (Open RAP Runtime): b"]);
+  });
+
+  it("opens the feedback form of the website with the version and the environment (D71)", () => {
+    const url = new URL(feedbackUrl("bug", "0.1.0", "VS Code 1.105.0 on linux (x64)"));
+    expect(url.origin + url.pathname).toBe("https://clementringot.github.io/RAP-Transpiler/feedback.html");
+    expect(Object.fromEntries(url.searchParams)).toEqual({ kind: "bug", version: "0.1.0", environment: "VS Code 1.105.0 on linux (x64)" });
   });
 });

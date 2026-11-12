@@ -25,7 +25,7 @@ import {
   type EntityModel,
   type HandlerParamRole,
   type Model,
-} from "@open-rap/model";
+} from "@open-rap-runtime/model";
 import type { Diagnostics } from "../../diagnostics.js";
 import { classifyMethodDefinition } from "../../ir/handlers.js";
 import { bdefAssociations } from "./derived-types.js";

@@ -16,7 +16,7 @@ import {
   type ServiceModel,
   type UiConfigModel,
   type TableModel,
-} from "@open-rap/model";
+} from "@open-rap-runtime/model";
 import { parseBdef } from "../bdef/parser.js";
 import type { BdefAst } from "../bdef/ast.js";
 import { readMsagXml } from "../ddic/xml.js";

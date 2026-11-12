@@ -8,7 +8,7 @@
 import { readFile } from "node:fs/promises";
 import path from "node:path";
 import type { FastifyInstance } from "fastify";
-import type { LaunchpadModel } from "@open-rap/model";
+import type { LaunchpadModel } from "@open-rap-runtime/model";
 import type { Authenticator } from "../auth/auth.js";
 import { launchpadView } from "./server.js";
 

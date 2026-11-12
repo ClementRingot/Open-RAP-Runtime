@@ -9,7 +9,7 @@ import { mkdirSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { PGlite } from "@electric-sql/pglite";
-import { generateApplication, loadProject, writeFiles } from "@open-rap/compiler";
+import { generateApplication, loadProject, writeFiles } from "@open-rap-runtime/compiler";
 import type { FastifyInstance } from "fastify";
 import { PGliteDialect } from "kysely";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
@@ -197,9 +197,11 @@ describe.skipIf(browserType === undefined)("enumerated types in the UI", () => {
     const order = page.locator(`${id("OrdersList", "filter_OrderId")}-inner`);
     await order.fill("1...3");
     await order.press("Enter");
+    // the MultiInput of OpenUI5 finishes the token of the first condition before the next input
+    await expect.poll(async () => tokens("filter_OrderId"), { timeout: 10_000 }).toEqual(["1...3"]);
     await order.fill("!(=3)");
     await order.press("Enter");
-    expect(await tokens("filter_OrderId")).toEqual(["1...3", "!(=3)"]);
+    await expect.poll(async () => tokens("filter_OrderId"), { timeout: 10_000 }).toEqual(["1...3", "!(=3)"]);
     await page.locator(`${id("OrdersList", "filter_OrderId")}-vhi`).click();
     await expect.poll(async () => page.locator(`${dialog} .raptConditionRow`).count(), { timeout: 10_000 }).toBe(2);
     expect(await page.locator(`${id("OrdersList", "conditionsTabs")}`).count()).toBe(0);

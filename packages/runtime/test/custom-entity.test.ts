@@ -10,7 +10,7 @@ import path from "node:path";
 import { PGlite } from "@electric-sql/pglite";
 import { PGliteDialect } from "kysely";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { generateApplication, loadProject, writeFiles } from "@open-rap/compiler";
+import { generateApplication, loadProject, writeFiles } from "@open-rap-runtime/compiler";
 import { createApp } from "../src/app.js";
 import { applySchema, createDatabase, PGLITE_PARSERS, type Database } from "../src/db/database.js";
 import { applySeed } from "../src/db/seed.js";

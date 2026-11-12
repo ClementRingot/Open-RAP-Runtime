@@ -23,7 +23,7 @@
 
 import { existsSync, readFileSync } from "node:fs";
 import path from "node:path";
-import { authorizationClaims, LAUNCHPAD_RESERVED_PATHS, type LaunchpadApp, type LaunchpadGroup, type LaunchpadModel, type LaunchpadPage, type LaunchpadSpace, type LaunchpadTile, type Model } from "@open-rap/model";
+import { authorizationClaims, LAUNCHPAD_RESERVED_PATHS, type LaunchpadApp, type LaunchpadGroup, type LaunchpadModel, type LaunchpadPage, type LaunchpadSpace, type LaunchpadTile, type Model } from "@open-rap-runtime/model";
 import type { Diagnostics, Location } from "../diagnostics.js";
 
 interface AppSource {

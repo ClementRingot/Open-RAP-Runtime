@@ -60,7 +60,7 @@ export function documentationSources(dir = documentationDir()): Array<{ id: stri
     const markdown = readFileSync(file, "utf8");
     const name = path.basename(file);
     const first = /^#\s+(.+)$/m.exec(markdown)?.[1]?.replace(/`/g, "");
-    return { id: pageId(name), file: name, title: name === "README.md" ? "open-rap-runtime" : (first ?? name), markdown };
+    return { id: pageId(name), file: name, title: name === "README.md" ? "Open RAP Runtime" : (first ?? name), markdown };
   });
 }
 
@@ -74,7 +74,7 @@ export function documentationPages(dir = documentationDir(), options: RenderOpti
     const name = path.basename(file);
     return {
       id: pageId(name),
-      title: name === "README.md" ? "open-rap-runtime" : (headings[0]?.title ?? name),
+      title: name === "README.md" ? "Open RAP Runtime" : (headings[0]?.title ?? name),
       file: name,
       html: renderMarkdown(markdown, options),
       text: markdown.replace(/[#*`|>[\]()_-]+/g, " ").replace(/\s+/g, " "),

@@ -7,7 +7,7 @@ import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
 import { createRequire } from "node:module";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { shortHash } from "@open-rap/model";
+import { shortHash } from "@open-rap-runtime/model";
 
 export interface PackageJson {
   name: string;

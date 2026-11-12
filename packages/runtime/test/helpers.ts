@@ -1,6 +1,6 @@
 import { PGlite } from "@electric-sql/pglite";
-import { buildModel, Diagnostics, generateApplication, generateCsdl, generateLaunchpadUi, generateSql, loadProject, resolveLaunchpad, writeFiles } from "@open-rap/compiler";
-import type { LaunchpadModel, Model } from "@open-rap/model";
+import { buildModel, Diagnostics, generateApplication, generateCsdl, generateLaunchpadUi, generateSql, loadProject, resolveLaunchpad, writeFiles } from "@open-rap-runtime/compiler";
+import type { LaunchpadModel, Model } from "@open-rap-runtime/model";
 import type { FastifyInstance } from "fastify";
 import { PGliteDialect } from "kysely";
 import pg from "pg";

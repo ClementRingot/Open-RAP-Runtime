@@ -27,7 +27,7 @@ import {
   type ODataEntityType,
   type ODataOperation,
   type ODataService,
-} from "@open-rap/model";
+} from "@open-rap-runtime/model";
 import { el, renderXml, type XmlElement } from "./xml.js";
 
 const VOCABULARIES = [

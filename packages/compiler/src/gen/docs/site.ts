@@ -79,6 +79,7 @@ function pageHtml(pages: DocPage[], page: DocPage): string {
       <nav aria-label="Main">
         <a href="../index.html#features">Features</a>
         <a href="index.html">Documentation</a>
+        <a href="../feedback.html">Feedback</a>
         <a class="button small" href="../index.html#download">Download</a>
       </nav>
     </div>
@@ -98,7 +99,7 @@ ${page.html}
   <footer>
     <div class="wrap foot">
       <span>Open RAP Runtime · MIT · not affiliated with SAP SE. SAP, ABAP, Fiori and SAP BTP are trademarks of SAP SE.</span>
-      <a href="../index.html">Home</a>
+      <span class="foot-links"><a href="../index.html">Home</a> · <a href="../feedback.html">Report a bug or request a feature</a></span>
     </div>
   </footer>
 </body>

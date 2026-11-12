@@ -4,7 +4,7 @@
  */
 
 import * as abaplint from "@abaplint/core";
-import { setAnnotation, type AnnotationObject, type AnnotationValue, type Annotations } from "@open-rap/model";
+import { setAnnotation, type AnnotationObject, type AnnotationValue, type Annotations } from "@open-rap-runtime/model";
 import { CdsExpressionError, parseCdsExpression, type CdsExprAst } from "./expression-ast.js";
 
 type Node = abaplint.INode;

@@ -9,7 +9,7 @@
 
 import { AsyncLocalStorage } from "node:async_hooks";
 import type { Kysely } from "kysely";
-import { ABAP_SQL_SCHEMA, type Model } from "@open-rap/model";
+import { ABAP_SQL_SCHEMA, type Model } from "@open-rap-runtime/model";
 import { AbapBridge, loadAbap, setSystemFields } from "../abap/bridge.js";
 import { abapGlobal } from "../abap/convert.js";
 import { AbapSqlClient } from "../abap/sql.js";

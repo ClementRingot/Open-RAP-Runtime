@@ -6,7 +6,7 @@
  * comparisons and assignments (the values of the database are the base values).
  */
 
-import type { EnumTypeModel } from "@open-rap/model";
+import type { EnumTypeModel } from "@open-rap-runtime/model";
 
 /** The ABAP literal of an enumerated value. */
 function literalOf(enumType: EnumTypeModel, value: string | number): string {

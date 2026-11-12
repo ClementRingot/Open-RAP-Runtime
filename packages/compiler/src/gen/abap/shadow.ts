@@ -6,7 +6,7 @@
  * them, and the ABAP code can type data with them.
  */
 
-import type { AbapType, EntityModel, TableModel } from "@open-rap/model";
+import type { AbapType, EntityModel, TableModel } from "@open-rap-runtime/model";
 import { catalogDataElements } from "../../ddic/catalog.js";
 
 export interface ShadowFile {

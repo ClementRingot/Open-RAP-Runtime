@@ -332,7 +332,7 @@ export class AgentServer {
           result: {
             protocolVersion: asked !== undefined && PROTOCOL_VERSIONS.includes(asked) ? asked : PROTOCOL_VERSIONS[0],
             capabilities: { tools: { listChanged: false } },
-            serverInfo: { name: "rapt", title: "open-rap-runtime", version: COMPILER_VERSION },
+            serverInfo: { name: "rapt", title: "Open RAP Runtime", version: COMPILER_VERSION },
             instructions: INSTRUCTIONS,
           },
         });

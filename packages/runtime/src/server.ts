@@ -18,7 +18,7 @@ import { existsSync, readFileSync } from "node:fs";
 import path from "node:path";
 import type { FastifyInstance } from "fastify";
 import { PGliteDialect, sql } from "kysely";
-import type { LaunchpadModel, McpToolsModel, Model } from "@open-rap/model";
+import type { LaunchpadModel, McpToolsModel, Model } from "@open-rap-runtime/model";
 import { registerDevLaunchpad } from "./launchpad/dev.js";
 import { platformEnvironment } from "./platform.js";
 import { createApp } from "./app.js";

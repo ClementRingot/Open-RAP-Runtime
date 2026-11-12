@@ -18,7 +18,7 @@ import {
   type Model,
   type ODataEntityType,
   type ODataService,
-} from "@open-rap/model";
+} from "@open-rap-runtime/model";
 import type { Diagnostics } from "../diagnostics.js";
 import type { Project } from "../input/project.js";
 

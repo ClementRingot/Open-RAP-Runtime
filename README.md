@@ -74,8 +74,11 @@ rapt dev my-project                         # http://localhost:8080/ — rebuilt
   `I_CalendarDate`, `I_TimeZone`, `I_BusinessUserBasic`, `I_ExchangeRate` with their data, for
   your value helps.
 - **Fiori UI**: List Report, Worklist, Analytical List Page (`$apply`), Overview Page, Form entry;
-  filters with conditions (`>100`, `1...5`, `*abc*`), views saved per user, table settings, value
-  helps, actions, editable compositions.
+  filters with conditions (`>100`, `1...5`, `*abc*`, `!(…)`) and the *Search and Select* /
+  *Define Conditions* dialog, views saved per user, table settings, value helps, actions,
+  editable compositions.
+- **CDS expressions**: calculated elements (`CASE`, `CAST`, arithmetic, SQL functions) computed
+  by the database view.
 - **Security**: OIDC (Keycloak, SAP Cloud Identity Services, Entra ID…), Web API bindings with
   OAuth 2.0 (client credentials, PKCE), authorization objects and `AUTHORITY-CHECK`, DCL, roles.
 - **One launchpad per workspace**: each application is added to it when it is created; ship
@@ -88,6 +91,8 @@ rapt dev my-project                         # http://localhost:8080/ — rebuilt
   `rapt` in the integrated terminals.
 - **AI coding agents**: `rapt agent`, an MCP server that checks the project, creates objects and
   searches the documentation; registered by the extension for the agent mode of VS Code.
+
+![Filter dialog: Search and Select, Define Conditions](docs/images/filter-dialog.png)
 
 ## Documentation
 
@@ -108,6 +113,14 @@ project website.
 
 The project website (`site/`, published on GitHub Pages by the `site.yml` workflow) presents
 Open RAP Runtime, contains this documentation and serves the `.vsix` of the latest version.
+
+## Feedback
+
+Report a bug or request a feature with the
+[feedback form](https://clementringot.github.io/RAP-Transpiler/feedback.html) (it opens a
+pre-filled issue in the public
+[feedback repository](https://github.com/ClementRingot/open-rap-runtime-feedback)), or in VS Code
+with *RAP: Report a bug or request a feature…*.
 
 ## Contributing
 

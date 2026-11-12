@@ -1,4 +1,4 @@
-import { findEntity, findEntityBehavior, getAnnotation, type Model } from "@open-rap/model";
+import { findEntity, findEntityBehavior, getAnnotation, type Model } from "@open-rap-runtime/model";
 import { afterEach, describe, expect, it } from "vitest";
 import { formatDiagnostic, type Diagnostic } from "../src/diagnostics.js";
 import { loadProject } from "../src/input/project.js";

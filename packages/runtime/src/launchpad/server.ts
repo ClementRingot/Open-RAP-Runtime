@@ -18,7 +18,7 @@ import { platformEnvironment } from "../platform.js";
 import { readFileSync } from "node:fs";
 import path from "node:path";
 import Fastify, { type FastifyInstance, type FastifyReply, type FastifyRequest, type FastifyServerOptions } from "fastify";
-import { appUrlVariable, tileVisible, type LaunchpadApp, type LaunchpadModel, type LaunchpadTile } from "@open-rap/model";
+import { appUrlVariable, tileVisible, type LaunchpadApp, type LaunchpadModel, type LaunchpadTile } from "@open-rap-runtime/model";
 import { AuthenticationError, Authenticator, type AuthOptions } from "../auth/auth.js";
 import { authFromEnvironment } from "../auth/environment.js";
 import { OidcSessions } from "../auth/session.js";

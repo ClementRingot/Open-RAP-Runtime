@@ -1,7 +1,7 @@
 /** The Fastify application of a generated service. */
 
 import Fastify, { type FastifyInstance, type FastifyReply, type FastifyRequest, type FastifyServerOptions } from "fastify";
-import type { McpToolsModel, Model } from "@open-rap/model";
+import type { McpToolsModel, Model } from "@open-rap-runtime/model";
 import { registerMcp } from "./mcp/server.js";
 import { AuthenticationError, Authenticator, type AuthOptions } from "./auth/auth.js";
 import { DevOAuthServer, type DevOAuthClient } from "./auth/dev-oauth.js";

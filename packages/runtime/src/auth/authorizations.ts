@@ -5,7 +5,7 @@
  * AUTHORITY-CHECK and the access controls (pfcg_auth) read them.
  */
 
-import { authorizationClaims, type AuthorizationsModel, type AuthorizationValue, type RoleModel } from "@open-rap/model";
+import { authorizationClaims, type AuthorizationsModel, type AuthorizationValue, type RoleModel } from "@open-rap-runtime/model";
 import type { User } from "./user.js";
 
 /** One authorization of a user: field → accepted values (the claims of the token expanded). */

@@ -283,7 +283,7 @@ export interface CliOptions {
   cliPath?: string;
   /** Setting rapt.nodePath: a Node.js 22+; empty for the Node.js of VS Code. */
   nodePath?: string;
-  /** The rapt embedded in the extension (rapt/node_modules/@open-rap/compiler/dist/cli.js). */
+  /** The rapt embedded in the extension (rapt/node_modules/@open-rap-runtime/compiler/dist/cli.js). */
   bundledCli?: string;
   workspaceFolders: string[];
   /** The executable of VS Code (process.execPath of the extension host). */
@@ -373,7 +373,7 @@ export function resolveCli(options: CliOptions, exists: (p: string) => boolean =
   }
   for (const folder of options.workspaceFolders) {
     candidates.push(path.join(folder, "packages", "compiler", "dist", "cli.js"));
-    candidates.push(path.join(folder, "node_modules", "@open-rap", "compiler", "dist", "cli.js"));
+    candidates.push(path.join(folder, "node_modules", "@open-rap-runtime", "compiler", "dist", "cli.js"));
   }
   const found = candidates.find((candidate) => exists(candidate));
   if (found === undefined) {
@@ -531,4 +531,13 @@ export function agentServers(cli: Cli, folders: Array<{ name: string; path: stri
     env: { ...(cli.env ?? {}) },
     cwd: folder.path,
   }));
+}
+
+/** The feedback form of the website (D71). */
+export const FEEDBACK_URL = "https://clementringot.github.io/RAP-Transpiler/feedback.html";
+
+/** The feedback form with the version and the environment filled in (D71). */
+export function feedbackUrl(kind: "bug" | "feature", version: string, environment: string): string {
+  const query = new URLSearchParams({ kind, version, environment });
+  return `${FEEDBACK_URL}?${query.toString()}`;
 }

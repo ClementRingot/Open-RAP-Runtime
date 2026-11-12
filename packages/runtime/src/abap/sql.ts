@@ -12,7 +12,7 @@
  */
 
 import { sql, type Kysely } from "kysely";
-import { ABAP_SQL_SCHEMA } from "@open-rap/model";
+import { ABAP_SQL_SCHEMA } from "@open-rap-runtime/model";
 import { withSavepoint } from "../db/database.js";
 
 export type AbapSqlValue = number | string | null;

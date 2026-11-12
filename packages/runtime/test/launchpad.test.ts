@@ -11,7 +11,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import Fastify, { type FastifyInstance } from "fastify";
 import { exportJWK, generateKeyPair, SignJWT, type CryptoKey } from "jose";
-import type { LaunchpadModel } from "@open-rap/model";
+import type { LaunchpadModel } from "@open-rap-runtime/model";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import type { OidcAuthOptions } from "../src/auth/auth.js";
 import { signSession } from "../src/auth/session.js";

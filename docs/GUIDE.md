@@ -46,6 +46,7 @@ nothing else to install), then in the command palette (`Ctrl+Shift+P`):
 | *RAP: Generate the abapGit files* | `rapt abapgit`: the missing XML files for the import into SAP |
 | *RAP: Generate the MCP server of the service* | `rapt mcp`: the tools for AI agents |
 | *RAP: Choose the project mode* | `standard` or `enhanced` (`rapt/config.json`) |
+| *RAP: Report a bug or request a feature…* | the feedback form of the website, with the version and the environment filled in ([D71](DECISIONS.md)) |
 
 A right click on a folder of the explorer arranges these commands in three groups: **create**
 (complete BO, object by object), **project** (check, abapGit), **application** (floorplan, rapt
@@ -75,7 +76,7 @@ Install it with `npm install -g open-rap-runtime` (Node.js 22): the package inst
 command with everything it needs (runtime, OpenUI5, PGlite) ([D65](DECISIONS.md)). Without a
 global installation: `npx open-rap-runtime <command>` (for example `npx open-rap-runtime check
 my-project` in a CI), or `open-rap-runtime` as a `devDependency` of the project and `npx rapt …`.
-The libraries `@open-rap/compiler`, `@open-rap/runtime` and `@open-rap/model`
+The libraries `@open-rap-runtime/compiler`, `@open-rap-runtime/runtime` and `@open-rap-runtime/model`
 are published separately too. From a clone of the repository: `pnpm install && pnpm build`,
 then `node packages/compiler/dist/cli.js` instead of `rapt`.
 

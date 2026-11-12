@@ -47,6 +47,9 @@ extension compiles nothing itself: it calls the `rapt` CLI (`--json`) and shows 
 - **AI agents**: the agent mode of VS Code finds the MCP server of rapt (`rapt agent`): check the
   project, create objects, set the floorplan, search the documentation of Open RAP Runtime. For
   Claude Code in the terminal: `claude mcp add rapt -- rapt agent .`.
+- **RAP: Report a bug or request a feature…**: the feedback form of the website, with the
+  version of the extension and the environment filled in; it opens a pre-filled issue in the
+  public feedback repository.
 - Context menus of the explorer (project folder, `.abapgit.xml`) in three groups (create,
   project, application), buttons in the title bar of the RAP sources. The commands that are not
   possible yet are greyed out: outside a project, only *New complete business object…* is

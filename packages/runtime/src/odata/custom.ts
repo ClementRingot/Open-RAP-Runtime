@@ -5,7 +5,7 @@
  * returns the rows through `io_response->set_data`, as in ABAP Cloud.
  */
 
-import { isUuid, type AbapType, type EntityModel } from "@open-rap/model";
+import { isUuid, type AbapType, type EntityModel } from "@open-rap-runtime/model";
 import { developmentUser, type User } from "../auth/user.js";
 import { abapGlobal, appendRow, component, getAbapValue, rowsOf, type AbapData } from "../abap/convert.js";
 import type { Database } from "../db/database.js";

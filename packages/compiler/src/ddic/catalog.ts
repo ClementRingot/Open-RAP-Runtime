@@ -6,7 +6,7 @@
  * sources (DTEL objects) take precedence over this catalog.
  */
 
-import type { AbapType } from "@open-rap/model";
+import type { AbapType } from "@open-rap-runtime/model";
 
 const t = (kind: AbapType["kind"], length?: number, decimals?: number): Omit<AbapType, "dataElement"> => {
   const type: Omit<AbapType, "dataElement"> = { kind };

@@ -9,7 +9,7 @@
  */
 
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
-import type { McpToolModel, McpToolsModel } from "@open-rap/model";
+import type { McpToolModel, McpToolsModel } from "@open-rap-runtime/model";
 import { AuthenticationError, type Authenticator } from "../auth/auth.js";
 import type { User } from "../auth/user.js";
 import { withReader } from "../odata/access.js";

@@ -25,6 +25,7 @@ import {
   unchosenFloorplans,
   wizardArgs,
   agentServers,
+  feedbackUrl,
   terminalShims,
   workspaceLaunchpad,
   type CatalogEntry,
@@ -93,7 +94,7 @@ function cli(): Cli {
   return resolveCli({
     ...(cliPath === undefined ? {} : { cliPath }),
     ...(nodePath === undefined ? {} : { nodePath }),
-    bundledCli: path.join(extensionPath, "rapt", "node_modules", "@open-rap", "compiler", "dist", "cli.js"),
+    bundledCli: path.join(extensionPath, "rapt", "node_modules", "@open-rap-runtime", "compiler", "dist", "cli.js"),
     workspaceFolders: (vscode.workspace.workspaceFolders ?? []).map((f) => f.uri.fsPath),
     execPath: process.execPath,
   });
@@ -762,6 +763,20 @@ export function activate(context: vscode.ExtensionContext): void {
       await vscode.env.openExternal(vscode.Uri.parse(dev.url));
     }),
     vscode.commands.registerCommand("rapt.showLog", () => output.show()),
+    vscode.commands.registerCommand("rapt.feedback", async () => {
+      // the feedback form of the website, which opens a pre-filled issue of the public feedback repository (D71)
+      const kind = await vscode.window.showQuickPick(
+        [
+          { label: "$(bug) Report a bug", feedback: "bug" as const },
+          { label: "$(lightbulb) Request a feature", feedback: "feature" as const },
+        ],
+        { title: "Open RAP Runtime: feedback" },
+      );
+      if (kind === undefined) return;
+      const version = String((context.extension.packageJSON as { version?: string }).version ?? "");
+      const environment = `VS Code ${vscode.version} on ${process.platform} (${process.arch})`;
+      await vscode.env.openExternal(vscode.Uri.parse(feedbackUrl(kind.feedback, version, environment)));
+    }),
     vscode.commands.registerCommand("rapt.newBo", newBo),
     vscode.commands.registerCommand("rapt.abapgit", withProject(abapGit)),
     vscode.commands.registerCommand("rapt.generate", withProject(generate)),

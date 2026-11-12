@@ -1,0 +1,160 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Feedback — Open RAP Runtime</title>
+  <meta name="description" content="Report a bug or request a feature of Open RAP Runtime: the rapt command, the VS Code extension and the generated applications.">
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%230a6ed1'/%3E%3Cpath d='M9 22V10h7a4 4 0 0 1 0 8h-7m7 0 5 4' stroke='white' stroke-width='3' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header class="top">
+    <div class="wrap nav">
+      <a class="brand" href="index.html"><span class="logo" aria-hidden="true">R</span>Open RAP Runtime</a>
+      <nav aria-label="Main">
+        <a href="index.html#features">Features</a>
+        <a href="docs/index.html">Documentation</a>
+        <a href="feedback.html" aria-current="page">Feedback</a>
+        <a class="button small" href="index.html#download">Download</a>
+      </nav>
+    </div>
+  </header>
+
+  <main>
+    <section class="feedback">
+      <div class="wrap">
+        <h1>Feedback</h1>
+        <p class="section-lead">Report a bug or ask for a feature. The form opens a pre-filled issue in the public
+          <a href="https://github.com/ClementRingot/open-rap-runtime-feedback/issues">feedback repository</a>
+          on GitHub, where you review it and submit it (a GitHub account is needed). Issues are public: do not
+          paste secrets nor confidential sources.</p>
+
+        <form id="feedback" class="feedback-form" novalidate>
+          <fieldset class="kind">
+            <legend>Type</legend>
+            <label><input type="radio" name="kind" value="bug" checked> Bug report</label>
+            <label><input type="radio" name="kind" value="feature"> Feature request</label>
+          </fieldset>
+
+          <label for="component">Component</label>
+          <select id="component" required></select>
+
+          <label for="title">Title</label>
+          <input id="title" required maxlength="200" placeholder="Short summary">
+
+          <label for="description" data-bug="What happened?" data-feature="What would you like?">What happened?</label>
+          <textarea id="description" required rows="6" data-bug="What you did, what you expected, what happened instead." data-feature="The feature, and how it behaves on SAP when it exists there (ABAP documentation, ADT, Fiori Elements)."></textarea>
+          <p class="hint" id="description-hint">What you did, what you expected, what happened instead.</p>
+
+          <div data-only="bug">
+            <label for="steps">Steps to reproduce</label>
+            <textarea id="steps" rows="5" placeholder="1. rapt new demo Travel --prefix ZRT&#10;2. …"></textarea>
+            <label for="logs">Diagnostics and logs</label>
+            <textarea id="logs" rows="5" class="mono" placeholder="Output of rapt check, error messages, log of the extension (Output → Open RAP Runtime)"></textarea>
+          </div>
+
+          <div data-only="feature">
+            <label for="usecase">Why</label>
+            <textarea id="usecase" rows="4" placeholder="What you are building, and what this feature would change for you."></textarea>
+          </div>
+
+          <div class="two-fields">
+            <div>
+              <label for="version">Version</label>
+              <input id="version" placeholder="0.1.0 (first line of rapt --help)">
+            </div>
+            <div>
+              <label for="environment">Environment</label>
+              <input id="environment" placeholder="VS Code on Windows 11, npm on macOS, Docker…">
+            </div>
+          </div>
+
+          <p class="error" id="error" role="alert"></p>
+          <div class="actions">
+            <button class="button" type="submit">Continue on GitHub</button>
+            <a class="button ghost" href="docs/known_gaps.html">Known gaps and workarounds</a>
+          </div>
+        </form>
+      </div>
+    </section>
+  </main>
+
+  <footer>
+    <div class="wrap foot">
+      <span>Open RAP Runtime · MIT · not affiliated with SAP SE. SAP, ABAP, Fiori and SAP BTP are trademarks of SAP SE.</span>
+      <span class="foot-links"><a href="index.html">Home</a> · <a href="docs/index.html">Documentation</a></span>
+    </div>
+  </footer>
+
+  <script>
+    // Builds the URL of a new issue of the feedback repository, with the issue form (template) and
+    // its fields filled in (GitHub fills an issue form field from the query parameter of its id).
+    (function () {
+      var REPO = "https://github.com/ClementRingot/open-rap-runtime-feedback";
+      var COMPONENTS = {
+        bug: ["VS Code extension", "rapt command line", "rapt agent (MCP server for AI agents)", "Generated UI (List Report, Object Page, launchpad…)", "OData service / RAP runtime (behavior pool, EML, draft…)", "CDS / BDEF / ABAP compilation (rapt check diagnostics)", "Deployment (Docker, Cloud Foundry, OIDC)", "Documentation / website", "Other"],
+        feature: ["RAP (BDEF, behavior pool, EML, draft…)", "CDS (views, annotations, types…)", "Generated UI (floorplans, filters, Object Page…)", "OData service", "VS Code extension", "rapt command line / rapt agent", "Deployment and security", "Documentation / website", "Other"]
+      };
+      var form = document.getElementById("feedback");
+      var $ = function (id) { return document.getElementById(id); };
+      var kind = function () { return form.querySelector("input[name=kind]:checked").value; };
+      var params = new URLSearchParams(location.search);
+
+      function update() {
+        var k = kind();
+        var select = $("component");
+        var current = select.value;
+        select.innerHTML = "";
+        COMPONENTS[k].forEach(function (name) {
+          var option = document.createElement("option");
+          option.textContent = name;
+          select.appendChild(option);
+        });
+        if (COMPONENTS[k].indexOf(current) >= 0) select.value = current;
+        document.querySelectorAll("[data-only]").forEach(function (el) { el.hidden = el.getAttribute("data-only") !== k; });
+        var label = form.querySelector("label[for=description]");
+        label.textContent = label.getAttribute("data-" + k);
+        $("description-hint").textContent = $("description").getAttribute("data-" + k);
+      }
+
+      // pre-filled by the VS Code extension and the links of the documentation: ?kind=bug&version=…
+      if (params.get("kind") === "feature") form.querySelector("input[value=feature]").checked = true;
+      update();
+      ["version", "environment", "title", "description"].forEach(function (id) {
+        if (params.get(id)) $(id).value = params.get(id);
+      });
+      if (params.get("component")) $("component").value = params.get("component");
+      form.querySelectorAll("input[name=kind]").forEach(function (r) { r.addEventListener("change", update); });
+
+      form.addEventListener("submit", function (event) {
+        event.preventDefault();
+        var title = $("title").value.trim();
+        var description = $("description").value.trim();
+        if (title === "" || description === "") {
+          $("error").textContent = "A title and a description are needed.";
+          return;
+        }
+        $("error").textContent = "";
+        var k = kind();
+        var query = new URLSearchParams();
+        query.set("template", k === "bug" ? "bug_report.yml" : "feature_request.yml");
+        query.set("title", (k === "bug" ? "[Bug]: " : "[Feature]: ") + title);
+        query.set("component", $("component").value);
+        query.set("description", description);
+        query.set("version", $("version").value.trim());
+        if (k === "bug") {
+          query.set("steps", $("steps").value.trim());
+          query.set("logs", $("logs").value.trim());
+          query.set("environment", $("environment").value.trim());
+        } else {
+          query.set("usecase", $("usecase").value.trim());
+          var environment = $("environment").value.trim();
+          if (environment !== "") query.set("example", "Environment: " + environment);
+        }
+        window.open(REPO + "/issues/new?" + query.toString(), "_blank", "noopener");
+      });
+    })();
+  </script>
+</body>
+</html>

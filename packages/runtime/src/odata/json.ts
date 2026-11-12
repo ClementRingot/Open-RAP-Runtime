@@ -1,6 +1,6 @@
 /** OData V4 JSON (odata.metadata=minimal): entities, collections, ETags, IEEE754Compatible. */
 
-import { ENTITY_CONTROL, FIELD_CONTROL, OPERATION_CONTROL } from "@open-rap/model";
+import { ENTITY_CONTROL, FIELD_CONTROL, OPERATION_CONTROL } from "@open-rap-runtime/model";
 import { RawJsonNumber, toJson, type CanonicalValue, type JsonValue } from "../values.js";
 import type { ReadEngine, Row } from "./read.js";
 import type { ServiceRuntime, TypeInfo } from "./service.js";

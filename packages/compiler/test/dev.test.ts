@@ -124,9 +124,9 @@ describe("rapt dev", () => {
     mkdirSync(path.join(root, "repo", "packages", "runtime", "node_modules", "@abaplint", "runtime"), { recursive: true });
     expect(runtimeDependencies(path.join(root, "repo", "packages", "runtime"))).toBe(path.join(root, "repo", "packages", "runtime", "node_modules"));
     // npm, flat (the VS Code extension): rapt/node_modules
-    mkdirSync(path.join(root, "rapt", "node_modules", "@open-rap", "runtime"), { recursive: true });
+    mkdirSync(path.join(root, "rapt", "node_modules", "@open-rap-runtime", "runtime"), { recursive: true });
     mkdirSync(path.join(root, "rapt", "node_modules", "@abaplint", "runtime"), { recursive: true });
-    expect(runtimeDependencies(path.join(root, "rapt", "node_modules", "@open-rap", "runtime"))).toBe(path.join(root, "rapt", "node_modules"));
+    expect(runtimeDependencies(path.join(root, "rapt", "node_modules", "@open-rap-runtime", "runtime"))).toBe(path.join(root, "rapt", "node_modules"));
     expect(runtimeDependencies(path.join(root, "nothing"))).toBeUndefined();
   });
 
