@@ -16,7 +16,7 @@ Le code de retour est 1 dès qu'il y a une erreur (ou un avertissement avec
 | SRVD006 | info | Association vers une entité non exposée : navigation omise |
 | SRVD007 | info | Plusieurs définitions de service : celle qui a un binding est construite (les autres, d'un service consumption model par exemple, ne le sont pas) |
 | CDS001 | erreur | Source CDS illisible |
-| CDS002 | erreur ou avertissement | Construction CDS non prise en charge |
+| CDS002 | erreur ou avertissement | Construction CDS non prise en charge ; dans un élément calculé, le message nomme la construction (chemin d'association, variable de session autre que `$session.system_date`, `BETWEEN`, agrégat, fonction SQL non prise en charge) (D64) |
 | CDS003 | erreur | Source de données ou entité projetée inconnue |
 | CDS004 | erreur | Élément inconnu dans la source |
 | CDS005 | erreur | Cible d'association ou de redirection inconnue |
@@ -36,6 +36,7 @@ Le code de retour est 1 dès qu'il y a une erreur (ou un avertissement avec
 | CDS019 | erreur | Nom de table entity de plus de 25 caractères (D55) |
 | CDS020 | erreur | Élément de table entity : clé `null`, clé après un élément non clé, `abap.string` ou `abap.rawstring` sans `null` (D55) |
 | CDS021 | erreur | Élément de type énuméré CDS dans une entité exposée : SAP n'expose pas les types énumérés dans les services OData RAP. En mode `enhanced`, type énumération OData (D55) |
+| CDS022 | erreur | Élément calculé invalide : type non déductible (`NULL` seul, calcul sur une chaîne : ajouter un `CAST`), type inconnu dans un `CAST`, nombre d'arguments d'une fonction, référence `$projection` circulaire ou inconnue, élément calculé clé ou sans alias (D64) |
 | TYPE001 | erreur | Source d'un type CDS (`.drty.acds`) illisible, ou nom différent de celui du fichier (D55) |
 | TYPE002 | erreur | Type CDS fondé sur un type inconnu (D55) |
 | TYPE003 | erreur | Type énuméré CDS incorrect : type de base (`abap.int1`, `int2`, `int4`, `char(1..8)`, `numc(1..8)`), pas exactement une constante `initial`, valeur hors du type de base, constantes ou valeurs en double (D55) |

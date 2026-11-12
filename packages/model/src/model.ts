@@ -229,6 +229,11 @@ export interface FieldModel {
   column?: string;
   /** Projections: the element of the projected entity. */
   baseField?: string;
+  /**
+   * A calculated element (D64): the expression of the select list, instead of `column` or
+   * `baseField`. Read-only, computed by the SQL view.
+   */
+  expression?: CdsExpression;
   semantics?: AdminSemantics;
   /** Draft (D54): IsActiveEntity, HasActiveEntity, HasDraftEntity, DraftUUID — no column of the base. */
   draft?: true;
@@ -240,6 +245,52 @@ export interface FieldModel {
   annotations: Annotations;
   src?: SourceRef;
 }
+
+/**
+ * The expression of a calculated element (D64), resolved and typed: `column` is a column of the
+ * source table (lower case) or an element of the source entity, `element` another element of the
+ * same entity (`$projection.X`).
+ */
+export type CdsExpression =
+  | { kind: "literal"; value: string | number | null; type: AbapType }
+  | { kind: "column"; name: string; type: AbapType }
+  | { kind: "element"; name: string; type: AbapType }
+  | { kind: "session"; variable: "system_date"; type: AbapType }
+  | { kind: "arithmetic"; operator: "+" | "-" | "*" | "/"; left: CdsExpression; right: CdsExpression; type: AbapType }
+  | { kind: "negate"; operand: CdsExpression; type: AbapType }
+  | { kind: "case"; operand?: CdsExpression; branches: Array<{ when: CdsExpression | CdsCondition; then: CdsExpression }>; else?: CdsExpression; type: AbapType }
+  | { kind: "cast"; operand: CdsExpression; type: AbapType }
+  | { kind: "function"; name: CdsFunctionName; args: CdsExpression[]; type: AbapType };
+
+export type CdsFunctionName =
+  | "concat"
+  | "concat_with_space"
+  | "substring"
+  | "upper"
+  | "lower"
+  | "length"
+  | "left"
+  | "right"
+  | "ltrim"
+  | "rtrim"
+  | "replace"
+  | "coalesce"
+  | "div"
+  | "division"
+  | "mod"
+  | "abs"
+  | "round"
+  | "ceil"
+  | "floor"
+  | "dats_days_between"
+  | "dats_add_days";
+
+/** A condition of a searched CASE (D64). */
+export type CdsCondition =
+  | { kind: "compare"; operator: "=" | "<>" | "<" | ">" | "<=" | ">=" | "like"; left: CdsExpression; right: CdsExpression }
+  | { kind: "isNull"; operand: CdsExpression; negated: boolean }
+  | { kind: "and" | "or"; left: CdsCondition; right: CdsCondition }
+  | { kind: "not"; operand: CdsCondition };
 
 export type AssociationKind = "composition" | "toParent" | "association";
 

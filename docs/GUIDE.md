@@ -143,7 +143,25 @@ assistants d'ADT ; le XML abapGit est écrit avec ([D46](DECISIONS.md)).
   classe `if_rap_query_provider`).
 - Contrôles d'accès (DCL) : `grant select … where`, `aspect pfcg_auth`, `aspect user`
   ([D35](DECISIONS.md)).
-- Pas d'expressions dans la liste de sélection (CASE, CAST, calculs, chemins) : CDS002.
+- Éléments calculés dans la liste de sélection ([D64](DECISIONS.md)) : `CASE`, `CAST`, `+ - * /`,
+  littéraux, `$projection.Element`, `$session.system_date` et les fonctions SQL courantes
+  (`concat`, `concat_with_space`, `substring`, `upper`, `lower`, `length`, `left`, `right`,
+  `ltrim`, `rtrim`, `replace`, `coalesce`, `div`, `division`, `mod`, `abs`, `round`, `ceil`,
+  `floor`, `dats_days_between`, `dats_add_days`). PostgreSQL les calcule dans la vue ; ils sont
+  en lecture seule (`Core.Computed`, ignorés dans les écritures) et ne peuvent pas être clés. Une
+  projection les reprend et peut elle-même en définir :
+
+  ```cds
+  case overall_status when 'A' then 'Accepted' else 'Open' end as StatusText,
+  booking_fee + total_price                                    as TotalWithFee,
+  cast( dats_days_between( begin_date, end_date ) as abap.int4 ) as Duration,
+  ```
+
+  Sans `CAST`, le type se déduit des opérandes ; s'il ne se déduit pas (`NULL` seul, calcul sur
+  une chaîne), CDS022 demande un `CAST`. Dans un brouillon, la valeur est calculée sur les valeurs
+  du brouillon ; lue en EML dans le behavior pool, elle est celle de la dernière sauvegarde.
+- Restent refusés (CDS002) : chemins d'association (`_Agency.Name`), `$session.user`,
+  `$session.client`, `$session.system_language`, `BETWEEN`, agrégats, autres fonctions SQL.
 
 #### Table entities et types CDS ([D55](DECISIONS.md))
 

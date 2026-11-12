@@ -104,4 +104,81 @@ describe("CDS adapter over abaplint", () => {
     ]);
     expect(parseCds("zbroken.ddls.asddls", "define view entity { }").ok).toBe(false);
   });
+
+  it("parses the expressions of the select list into a tree (D64)", () => {
+    const source = [
+      "define view entity ZX_Expr as select from zrt_travel as t {",
+      "  key t.travel_uuid as TravelUUID,",
+      "  t.booking_fee + t.total_price * 2 as Total,",
+      "  ( t.booking_fee - t.total_price ) / 3 as Ratio,",
+      "  - t.booking_fee as Negative,",
+      "  'abc' as Text,",
+      "  abap.char'X' as Flag,",
+      "  1.5 as Decimal,",
+      "  concat_with_space( t.description, t.agency_id, 1 ) as Label,",
+      "  cast( t.total_price as abap.dec( 10, 2 ) ) as Price,",
+      "  case t.overall_status when 'A' then 'Accepted' else 'Other' end as StatusText,",
+      "  case when t.total_price >= 100 and not ( t.description is null or t.booking_fee <> 0 ) then 1 else 0 end as Big,",
+      "  $session.system_date as Today,",
+      "  count( * ) as Bad",
+      "}",
+    ].join("\n");
+    const result = parseCds("zx_expr.ddls.asddls", source);
+    if (!result.ok || !("entity" in result)) {
+      throw new Error("not an entity");
+    }
+    const byName = new Map(result.entity.elements.map((e) => [e.name, e]));
+    const path = (...p: string[]): unknown => ({ kind: "path", path: ["t", ...p] });
+    expect(byName.get("Total")?.expr).toEqual({
+      kind: "arithmetic",
+      operator: "+",
+      left: path("booking_fee"),
+      right: { kind: "arithmetic", operator: "*", left: path("total_price"), right: { kind: "literal", value: 2, text: "2" } },
+    });
+    expect(byName.get("Ratio")?.expr).toMatchObject({
+      operator: "/",
+      left: { kind: "arithmetic", operator: "-", left: path("booking_fee"), right: path("total_price") },
+      right: { kind: "literal", value: 3 },
+    });
+    expect(byName.get("Negative")?.expr).toEqual({ kind: "negate", operand: path("booking_fee") });
+    expect(byName.get("Text")?.expr).toEqual({ kind: "literal", value: "abc", text: "'abc'" });
+    expect(byName.get("Flag")?.expr).toMatchObject({ kind: "literal", value: "X", typed: "abap.char" });
+    expect(byName.get("Decimal")?.expr).toMatchObject({ kind: "literal", value: 1.5 });
+    expect(byName.get("Label")?.expr).toEqual({
+      kind: "function",
+      name: "concat_with_space",
+      args: [path("description"), path("agency_id"), { kind: "literal", value: 1, text: "1" }],
+    });
+    expect(byName.get("Price")?.expr).toEqual({ kind: "cast", operand: path("total_price"), type: "abap.dec(10,2)" });
+    expect(byName.get("StatusText")?.expr).toMatchObject({
+      kind: "case",
+      operand: path("overall_status"),
+      branches: [{ when: { kind: "literal", value: "A" }, then: { kind: "literal", value: "Accepted" } }],
+      else: { kind: "literal", value: "Other" },
+    });
+    expect(byName.get("Big")?.expr).toMatchObject({
+      kind: "case",
+      branches: [
+        {
+          when: {
+            kind: "and",
+            left: { kind: "compare", operator: ">=", left: path("total_price"), right: { kind: "literal", value: 100 } },
+            right: {
+              kind: "not",
+              operand: {
+                kind: "or",
+                left: { kind: "isNull", operand: path("description"), negated: false },
+                right: { kind: "compare", operator: "<>", left: path("booking_fee"), right: { kind: "literal", value: 0 } },
+              },
+            },
+          },
+          then: { kind: "literal", value: 1 },
+        },
+      ],
+      else: { kind: "literal", value: 0 },
+    });
+    expect(byName.get("Today")?.expr).toEqual({ kind: "path", path: ["$session", "system_date"] });
+    expect(byName.get("Bad")?.expr).toBeUndefined();
+    expect(byName.get("Bad")?.expressionError).toContain("aggregate");
+  });
 });

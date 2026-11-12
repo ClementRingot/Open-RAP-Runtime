@@ -63,8 +63,9 @@ Versions de référence : `@abaplint/core` 2.120.98, `@abaplint/transpiler` 2.14
 
 | Écart | Statut |
 |---|---|
-| Expressions dans la liste de sélection (CAST, CASE, calculs, littéraux) | Diagnostic CDS002 |
-| Chemins d'association dans la liste de sélection (`_Agency.Name`) | Diagnostic CDS002 |
+| Expressions dans la liste de sélection (D64) : `$session.user`, `$session.client`, `$session.system_language`, `BETWEEN`, agrégats, fonctions SQL hors de la liste de D64 | Diagnostic CDS002 |
+| Éléments calculés lus en EML dans le behavior pool (D64) | Valeur de la vue active (dernière sauvegarde), pas recalculée sur les modifications de la transaction ; valeur initiale pour une instance de brouillon. |
+| Chemins d'association dans la liste de sélection (`_Agency.Name`), y compris dans une expression | Diagnostic CDS002 |
 | Jointures, clause WHERE | Diagnostic CDS002 (WHERE ignoré avec avertissement) |
 | Vues avec paramètres, unions, hiérarchies | Diagnostic CDS002 |
 | Entités custom (D43) : paramètres, agrégation (`get_aggregation`), `$expand` imbriqué ; DCL non appliqué (la classe de requête filtre elle-même) | Non gérés |
@@ -77,7 +78,7 @@ Versions de référence : `@abaplint/core` 2.120.98, `@abaplint/transpiler` 2.14
 | Table entities (D55) : `@ClientHandling.type` | Lu, sans effet : pas de colonne mandant (D9). |
 | Table entities : colonnes `null` | La colonne PostgreSQL garde sa valeur par défaut (valeur initiale ABAP) comme les autres ; `null` n'est un état distinct que pour les types sans valeur initiale. |
 | Table entities : `SOURCE_TYPE` du XML abapGit écrit par `rapt abapgit` | `T`, déduit de la documentation : à vérifier à la première importation ; ADT réécrit le XML à l'activation. |
-| Types énumérés : `CAST( x AS enum )`, constante `Type.#CONST` dans une vue, `CONV string( enum )` (nom de la constante) dans le behavior pool, `cl_abap_enumdescr` | Non gérés : les expressions CDS sont refusées (CDS002) ; dans le behavior pool, une valeur énumérée est sa valeur de base. |
+| Types énumérés : `CAST( x AS enum )`, constante `Type.#CONST` dans une vue, `CONV string( enum )` (nom de la constante) dans le behavior pool, `cl_abap_enumdescr` | Non gérés : seuls les `CAST` vers un type `abap.xxx` ou un élément de données sont pris en charge (D64) ; dans le behavior pool, une valeur énumérée est sa valeur de base. |
 | Types énumérés dans le behavior pool : constante dans un modèle de chaîne (`|{ type-const }|`) | Non remplacée : le transpiler signale le nom inconnu (ABP004) ; passer par une variable. |
 | Types énumérés exposés en OData | Refusés en mode `standard` comme sur SAP (CDS021) ; `EnumType` en mode `enhanced` seulement. |
 | Conversion exits (ALPHA…), conversion ISO des langues | Non gérés |

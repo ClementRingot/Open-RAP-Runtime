@@ -20,6 +20,7 @@ import { parseBuiltInType } from "../ddic/catalog.js";
 import type { Diagnostics } from "../diagnostics.js";
 import { filesOfType, type Project, type SourceFile } from "../input/project.js";
 import type { Dictionary } from "./dictionary.js";
+import { ExpressionIssue, resolveExpression, type ExpressionScope } from "./expressions.js";
 
 const LAYERS = ["#CORE", "#LOCALIZATION", "#INDUSTRY", "#PARTNER", "#CUSTOMER"];
 
@@ -227,6 +228,82 @@ export class EntityResolver {
   }
 
   // -------------------------------------------------------------------------------------------
+  // calculated elements (D64)
+
+  /** The fields in the order of the select list: the plain ones, and the calculated elements resolved. */
+  private withCalculatedFields(
+    parsed: ParsedEntity,
+    slots: Array<FieldModel | CdsElementAst>,
+    scope: Omit<ExpressionScope, "element" | "dictionary">,
+  ): FieldModel[] {
+    const done = new Map<CdsElementAst, FieldModel | undefined>();
+    const active = new Set<CdsElementAst>();
+    const isPlain = (slot: FieldModel | CdsElementAst): slot is FieldModel => "type" in slot;
+    const resolve = (element: CdsElementAst): FieldModel | undefined => {
+      if (done.has(element)) {
+        return done.get(element);
+      }
+      if (active.has(element)) {
+        throw new ExpressionIssue("CDS022", `circular reference through $projection.${element.name}`);
+      }
+      active.add(element);
+      try {
+        const field = this.calculatedField(parsed, element, { ...scope, dictionary: this.dictionary, element: elementOf });
+        done.set(element, field);
+        return field;
+      } finally {
+        active.delete(element);
+      }
+    };
+    const elementOf = (name: string): { name: string; type: AbapType } | undefined => {
+      const slot = slots.find((s) => s.name.toUpperCase() === name.toUpperCase());
+      if (slot === undefined) {
+        return undefined;
+      }
+      const field = isPlain(slot) ? slot : resolve(slot);
+      if (field === undefined) {
+        throw new ExpressionIssue("CDS022", `$projection.${name} is not a valid element`);
+      }
+      return { name: field.name, type: field.type };
+    };
+    return slots.flatMap((slot) => {
+      if (isPlain(slot)) {
+        return [slot];
+      }
+      const field = resolve(slot);
+      return field === undefined ? [] : [field];
+    });
+  }
+
+  private calculatedField(parsed: ParsedEntity, element: CdsElementAst, scope: ExpressionScope): FieldModel | undefined {
+    const { ast, file } = parsed;
+    const where = this.loc(file, element.loc);
+    const label = `${ast.name}.${element.name || "?"}`;
+    if (element.expr === undefined) {
+      this.diagnostics.error("CDS002", `${label}: ${element.expressionError ?? "this expression"} is not supported yet`, where);
+      return undefined;
+    }
+    try {
+      if (element.name === "") {
+        throw new ExpressionIssue("CDS022", "a calculated element needs a name (AS alias)");
+      }
+      if (element.key) {
+        throw new ExpressionIssue("CDS022", "a calculated element cannot be a key element");
+      }
+      const expression = resolveExpression(element.expr, scope);
+      const field = this.fieldFromElement(parsed, element, expression.type, undefined);
+      field.expression = expression;
+      return field;
+    } catch (error) {
+      if (!(error instanceof ExpressionIssue)) {
+        throw error;
+      }
+      this.diagnostics.error(error.code, `${label}: ${error.message}`, where);
+      return undefined;
+    }
+  }
+
+  // -------------------------------------------------------------------------------------------
   // view entities
 
   private view(parsed: ParsedEntity): EntityModel | undefined {
@@ -251,14 +328,10 @@ export class EntityResolver {
       return undefined;
     }
     const associationNames = new Set(ast.associations.map((a) => a.alias.toUpperCase()));
-    const fields: FieldModel[] = [];
+    const slots: Array<FieldModel | CdsElementAst> = [];
     for (const element of ast.elements) {
       if (element.path === undefined) {
-        this.diagnostics.error(
-          "CDS002",
-          `${ast.name}.${element.name || "?"}: expressions in the select list are not supported yet (${element.expression ?? ""})`,
-          this.loc(file, element.loc),
-        );
+        slots.push(element); // a calculated element (D64), resolved once the plain ones are known
         continue;
       }
       let path = element.path;
@@ -287,7 +360,7 @@ export class EntityResolver {
           this.diagnostics.warning("CDS009", `${ast.name}.${element.name}: client fields are not exposed (single tenant, decision D9)`, this.loc(file, element.loc));
           continue;
         }
-        fields.push(field);
+        slots.push(field);
       } else if (sourceEntity !== undefined) {
         const base = sourceEntity.fields.find((f) => f.name.toUpperCase() === sourceName.toUpperCase());
         if (base === undefined) {
@@ -296,9 +369,22 @@ export class EntityResolver {
         }
         const field = this.fieldFromElement(parsed, element, base.type, propagated(ast, base.annotations));
         field.baseField = base.name;
-        fields.push(field);
+        slots.push(field);
       }
     }
+    const fields = this.withCalculatedFields(parsed, slots, {
+      sourceName: table?.name ?? sourceEntity?.name ?? ast.source,
+      sourcePrefixes: [ast.source, ...(ast.sourceAlias === undefined ? [] : [ast.sourceAlias])],
+      associations: associationNames,
+      column: (name) => {
+        if (table !== undefined) {
+          const column = table.columns.find((c) => c.name === name.toLowerCase() && !c.client);
+          return column === undefined ? undefined : { name: column.name, type: column.type };
+        }
+        const base = sourceEntity?.fields.find((f) => f.name.toUpperCase() === name.toUpperCase() && f.draft !== true);
+        return base === undefined ? undefined : { name: base.name, type: base.type };
+      },
+    });
     if (table !== undefined) {
       this.addDataElementLabels(fields, table.name);
     }
@@ -406,13 +492,18 @@ export class EntityResolver {
       return undefined;
     }
     const fields: FieldModel[] = [];
+    const slots: Array<FieldModel | CdsElementAst> = [];
     const associations: AssociationModel[] = [];
     for (const element of ast.elements) {
       const source = element.path?.join(".") ?? "";
-      if (element.path === undefined || element.path.length !== 1) {
+      if (element.path === undefined) {
+        slots.push(element); // a calculated element (D64)
+        continue;
+      }
+      if (element.path.length !== 1) {
         this.diagnostics.error(
           "CDS002",
-          `${ast.name}.${element.name || "?"}: only elements of the projected entity can be projected (${element.expression ?? source})`,
+          `${ast.name}.${element.name || "?"}: path expressions (${source}) are not supported yet: only elements of the projected entity can be projected`,
           this.loc(file, element.loc),
         );
         continue;
@@ -458,8 +549,19 @@ export class EntityResolver {
       if (baseField.unitOfMeasure !== undefined && field.unitOfMeasure === undefined) {
         field.unitOfMeasure = projectedName(ast, baseField.unitOfMeasure);
       }
-      fields.push(field);
+      slots.push(field);
     }
+    fields.push(
+      ...this.withCalculatedFields(parsed, slots, {
+        sourceName: base.name,
+        sourcePrefixes: [base.name, ...(ast.sourceAlias === undefined ? [] : [ast.sourceAlias])],
+        associations: new Set(base.associations.map((a) => a.name.toUpperCase())),
+        column: (name) => {
+          const baseField = base.fields.find((f) => f.name.toUpperCase() === name.toUpperCase() && f.draft !== true);
+          return baseField === undefined ? undefined : { name: baseField.name, type: baseField.type };
+        },
+      }),
+    );
     // ON conditions: the pairs of the base association, renamed through both projections
     const entity: EntityModel = {
       name: ast.name,

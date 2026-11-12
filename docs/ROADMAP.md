@@ -19,6 +19,9 @@ dans [FEATURES.md](FEATURES.md), les écarts assumés dans [KNOWN_GAPS.md](../KN
 
 - Expressions CDS : `CAST` vers un type CDS ou un type énuméré, constantes `Type.#CONST` dans les
   vues.
+- Expressions CDS (suite de D64) : chemins d'association to-one (`_Agency.Name`, jointure gauche
+  dans la vue), `BETWEEN`, `$session.user` et `$session.system_language` (paramètres de session
+  PostgreSQL posés par requête).
 
 ## Autres pistes
 

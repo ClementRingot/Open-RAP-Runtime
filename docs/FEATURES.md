@@ -182,7 +182,7 @@ ajoutent ce que la fixture n'utilise pas : numérotation, feature control global
 | Types simples CDS (`define type x : abap.char(40);`) | ✅ | Objets DRTY (`.drty.acds`) : type et libellé des éléments (D55). |
 | Types énumérés CDS (`define type x : abap.char(1) enum { … }`) | ✅ | Valeurs de base en base ; constantes utilisables dans le behavior pool. Exposition OData : refusée en mode `standard` comme sur SAP (CDS021), `EnumType` en mode `enhanced` (D55). |
 | Vues standards `I_Region`, `I_CalendarDate`, `I_TimeZone`, `I_BusinessUserBasic`, `I_ExchangeRate` | ✅ | Calendrier généré, utilisateurs de l'IdP enregistrés à la connexion, taux de change à maintenir (D44). |
-| Expressions CDS (CASE, CAST, calculs, littéraux) | ❌ | Prévu après le MVP. |
+| Expressions CDS dans la liste de sélection (CASE, CAST, calculs, fonctions SQL, littéraux, `$projection`) | ✅ | Calculées par la vue PostgreSQL, type inféré ou donné par `CAST` (CDS022 sinon), lecture seule (`Core.Computed`), projections, brouillons (D64). Restent CDS002 : `$session.user`/`client`/`system_language`, chemins d'association, `BETWEEN`, agrégats, autres fonctions. |
 | Contrôle d'accès DCL (`define role … grant select on … where …`) | ✅ | Lectures OData filtrées pour l'utilisateur : `aspect pfcg_auth` (filtres `ACTVT = '03'`, n-uplets), `aspect user`, `?=`, comparaisons, `like`, `is [not] null`, `and`/`or`/`not`, chemins `_Assoc.Element` (to-one), `inheriting conditions from entity` (D35). Tests `rap-authorizations.test.ts`, `dcl.test.ts`. |
 | Side effects (`side effects { … }`) | ✅ | `Common.SideEffects` dans le `$metadata` ; l'UI générée ne les exploite pas encore (rechargement de l'objet après sauvegarde). |
 

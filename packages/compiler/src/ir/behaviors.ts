@@ -575,6 +575,9 @@ function checkMapping(model: EntityBehaviorModel, entity: EntityModel, at: (loc:
     ctx.diagnostics.error("BDEF008", `${entity.name}: mapping for ${model.mapping.table} does not match the persistent table ${table.name}`, loc);
   }
   for (const field of entity.fields) {
+    if (field.expression !== undefined) {
+      continue; // a calculated element (D64) has no column
+    }
     const column = model.mapping?.fields[field.name] ?? (entity.source === table.name ? field.column : undefined) ?? (model.mapping?.corresponding ? field.name.toLowerCase() : undefined);
     if (column === undefined) {
       ctx.diagnostics.error("BDEF009", `${entity.name}.${field.name}: no column of ${table.name} is mapped to this element`, loc);

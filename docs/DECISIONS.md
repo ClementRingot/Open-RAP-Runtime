@@ -1248,3 +1248,45 @@ et la conséquence. Les numéros D1 à D13 correspondent aux points 1 à 13 du �
   configurés). À activer une fois : *Settings → Pages → Source : GitHub Actions*.
 - **Pourquoi** : une adresse à partager, toujours à jour, sans serveur à maintenir.
 - **Tests** : rendu vérifié dans Chromium (bureau, mobile sans défilement horizontal, mode sombre).
+
+## D64 — Expressions dans les éléments des vues CDS
+
+- **Contexte** : un élément calculé de la liste de sélection (`CASE`, `CAST`, calcul, fonction,
+  littéral) était refusé (CDS002), alors que les vues RAP en ont souvent (texte de statut, montant
+  total, durée).
+- **Décision** : l'adaptateur transforme l'expression analysée par abaplint en arbre ; l'IR la
+  résout et la type (`FieldModel.expression` à la place de `column`) ; le générateur SQL la traduit
+  en PostgreSQL dans la vue (`CAST(… AS type)` autour du résultat, pour un type de colonne stable).
+  - **Pris en charge** : littéraux (chaîne, entier, décimal, `abap.xxx'…'`), colonnes de la
+    source, `$projection.Element`, `+ - * /` et parenthèses, `CASE` simple et recherché
+    (`= <> < > <= >=`, `[NOT] LIKE`, `IS [NOT] NULL`, `AND`, `OR`, `NOT`), `CAST( x AS abap.xxx )`
+    ou vers un élément de données, fonctions `concat`, `concat_with_space`, `substring`, `upper`,
+    `lower`, `length`, `left`, `right`, `ltrim`, `rtrim`, `replace`, `coalesce`, `div`, `division`,
+    `mod`, `abs`, `round`, `ceil`, `floor`, `dats_days_between`, `dats_add_days`, et
+    `$session.system_date` (`current_date`). Une projection reprend les éléments calculés de sa
+    vue et accepte elle-même des expressions sur les éléments de l'entité projetée.
+  - **Typage** : le `CAST` explicite l'emporte ; sinon, calcul sur des nombres (entiers : le plus
+    grand ; décimaux : précision et échelle combinées, 31 chiffres au plus ; `/` : `decfloat34`),
+    chaîne pour `concat` (longueurs additionnées), type commun des branches d'un `CASE`. Quand le
+    type ne se déduit pas (`NULL` seul, `+` sur une chaîne), CDS022 demande un `CAST`.
+  - **Sémantique ABAP** : les chaînes `CHAR` perdent leurs blancs de fin dans `concat` et
+    `length` ; `div` est une division entière, `division( a, b, d )` arrondit à `d` décimales ;
+    `/` donne un décimal (pas de division entière de PostgreSQL).
+  - **Lecture seule** : un élément calculé ne peut pas être clé (CDS022) ; il n'est ni dans le
+    mapping du BDEF, ni dans la table de brouillon, ni dans les écritures. En OData, il est
+    `Core.Computed` et ignoré dans le corps des requêtes (convention OData des propriétés
+    calculées).
+  - **Brouillons** : la vue de brouillon calcule l'expression sur les valeurs du brouillon ; une
+    colonne de la source que l'entité n'expose pas y vaut `NULL`. Dans le behavior pool (EML), la
+    valeur lue est celle de la vue active : elle reflète la dernière sauvegarde, pas les
+    modifications en cours de la transaction ; une instance de brouillon y a la valeur initiale.
+  - **Toujours CDS002** (message nommant la construction) : `$session.user`, `$session.client`,
+    `$session.system_language` (les vues SQL n'ont pas la session de la requête), chemins
+    d'association (`_Assoc.champ`), associations dans une expression, `BETWEEN`, agrégats, fonctions
+    SQL non listées, paramètres et filtres de chemin. Jointures et `WHERE` inchangés.
+- **Pourquoi** : PostgreSQL calcule à la lecture, comme la base HANA : `$filter` et `$orderby`
+  sur un élément calculé fonctionnent sans code à l'exécution, et la valeur reste cohérente avec
+  les données.
+- **Tests** : arbre de l'adaptateur, types inférés et diagnostics (CDS002, CDS004, CDS022), schéma
+  appliqué sur PGlite et valeurs lues dans la vue et la projection, `$metadata` (`Core.Computed`),
+  lecture OData, `PATCH` ignoré et valeurs calculées sur un brouillon puis après activation.

@@ -78,6 +78,9 @@ export class BoModel {
         const columnsOf = (table: TableModel): Map<string, string> => {
           const columns = new Map<string, string>();
           for (const field of entity.fields) {
+            if (field.expression !== undefined) {
+              continue; // a calculated element (D64) is computed by the view
+            }
             const mapped = Object.entries(behavior.mapping?.fields ?? {}).find(([f]) => same(f, field.name))?.[1];
             const column = (mapped ?? field.column ?? field.name).toLowerCase();
             if (table.columns.some((c) => c.name === column)) {
@@ -216,7 +219,8 @@ export class BoModel {
   }
 
   public characteristics(bo: BoEntity, field: string): FieldCharacteristic[] {
-    return Object.entries(bo.behavior.fieldCharacteristics).find(([f]) => same(f, field))?.[1] ?? [];
+    const own = Object.entries(bo.behavior.fieldCharacteristics).find(([f]) => same(f, field))?.[1] ?? [];
+    return this.field(bo, field)?.expression !== undefined && !own.includes("readonly") ? [...own, "readonly"] : own;
   }
 
   public field(bo: BoEntity, name: string): FieldModel | undefined {
