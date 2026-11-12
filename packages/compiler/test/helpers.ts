@@ -36,3 +36,30 @@ export function fixtureVariant(changes: Record<string, string | null | ((content
   }
   return { dir, cleanup: () => rmSync(dir, { recursive: true, force: true }) };
 }
+
+/** The content with LF line endings (the checkout may have CRLF ones). */
+export const lf = (content: string): string => content.replace(/\r\n/g, "\n");
+
+/** Calculated elements (D67) in the Travel view and its projection. */
+export const CALCULATED_CHANGES: Record<string, (content: string) => string> = {
+  "zrt_r_travel.ddls.asddls": (c) =>
+    lf(c).replace(
+      "      _Booking\n",
+      [
+        "      @Semantics.amount.currencyCode: 'CurrencyCode'",
+        "      booking_fee + total_price as TotalWithFee,",
+        "      case overall_status when 'A' then 'Accepted' when 'X' then 'Cancelled' else 'Open' end as StatusText,",
+        "      concat_with_space( description, cast( agency_id as abap.char( 6 ) ), 1 ) as Label,",
+        "      dats_days_between( begin_date, end_date ) as Duration,",
+        "      division( total_price, 3, 2 ) as Third,",
+        "      cast( case when total_price >= 1000 and $projection.Duration > 3 then 'X' else '' end as abap_boolean ) as IsExpensive,",
+        "      _Booking",
+        "",
+      ].join("\n"),
+    ),
+  "zrt_c_travel.ddls.asddls": (c) =>
+    lf(c).replace(
+      "      _Booking : redirected",
+      ["      TotalWithFee,", "      StatusText,", "      Label,", "      Duration,", "      Third,", "      IsExpensive,", "      Duration * 2 as DoubleDuration,", "      upper( Description ) as DescriptionUpper,", "      _Booking : redirected"].join("\n"),
+    ),
+};

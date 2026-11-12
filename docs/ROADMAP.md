@@ -19,6 +19,9 @@ What is planned, with the design elements already known. The available features 
 
 - CDS expressions: `CAST` to a CDS type or an enumerated type, `Type.#CONST` constants in the
   views.
+- CDS expressions (continuation of D67): to-one association paths (`_Agency.Name`, left join in
+  the view), `BETWEEN`, `$session.user` and `$session.system_language` (PostgreSQL session
+  parameters set per request).
 
 ## Other leads
 

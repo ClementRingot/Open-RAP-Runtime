@@ -434,6 +434,9 @@ export class RapWriteHandler implements WriteHandler {
       if (property?.field.draft === true) {
         continue; // IsActiveEntity, HasDraftEntity… sent back by clients (D54)
       }
+      if (property?.property.calculated === true) {
+        continue; // a calculated element (D67) is computed: its value in a body is ignored (Core.Computed)
+      }
       if (property === undefined) {
         if (set.info.navigations.has(name)) {
           navigations.set(name, value);

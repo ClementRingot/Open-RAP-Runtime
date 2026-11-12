@@ -69,7 +69,8 @@ export class DraftRuntime {
   private rowOf(bo: BoEntity, raw: Record<string, unknown>): Row & { DraftUUID: string; HasActiveEntity: boolean } {
     const row: Row = {};
     for (const field of bo.fields) {
-      row[field.name] = fromSql(field.type, raw[field.name]);
+      // a calculated element (D67) has no column in the draft table: the draft view computes it
+      row[field.name] = field.expression !== undefined ? initialValue(field.type) : fromSql(field.type, raw[field.name]);
     }
     return { ...row, DraftUUID: String(raw["DraftUUID"]), HasActiveEntity: raw["HasActiveEntity"] === true };
   }
@@ -90,8 +91,9 @@ export class DraftRuntime {
   }
 
   private async insert(db: Kysely<unknown>, bo: BoEntity, row: Row, draftUuid: string, hasActive: boolean): Promise<void> {
-    const columns = [...bo.fields.map((f) => sql.id(f.name)), sql.id("DraftUUID"), sql.id("HasActiveEntity")];
-    const values = [...bo.fields.map((f) => sql`${toSql(f.type, (row[f.name] ?? initialValue(f.type)) as CanonicalValue)}`), sql`${draftUuid}`, sql`${hasActive}`];
+    const stored = bo.fields.filter((f) => f.expression === undefined);
+    const columns = [...stored.map((f) => sql.id(f.name)), sql.id("DraftUUID"), sql.id("HasActiveEntity")];
+    const values = [...stored.map((f) => sql`${toSql(f.type, (row[f.name] ?? initialValue(f.type)) as CanonicalValue)}`), sql`${draftUuid}`, sql`${hasActive}`];
     await sql`INSERT INTO ${sql.table(this.table(bo))} (${sql.join(columns)}) VALUES (${sql.join(values)})`.execute(db);
     await this.touch(db, bo, row);
   }

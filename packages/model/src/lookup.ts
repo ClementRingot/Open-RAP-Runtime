@@ -98,11 +98,14 @@ export function baseEntityOf(model: Pick<Model, "entities">, entity: EntityModel
   return current;
 }
 
-/** The field of the base view entity a projection field ends up at. */
+/** The field of the base view entity a projection field ends up at; undefined for an expression of a projection (D67). */
 export function baseFieldOf(model: Pick<Model, "entities">, entity: EntityModel, field: FieldModel): FieldModel | undefined {
   let currentEntity = entity;
   let currentField: FieldModel | undefined = field;
   while (currentEntity.kind === "projection" && currentEntity.source !== undefined && currentField !== undefined) {
+    if (currentField.expression !== undefined) {
+      return undefined;
+    }
     const next = findEntity(model, currentEntity.source);
     if (next === undefined) {
       return undefined;
@@ -111,6 +114,24 @@ export function baseFieldOf(model: Pick<Model, "entities">, entity: EntityModel,
     currentEntity = next;
   }
   return currentField;
+}
+
+/** A calculated element (D67), or the projection of one: read-only, computed by the SQL views. */
+export function isCalculatedField(model: Pick<Model, "entities">, entity: EntityModel, field: FieldModel): boolean {
+  let currentEntity: EntityModel | undefined = entity;
+  let currentField: FieldModel | undefined = field;
+  for (let depth = 0; depth < 20 && currentEntity !== undefined && currentField !== undefined; depth++) {
+    if (currentField.expression !== undefined) {
+      return true;
+    }
+    if (currentEntity.kind !== "projection" || currentEntity.source === undefined) {
+      return false;
+    }
+    const name: string = currentField.baseField ?? currentField.name;
+    currentEntity = findEntity(model, currentEntity.source);
+    currentField = currentEntity === undefined ? undefined : findField(currentEntity, name);
+  }
+  return false;
 }
 
 /** How an entity of a managed BO is saved: by the runtime, the runtime and save_modified, save_modified alone. */

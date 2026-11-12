@@ -10,6 +10,7 @@ import {
   baseEntityOf,
   baseFieldOf,
   findEntityBehavior,
+  findField,
   isUuid,
   same,
   type AbapType,
@@ -20,6 +21,7 @@ import {
   type TableModel,
 } from "@rap-transpiler/model";
 import { standardRows, standardSql } from "../standard/index.js";
+import { calculatedColumn, type SqlRefs } from "./sql-expressions.js";
 
 export function quoteIdentifier(name: string): string {
   return `"${name.replace(/"/g, '""')}"`;
@@ -219,10 +221,18 @@ function createView(model: Model, entity: EntityModel): string {
   const source = entity.source ?? "";
   const sourceEntity = sourceEntityOf(model, entity);
   const from = sourceEntity?.sqlView ?? source.toLowerCase();
-  const columns = entity.fields.filter((field) => field.draft !== true).map((field) => {
-    const expression = sourceEntity === undefined ? field.column ?? field.name.toLowerCase() : field.baseField ?? field.name;
-    return `  ${quoteIdentifier(expression)} AS ${quoteIdentifier(field.name)}`;
-  });
+  const plainColumn = (field: FieldModel): string =>
+    quoteIdentifier(sourceEntity === undefined ? field.column ?? field.name.toLowerCase() : field.baseField ?? field.name);
+  const refs: SqlRefs = {
+    column: (name) => quoteIdentifier(name),
+    element: (name) => {
+      const target = findField(entity, name);
+      return target === undefined ? "NULL" : fieldSql(target);
+    },
+  };
+  const fieldSql = (field: FieldModel): string =>
+    field.expression === undefined ? plainColumn(field) : calculatedColumn(field.expression, field.type, sqlType, refs);
+  const columns = entity.fields.filter((field) => field.draft !== true).map((field) => `  ${fieldSql(field)} AS ${quoteIdentifier(field.name)}`);
   return `CREATE VIEW ${quoteIdentifier(entity.sqlView ?? "")} AS SELECT\n${columns.join(",\n")}\nFROM ${quoteIdentifier(from)};\n`;
 }
 
@@ -444,7 +454,7 @@ function draftTables(model: Model): string[] {
       }
       done.add(entityBehavior.draftTable);
       const lines = entity.fields
-        .filter((f) => f.draft !== true)
+        .filter((f) => f.draft !== true && f.expression === undefined)
         .map((f) => `  ${columnDefinition({ name: f.name, type: f.type, key: f.key, notNull: f.key, client: false })}`);
       lines.push('  "DraftUUID" uuid NOT NULL', '  "HasActiveEntity" boolean NOT NULL DEFAULT false', '  "DraftEntityCreationDateTime" timestamptz(6) NOT NULL DEFAULT now()', '  "DraftEntityLastChangeDateTime" timestamptz(6) NOT NULL DEFAULT now()');
       lines.push(`  PRIMARY KEY (${entity.fields.filter((f) => f.key && f.draft !== true).map((f) => quoteIdentifier(f.name)).join(", ")})`);
@@ -496,11 +506,44 @@ SELECT ${fields.map((f) => `a.${quoteIdentifier(f.name)}`).join(", ")}, TRUE AS 
   (SELECT d."DraftUUID" FROM ${quoteIdentifier(draft.table)} d WHERE ${exists} LIMIT 1) AS "DraftUUID"
 FROM ${quoteIdentifier(entity.sqlView ?? "")} a
 UNION ALL
-SELECT ${fields.map((f) => `d.${quoteIdentifier(baseName(f))} AS ${quoteIdentifier(f.name)}`).join(", ")}, FALSE, d."HasActiveEntity", FALSE, d."DraftUUID"
+SELECT ${fields.map((f) => `${draftFieldSql(model, entity, f)} AS ${quoteIdentifier(f.name)}`).join(", ")}, FALSE, d."HasActiveEntity", FALSE, d."DraftUUID"
 FROM ${quoteIdentifier(draft.table)} d;
 `);
   }
   return statements.length === 0 ? [] : ["-- active instances and drafts of the exposed entities (D54)", ...statements];
+}
+
+/**
+ * A field of an entity of a draft BO read from its draft table `d`: the column of its base field,
+ * or its calculated element (D67) computed from the draft values (NULL for a column of the data
+ * source the base entity does not expose).
+ */
+function draftFieldSql(model: Model, entity: EntityModel, field: FieldModel, depth = 0): string {
+  const source = entity.kind === "projection" ? sourceEntityOf(model, entity) : undefined;
+  if (field.expression !== undefined && depth < 20) {
+    const refs: SqlRefs = {
+      column: (name, type) => {
+        if (source !== undefined) {
+          const sourceField = findField(source, name);
+          return sourceField === undefined ? `NULL::${sqlType(type)}` : draftFieldSql(model, source, sourceField, depth + 1);
+        }
+        const exposed = entity.fields.find((f) => f.expression === undefined && f.draft !== true && same(f.column ?? f.baseField ?? "", name));
+        return exposed === undefined ? `NULL::${sqlType(type)}` : `d.${quoteIdentifier(exposed.name)}`;
+      },
+      element: (name, type) => {
+        const target = findField(entity, name);
+        return target === undefined ? `NULL::${sqlType(type)}` : draftFieldSql(model, entity, target, depth + 1);
+      },
+    };
+    return calculatedColumn(field.expression, field.type, sqlType, refs);
+  }
+  if (source !== undefined) {
+    const sourceField = findField(source, field.baseField ?? field.name);
+    if (sourceField !== undefined) {
+      return draftFieldSql(model, source, sourceField, depth + 1);
+    }
+  }
+  return `d.${quoteIdentifier(field.name)}`;
 }
 
 /**

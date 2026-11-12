@@ -148,7 +148,29 @@ export class Transaction {
     const conditions = bo.keys.map((k) => sql`${sql.id(bo.columns.get(k.name) ?? abapName(k.name))} = ${toSql(k.type, key[k.name] ?? null)}`);
     const result = await sql<Record<string, unknown>>`SELECT * FROM ${sql.id(bo.table.name)} WHERE ${sql.join(conditions, sql` AND `)}`.execute(this.db);
     const record = result.rows[0];
-    return record === undefined ? undefined : this.fromRecord(bo, record);
+    return record === undefined ? undefined : (await this.withCalculated(bo, [this.fromRecord(bo, record)]))[0];
+  }
+
+  /**
+   * The calculated elements (D67) of instances read from the persistent table, read from the CDS
+   * view: their values as of the last save.
+   */
+  private async withCalculated(bo: BoEntity, rows: Row[]): Promise<Row[]> {
+    const calculated = bo.fields.filter((f) => f.expression !== undefined);
+    const view = bo.entity.sqlView;
+    if (calculated.length === 0 || view === undefined || same(view, bo.table.name) || rows.length === 0) {
+      return rows;
+    }
+    const byKey = (row: Row): ReturnType<typeof sql> => sql`(${sql.join(bo.keys.map((k) => sql`${sql.id(k.name)} = ${toSql(k.type, row[k.name] ?? null)}`), sql` AND `)})`;
+    const result = await sql<Record<string, unknown>>`SELECT ${sql.join([...bo.keys, ...calculated].map((f) => sql.id(f.name)))} FROM ${sql.id(view)} WHERE ${sql.join(rows.map(byKey), sql` OR `)}`.execute(this.db);
+    const records = new Map(result.rows.map((record) => [keyString(bo, Object.fromEntries(bo.keys.map((k) => [k.name, fromSql(k.type, record[k.name])])) as Row), record]));
+    for (const row of rows) {
+      const record = records.get(keyString(bo, row));
+      for (const field of calculated) {
+        row[field.name] = record === undefined ? initialValue(field.type) : fromSql(field.type, record[field.name]);
+      }
+    }
+    return rows;
   }
 
   private fromRecord(bo: BoEntity, record: Record<string, unknown>): Row {
@@ -208,12 +230,15 @@ export class Transaction {
     const read =
       target.entity.kind === "custom"
         ? await this.readCustom(target, conditions.map(({ field, value }) => ({ name: field.name, value: value as CanonicalValue })))
-        : (
-            await sql<Record<string, unknown>>`SELECT * FROM ${sql.id(target.table.name)} WHERE ${sql.join(
-              conditions.map(({ field, value }) => sql`${sql.id(target.columns.get(field.name) ?? abapName(field.name))} = ${toSql(field.type, value)}`),
-              sql` AND `,
-            )}`.execute(this.db)
-          ).rows.map((record) => this.fromRecord(target, record));
+        : await this.withCalculated(
+            target,
+            (
+              await sql<Record<string, unknown>>`SELECT * FROM ${sql.id(target.table.name)} WHERE ${sql.join(
+                conditions.map(({ field, value }) => sql`${sql.id(target.columns.get(field.name) ?? abapName(field.name))} = ${toSql(field.type, value)}`),
+                sql` AND `,
+              )}`.execute(this.db)
+            ).rows.map((record) => this.fromRecord(target, record)),
+          );
     const rows = new Map<string, Row>();
     for (const row of read) {
       const id = this.id(target, row);

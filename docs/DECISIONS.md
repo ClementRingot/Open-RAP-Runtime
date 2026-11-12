@@ -1360,6 +1360,47 @@ correspond to points 1 to 13 of §11 of PLAN.md. The milestones M1 to M6 are tho
 - **Tests**: `vscode/test/rapt.test.ts` (folders of the projects and of the applications,
   `chosen`, List Report kept).
 
+## D67 — Expressions in the elements of the CDS views
+
+- **Context**: a calculated element of the select list (`CASE`, `CAST`, calculation, function,
+  literal) was refused (CDS002), while RAP views often have some (status text, total amount,
+  duration).
+- **Decision**: the adapter turns the expression parsed by abaplint into a tree; the IR resolves
+  and types it (`FieldModel.expression` instead of `column`); the SQL generator translates it to
+  PostgreSQL in the view (`CAST(… AS type)` around the result, for a stable column type).
+  - **Supported**: literals (string, integer, decimal, `abap.xxx'…'`), columns of the source,
+    `$projection.Element`, `+ - * /` and parentheses, simple and searched `CASE`
+    (`= <> < > <= >=`, `[NOT] LIKE`, `IS [NOT] NULL`, `AND`, `OR`, `NOT`), `CAST( x AS abap.xxx )`
+    or to a data element, functions `concat`, `concat_with_space`, `substring`, `upper`, `lower`,
+    `length`, `left`, `right`, `ltrim`, `rtrim`, `replace`, `coalesce`, `div`, `division`, `mod`,
+    `abs`, `round`, `ceil`, `floor`, `dats_days_between`, `dats_add_days`, and
+    `$session.system_date` (`current_date`). A projection takes the calculated elements of its
+    view and accepts expressions itself on the elements of the projected entity.
+  - **Typing**: the explicit `CAST` wins; otherwise, calculation on numbers (integers: the
+    largest; decimals: precision and scale combined, 31 digits at most; `/`: `decfloat34`),
+    string for `concat` (lengths added), common type of the branches of a `CASE`. When the type
+    cannot be derived (`NULL` alone, `+` on a string), CDS022 asks for a `CAST`.
+  - **ABAP semantics**: `CHAR` strings lose their trailing blanks in `concat` and `length`; `div`
+    is an integer division, `division( a, b, d )` rounds to `d` decimals; `/` gives a decimal (no
+    integer division of PostgreSQL).
+  - **Read-only**: a calculated element cannot be a key (CDS022); it is neither in the mapping of
+    the BDEF, nor in the draft table, nor in the writes. In OData, it is `Core.Computed` and
+    ignored in the body of the requests (OData convention of computed properties).
+  - **Drafts**: the draft view computes the expression on the values of the draft; a column of
+    the source that the entity does not expose is `NULL` there. In the behavior pool (EML), the
+    value read is the one of the active view: it reflects the last save, not the current changes
+    of the transaction; a draft instance has the initial value there.
+  - **Still CDS002** (message naming the construct): `$session.user`, `$session.client`,
+    `$session.system_language` (the SQL views do not have the session of the request),
+    association paths (`_Assoc.field`), associations in an expression, `BETWEEN`, aggregates, SQL
+    functions not listed, parameters and path filters. Joins and `WHERE` unchanged.
+- **Why**: PostgreSQL computes on read, like the HANA database: `$filter` and `$orderby` on a
+  calculated element work without code at runtime, and the value stays consistent with the data.
+- **Tests**: tree of the adapter, inferred types and diagnostics (CDS002, CDS004, CDS022), schema
+  applied on PGlite and values read in the view and the projection, `$metadata`
+  (`Core.Computed`), OData read, `PATCH` ignored and values computed on a draft then after
+  activation.
+
 ## D68 — Filter value help: *Search and Select* and *Define Conditions*
 
 - **Context**: the filter fields of the List Report (and of the ALP) accepted typed conditions

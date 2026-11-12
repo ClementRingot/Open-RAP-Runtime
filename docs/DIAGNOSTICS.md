@@ -16,7 +16,7 @@ exit code is 1 as soon as there is an error (or a warning with `--warnings-as-er
 | SRVD007 | info | Several service definitions: the one with a binding is built (the others, of a service consumption model for example, are not) |
 | SRVD008 | error | `--binding-type` other than `ui` or `webapi` (D60) |
 | CDS001 | error | Unreadable CDS source |
-| CDS002 | error or warning | Unsupported CDS construct |
+| CDS002 | error or warning | Unsupported CDS construct; in a calculated element, the message names the construct (association path, session variable other than `$session.system_date`, `BETWEEN`, aggregate, unsupported SQL function) (D67) |
 | CDS003 | error | Unknown data source or projected entity |
 | CDS004 | error | Unknown element in the source |
 | CDS005 | error | Unknown association or redirection target |
@@ -36,6 +36,7 @@ exit code is 1 as soon as there is an error (or a warning with `--warnings-as-er
 | CDS019 | error | Table entity name longer than 25 characters (D55) |
 | CDS020 | error | Table entity element: `null` key, key after a non-key element, `abap.string` or `abap.rawstring` without `null` (D55) |
 | CDS021 | error | Element of a CDS enumerated type in an exposed entity: SAP does not expose enumerated types in RAP OData services. In `enhanced` mode, OData enumeration type (D55) |
+| CDS022 | error | Invalid calculated element: type that cannot be derived (`NULL` alone, calculation on a string: add a `CAST`), unknown type in a `CAST`, number of arguments of a function, circular or unknown `$projection` reference, calculated element that is a key or has no alias (D67) |
 | TYPE001 | error | Unreadable CDS type source (`.drty.acds`), or name different from the one of the file (D55) |
 | TYPE002 | error | CDS type based on an unknown type (D55) |
 | TYPE003 | error | Wrong CDS enumerated type: base type (`abap.int1`, `int2`, `int4`, `char(1..8)`, `numc(1..8)`), not exactly one `initial` constant, value outside the base type, duplicate constants or values (D55) |

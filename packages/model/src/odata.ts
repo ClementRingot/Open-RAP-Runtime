@@ -5,7 +5,7 @@
 
 import { edmTypeOf, type AbapType, type EdmEnum, type EdmType } from "./abap-types.js";
 import { getAnnotation, getBoolean } from "./annotations.js";
-import { baseEntityOf, entitySetOfEntity, findEntity, findEntityBehavior, same } from "./lookup.js";
+import { baseEntityOf, entitySetOfEntity, findEntity, findEntityBehavior, isCalculatedField, same } from "./lookup.js";
 import type { ActionModel, EntityBehaviorModel, EntityModel, FieldCharacteristic, FieldModel, Model } from "./model.js";
 
 export const SCHEMA_ALIAS = "SAP__self";
@@ -28,6 +28,8 @@ export interface ODataProperty {
   mandatory: boolean;
   /** features : instance (Common.FieldControl through __FieldControl). */
   dynamic: boolean;
+  /** A calculated element (D67): computed by the SQL views, ignored in request bodies. */
+  calculated?: true;
 }
 
 export interface ODataNavigation {
@@ -170,7 +172,9 @@ export function characteristicsOf(model: Model, entity: EntityModel, field: Fiel
   const baseField = baseFieldName(model, entity, field);
   const fromBase = behavior.base === undefined || baseField === undefined ? [] : (behavior.base.fieldCharacteristics[baseField] ?? []);
   const fromProjection = behavior.projection?.fieldCharacteristics[field.name] ?? [];
-  return [...new Set([...fromBase, ...fromProjection])];
+  // a calculated element (D67) is computed by the view: read-only
+  const calculated: FieldCharacteristic[] = isCalculatedField(model, entity, field) ? ["readonly"] : [];
+  return [...new Set([...fromBase, ...fromProjection, ...calculated])];
 }
 
 function baseFieldName(model: Model, entity: EntityModel, field: FieldModel): string | undefined {
@@ -178,6 +182,9 @@ function baseFieldName(model: Model, entity: EntityModel, field: FieldModel): st
   let current: string | undefined = field.name;
   while (currentEntity !== undefined && currentEntity.kind === "projection" && current !== undefined) {
     const f: FieldModel | undefined = currentEntity.fields.find((x) => same(x.name, current as string));
+    if (f?.expression !== undefined) {
+      return undefined; // an expression of the projection (D67): no base field
+    }
     current = f?.baseField ?? f?.name;
     currentEntity = currentEntity.source === undefined ? undefined : findEntity(model, currentEntity.source);
   }
@@ -328,6 +335,7 @@ export function buildODataService(model: Model): ODataService {
         immutable: characteristics.includes("readonlyUpdate"),
         mandatory: characteristics.includes("mandatory") || characteristics.includes("mandatoryCreate"),
         dynamic: model.service.webApi !== true && characteristics.includes("featuresInstance"),
+        ...(isCalculatedField(model, entity, field) ? { calculated: true as const } : {}),
       });
     }
     const entityType: ODataEntityType = {

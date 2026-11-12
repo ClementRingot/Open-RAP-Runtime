@@ -157,7 +157,25 @@ in the wizards of ADT; the abapGit XML is written with it ([D46](DECISIONS.md)).
   `if_rap_query_provider` class).
 - Access controls (DCL): `grant select … where`, `aspect pfcg_auth`, `aspect user`
   ([D35](DECISIONS.md)).
-- No expressions in the select list (CASE, CAST, calculations, paths): CDS002.
+- Calculated elements in the select list ([D67](DECISIONS.md)): `CASE`, `CAST`, `+ - * /`,
+  literals, `$projection.Element`, `$session.system_date` and the common SQL functions
+  (`concat`, `concat_with_space`, `substring`, `upper`, `lower`, `length`, `left`, `right`,
+  `ltrim`, `rtrim`, `replace`, `coalesce`, `div`, `division`, `mod`, `abs`, `round`, `ceil`,
+  `floor`, `dats_days_between`, `dats_add_days`). PostgreSQL computes them in the view; they are
+  read-only (`Core.Computed`, ignored in the writes) and cannot be keys. A projection takes them
+  and can define its own:
+
+  ```cds
+  case overall_status when 'A' then 'Accepted' else 'Open' end as StatusText,
+  booking_fee + total_price                                    as TotalWithFee,
+  cast( dats_days_between( begin_date, end_date ) as abap.int4 ) as Duration,
+  ```
+
+  Without a `CAST`, the type is derived from the operands; when it cannot be derived (`NULL`
+  alone, calculation on a string), CDS022 asks for a `CAST`. In a draft, the value is computed on
+  the values of the draft; read with EML in the behavior pool, it is the one of the last save.
+- Still refused (CDS002): association paths (`_Agency.Name`), `$session.user`,
+  `$session.client`, `$session.system_language`, `BETWEEN`, aggregates, other SQL functions.
 
 #### Table entities and CDS types ([D55](DECISIONS.md))
 

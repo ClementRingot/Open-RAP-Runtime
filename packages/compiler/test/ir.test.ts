@@ -3,7 +3,7 @@ import { afterEach, describe, expect, it } from "vitest";
 import { formatDiagnostic, type Diagnostic } from "../src/diagnostics.js";
 import { loadProject } from "../src/input/project.js";
 import { buildModel } from "../src/ir/builder.js";
-import { FIXTURE_DIR, fixtureVariant } from "./helpers.js";
+import { CALCULATED_CHANGES, FIXTURE_DIR, fixtureVariant, lf } from "./helpers.js";
 
 function fixtureModel(): Model {
   const { model, diagnostics } = buildModel(loadProject(FIXTURE_DIR));
@@ -163,5 +163,74 @@ describe("IR diagnostics", () => {
   it("checks the projection against its base behavior", () => {
     const items = diagnosticsOf({ "zrt_c_travel.bdef.asbdef": (c) => c.replace("use action acceptTravel;", "use action acceptTravel;\n  use action reCalcTotalPrice;") });
     expect(items).toContainEqual(expect.objectContaining({ code: "BDEF023", message: "ZRT_C_Travel: use action reCalcTotalPrice, but ZRT_R_Travel has no public action reCalcTotalPrice" }));
+  });
+});
+
+describe("calculated elements (D67)", () => {
+  let cleanup: (() => void) | undefined;
+  afterEach(() => cleanup?.());
+
+  function build(changes: Parameters<typeof fixtureVariant>[0]): { model: Model; diagnostics: Diagnostic[] } {
+    const variant = fixtureVariant(changes);
+    cleanup = variant.cleanup;
+    const { model, diagnostics } = buildModel(loadProject(variant.dir));
+    if (model === undefined) throw new Error(diagnostics.items.map(formatDiagnostic).join("\n"));
+    return { model, diagnostics: diagnostics.items };
+  }
+
+  const view = "zrt_r_travel.ddls.asddls";
+  const withElement = (line: string) => ({ [view]: (c: string) => lf(c).replace("      _Booking\n", `      ${line},\n      _Booking\n`) });
+
+  it("resolves and types the expressions of a view and passes them through its projection", () => {
+    const { model, diagnostics } = build(CALCULATED_CHANGES);
+    expect(diagnostics.filter((d) => d.severity === "error").map(formatDiagnostic)).toEqual([]);
+    const travel = findEntity(model, "ZRT_R_Travel");
+    const field = (name: string) => travel?.fields.find((f) => f.name === name);
+    expect(field("TotalWithFee")).toMatchObject({ type: { kind: "dec", length: 17, decimals: 2 }, currencyCode: "CurrencyCode", expression: { kind: "arithmetic", operator: "+" } });
+    expect(field("TotalWithFee")?.column).toBeUndefined();
+    expect(field("StatusText")?.type).toEqual({ kind: "char", length: 9 });
+    expect(field("Label")?.type).toEqual({ kind: "char", length: 263 });
+    expect(field("Duration")?.type).toEqual({ kind: "int4" });
+    expect(field("Third")?.type).toEqual({ kind: "dec", length: 31, decimals: 2 });
+    expect(field("IsExpensive")?.type).toMatchObject({ kind: "bool", dataElement: "ABAP_BOOLEAN" });
+    expect(field("IsExpensive")?.expression).toMatchObject({
+      kind: "cast",
+      operand: { kind: "case", branches: [{ when: { kind: "and", right: { left: { kind: "element", name: "Duration" } } } }] },
+    });
+    const projection = findEntity(model, "ZRT_C_Travel");
+    expect(projection?.fields.find((f) => f.name === "TotalWithFee")).toMatchObject({ baseField: "TotalWithFee", currencyCode: "CurrencyCode" });
+    expect(projection?.fields.find((f) => f.name === "DoubleDuration")).toMatchObject({ type: { kind: "int4" }, expression: { kind: "arithmetic", left: { kind: "column", name: "Duration" } } });
+    expect(projection?.fields.find((f) => f.name === "DescriptionUpper")?.type).toEqual({ kind: "char", length: 256 });
+  });
+
+  it("keeps CDS002 for what is not supported, naming the construct", () => {
+    const message = (line: string): string[] =>
+      build(withElement(line))
+        .diagnostics.filter((d) => d.severity === "error")
+        .map((d) => `${d.code} ${d.message}`);
+    expect(message("$session.user as CurrentUser")).toEqual([
+      "CDS002 ZRT_R_Travel.CurrentUser: session variable $session.user is not supported (the SQL views have no session of the request; only $session.system_date)",
+    ]);
+    expect(message("concat( _Booking.BookingID, 'x' ) as FirstBooking")).toEqual(["CDS002 ZRT_R_Travel.FirstBooking: path expressions (_Booking.BookingID) are not supported yet"]);
+    expect(message("count( * ) as Bookings")).toEqual(["CDS002 ZRT_R_Travel.Bookings: aggregate functions (count ( * )) is not supported yet"]);
+    expect(message("instr( description, 'a' ) as Position")).toEqual(["CDS002 ZRT_R_Travel.Position: the SQL function INSTR is not supported yet"]);
+  });
+
+  it("reports invalid expressions with CDS022", () => {
+    const message = (line: string): string[] =>
+      build(withElement(line))
+        .diagnostics.filter((d) => d.severity === "error")
+        .map((d) => `${d.code} ${d.message}`);
+    expect(message("null as Nothing")).toEqual(["CDS022 ZRT_R_Travel.Nothing: the type of NULL cannot be inferred: use CAST( NULL AS type )"]);
+    expect(message("description + 1 as Bad")).toEqual(["CDS022 ZRT_R_Travel.Bad: operator + needs numeric operands (char); use CAST or a function"]);
+    expect(message("cast( description as zunknown_type ) as Bad")).toEqual([
+      "CDS022 ZRT_R_Travel.Bad: unknown type zunknown_type in CAST (a built-in type abap.xxx or a data element of the sources)",
+    ]);
+    expect(message("$projection.B + 1 as A,\n      $projection.A + 1 as B")).toEqual([
+      "CDS022 ZRT_R_Travel.B: circular reference through $projection.A",
+      "CDS022 ZRT_R_Travel.A: $projection.B is not a valid element",
+    ]);
+    const key = build({ [view]: (c) => lf(c).replace("key travel_uuid           as TravelUUID,", "key travel_uuid           as TravelUUID,\n  key concat( travel_id, 'x' ) as CalcKey,") });
+    expect(key.diagnostics.filter((d) => d.severity === "error").map((d) => `${d.code} ${d.message}`)).toEqual(["CDS022 ZRT_R_Travel.CalcKey: a calculated element cannot be a key element"]);
   });
 });

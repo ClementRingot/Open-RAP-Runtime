@@ -5,6 +5,7 @@
 
 import * as abaplint from "@abaplint/core";
 import { setAnnotation, type AnnotationObject, type AnnotationValue, type Annotations } from "@rap-transpiler/model";
+import { CdsExpressionError, parseCdsExpression, type CdsExprAst } from "./expression-ast.js";
 
 type Node = abaplint.INode;
 const E = abaplint.ExpressionsCDS;
@@ -22,6 +23,10 @@ export interface CdsElementAst {
   path?: string[];
   /** Text of an expression that is not a plain path (CAST, CASE, literal…). */
   expression?: string;
+  /** The parsed expression (D67); undefined with `expressionError` when a construct is not supported. */
+  expr?: CdsExprAst;
+  /** The unsupported construct of `expression`. */
+  expressionError?: string;
   /** `name : abap.char( 10 )` or `name : data_element` in abstract entities. */
   declaredType?: string;
   /** Table entities (D55): `name : type null`. */
@@ -281,13 +286,21 @@ class AdapterContext {
         isExpression(c) && !(c.get() instanceof E.CDSAnnotation) && !(c.get() instanceof E.CDSAs) && !(c.get() instanceof E.CDSName),
     );
     const element: CdsElementAst = { name: alias ?? "", key, annotations, loc: this.loc(expressionNode ?? node) };
-    if (expressionNode !== undefined && expressionNode.get() instanceof E.CDSPrefixedName) {
+    if (expressionNode !== undefined && expressionNode.get() instanceof E.CDSPrefixedName && !/^(\$|null$|\d)/i.test(expressionNode.concatTokens())) {
       const path = this.path(expressionNode);
       element.path = path;
       element.name = alias ?? path[path.length - 1] ?? "";
     } else if (expressionNode !== undefined) {
       element.expression = expressionNode.concatTokens();
       element.name = alias ?? "";
+      try {
+        element.expr = parseCdsExpression(expressionNode);
+      } catch (error) {
+        if (!(error instanceof CdsExpressionError)) {
+          throw error;
+        }
+        element.expressionError = error.message;
+      }
     }
     if (tokens.includes("REDIRECTED")) {
       const target = node.findDirectExpressions(E.CDSName).map((n) => n.concatTokens());
