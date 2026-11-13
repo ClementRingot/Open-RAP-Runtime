@@ -1,4 +1,5 @@
 import { cpSync, existsSync, mkdtempSync, mkdirSync, readFileSync, readdirSync, copyFileSync, writeFileSync, rmSync } from "node:fs";
+import { createServer } from "node:net";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -63,3 +64,28 @@ export const CALCULATED_CHANGES: Record<string, (content: string) => string> = {
       ["      TotalWithFee,", "      StatusText,", "      Label,", "      Duration,", "      Third,", "      IsExpensive,", "      Duration * 2 as DoubleDuration,", "      upper( Description ) as DescriptionUpper,", "      _Booking : redirected"].join("\n"),
     ),
 };
+
+/**
+ * Ports no other process listens on, given by the system: random ports collided with the servers
+ * of the other test files running at the same time (EADDRINUSE).
+ */
+export async function freePorts(count: number): Promise<number[]> {
+  const servers = await Promise.all(
+    Array.from(
+      { length: count },
+      () =>
+        new Promise<ReturnType<typeof createServer>>((resolve) => {
+          const server = createServer();
+          server.listen(0, "127.0.0.1", () => resolve(server));
+        }),
+    ),
+  );
+  const ports = servers.map((s) => (s.address() as { port: number }).port);
+  await Promise.all(servers.map((s) => new Promise((resolve) => s.close(resolve))));
+  return ports;
+}
+
+/** One free port (freePorts). */
+export async function freePort(): Promise<number> {
+  return (await freePorts(1))[0] as number;
+}
