@@ -19,6 +19,8 @@ export interface ObjectInput {
   /** What to pick from: the objects of the project of that kind, or fixed values. */
   of?: "table" | "entity" | "bdef" | "srvd" | "domain";
   values?: string[];
+  /** What each value means, shown instead of the value (--binding-type: UI or Web API, D76). */
+  labels?: Record<string, string>;
   required: boolean;
   /** --expose: several objects. */
   multiple?: boolean;
@@ -38,16 +40,26 @@ export interface CatalogEntry {
   inputs: ObjectInput[];
 }
 
+/** The two kinds of OData V4 service binding (D60, D76), for the wizard. */
+const BINDING_TYPE: ObjectInput = {
+  option: "--binding-type",
+  label: "Binding type",
+  values: ["ui", "webapi"],
+  labels: { ui: "UI: a Fiori application, in the launchpad", webapi: "Web API: for other systems, without UI, not in the launchpad" },
+  required: false,
+  default: "ui",
+};
+
 export const OBJECT_CATALOG: CatalogEntry[] = [
   {
     kind: "bo",
     category: "Business Object",
     label: "Complete business object",
-    description: "Table, view, projection, metadata extension, BDEF, behavior pool, service and binding of a managed BO, with data (rapt new).",
+    description: "Table, view, projection, metadata extension, BDEF, behavior pool, service and binding of a managed BO, with data (rapt new). As a Web API: no metadata extension, not in the launchpad (D76).",
     files: "all the objects of the BO",
     maxLength: 30,
     namePattern: "Travel",
-    inputs: [],
+    inputs: [{ ...BINDING_TYPE, label: "Service" }],
   },
   { kind: "table", category: "Dictionary", label: "Database table", description: "Transparent table written as in ADT (define table).", files: ".tabl.astabl, .tabl.xml", maxLength: 16, namePattern: "zxx_order", inputs: [] },
   {
@@ -107,7 +119,7 @@ export const OBJECT_CATALOG: CatalogEntry[] = [
     namePattern: "ZUI_ORDER_O4",
     inputs: [
       { option: "--for", label: "Service definition", of: "srvd", required: true },
-      { option: "--binding-type", label: "Binding type", values: ["ui", "webapi"], required: false, default: "ui" },
+      BINDING_TYPE,
     ],
   },
   { kind: "class", category: "Source Code Library", label: "ABAP class", description: "ABAP Cloud global class.", files: ".clas.abap, .clas.xml", maxLength: 30, namePattern: "ZCL_ORDER_UTIL", inputs: [] },

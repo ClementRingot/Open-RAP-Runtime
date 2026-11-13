@@ -19,7 +19,8 @@ Source code, issues and releases: [GitHub](https://github.com/ClementRingot/Open
 - **RAP: New RAP object…**: create object by object (table, view, projection, BDEF, behavior
   pool, service, binding…) with the wizard: the object types of `rapt generate` by category, as
   in the *New ABAP Repository Object* wizard of ADT, with the objects of the project to derive
-  from.
+  from. A service binding asks its type, UI (a Fiori application) or Web API (for other systems),
+  and proposes the matching name (`…_UI_…_O4`, `…_API_…_O4`).
 - **RAP: Choose the floorplan of the application**: List Report, Worklist, Analytical List Page
   or Form Entry, with what each one is for.
 - **RAP: Start rapt dev**: the application runs with a PGlite database and is rebuilt on each

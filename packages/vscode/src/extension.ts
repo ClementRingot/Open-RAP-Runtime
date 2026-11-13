@@ -22,6 +22,8 @@ import {
   summary,
   newArgs,
   SERVICE_KINDS,
+  BINDING_TYPES,
+  bindingName,
   validEntityName,
   GENERATE_KINDS,
   LAUNCHPAD_FILE,
@@ -379,10 +381,22 @@ async function generate(root: string): Promise<void> {
       return;
     }
   }
+  // a binding: UI (a Fiori application) or Web API (for other systems), D76
+  let bindingType: "ui" | "webapi" | undefined;
+  if (kind.kind === "binding") {
+    const type = await vscode.window.showQuickPick(
+      BINDING_TYPES.map((t) => ({ label: t.label, detail: t.detail, type: t.bindingType })),
+      { title, placeHolder: "Binding type", ignoreFocusOut: true },
+    );
+    if (type === undefined) {
+      return;
+    }
+    bindingType = type.type;
+  }
   const name = await vscode.window.showInputBox({
     title,
     prompt: `Object name (${kind.label})`,
-    value: source !== undefined && kind.name !== undefined ? kind.name(source) : "",
+    value: source !== undefined && bindingType !== undefined ? bindingName(source, bindingType) : source !== undefined && kind.name !== undefined ? kind.name(source) : "",
     ignoreFocusOut: true,
     validateInput: (value) => (/^[A-Za-z][A-Za-z0-9_]*$/.test(value) ? undefined : "Letters, digits and _, starting with a letter"),
   });
@@ -392,6 +406,9 @@ async function generate(root: string): Promise<void> {
   args.push(name);
   if (source !== undefined && kind.source !== undefined) {
     args.push(kind.source.option, source);
+  }
+  if (bindingType === "webapi") {
+    args.push("--binding-type", "webapi");
   }
   if (kind.kind === "view") {
     const root = await vscode.window.showQuickPick(["Root view entity", "Child view entity"], { title, ignoreFocusOut: true });
@@ -477,7 +494,9 @@ async function newObject(root: string, kind?: string): Promise<void> {
         if (main !== undefined) {
           await vscode.window.showTextDocument(vscode.Uri.file(path.join(root, main)));
         }
-        void vscode.window.showInformationMessage(`RAP: ${answer.name} created (${result.written.length} files).`);
+        // a complete business object created as a Web API (D76); a binding alone keeps the project as it is
+        const webApi = args[0] === "new" && args.includes("webapi");
+        void vscode.window.showInformationMessage(`RAP: ${answer.name} created (${result.written.length} files)${webApi ? ": a Web API, without UI, not in the launchpad" : ""}.`);
         return undefined;
       } catch (e) {
         return (e as Error).message.split("\n")[0];

@@ -4,7 +4,7 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { afterEach, describe, expect, it } from "vitest";
-import { agentServers, appLabel, bindingKind, newArgs, SERVICE_KINDS, appRoots, devArgs, devContext, feedbackUrl, launchpadDevArgs, terminalShims, DevProcess, GENERATE_KINDS, groupObjects, launchpadNotice, launchpadSources, menuContext, projectObjects, unchosenFloorplans, wizardArgs, workspaceLaunchpad, type CatalogEntry, type LaunchpadAddResult, diagnosticPath, findProjectRoot, LineSplitter, parseDevEvent, position, resolveCli, runJson, summary, type DevEvent } from "../src/rapt.js";
+import { agentServers, appLabel, bindingKind, bindingName, bindingNames, BINDING_TYPES, newArgs, SERVICE_KINDS, appRoots, devArgs, devContext, feedbackUrl, launchpadDevArgs, terminalShims, DevProcess, GENERATE_KINDS, groupObjects, launchpadNotice, launchpadSources, menuContext, projectObjects, unchosenFloorplans, wizardArgs, workspaceLaunchpad, type CatalogEntry, type LaunchpadAddResult, diagnosticPath, findProjectRoot, LineSplitter, parseDevEvent, position, resolveCli, runJson, summary, type DevEvent } from "../src/rapt.js";
 
 const REPO = fileURLToPath(new URL("../../../", import.meta.url));
 const FIXTURE = path.join(REPO, "fixtures", "travel");
@@ -109,6 +109,19 @@ describe("rapt generate in VS Code", () => {
     expect(name("binding", "ZRT_UI_TRAVEL")).toBe("ZRT_UI_TRAVEL_O4");
     expect(name("service", "ZRT_C_TRAVEL")).toBe("ZUI_TRAVEL");
   });
+
+  it("names a binding after its type, UI or Web API (D76)", () => {
+    expect(bindingName("zrt_ui_travel")).toBe("ZRT_UI_TRAVEL_O4");
+    expect(bindingName("ZRT_UI_TRAVEL", "webapi")).toBe("ZRT_API_TRAVEL_O4");
+    expect(bindingName("ZUI_ORDER", "webapi")).toBe("ZAPI_ORDER_O4");
+    expect(bindingName("ZRT_API_TRAVEL", "ui")).toBe("ZRT_UI_TRAVEL_O4");
+    expect(bindingName("ZAPI_ORDER")).toBe("ZUI_ORDER_O4");
+    expect(bindingName("ZTRAVEL", "webapi")).toBe("ZTRAVEL_API_O4");
+    expect(bindingName("ZRT_API_TRAVEL", "webapi")).toBe("ZRT_API_TRAVEL_O4");
+    expect(bindingName("ZRT_UI_A_VERY_LONG_SERVICE_NAME", "webapi")).toHaveLength(30);
+    expect(bindingNames(["ZRT_UI_TRAVEL"])).toEqual({ ZRT_UI_TRAVEL: { ui: "ZRT_UI_TRAVEL_O4", webapi: "ZRT_API_TRAVEL_O4" } });
+    expect(BINDING_TYPES.map((t) => t.bindingType)).toEqual(["ui", "webapi"]);
+  });
 });
 
 describe("the creation wizard and the objects view (D61)", () => {
@@ -142,6 +155,11 @@ describe("the creation wizard and the objects view (D61)", () => {
     expect(await runJson(cli, wizardArgs(dir, element, "ZRT_ORDER_NO", "Order number", { "--type": "abap.numc(8)" }) as string[], dir)).toMatchObject({ ok: true, written: ["src/zrt_order_no.dtel.xml"] });
     const bo = kinds.find((k) => k.kind === "bo") as CatalogEntry;
     expect(wizardArgs(dir, bo, "Order", "Orders", { "--prefix": "ZOR" })).toEqual(["new", dir, "Order", "--prefix", "ZOR", "--description", "Orders"]);
+    // UI or Web API, with what each one means (D76)
+    expect(binding.inputs.find((i) => i.option === "--binding-type")?.labels).toEqual({ ui: expect.stringMatching(/^UI: /), webapi: expect.stringMatching(/^Web API: /) });
+    expect(bo.inputs).toEqual([expect.objectContaining({ option: "--binding-type", label: "Service", values: ["ui", "webapi"], default: "ui" })]);
+    expect(wizardArgs(dir, bo, "Order", "Orders", { "--prefix": "ZOR", "--binding-type": "ui" })).toEqual(["new", dir, "Order", "--prefix", "ZOR", "--description", "Orders"]);
+    expect(wizardArgs(dir, bo, "Partner", "", { "--prefix": "ZPA", "--binding-type": "webapi" })).toEqual(["new", dir, "Partner", "--prefix", "ZPA", "--binding-type", "webapi"]);
   });
 
   it("writes the missing abapGit files before a build, and only those (D73)", async () => {

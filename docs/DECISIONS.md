@@ -1640,8 +1640,17 @@ _The issues moved to the repository itself once public: see D74._
     with it); without it, the UI binding is preferred over the Web API ones, with SRVD002 as an
     info naming the other one; several UI bindings remain a SRVD002 warning.
   - **RAP Objects view**: each service binding shows its kind, `UI` or `Web API`.
+  - **A binding alone**: the catalog of `rapt generate` gives each value of `--binding-type` its
+    meaning (`labels`: "UI: a Fiori application, in the launchpad", "Web API: for other systems,
+    without UI, not in the launchpad"), shown by the wizard *New RAP object…*, whose *Complete
+    business object* also asks it (*Service*). The quick picks (*New RAP object (quick
+    picks)…*) ask the type of a binding too. The proposed name follows the service definition
+    and the type, as SAP names them (`ZRT_UI_TRAVEL` → `ZRT_UI_TRAVEL_O4` or
+    `ZRT_API_TRAVEL_O4`, `ZUI_ORDER` → `ZAPI_ORDER_O4`), until the user types one.
 - **Why**: the choice is made where the developer thinks about it (what is the service for?),
   the result activates on SAP as is, and the launchpad never shows a tile that cannot open.
 - **Tests**: `compiler/test/web-api-app.test.ts` (names, files, model, floorplan, rapt new and
   rapt launchpad add, LPD011, the choice between two bindings), `compiler/test/agent.test.ts`
-  (`bindingType`), `vscode/test/rapt.test.ts` (arguments of rapt new, kind of a binding, notice).
+  (`bindingType`), `vscode/test/rapt.test.ts` (arguments of rapt new and of the wizard, names of
+  a binding, kind of a binding, notice), `vscode/test/wizard.test.ts` (the page of the wizard in
+  a browser: labels, proposed names, answers).

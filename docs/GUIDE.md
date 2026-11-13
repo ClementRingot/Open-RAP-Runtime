@@ -532,6 +532,11 @@ binding `ZPA_API_PARTNER_O4` (category 1), without metadata extension. A Web API
 - has no floorplan (`rapt floorplan` lists none, VS Code does not ask);
 - shows `Web API` next to its binding in the *RAP Objects* view.
 
+A binding alone is created the same way: *New RAP object… > Service binding* (or the quick
+picks) asks its type, UI or Web API, and proposes the name SAP would give (`ZRT_UI_TRAVEL_O4`,
+`ZRT_API_TRAVEL_O4`); on the command line, `rapt generate . binding ZRT_API_TRAVEL_O4 --for
+ZRT_UI_TRAVEL --binding-type webapi`.
+
 A service can have both bindings, as on SAP: `rapt dev` and the launchpad serve the UI one
 (SRVD002 info), `rapt dev . --binding ZPA_API_PARTNER_O4` the Web API. To turn an application
 into a Web API, change `BINDING_TYPE_CATEGORY` of its binding to `1` (or add a Web API binding
