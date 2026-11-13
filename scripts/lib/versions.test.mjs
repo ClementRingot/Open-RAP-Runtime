@@ -42,13 +42,20 @@ describe("the versions of Open RAP Runtime (D77)", () => {
   });
 
   it("knows what ships", () => {
-    const json = { "packages/cli/package.json": [{ version: "1.0.0", dependencies: { a: "1" } }, { version: "1.0.0", dependencies: { a: "2" } }], "packages/model/package.json": [{ version: "1.0.0", devDependencies: { b: "1" } }, { version: "1.0.0", devDependencies: { b: "2" } }] };
+    const json = { "packages/cli/package.json": [{ version: "1.0.0", dependencies: { a: "1" } }, { version: "1.0.0", dependencies: { a: "2" } }], "packages/vscode/package.json": [{ version: "1.0.0" }, { version: "1.0.0", icon: "images/icon.png" }], "packages/model/package.json": [{ version: "1.0.0", devDependencies: { b: "1" } }, { version: "1.0.0", devDependencies: { b: "2" } }] };
     expect(
       shippedChanges(
-        ["packages/compiler/src/cli.ts", "packages/compiler/test/cli.test.ts", "packages/runtime/src/x.test.ts", "packages/vscode/syntaxes/cds.json", "docs/GUIDE.md", "packages/cli/package.json", "packages/model/package.json", "README.md", ".github/workflows/ci.yml", "site/index.html"],
+        ["packages/compiler/src/cli.ts", "packages/compiler/test/cli.test.ts", "packages/runtime/src/x.test.ts", "packages/vscode/syntaxes/cds.json", "packages/vscode/images/icon.png", "docs/GUIDE.md", "packages/cli/package.json", "packages/vscode/package.json", "packages/model/package.json", "README.md", ".github/workflows/ci.yml", "site/index.html"],
         (file) => json[file] ?? [null, null],
       ),
-    ).toEqual(["source   packages/compiler/src/cli.ts", "vscode   packages/vscode/syntaxes/cds.json", "docs     docs/GUIDE.md", "package  packages/cli/package.json (dependencies)"]);
+    ).toEqual([
+      "source   packages/compiler/src/cli.ts",
+      "vscode   packages/vscode/syntaxes/cds.json",
+      "vscode   packages/vscode/images/icon.png",
+      "docs     docs/GUIDE.md",
+      "package  packages/cli/package.json (dependencies)",
+      "package  packages/vscode/package.json (icon)",
+    ]);
   });
 
   it("reads changesets and the notes of a version", () => {

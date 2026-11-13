@@ -43,11 +43,11 @@ export function versions(root) {
 }
 
 /** The fields of a published package.json that change what is installed or what the extension does. */
-const SHIPPED_FIELDS = ["dependencies", "optionalDependencies", "peerDependencies", "bin", "exports", "main", "engines", "contributes", "activationEvents"];
+const SHIPPED_FIELDS = ["dependencies", "optionalDependencies", "peerDependencies", "bin", "exports", "main", "engines", "contributes", "activationEvents", "icon", "galleryBanner", "displayName", "description"];
 
 /**
  * The changes of a pull request that are released, so that need a changeset: the sources of a
- * package (not its tests), the grammars and the build scripts of the extension, the
+ * package (not its tests), the grammars, images and build scripts of the extension, the
  * documentation (copied into the compiler: rapt dev, rapt agent), and the shipped fields of a
  * package.json. `jsonAt(file)` gives [before, after] of a package.json.
  */
@@ -56,7 +56,7 @@ export function shippedChanges(paths, jsonAt = () => [null, null]) {
   for (const file of paths) {
     if (/^packages\/[^/]+\/src\//.test(file) && !/\.test\.[cm]?[jt]s$/.test(file)) {
       found.push(`source   ${file}`);
-    } else if (/^packages\/vscode\/(syntaxes|scripts)\//.test(file)) {
+    } else if (/^packages\/vscode\/(syntaxes|scripts|images)\//.test(file)) {
       found.push(`vscode   ${file}`);
     } else if (/^docs\/.+\.md$/.test(file)) {
       found.push(`docs     ${file}`);

@@ -118,8 +118,12 @@ publisher. To set up once:
 - **npm** — for each of the four packages (`open-rap-runtime`, `@open-rap/model`,
   `@open-rap/compiler`, `@open-rap/runtime`): npmjs.com → the package → *Settings* →
   *Trusted Publisher* → *GitHub Actions*: owner `ClementRingot`, repository
-  `Open-RAP-Runtime`, workflow `release.yml`, no environment. npm then attests the provenance
-  of each version. Then, in *Settings* → *Publishing access*, the packages can refuse tokens
+  `Open-RAP-Runtime`, workflow `release.yml`, no environment, and under *Allowed actions*
+  **`npm publish`** ticked: a trusted publisher created since September 2026 only allows
+  `npm stage publish` by default, and npm then refuses the publication of the workflow with
+  `403 OIDC permission denied for this action`. `open-rap-runtime` has no scope: it is a package
+  of the account (*Profile → Packages*), not of the `open-rap` organization. npm then attests the
+  provenance of each version. Then, in *Settings* → *Publishing access*, the packages can refuse tokens
   (*Require two-factor authentication and disallow tokens*), and the `NPM_TOKEN` secret is
   deleted.
 - **Visual Studio Marketplace** — in the management page of the publisher `abaper`, a
