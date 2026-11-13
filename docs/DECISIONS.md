@@ -1321,7 +1321,9 @@ correspond to points 1 to 13 of §11 of PLAN.md. The milestones M1 to M6 are tho
   runs `rapt --help`, `rapt check` and `rapt build` of the fixture; then, when the secret
   `NPM_TOKEN` is set, publishes them (`workspace:*` becomes the version of the tag). npm
   provenance is added when the repository is public. Once: create the `open-rap-runtime`
-  organization on npmjs.com and the `NPM_TOKEN` secret ([DEPLOYMENT.md](DEPLOYMENT.md)). The name
+  organization on npmjs.com and the `NPM_TOKEN` secret ([DEPLOYMENT.md](DEPLOYMENT.md)).
+  *Since D77 and D78: the version is the committed one, and npm trusts the workflow by trusted
+  publishing, without `NPM_TOKEN`.* The name
   `rapt` is taken on npm, hence `open-rap-runtime`.
 - **Why**: the same CLI everywhere; CI can check RAP sources without VS Code; a terminal agent
   can install it in one command.
@@ -1692,4 +1694,34 @@ _The issues moved to the repository itself once public: see D74._
   `check-version-sync.mjs` with a tag, what ships, changesets, the notes merged from several
   changelogs); `changeset version` checked on a copy of the repository (the five packages bumped
   together, the mirrors copied).
+
+## D78 — Publishing without tokens: trusted publishing
+
+- **Context**: `release.yml` published with three long-lived secrets (`NPM_TOKEN`, `VSCE_PAT`,
+  `OVSX_PAT`). A stolen token publishes anything, until someone revokes it; the tokens also
+  expire and have to be renewed. LISA already publishes to npm by trusted publishing.
+- **Decision**: every registry trusts the workflow `release.yml` of this repository by OIDC;
+  the jobs have `id-token: write` and no secret.
+  - **npm**: npm 11.21.1 (trusted publishing needs 11.5.1 or later; Node.js 22 comes with npm
+    10), without `registry-url` in `setup-node` (it writes an `.npmrc` waiting for a token).
+    The four archives already checked (`pnpm pack`: `workspace:*` replaced by the version) are
+    published by `npm publish <archive>`: npm exchanges the identity token, pnpm does not. The
+    provenance is attested automatically. A version already on npm is skipped.
+  - **Visual Studio Marketplace**: `vsce publish --oidc` (`@vscode/vsce` 4.1.0, which also builds
+    the `.vsix`), with `--skip-duplicate`; the publisher declares a Trusted Publishing policy.
+  - **Open VSX**: `ovsx publish --trusted-publishing` (`ovsx` 1.3.0, run by `npx` in the CI
+    only: EPL-2.0, never distributed), with `--skip-duplicate`; the namespace declares its
+    trusted publisher.
+  - The Marketplace and Open VSX steps run when the repository variables
+    `PUBLISH_VS_MARKETPLACE` and `PUBLISH_OPEN_VSX` are `true`, so that a release does not fail
+    before their trusted publisher is declared. npm and the GitHub release always run.
+  - The only stored credential left is the private key of the GitHub App of the release train
+    (D77), which only opens the Version packages pull request.
+- **Why**: nothing to steal nor to renew; a version can only come from this workflow on this
+  repository, which the npm provenance shows; the release can be re-run (each registry skips a
+  version it has).
+- **Tests**: the `.vsix` built with `@vscode/vsce` 4.1.0 (the embedded `rapt` checks the
+  fixture); the options `--oidc` (`vsce`) and `--trusted-publishing` (`ovsx`) checked in the help
+  of the pinned versions; the workflow runs on the next release (npm needs its trusted publisher
+  declared first, [DEPLOYMENT.md](DEPLOYMENT.md)).
 

@@ -14,6 +14,8 @@
   preferred when a service has both.
 - The versions are managed by Changesets (D77): each change carries a changeset, the *Version
   packages* pull request bumps the versions and writes the changelogs, its merge releases.
+- Published without tokens (D78): npm, the Visual Studio Marketplace and Open VSX trust the
+  release workflow by trusted publishing (OIDC); npm attests the provenance of each version.
 
 ### Patch Changes
 

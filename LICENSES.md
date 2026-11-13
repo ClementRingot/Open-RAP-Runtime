@@ -104,7 +104,7 @@ redistributed:
 | Component | Version | License | Use |
 |---|---|---|---|
 | `esbuild` | 0.28.2 | MIT | Single CommonJS file of the extension |
-| `@vscode/vsce` | 3.9.2 | MIT | Building of the `.vsix` |
+| `@vscode/vsce` | 4.1.0 | MIT | Building of the `.vsix`, publication to the Marketplace by trusted publishing (D78) |
 | `@types/vscode` | 1.101.0 | MIT | Types of the VS Code API |
 | `vscode-textmate`, `vscode-oniguruma` | 9.3.2, 2.0.1 | MIT | Tests of the grammars (the highlighting engine of VS Code) |
 
