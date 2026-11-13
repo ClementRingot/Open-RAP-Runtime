@@ -108,6 +108,17 @@ public.
 git tag v0.1.0 && git push origin v0.1.0
 ```
 
+To build the `.vsix` locally:
+
+```sh
+pnpm install && pnpm build
+cd packages/vscode && pnpm run package    # open-rap-runtime-vscode.vsix (~31 MB)
+```
+
+`pnpm run package` compiles the extension (esbuild), prepares `rapt/`
+(`scripts/stage-rapt.mjs`: packages of the repository and dependencies installed from the npm
+registry, useless files removed), then calls `vsce package`.
+
 Or without a tag: *Actions → Release → Run workflow* with the version (`0.1.0`); the release then
 creates the tag `v0.1.0` on the commit of the run.
 
