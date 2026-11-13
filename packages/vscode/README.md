@@ -99,27 +99,3 @@ the `rapt` command of the PATH.
 | `rapt.new.prefix` | `Z` | prefix proposed for a new business object |
 | `rapt.terminal.addToPath` | `true` | `rapt` on the PATH of the integrated terminals |
 | `rapt.agent.enabled` | `true` | MCP server of rapt for the agent mode of VS Code |
-
-## Publishing a version
-
-Push a `v1.2.3` tag: the `release.yml` workflow builds the `.vsix` (version 1.2.3) and attaches
-it to the GitHub release of the tag. It also publishes it on the Visual Studio Marketplace when
-the `VSCE_PAT` secret is set (publisher `clementringot` to create on the Marketplace), and on
-Open VSX (VSCodium, Cursor…) when the `OVSX_PAT` secret is set. The same tag publishes the CLI
-on npm (`open-rap-runtime`) when the `NPM_TOKEN` secret is set (see the deployment guide of the
-documentation).
-
-```sh
-git tag v0.1.0 && git push origin v0.1.0
-```
-
-## Building the extension
-
-```sh
-pnpm install && pnpm build
-cd packages/vscode && pnpm run package    # open-rap-runtime-vscode.vsix (~31 MB)
-```
-
-`pnpm run package` compiles the extension (esbuild), prepares `rapt/`
-(`scripts/stage-rapt.mjs`: packages of the repository and dependencies installed from the npm
-registry, useless files removed), then calls `vsce package`.
