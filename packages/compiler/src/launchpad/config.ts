@@ -263,6 +263,11 @@ export function resolveLaunchpad(file: string, diagnostics: Diagnostics, options
         diagnostics.error("LPD002", `tile ${name}: give either app (an application of the launchpad) or url`, at);
         continue;
       }
+      if (app?.model?.service.webApi === true) {
+        // an OData V4 - Web API has no UI to open (D76): the tile is left out
+        diagnostics.warning("LPD011", `tile ${name}: the application ${app.id} is an OData V4 - Web API (${app.model.service.binding}), without UI; the tile is left out (remove it, or give ${app.id} a UI binding)`, at);
+        continue;
+      }
       const tileTitle = text(tile.title) ?? app?.title;
       if (tileTitle === undefined) {
         diagnostics.error("LPD001", `tile ${t + 1} of ${title} needs a title`, at);

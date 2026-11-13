@@ -204,7 +204,7 @@ export class AgentServer {
         name: "rapt_new_business_object",
         title: "Create a complete business object",
         description:
-          "Writes a complete managed RAP business object, activatable on SAP: table, root view and projection, metadata extension (List Report and Object Page), behavior definitions, behavior pool, service definition and binding, initial data, abapGit XML. The project folder is created when it does not exist. Never overwrites a file.",
+          "Writes a complete managed RAP business object, activatable on SAP: table, root view and projection, metadata extension (List Report and Object Page), behavior definitions, behavior pool, service definition and binding, initial data, abapGit XML. The project folder is created when it does not exist. Never overwrites a file. bindingType webapi: an OData V4 - Web API for other systems instead of a Fiori application (ZRT_API_… service and binding, no metadata extension, not in the launchpad).",
         inputSchema: {
           type: "object",
           required: ["entity"],
@@ -213,7 +213,8 @@ export class AgentServer {
             entity: { type: "string", description: "Name of the root entity, e.g. Travel." },
             prefix: { type: "string", description: "Prefix of the object names (Z by default): ZRT gives zrt_travel, ZRT_R_Travel…" },
             description: { type: "string" },
-            launchpad: { type: "boolean", description: "Add the application to the launchpad of the workspace (default true)." },
+            bindingType: { type: "string", enum: ["ui", "webapi"], description: "ui (default): a Fiori application in the launchpad; webapi: an API called by other systems, without UI." },
+            launchpad: { type: "boolean", description: "Add the application to the launchpad of the workspace (default true; never for a Web API)." },
           },
         },
         run: (args) => {
@@ -224,10 +225,11 @@ export class AgentServer {
           if (entity === undefined) throw new ToolError("entity is required");
           const prefix = str(args, "prefix");
           const description = str(args, "description");
-          const result = newBusinessObject(root, entity, { ...(prefix === undefined ? {} : { prefix }), ...(description === undefined ? {} : { description }) });
+          const bindingType = str(args, "bindingType");
+          const result = newBusinessObject(root, entity, { ...(prefix === undefined ? {} : { prefix }), ...(description === undefined ? {} : { description }), ...(bindingType === undefined ? {} : { bindingType }) });
           if (result.error !== undefined) throw new ToolError(result.error);
-          // as rapt new: the application joins the launchpad of the workspace (D69)
-          const launchpad = args["launchpad"] === false ? undefined : registerApp(root);
+          // as rapt new: the application joins the launchpad of the workspace (D69), not a Web API (D76)
+          const launchpad = args["launchpad"] === false || bindingType?.toLowerCase() === "webapi" ? undefined : registerApp(root);
           return { project: this.relative(root), written: result.written, ...(launchpad === undefined ? {} : { launchpad: { ...launchpad, file: this.relative(launchpad.file) } }), next: "rapt_check, then the user runs rapt dev" };
         },
       },

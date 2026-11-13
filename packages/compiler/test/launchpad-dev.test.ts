@@ -4,11 +4,28 @@
  */
 
 import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { createServer } from "node:net";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import { launchpadDevPlan, LaunchpadDevSession, type LaunchpadDevEvent } from "../src/launchpad/dev.js";
 import { fixtureVariant } from "./helpers.js";
+
+/**
+ * Ports no other process listens on, given by the system: random ports collided with the servers
+ * of the other test files running at the same time (EADDRINUSE).
+ */
+async function freePorts(count: number): Promise<number[]> {
+  const servers = await Promise.all(
+    Array.from({ length: count }, () => new Promise<ReturnType<typeof createServer>>((resolve) => {
+      const server = createServer();
+      server.listen(0, "127.0.0.1", () => resolve(server));
+    })),
+  );
+  const ports = servers.map((s) => (s.address() as { port: number }).port);
+  await Promise.all(servers.map((s) => new Promise((resolve) => s.close(resolve))));
+  return ports;
+}
 
 const SERVICE = "/sap/opu/odata4/sap/zrt_ui_travel_o4/srvd/sap/zrt_ui_travel/0001/";
 
@@ -64,8 +81,7 @@ describe("rapt launchpad dev", () => {
   it("serves the applications behind the launchpad, regenerated when launchpad.json changes", async () => {
     const variant = fixtureVariant({});
     cleanups.push(variant.cleanup);
-    const port = 20000 + Math.floor(Math.random() * 20000);
-    const appPort = port + 1;
+    const [port, appPort] = (await freePorts(2)) as [number, number];
     const file = workspace([]);
     const source = { title: "Launchpad", apps: [{ id: "travel", source: variant.dir, url: `http://localhost:${appPort}/` }], groups: [{ title: "Applications", tiles: [{ app: "travel", count: "Travel" }] }] };
     writeFileSync(file, JSON.stringify(source));
@@ -98,9 +114,9 @@ describe("rapt launchpad dev", () => {
   it("reports a launchpad that cannot be written, and generates it on the next change", async () => {
     const variant = fixtureVariant({});
     cleanups.push(variant.cleanup);
-    const port = 20000 + Math.floor(Math.random() * 20000);
+    const [port, appPort] = (await freePorts(2)) as [number, number];
     const file = workspace([]);
-    const source = { title: "Launchpad", apps: [{ id: "travel", source: variant.dir, url: `http://localhost:${port + 1}/` }], groups: [] };
+    const source = { title: "Launchpad", apps: [{ id: "travel", source: variant.dir, url: `http://localhost:${appPort}/` }], groups: [] };
     writeFileSync(file, JSON.stringify(source));
     // a file where the folder of the launchpad goes: writing it fails
     const outDir = path.join(path.dirname(file), "out");

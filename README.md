@@ -83,6 +83,9 @@ rapt dev my-project                         # http://localhost:8080/ — rebuilt
   by the database view.
 - **Security**: OIDC (Keycloak, SAP Cloud Identity Services, Entra ID…), Web API bindings with
   OAuth 2.0 (client credentials, PKCE), authorization objects and `AUTHORITY-CHECK`, DCL, roles.
+- **Web APIs**: a business object created as an API for other systems
+  (`rapt new … --binding-type webapi`, or the first question of *New complete business object…*)
+  has no UI and stays out of the launchpad.
 - **One launchpad per workspace**: each application is added to it when it is created; develop
   them together behind it (`rapt launchpad dev`, *RAP: Start the launchpad* in VS Code); ship
   either the launchpad with all its applications (`rapt launchpad`) or one application alone

@@ -178,6 +178,7 @@ Reference versions: `@abaplint/core` 2.120.98, `@abaplint/transpiler` 2.14.24,
 |---|---|
 | Development OAuth server | Development only: no refresh token, nor consent, nor revocation; signing key regenerated on each start. |
 | Web API of a draft BO | Active instances only (the draft is not exposed). |
+| Service with a UI and a Web API binding | One binding served at a time: the UI one by default, the Web API with `rapt dev --binding <name>` (D76). On SAP, both are published. |
 | OData V2 | Not supported: the generated service is always OData V4 (SRVD003). |
 
 ## Enhanced mode (D45)

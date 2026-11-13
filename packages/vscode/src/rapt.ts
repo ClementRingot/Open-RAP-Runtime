@@ -53,6 +53,8 @@ export interface LaunchpadAddResult {
   created: boolean;
   added: boolean;
   app?: { id: string; source: string; url: string };
+  /** The project is an OData V4 - Web API, never in the launchpad (D76). */
+  webApi?: boolean;
   error?: string;
 }
 
@@ -97,6 +99,7 @@ export function launchpadSources(file: string, text: string): string[] {
 
 /** The message of an application added to the launchpad; undefined when nothing changed. */
 export function launchpadNotice(result: LaunchpadAddResult | undefined): string | undefined {
+  if (result?.webApi === true) return "a Web API (no UI): not in the launchpad";
   if (result === undefined || (result.error === undefined && !result.added)) return undefined;
   if (result.error !== undefined) return `not added to the launchpad (${result.error})`;
   return `${result.app?.id ?? "application"} added to the launchpad${result.created ? " (created)" : ""}: ${result.file}`;
@@ -157,7 +160,7 @@ export const GENERATE_KINDS: GenerateKind[] = [
   { kind: "abstract", label: "Abstract entity (action parameter)" },
   { kind: "custom", label: "Custom entity and its query class" },
   { kind: "service", label: "Service definition", source: { of: "entity", option: "--from", prompt: "Exposed entity" }, name: (entity) => `ZUI_${entity.toUpperCase().replace(/^[ZY][A-Z0-9]*?_[A-Z]_/, "")}` },
-  { kind: "binding", label: "Service binding OData V4", source: { of: "srvd", option: "--for", prompt: "Service definition" }, name: (srvd) => `${srvd.toUpperCase()}_O4` },
+  { kind: "binding", label: "Service binding OData V4", source: { of: "srvd", option: "--for", prompt: "Service definition" }, name: (srvd) => bindingName(srvd) },
   { kind: "class", label: "ABAP class" },
   { kind: "interface", label: "ABAP interface" },
 ];
@@ -189,6 +192,8 @@ export interface ObjectInput {
   label: string;
   of?: "table" | "entity" | "bdef" | "srvd" | "domain";
   values?: string[];
+  /** What each value means (--binding-type, D76). */
+  labels?: Record<string, string>;
   required: boolean;
   multiple?: boolean;
   default?: string;
@@ -215,7 +220,9 @@ export function wizardArgs(root: string, entry: CatalogEntry, name: string, desc
   }
   if (entry.kind === "bo") {
     const prefix = typeof values["--prefix"] === "string" && values["--prefix"] !== "" ? ["--prefix", values["--prefix"]] : [];
-    return ["new", root, name, ...prefix, ...(description === "" ? [] : ["--description", description])];
+    // a Web API instead of a Fiori application (D76)
+    const webApi = values["--binding-type"] === "webapi" ? ["--binding-type", "webapi"] : [];
+    return ["new", root, name, ...prefix, ...(description === "" ? [] : ["--description", description]), ...webApi];
   }
   const args = ["generate", root, entry.kind, name];
   for (const input of entry.inputs) {
@@ -246,6 +253,51 @@ export const OBJECT_GROUPS: Array<{ id: string; label: string; pattern: RegExp }
   { id: "srvb", label: "Service bindings", pattern: /\.srvb\.xml$/i },
   { id: "abap", label: "Classes and interfaces", pattern: /\.(clas|intf)\.abap$/i },
 ];
+
+/** The kind of a service binding (abapGit XML of a SRVB): UI (category 0) or Web API (1), D76. */
+export function bindingKind(xml: string): "UI" | "Web API" | undefined {
+  const category = /<BINDING_TYPE_CATEGORY>\s*(\d)\s*<\/BINDING_TYPE_CATEGORY>/.exec(xml)?.[1];
+  if (category === "1") return "Web API";
+  if (category === "0" || /<SRVB>/.test(xml)) return "UI";
+  return undefined;
+}
+
+/**
+ * The name of a new binding of a service definition, as SAP names them (D76): `<SRVD>_O4` for a
+ * UI, with UI turned into API for a Web API (ZRT_UI_TRAVEL → ZRT_API_TRAVEL_O4, ZUI_TRAVEL →
+ * ZAPI_TRAVEL_O4), and the other way round; at most 30 characters.
+ */
+export function bindingName(srvd: string, bindingType: "ui" | "webapi" = "ui"): string {
+  const name = srvd.toUpperCase();
+  const [from, to] = bindingType === "webapi" ? ["UI", "API"] : ["API", "UI"];
+  let base: string;
+  if (name.includes(`_${from}_`)) base = name.replace(`_${from}_`, `_${to}_`);
+  else if (new RegExp(`^[ZY]${from}_`).test(name)) base = `${name.charAt(0)}${to}_${name.slice(from.length + 2)}`;
+  else base = bindingType === "webapi" && !name.includes("API") ? `${name}_API` : name;
+  return `${base.slice(0, 27)}_O4`;
+}
+
+/** The names of the bindings of each service definition, by type: the suggestions of the wizard. */
+export function bindingNames(srvds: string[]): Record<string, { ui: string; webapi: string }> {
+  return Object.fromEntries(srvds.map((s) => [s, { ui: bindingName(s, "ui"), webapi: bindingName(s, "webapi") }]));
+}
+
+/** What `rapt new` creates (D76): a Fiori application, or a Web API for other systems. */
+export const SERVICE_KINDS: Array<{ bindingType: "ui" | "webapi"; label: string; detail: string }> = [
+  { bindingType: "ui", label: "Fiori application (UI)", detail: "List Report and Object Page, added to the launchpad of the workspace (OData V4 - UI binding)" },
+  { bindingType: "webapi", label: "Web API", detail: "An OData API for other systems, without UI, not in the launchpad (OData V4 - Web API binding)" },
+];
+
+/** The types of a service binding (D60, D76), for the quick picks of "New RAP object". */
+export const BINDING_TYPES: Array<{ bindingType: "ui" | "webapi"; label: string; detail: string }> = [
+  { bindingType: "ui", label: "UI", detail: "OData V4 - UI: a Fiori application, in the launchpad" },
+  { bindingType: "webapi", label: "Web API", detail: "OData V4 - Web API: for other systems, without UI, not in the launchpad" },
+];
+
+/** The arguments of `rapt new` (D42, D76). */
+export function newArgs(root: string, entity: string, prefix: string, description: string, bindingType: "ui" | "webapi" = "ui"): string[] {
+  return ["new", root, entity, "--prefix", prefix, "--description", description, ...(bindingType === "webapi" ? ["--binding-type", "webapi"] : [])];
+}
 
 /** The main file of each object of a project, by group; a table written as source hides its XML. */
 export function groupObjects(fileNames: string[]): Record<string, string[]> {

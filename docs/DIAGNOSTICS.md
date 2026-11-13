@@ -8,7 +8,7 @@ exit code is 1 as soon as there is an error (or a warning with `--warnings-as-er
 | PRJ001 | error | No service definition, or several without `--service` |
 | PRJ002 | error | The requested service definition does not exist |
 | SRVD001 | error | Syntax error in a service definition |
-| SRVD002 | warning | Several bindings for the service |
+| SRVD002 | info / warning | Several bindings for the service: a UI binding and Web API ones, the UI one is built (info, D76); otherwise the first one (warning); `--binding <name>` chooses |
 | SRVD003 | warning | Binding that is not OData V4 |
 | SRVD004 | error | Entity set exposed twice |
 | SRVD005 | error | Exposed entity not found |
@@ -106,6 +106,7 @@ exit code is 1 as soon as there is an error (or a warning with `--warnings-as-er
 | LPD008 | error | Malformed space or page in `launchpad.json` (title, pages, sections, roles) (D48) |
 | LPD009 | error | Malformed `source` application (not a path, or with `build`), folder not found, or application that does not build with the launchpad (D69) |
 | LPD010 | error / warning | `rapt launchpad dev`: application without a local `url` with a port, port taken by another application or by the launchpad, no application with sources (errors); application without sources, not started (warning) (D75) |
+| LPD011 | warning | Tile of an application that is an OData V4 - Web API (no UI): the tile is left out (D76) |
 | SEED001 | error | Unreadable or malformed `rapt/seed.json` (object table → array of rows expected) |
 | SEED002 | error | `rapt/seed.json`: table or field unknown to the application |
 | NR001 | error | Unreadable or malformed `rapt/number-ranges.json`: object longer than 10 characters, interval longer than 2 characters, non-numeric or inverted bounds |

@@ -1613,3 +1613,44 @@ _The issues moved to the repository itself once public: see D74._
   launchpad, regeneration on a change of `launchpad.json`, ports freed on close, a launchpad that cannot be
   written then generated on the next change),
   `vscode/test/rapt.test.ts` (context keys, arguments of the sessions).
+
+## D76 — A Web API or a Fiori application: chosen at the creation, kept out of the launchpad
+
+- **Context**: what makes a service a Web API is the type of its service binding (*OData V4 -
+  Web API*, `BINDING_TYPE_CATEGORY` 1, D60). `rapt new` and *New complete business object…* only
+  created UI bindings; a Web API was made by hand (`rapt generate binding --binding-type
+  webapi`) and was then added to the launchpad like an application: a tile with no UI behind it,
+  and a floorplan asked for nothing. A service with both a UI and a Web API binding, common on
+  SAP, built the first one found (SRVD002).
+- **Decision**: the type of the binding stays the only source of truth, as on SAP; it is chosen
+  at the creation and respected everywhere.
+  - **Creation**: `rapt new <src> <Entity> --binding-type webapi` (VS Code: *New complete
+    business object…* asks "Fiori application (UI)" or "Web API" first; `rapt agent`:
+    `bindingType` of `rapt_new_business_object`) writes the service and binding with the names
+    of SAP for an API (`ZRT_API_TRAVEL`, `ZRT_API_TRAVEL_O4`, category 1), no metadata extension
+    (nor `@Metadata.allowExtensions`), and does not add the project to the launchpad.
+  - **Launchpad**: `rapt launchpad add` (and the extension, which adds the applications of the
+    workspace before building or starting the launchpad) leaves a Web API out: `webApi: true`,
+    `added: false`, no error, `launchpad.json` not created for it. A tile of `launchpad.json` on
+    a Web API is left out of the launchpad with the warning **LPD011**; the application itself
+    can stay in `apps` (built and served behind the launchpad, at its service path).
+  - **Floorplan**: `rapt floorplan` lists no entity set for a Web API (`webApi: true`), and
+    refuses to set one; the extension says so instead of asking.
+  - **Two bindings**: `--binding <name>` designates one of the bindings of the service (its type
+    with it); without it, the UI binding is preferred over the Web API ones, with SRVD002 as an
+    info naming the other one; several UI bindings remain a SRVD002 warning.
+  - **RAP Objects view**: each service binding shows its kind, `UI` or `Web API`.
+  - **A binding alone**: the catalog of `rapt generate` gives each value of `--binding-type` its
+    meaning (`labels`: "UI: a Fiori application, in the launchpad", "Web API: for other systems,
+    without UI, not in the launchpad"), shown by the wizard *New RAP object…*, whose *Complete
+    business object* also asks it (*Service*). The quick picks (*New RAP object (quick
+    picks)…*) ask the type of a binding too. The proposed name follows the service definition
+    and the type, as SAP names them (`ZRT_UI_TRAVEL` → `ZRT_UI_TRAVEL_O4` or
+    `ZRT_API_TRAVEL_O4`, `ZUI_ORDER` → `ZAPI_ORDER_O4`), until the user types one.
+- **Why**: the choice is made where the developer thinks about it (what is the service for?),
+  the result activates on SAP as is, and the launchpad never shows a tile that cannot open.
+- **Tests**: `compiler/test/web-api-app.test.ts` (names, files, model, floorplan, rapt new and
+  rapt launchpad add, LPD011, the choice between two bindings), `compiler/test/agent.test.ts`
+  (`bindingType`), `vscode/test/rapt.test.ts` (arguments of rapt new and of the wizard, names of
+  a binding, kind of a binding, notice), `vscode/test/wizard.test.ts` (the page of the wizard in
+  a browser: labels, proposed names, answers).

@@ -39,7 +39,7 @@ export function wizardHtml(nonce: string, cspSource: string): string {
 </div>
 <script nonce="${nonce}">
   const vscode = acquireVsCodeApi();
-  let catalog = [], objects = {}, current;
+  let catalog = [], objects = {}, bindingNames = {}, current, named;
   const $ = (id) => document.getElementById(id);
   const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]);
   function renderList() {
@@ -61,7 +61,8 @@ export function wizardHtml(nonce: string, cspSource: string): string {
       control = '<select id="' + id + '"' + (input.multiple ? " multiple" : "") + ">" + (input.multiple || input.required ? "" : '<option value=""></option>') + options + "</select>";
       if (!(objects[input.of] || []).length) control += '<div class="hint">No object of this type in the project.</div>';
     } else if (input.values) {
-      control = '<select id="' + id + '">' + input.values.map((v) => '<option value="' + esc(v) + '"' + (v === input.default ? " selected" : "") + ">" + esc(v === "true" ? "yes" : v === "false" ? "no" : v) + "</option>").join("") + "</select>";
+      const text = (v) => (input.labels && input.labels[v]) || (v === "true" ? "yes" : v === "false" ? "no" : v);
+      control = '<select id="' + id + '">' + input.values.map((v) => '<option value="' + esc(v) + '"' + (v === input.default ? " selected" : "") + ">" + esc(text(v)) + "</option>").join("") + "</select>";
     } else {
       control = '<input id="' + id + '" value="' + esc(input.default || "") + '">';
     }
@@ -79,6 +80,18 @@ export function wizardHtml(nonce: string, cspSource: string): string {
       '<div id="error" class="error"></div><div class="buttons"><button id="finish">Create</button><button id="cancel" class="secondary">Cancel</button></div>';
     $("finish").addEventListener("click", finish);
     $("cancel").addEventListener("click", () => vscode.postMessage({ type: "cancel" }));
+    // a binding: its name follows the service definition and the type (UI or Web API, D76) until typed
+    named = false;
+    $("name").addEventListener("input", () => { named = true; });
+    if (current.kind === "binding") {
+      const suggest = () => {
+        const names = bindingNames[$("in_for").value];
+        if (!named && names) $("name").value = names[$("in_binding-type").value] || names.ui;
+      };
+      $("in_for").addEventListener("change", suggest);
+      $("in_binding-type").addEventListener("change", suggest);
+      suggest();
+    }
     $("name").focus();
     $("name").select();
   }
@@ -95,7 +108,7 @@ export function wizardHtml(nonce: string, cspSource: string): string {
   }
   window.addEventListener("message", (event) => {
     const m = event.data;
-    if (m.type === "init") { catalog = m.catalog; objects = m.objects; renderList(); if (m.kind) select(m.kind); }
+    if (m.type === "init") { catalog = m.catalog; objects = m.objects; bindingNames = m.bindingNames || {}; renderList(); if (m.kind) select(m.kind); }
     if (m.type === "error") { $("error").textContent = m.message; $("finish").disabled = false; }
   });
   $("filter").addEventListener("input", renderList);

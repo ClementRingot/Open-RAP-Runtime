@@ -8,7 +8,7 @@
 
 import { randomBytes } from "node:crypto";
 import * as vscode from "vscode";
-import type { CatalogEntry } from "./rapt.js";
+import { bindingNames, type CatalogEntry } from "./rapt.js";
 import { wizardHtml } from "./wizard-html.js";
 
 export interface WizardAnswer {
@@ -33,7 +33,8 @@ export function openWizard(options: WizardOptions): vscode.WebviewPanel {
   panel.webview.html = wizardHtml(nonce, panel.webview.cspSource);
   panel.webview.onDidReceiveMessage(async (message: { type: string; answer?: WizardAnswer }) => {
     if (message.type === "ready") {
-      await panel.webview.postMessage({ type: "init", catalog: options.catalog, objects: options.objects, kind: options.kind });
+      // the names a new binding gets for each service definition, UI or Web API (D76)
+      await panel.webview.postMessage({ type: "init", catalog: options.catalog, objects: options.objects, bindingNames: bindingNames(options.objects["srvd"] ?? []), kind: options.kind });
     } else if (message.type === "finish" && message.answer !== undefined) {
       const error = await options.finish(message.answer);
       if (error === undefined) {

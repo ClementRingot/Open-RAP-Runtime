@@ -64,9 +64,18 @@ export function selectService(project: Project, options: ServiceOptions, diagnos
   }
   const name = chosen.ast.name.toUpperCase();
   const bindings = bindingsOf(project, name);
-  const binding = bindings[0];
-  if (bindings.length > 1 && options.binding === undefined) {
-    diagnostics.warning("SRVD002", `several service bindings for ${name}, using ${binding?.file.name ?? ""}`);
+  const bindingLabel = (b: (typeof bindings)[number]): string => (b.xml.name ?? b.file.name).toUpperCase();
+  // --binding names one of the bindings; else, with a UI and Web API bindings, the UI one (D76)
+  const named = options.binding === undefined ? undefined : bindings.find((b) => bindingLabel(b) === options.binding?.toUpperCase());
+  const ui = bindings.filter((b) => b.xml.bindingCategory !== "1");
+  const binding = named ?? ui[0] ?? bindings[0];
+  if (bindings.length > 1 && options.binding === undefined && binding !== undefined) {
+    const others = bindings.filter((b) => b !== binding).map(bindingLabel);
+    if (ui.length === 1) {
+      diagnostics.info("SRVD002", `several service bindings for ${name}: the UI binding ${bindingLabel(binding)} is served (the Web API ${others.join(", ")}: rapt dev --binding ${others[0] ?? ""})`, { file: binding.file.path, line: 1 });
+    } else {
+      diagnostics.warning("SRVD002", `several service bindings for ${name}, using ${binding.file.name} (choose one with --binding: ${bindings.map(bindingLabel).join(", ")})`, { file: binding.file.path, line: 1 });
+    }
   }
   if (binding !== undefined && binding.xml.bindingVersion !== undefined && binding.xml.bindingVersion.toUpperCase() !== "V4") {
     diagnostics.warning("SRVD003", `${binding.file.name} is an OData ${binding.xml.bindingVersion} binding; the generated service is OData V4`, { file: binding.file.path, line: 1 });

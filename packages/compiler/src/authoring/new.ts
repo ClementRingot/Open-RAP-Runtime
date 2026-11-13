@@ -2,7 +2,9 @@
  * `rapt new` (decision D42): the sources of a new managed business object, ready to run with
  * `rapt dev` and to pull into an SAP system with abapGit — a table written as source, the root
  * and projection CDS entities with UI annotations, the behavior definitions and pool, the service
- * definition and binding, seed data — then their abapGit XML (`rapt abapgit`).
+ * definition and binding, seed data — then their abapGit XML (`rapt abapgit`). With
+ * `--binding-type webapi` (D76), an OData V4 - Web API for other systems: ZRT_API_… service and
+ * binding, no metadata extension, no UI, not in the launchpad.
  */
 
 import { appendFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
@@ -15,6 +17,8 @@ export interface NewBoOptions {
   prefix?: string;
   /** Description of the business object (default: the entity name). */
   description?: string;
+  /** ui (default): a Fiori application; webapi: an OData V4 - Web API for other systems (D76). */
+  bindingType?: string;
 }
 
 export interface NewBoResult {
@@ -42,12 +46,19 @@ interface Names {
   service: string;
   binding: string;
   description: string;
+  /** OData V4 - Web API (D76): no metadata extension, binding category 1. */
+  webApi: boolean;
 }
 
 export function boNames(entity: string, options: NewBoOptions = {}): Names | { error: string } {
   if (!/^[A-Za-z][A-Za-z0-9]*$/.test(entity)) {
     return { error: `${entity}: the entity name is made of letters and digits, e.g. Travel or SalesOrder` };
   }
+  const bindingType = (options.bindingType ?? "ui").toLowerCase();
+  if (bindingType !== "ui" && bindingType !== "webapi") {
+    return { error: `${options.bindingType ?? ""}: the binding type is ui (a Fiori application) or webapi (an API for other systems)` };
+  }
+  const webApi = bindingType === "webapi";
   const prefix = (options.prefix ?? "Z").toUpperCase().replace(/_+$/, "");
   if (!/^[ZY][A-Z0-9_]*$/.test(prefix)) {
     return { error: `${prefix}: the prefix starts with Z or Y (customer namespace)` };
@@ -62,9 +73,11 @@ export function boNames(entity: string, options: NewBoOptions = {}): Names | { e
     root: `${prefix}_R_${name}`,
     projection: `${prefix}_C_${name}`,
     pool: `${prefix.charAt(0)}BP_${short === "" ? "" : `${short}_`}R_${snake}`.toLowerCase(),
-    service: `${prefix}_UI_${snake}`.toUpperCase(),
-    binding: `${prefix}_UI_${snake}_O4`.toUpperCase(),
+    // the naming of SAP: ZRT_UI_TRAVEL_O4 for a UI, ZRT_API_TRAVEL_O4 for a Web API
+    service: `${prefix}_${webApi ? "API" : "UI"}_${snake}`.toUpperCase(),
+    binding: `${prefix}_${webApi ? "API" : "UI"}_${snake}_O4`.toUpperCase(),
     description: options.description ?? name,
+    webApi,
   };
   if (names.table.length > 16) {
     return { error: `${names.table}: a table name has at most 16 characters, use a shorter prefix or entity name` };
@@ -149,8 +162,7 @@ function projectionView(n: Names): string {
   });
   return `@AccessControl.authorizationCheck: #NOT_REQUIRED
 @EndUserText.label: '${n.description} (projection)'
-@Metadata.allowExtensions: true
-@Search.searchable: true
+${n.webApi ? "" : "@Metadata.allowExtensions: true\n"}@Search.searchable: true
 define root view entity ${n.projection}
   provider contract transactional_query
   as projection on ${n.root}
@@ -335,11 +347,11 @@ function serviceBinding(n: Names): string {
     "SRVB",
     [
       ["NAME", n.binding],
-      ["DESCRIPTION", `${n.description} service binding (OData V4, UI)`.slice(0, 60)],
+      ["DESCRIPTION", `${n.description} service binding (OData V4, ${n.webApi ? "Web API" : "UI"})`.slice(0, 60)],
       ["LANGUAGE", "EN"],
       ["BINDING_TYPE", "ODATA"],
       ["BINDING_TYPE_VERSION", "V4"],
-      ["BINDING_TYPE_CATEGORY", "0"],
+      ["BINDING_TYPE_CATEGORY", n.webApi ? "1" : "0"],
     ],
     3,
   );
@@ -382,8 +394,14 @@ finds the MCP server of rapt (tools \`rapt_check\`, \`rapt_generate\`, \`rapt_do
 - Keep \`rapt/config.json\` in mode \`standard\` when the BO must activate on SAP; \`enhanced\`
   allows Open RAP Runtime extensions (mandatory fields checked automatically, managed BO on a
   custom entity).
-- Objects: ${n.table} (table), ${n.root} (root view), ${n.projection} (projection and UI
-  annotations), ${n.pool.toUpperCase()} (behavior pool), ${n.service} (service).
+- Objects: ${n.table} (table), ${n.root} (root view), ${n.projection} (projection${n.webApi ? "" : " and UI\n  annotations"}), ${n.pool.toUpperCase()} (behavior pool), ${n.service} (service).${
+    n.webApi
+      ? `
+- The service is an OData V4 - Web API (binding ${n.binding}, BINDING_TYPE_CATEGORY 1): an API
+  for other systems, without UI, outside the launchpad of the workspace. \`rapt dev .\` serves it
+  with a development OAuth 2.0 server (client \`rapt-client\` / \`rapt-secret\`).`
+      : ""
+  }
 - \`rapt/\` holds the configuration of Open RAP Runtime (seed data, roles, number ranges, MCP); it is
   not imported into SAP. Never edit \`.rapt/\` (build output).
 `;
@@ -403,7 +421,8 @@ export function newBusinessObject(dir: string, entity: string, options: NewBoOpt
     [path.join(src, `${names.table}.tabl.astabl`), tableSource(names)],
     [path.join(src, `${names.root.toLowerCase()}.ddls.asddls`), rootView(names)],
     [path.join(src, `${names.projection.toLowerCase()}.ddls.asddls`), projectionView(names)],
-    [path.join(src, `${names.projection.toLowerCase()}.ddlx.asddlxs`), metadataExtension(names)],
+    // a Web API has no UI: no metadata extension
+    ...(names.webApi ? [] : ([[path.join(src, `${names.projection.toLowerCase()}.ddlx.asddlxs`), metadataExtension(names)]] as [string, string][])),
     [path.join(src, `${names.root.toLowerCase()}.bdef.asbdef`), behavior(names)],
     [path.join(src, `${names.projection.toLowerCase()}.bdef.asbdef`), projectionBehavior(names)],
     [path.join(src, `${names.pool}.clas.abap`), pool(names)],

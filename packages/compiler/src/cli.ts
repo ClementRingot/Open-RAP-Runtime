@@ -37,7 +37,9 @@ Usage:
                                                  launchpad (default port 8090), all rebuilt on change
   rapt dev   <src> [--port <n>] [--out <dir>]    build, run with an embedded database, rebuild on change
   rapt new   <src> <Entity> [--prefix Z…]        write the sources of a new business object (and their XML),
-                                                 and add the application to the launchpad of the workspace
+                                                 and add the application to the launchpad of the workspace;
+                                                 --binding-type webapi: an API for other systems, without UI,
+                                                 not in the launchpad
   rapt abapgit <src> [--check]                   write the abapGit XML files the sources lack
   rapt mcp   <src>                               write rapt/mcp.json: the MCP tools of the service, to describe;
                                                  the application then serves them at /mcp
@@ -53,8 +55,10 @@ Options:
   --service <name>   service definition to build (required when the sources have several)
   --mode <mode>      standard (as on SAP, the default) or enhanced (Open RAP Runtime extensions);
                      overrides "mode" of rapt/config.json
-  --binding <name>   service binding name (default: the SRVB of the service, else <SRVD>_O4)
-  --binding-type <t> ui or webapi (OData V4 - Web API: no UI information, no draft; default: the SRVB)
+  --binding <name>   service binding (default: the SRVB of the service, the UI one when it also has a
+                     Web API binding, else <SRVD>_O4)
+  --binding-type <t> ui or webapi (OData V4 - Web API: no UI information, no draft; default: the SRVB;
+                     rapt new: the binding to create, default ui)
   --path <path>      service root path (default: /sap/opu/odata4/sap/<binding>/srvd/sap/<srvd>/0001/)
   --runtime <dir>    @open-rap/runtime package to embed in the application (default: next to rapt)
   --out <path>       output file (rapt ir) or folder (rapt build, rapt launchpad, rapt dev: <src>/.rapt/dev)
@@ -299,6 +303,10 @@ function floorplanCommand(source: string, set: string | undefined, floorplan: st
     process.stdout.write(`${result.set}: ${result.label} (${result.file})\n${launchpadLine(launchpad)}`);
     return 0;
   }
+  if (result.webApi === true) {
+    process.stdout.write(`${result.root}: an OData V4 - Web API (D76), without UI: no floorplan\n`);
+    return 0;
+  }
   for (const s of result.sets) process.stdout.write(`${s.set.padEnd(24)}${s.floorplan}${s.chosen ? "" : " (default, not chosen)"}\n`);
   process.stdout.write(`\nFloorplans:\n${FLOORPLAN_CATALOG.map((f) => `  ${f.floorplan.padEnd(20)}${f.label}: ${f.description}`).join("\n")}\n`);
   return 0;
@@ -346,12 +354,16 @@ function newCommand(source: string, entity: string | undefined, values: Record<s
     process.stderr.write(`rapt new needs the name of the entity, e.g. rapt new . Travel --prefix ZRT\n`);
     return 2;
   }
+  const bindingType = typeof values["binding-type"] === "string" ? values["binding-type"] : undefined;
   const result = newBusinessObject(source, entity, {
     ...(typeof values["prefix"] === "string" ? { prefix: values["prefix"] } : {}),
     ...(typeof values["description"] === "string" ? { description: values["description"] } : {}),
+    ...(bindingType === undefined ? {} : { bindingType }),
   });
+  // a Web API has no UI: it does not join the launchpad (D76)
+  const webApi = bindingType?.toLowerCase() === "webapi";
   if (json) {
-    const launchpad = result.error === undefined ? register(source, values) : undefined;
+    const launchpad = result.error === undefined && !webApi ? register(source, values) : undefined;
     process.stdout.write(`${JSON.stringify({ command: "new", ok: result.error === undefined, root: path.resolve(source), ...result, ...(launchpad === undefined ? {} : { launchpad }) })}\n`);
     return result.error === undefined ? 0 : 1;
   }
@@ -362,7 +374,7 @@ function newCommand(source: string, entity: string | undefined, values: Record<s
   for (const file of result.written) {
     process.stdout.write(`written: ${file}\n`);
   }
-  process.stdout.write(launchpadLine(register(source, values)));
+  process.stdout.write(webApi ? "launchpad: a Web API has no UI, it is not added to the launchpad\n" : launchpadLine(register(source, values)));
   process.stdout.write(`next: rapt dev ${source}\n`);
   return 0;
 }
@@ -381,6 +393,7 @@ function register(root: string, values: Record<string, unknown>): RegisterResult
 function launchpadLine(result: RegisterResult | undefined): string {
   if (result === undefined) return "";
   if (result.error !== undefined) return `launchpad: not added (${result.error})\n`;
+  if (result.webApi === true) return `launchpad: not added, the project is an OData V4 - Web API (no UI)\n`;
   if (!result.added) return `launchpad: ${result.app?.id ?? "the application"} already in ${result.file}\n`;
   return `launchpad: ${result.app?.id ?? ""} added to ${result.file}${result.created ? " (created)" : ""}\n`;
 }
