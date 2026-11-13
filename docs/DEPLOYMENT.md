@@ -122,11 +122,11 @@ publisher. To set up once:
   of each version. Then, in *Settings* → *Publishing access*, the packages can refuse tokens
   (*Require two-factor authentication and disallow tokens*), and the `NPM_TOKEN` secret is
   deleted.
-- **Visual Studio Marketplace** — in the management page of the publisher `clementringot`, a
+- **Visual Studio Marketplace** — in the management page of the publisher `abaper`, a
   *Trusted Publishing* policy for this repository and `release.yml`; then the repository
   variable **`PUBLISH_VS_MARKETPLACE`** = `true` (*Settings → Secrets and variables → Actions →
   Variables*), and the `VSCE_PAT` secret is deleted.
-- **Open VSX** — on open-vsx.org, the trusted publisher of the namespace `clementringot` for this
+- **Open VSX** — on open-vsx.org, the trusted publisher of the namespace `abaper` for this
   repository and `release.yml` (the Eclipse publisher agreement signed); then the variable
   **`PUBLISH_OPEN_VSX`** = `true`, and the `OVSX_PAT` secret is deleted.
 

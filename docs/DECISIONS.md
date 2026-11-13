@@ -1708,10 +1708,13 @@ _The issues moved to the repository itself once public: see D74._
     published by `npm publish <archive>`: npm exchanges the identity token, pnpm does not. The
     provenance is attested automatically. A version already on npm is skipped.
   - **Visual Studio Marketplace**: `vsce publish --oidc` (`@vscode/vsce` 4.1.0, which also builds
-    the `.vsix`), with `--skip-duplicate`; the publisher declares a Trusted Publishing policy.
+    the `.vsix`), with `--skip-duplicate`; the publisher declares a Trusted Publishing policy. The
+    extension is published by the publisher `abaper` of the maintainer (it was `clementringot`
+    in `package.json`, a publisher that does not exist on the Marketplace): its ID becomes
+    `abaper.open-rap-runtime-vscode`.
   - **Open VSX**: `ovsx publish --trusted-publishing` (`ovsx` 1.3.0, run by `npx` in the CI
-    only: EPL-2.0, never distributed), with `--skip-duplicate`; the namespace declares its
-    trusted publisher.
+    only: EPL-2.0, never distributed), with `--skip-duplicate`; the namespace `abaper` declares
+    its trusted publisher.
   - The Marketplace and Open VSX steps run when the repository variables
     `PUBLISH_VS_MARKETPLACE` and `PUBLISH_OPEN_VSX` are `true`, so that a release does not fail
     before their trusted publisher is declared. npm and the GitHub release always run.

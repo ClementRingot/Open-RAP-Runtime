@@ -12,9 +12,9 @@ run-name: Release ${{ inputs.version && format('v{0}', inputs.version) || github
 # trusted publisher:
 #   - npm: each package → Settings → Trusted Publisher → GitHub Actions
 #     (ClementRingot / Open-RAP-Runtime / release.yml); provenance is attested automatically.
-#   - Visual Studio Marketplace: a Trusted Publishing policy of the publisher clementringot for
+#   - Visual Studio Marketplace: a Trusted Publishing policy of the publisher abaper for
 #     this workflow; published when the repository variable PUBLISH_VS_MARKETPLACE is true.
-#   - Open VSX: the trusted publisher of the namespace clementringot; published when the
+#   - Open VSX: the trusted publisher of the namespace abaper; published when the
 #     repository variable PUBLISH_OPEN_VSX is true.
 #
 # Normally started by the Changesets workflow once the "Version packages" pull request is merged

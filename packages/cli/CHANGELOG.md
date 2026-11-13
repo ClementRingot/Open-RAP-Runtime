@@ -16,6 +16,9 @@
   packages* pull request bumps the versions and writes the changelogs, its merge releases.
 - Published without tokens (D78): npm, the Visual Studio Marketplace and Open VSX trust the
   release workflow by trusted publishing (OIDC); npm attests the provenance of each version.
+- The VS Code extension is published by the publisher `abaper`: its ID becomes
+  `abaper.open-rap-runtime-vscode` (an earlier `.vsix` installed shows as another extension;
+  uninstall it, the `rapt.*` settings are kept).
 
 ### Patch Changes
 
