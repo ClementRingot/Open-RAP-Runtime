@@ -75,8 +75,9 @@ Transitive dependencies: `@adobe/css-tools` and `mime` (MIT).
 | `@electric-sql/pglite` | 0.5.16 | Apache-2.0 | In-process PostgreSQL (WASM) for the tests (D18) |
 | `@types/pg` | 8.x | MIT | Types of `pg` |
 | `playwright` | 1.63 | Apache-2.0 | Tests of the UI in Chromium (pre-installed in the development environment; added in M6 for the CI) |
+| `@changesets/cli` | 3.0.3 | MIT | Versions and changelogs of the packages (D77) |
 
-Transitive development dependencies: MIT for most of them, plus `picocolors` (ISC),
+Transitive development dependencies: MIT for most of them, plus `picocolors` and `yaml` (ISC),
 `source-map-js` (BSD-3-Clause), `detect-libc` and `expect-type` (Apache-2.0).
 
 **Reported exception: `lightningcss` 1.33.0, MPL-2.0 license.** It is a dependency of Vite,

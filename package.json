@@ -13,9 +13,14 @@
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "test": "vitest run",
     "test:watch": "vitest",
-    "rapt": "node packages/compiler/dist/cli.js"
+    "rapt": "node packages/compiler/dist/cli.js",
+    "changeset": "changeset",
+    "changeset:version": "changeset version && node scripts/sync-versions.mjs && pnpm install --lockfile-only && node scripts/check-version-sync.mjs",
+    "check:version": "node scripts/check-version-sync.mjs",
+    "changeset:check": "node scripts/require-changeset.mjs"
   },
   "devDependencies": {
+    "@changesets/cli": "3.0.3",
     "@electric-sql/pglite": "0.5.16",
     "@types/node": "22.20.5",
     "typescript": "7.0.2",

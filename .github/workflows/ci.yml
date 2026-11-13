@@ -24,12 +24,20 @@ jobs:
       RAPT_E2E_DATABASE_URL: postgres://postgres:postgres@localhost:5432/postgres
     steps:
       - uses: actions/checkout@v4
+        with:
+          # the merge base of a pull request, for the changeset check
+          fetch-depth: 0
       - uses: pnpm/action-setup@v4
       - uses: actions/setup-node@v4
         with:
           node-version: 22
           cache: pnpm
       - run: pnpm install --frozen-lockfile
+      # one version in every file that carries it (D77)
+      - run: pnpm check:version
+      - name: A changeset when released content changes (D77)
+        if: github.event_name == 'pull_request'
+        run: node scripts/require-changeset.mjs "origin/${{ github.base_ref }}"
       - run: pnpm typecheck
       - run: pnpm build
       - name: Chromium for the UI tests

@@ -86,10 +86,30 @@ HTTPS address.
 
 ## Publishing a version of Open RAP Runtime (maintainers)
 
-A tag `v1.2.3` runs `release.yml`: the VS Code extension (GitHub release, Marketplace with the
-`VSCE_PAT` secret, Open VSX with `OVSX_PAT`) and the CLI on npm ([D65](DECISIONS.md)):
-`open-rap-runtime` (the `rapt` command), `@open-rap/model`, `@open-rap/compiler` and
-`@open-rap/runtime`, all in version 1.2.3.
+The versions are managed by [Changesets](https://github.com/changesets/changesets)
+([D77](DECISIONS.md)). The five packages — `open-rap-runtime` (the `rapt` command),
+`@open-rap/model`, `@open-rap/compiler`, `@open-rap/runtime` and the VS Code extension — share
+one version.
+
+1. **Each pull request** that changes what ships (the sources of a package, `docs/`, the
+   dependencies of a published package) adds a changeset: `pnpm changeset`, the bump (`patch`
+   for a fix, `minor` for a feature, `major`) and one line for the changelog. A change that must
+   not be released records it with `pnpm changeset add --empty`. The CI refuses a pull request
+   without one (`scripts/require-changeset.mjs`).
+2. **On `main`**, the *Changesets* workflow (`.github/workflows/changesets.yml`) keeps a
+   *Version packages* pull request open: the next version of the five packages, their
+   `CHANGELOG.md`, and the version copied into `RUNTIME_VERSION` and the reference snapshot
+   (`pnpm changeset:version`).
+3. **Merging the Version packages pull request** releases: the workflow tags the version
+   `vX.Y.Z` on the merge commit and runs `release.yml` on the tag — the VS Code extension (GitHub
+   release with the `.vsix` and the notes of the changelogs, Marketplace with the `VSCE_PAT`
+   secret, Open VSX with `OVSX_PAT`), the CLI on npm ([D65](DECISIONS.md)), then the website.
+
+`pnpm check:version` checks that every file carries the same version (the CI runs it), and
+`release.yml` refuses a tag that is not the committed version. The Version packages pull request
+is opened with the `GITHUB_TOKEN`, so the CI does not run on it (it runs on `main` once merged,
+and the release checks everything again); a GitHub App gives it the CI — see the comments of
+`changesets.yml`.
 
 Once, for npm:
 
@@ -104,9 +124,9 @@ installed by npm, `rapt check` and `rapt build` of the fixture) but publishes no
 provenance (the link between the package and the workflow) is added when the repository is
 public.
 
-```sh
-git tag v0.1.0 && git push origin v0.1.0
-```
+By hand, for a release the train did not start: *Actions → Release → Run workflow* with the
+committed version (`0.2.0`), or `git tag v0.2.0 && git push origin v0.2.0` on the commit of that
+version.
 
 To build the `.vsix` locally:
 
@@ -119,6 +139,4 @@ cd packages/vscode && pnpm run package    # open-rap-runtime-vscode.vsix (~31 MB
 (`scripts/stage-rapt.mjs`: packages of the repository and dependencies installed from the npm
 registry, useless files removed), then calls `vsce package`.
 
-Or without a tag: *Actions → Release → Run workflow* with the version (`0.1.0`); the release then
-creates the tag `v0.1.0` on the commit of the run.
 

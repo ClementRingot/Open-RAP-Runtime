@@ -1654,3 +1654,42 @@ _The issues moved to the repository itself once public: see D74._
   (`bindingType`), `vscode/test/rapt.test.ts` (arguments of rapt new and of the wizard, names of
   a binding, kind of a binding, notice), `vscode/test/wizard.test.ts` (the page of the wizard in
   a browser: labels, proposed names, answers).
+
+## D77 — Versions and releases by Changesets
+
+- **Context**: a release meant changing the version by hand in seven files (the five
+  `package.json`, `RUNTIME_VERSION`, the generator of the reference snapshot), then running the
+  Release workflow with the same version; nothing tied a change to its version, and there was no
+  changelog. LISA, another repository of the maintainer, releases with Changesets.
+- **Decision**: [Changesets](https://github.com/changesets/changesets) (`@changesets/cli`, MIT),
+  as in LISA, with one version for the five packages (a `fixed` group; the VS Code extension is
+  private: versioned, never published to npm by Changesets).
+  - **Each pull request** that changes what ships adds a changeset (`pnpm changeset`). What
+    ships (`scripts/lib/versions.mjs`): the sources of a package (not its tests), the grammars
+    and build scripts of the extension, `docs/` (copied into the compiler), the installed fields
+    of a published `package.json` (dependencies, `bin`, `exports`, `contributes`…). The CI
+    refuses a pull request without one (`scripts/require-changeset.mjs`); `pnpm changeset add
+    --empty` declares a change that must not be released; the Version packages pull request,
+    and a pull request that bumps the version itself, are exempt.
+  - **On `main`**, the *Changesets* workflow (`changesets/action`) keeps the *Version packages*
+    pull request up to date: `pnpm changeset:version` bumps the packages, writes their
+    `CHANGELOG.md`, copies the version into the files that carry it
+    (`scripts/sync-versions.mjs`), updates the lockfile and checks the result.
+  - **Its merge releases**: without pending changesets, `scripts/release-version.mjs` tags the
+    committed version `vX.Y.Z` on the merge commit (when not tagged yet, nor being released) and
+    runs `release.yml` on the tag. Unlike LISA, no GitHub App is needed for that: the tag is
+    created with the `GITHUB_TOKEN` (it does not start the tag trigger, so no second run) and the
+    `workflow_dispatch` it sends does start the workflow. An optional App gives the CI to the
+    Version packages pull request.
+  - **One version everywhere**: `pnpm check:version` (CI) fails on a drift; `release.yml` checks
+    that the tag is the committed version instead of writing the version at release time. The
+    notes of the GitHub release are the sections of the version in the changelogs, merged
+    (`scripts/release-notes.mjs`).
+- **Why**: the only human step of a release is merging a pull request that shows the version and
+  its changelog; a change cannot be merged without saying whether and how it is released; the
+  version can no longer differ between the files.
+- **Tests**: `scripts/lib/versions.test.mjs` (the files of the version, `sync-versions.mjs` and
+  `check-version-sync.mjs` with a tag, what ships, changesets, the notes merged from several
+  changelogs); `changeset version` checked on a copy of the repository (the five packages bumped
+  together, the mirrors copied).
+
