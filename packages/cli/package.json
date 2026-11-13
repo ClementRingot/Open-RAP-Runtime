@@ -1,6 +1,6 @@
 {
   "name": "open-rap-runtime",
-  "version": "0.1.2",
+  "version": "0.2.0",
   "description": "rapt, the command line of Open RAP Runtime: compiles SAP RAP sources (abapGit format) into a standalone Node.js OData V4 application, with what rapt dev serves (runtime, OpenUI5, PGlite).",
   "type": "module",
   "license": "MIT",

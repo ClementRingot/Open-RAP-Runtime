@@ -86,27 +86,62 @@ HTTPS address.
 
 ## Publishing a version of Open RAP Runtime (maintainers)
 
-A tag `v1.2.3` runs `release.yml`: the VS Code extension (GitHub release, Marketplace with the
-`VSCE_PAT` secret, Open VSX with `OVSX_PAT`) and the CLI on npm ([D65](DECISIONS.md)):
-`open-rap-runtime` (the `rapt` command), `@open-rap/model`, `@open-rap/compiler` and
-`@open-rap/runtime`, all in version 1.2.3.
+The versions are managed by [Changesets](https://github.com/changesets/changesets)
+([D77](DECISIONS.md)). The five packages — `open-rap-runtime` (the `rapt` command),
+`@open-rap/model`, `@open-rap/compiler`, `@open-rap/runtime` and the VS Code extension — share
+one version.
 
-Once, for npm:
+1. **Each pull request** that changes what ships (the sources of a package, `docs/`, the
+   dependencies of a published package) adds a changeset: `pnpm changeset`, the bump (`patch`
+   for a fix, `minor` for a feature, `major`) and one line for the changelog. A change that must
+   not be released records it with `pnpm changeset add --empty`. The CI refuses a pull request
+   without one (`scripts/require-changeset.mjs`).
+2. **On `main`**, the *Changesets* workflow (`.github/workflows/changesets.yml`) keeps a
+   *Version packages* pull request open: the next version of the five packages, their
+   `CHANGELOG.md`, and the version copied into `RUNTIME_VERSION` and the reference snapshot
+   (`pnpm changeset:version`).
+3. **Merging the Version packages pull request** releases: the workflow tags the version
+   `vX.Y.Z` on the merge commit and runs `release.yml` on the tag — the VS Code extension (GitHub
+   release with the `.vsix` and the notes of the changelogs, the Visual Studio Marketplace, Open
+   VSX), the CLI on npm ([D65](DECISIONS.md)), then the website.
 
-1. Create the organization **`open-rap`** on npmjs.com (free for public packages): it
-   holds the `@open-rap` scope.
-2. Create a *Granular Access Token* (*Read and write*, packages `open-rap-runtime` and scope
-   `@open-rap`, or the whole organization) and save it as the **`NPM_TOKEN`** secret of the
-   repository (*Settings → Secrets and variables → Actions*).
+`pnpm check:version` checks that every file carries the same version (the CI runs it), and
+`release.yml` refuses a tag that is not the committed version.
 
-Without `NPM_TOKEN`, the `npm` job builds and checks the packages (archives of `pnpm pack`
-installed by npm, `rapt check` and `rapt build` of the fixture) but publishes nothing. npm
-provenance (the link between the package and the workflow) is added when the repository is
-public.
+### No token: trusted publishing ([D78](DECISIONS.md))
 
-```sh
-git tag v0.1.0 && git push origin v0.1.0
-```
+The repository stores no token for the registries. `release.yml` asks GitHub for an identity
+token of the job (`id-token: write`); each registry exchanges it for a short-lived credential,
+provided this repository and the workflow file `release.yml` are declared as its trusted
+publisher. To set up once:
+
+- **npm** — for each of the four packages (`open-rap-runtime`, `@open-rap/model`,
+  `@open-rap/compiler`, `@open-rap/runtime`): npmjs.com → the package → *Settings* →
+  *Trusted Publisher* → *GitHub Actions*: owner `ClementRingot`, repository
+  `Open-RAP-Runtime`, workflow `release.yml`, no environment. npm then attests the provenance
+  of each version. Then, in *Settings* → *Publishing access*, the packages can refuse tokens
+  (*Require two-factor authentication and disallow tokens*), and the `NPM_TOKEN` secret is
+  deleted.
+- **Visual Studio Marketplace** — in the management page of the publisher `abaper`, a
+  *Trusted Publishing* policy for this repository and `release.yml`; then the repository
+  variable **`PUBLISH_VS_MARKETPLACE`** = `true` (*Settings → Secrets and variables → Actions →
+  Variables*), and the `VSCE_PAT` secret is deleted.
+- **Open VSX** — on open-vsx.org, the trusted publisher of the namespace `abaper` for this
+  repository and `release.yml` (the Eclipse publisher agreement signed); then the variable
+  **`PUBLISH_OPEN_VSX`** = `true`, and the `OVSX_PAT` secret is deleted.
+
+Without the variable, the Marketplace or Open VSX step is skipped; the GitHub release and npm
+are always published. A version already on a registry is skipped (`--skip-duplicate`, `npm
+view`), so a failed release is simply re-run.
+
+The only stored credential is the private key of the **GitHub App** of the release train
+(variable `RELEASE_APP_ID`, secret `RELEASE_APP_PRIVATE_KEY`, as in LISA): with it, the Version
+packages pull request is opened by the App and the CI runs on it. Without it, the train still
+works with the `GITHUB_TOKEN`, and the CI only runs once the pull request is merged.
+
+By hand, for a release the train did not start: *Actions → Release → Run workflow* with the
+committed version (`0.2.0`), or `git tag v0.2.0 && git push origin v0.2.0` on the commit of that
+version.
 
 To build the `.vsix` locally:
 
@@ -119,6 +154,4 @@ cd packages/vscode && pnpm run package    # open-rap-runtime-vscode.vsix (~31 MB
 (`scripts/stage-rapt.mjs`: packages of the repository and dependencies installed from the npm
 registry, useless files removed), then calls `vsce package`.
 
-Or without a tag: *Actions → Release → Run workflow* with the version (`0.1.0`); the release then
-creates the tag `v0.1.0` on the commit of the run.
 

@@ -97,9 +97,10 @@ describe.skipIf(browserType === undefined)("draft in the UI", () => {
     await page.locator(id("TravelObject", "crumbList")).click();
     await page.locator(".sapMMessageBox button", { hasText: "Keep Draft" }).first().click();
     await page.locator(ROWS).first().waitFor({ timeout: 30_000 });
-    // the list shows the own draft instead of the active instance, with its marker
-    await expect.poll(async () => page.locator(ROWS, { hasText: "70002" }).count(), { timeout: 15_000 }).toBe(1);
-    expect(await page.locator(ROWS, { hasText: "70002" }).first().textContent()).toContain("Draft");
+    // the list shows the own draft instead of the active instance, with its marker: the active
+    // row can show first, until the list is read again, so the poll waits for the draft row
+    await expect.poll(async () => (await page.locator(ROWS, { hasText: "70002" }).allTextContents()).join(" | "), { timeout: 15_000 }).toContain("Draft");
+    expect(await page.locator(ROWS, { hasText: "70002" }).count()).toBe(1);
     // Editing Status: own drafts
     await page.locator(id("TravelList", "filter_EditingStatus")).click();
     await page.locator("li.sapMSelectListItemBase", { hasText: "Own Draft" }).first().click();

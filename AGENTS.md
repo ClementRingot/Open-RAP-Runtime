@@ -9,7 +9,7 @@ writes an `AGENTS.md` in the projects it creates.
 A TypeScript compiler (pnpm monorepo) that turns the sources of a RAP BO (abapGit format) into a
 Node.js application: OData V4, RAP managed runtime, ABAP transpiled by abaplint, PostgreSQL,
 OpenUI5 UI. Read [README.md](README.md), [docs/GUIDE.md](docs/GUIDE.md) and the list of decisions
-[docs/DECISIONS.md](docs/DECISIONS.md) (D1 to D71) first.
+[docs/DECISIONS.md](docs/DECISIONS.md) (D1 to D78) first.
 
 ```
 packages/model/      types of the IR (model.json) and shared derivations (OData, value helps, MCP)
@@ -37,6 +37,8 @@ npx vitest run packages/compiler/test/ui.test.ts      # one file
 node packages/compiler/dist/cli.js check fixtures/travel
 node packages/compiler/dist/cli.js dev fixtures/travel --port 8081
 node scripts/build-site.mjs _site                     # the website, with the documentation pages
+pnpm changeset      # the changeset of a pull request: the bump and its line in the changelog (D77)
+pnpm check:version  # one version in every file that carries it
 ```
 
 The runtime tests import the built `@open-rap/compiler`: run `pnpm build` before running them
@@ -64,6 +66,11 @@ after a change to the compiler.
    names, pull requests (title, description, review comments), issues and release notes.
 9. **Generated files**: never edit `.rapt/`, `dist/`, `packages/compiler/docs/`, nor the virtual
    objects `<standard>/…` (standard views, D44).
+10. **Versions** (D77): never change a version by hand. A pull request that changes what ships
+    (sources of a package, `docs/`, the dependencies of a published package) adds a changeset
+    (`pnpm changeset`: `patch` for a fix, `minor` for a feature; one line in English for the
+    changelog), or `pnpm changeset add --empty` when it must not be released; the CI checks it.
+    The *Version packages* pull request bumps the versions, its merge releases.
 
 ## Adding a feature, in practice
 

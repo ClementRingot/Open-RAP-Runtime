@@ -12,7 +12,7 @@ export default defineConfig({
     },
   },
   test: {
-    include: ["packages/*/test/**/*.test.ts"],
+    include: ["packages/*/test/**/*.test.ts", "scripts/**/*.test.mjs"],
     testTimeout: 60_000,
     hookTimeout: 120_000,
   },
