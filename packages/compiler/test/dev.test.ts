@@ -3,7 +3,7 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import { DevSession, linkFolder, realPath, runtimeDependencies, type DevEvent } from "../src/dev.js";
-import { fixtureVariant } from "./helpers.js";
+import { fixtureVariant, freePort } from "./helpers.js";
 
 const SERVICE = "sap/opu/odata4/sap/zrt_ui_travel_o4/srvd/sap/zrt_ui_travel/0001";
 const TRAVEL = { TravelID: "00000001", AgencyID: "070001", CustomerID: "000001", BeginDate: "2027-05-01", EndDate: "2027-05-08", BookingFee: "40.00", CurrencyCode: "EUR" };
@@ -33,8 +33,8 @@ describe("rapt dev", () => {
     }
   });
 
-  function session(dir: string, lines: string[]): { dev: DevSession; base: string } {
-    const port = 20000 + Math.floor(Math.random() * 20000);
+  async function session(dir: string, lines: string[]): Promise<{ dev: DevSession; base: string }> {
+    const port = await freePort();
     const dev = new DevSession(dir, { port, env: { ...process.env, DATABASE_URL: "", LOG_LEVEL: "error" }, out: (l) => lines.push(l), err: (l) => lines.push(l) });
     cleanups.push(() => dev.close());
     return { dev, base: `http://localhost:${port}/` };
@@ -44,7 +44,7 @@ describe("rapt dev", () => {
     const variant = fixtureVariant({});
     cleanups.push(variant.cleanup);
     const lines: string[] = [];
-    const { dev, base } = session(variant.dir, lines);
+    const { dev, base } = await session(variant.dir, lines);
 
     expect((await dev.rebuild()).ok).toBe(true);
     expect(lines).toContain(`rapt dev: ready at ${base}`);
@@ -90,7 +90,7 @@ describe("rapt dev", () => {
     const variant = fixtureVariant({});
     cleanups.push(variant.cleanup);
     const lines: string[] = [];
-    const { dev } = session(variant.dir, lines);
+    const { dev } = await session(variant.dir, lines);
     await dev.watch();
     const ready = (): number => lines.filter((l) => l.startsWith("rapt dev: ready")).length;
     expect(ready()).toBe(1);
@@ -109,7 +109,7 @@ describe("rapt dev", () => {
     const variant = fixtureVariant({});
     cleanups.push(variant.cleanup);
     const events: DevEvent[] = [];
-    const port = 20000 + Math.floor(Math.random() * 20000);
+    const port = await freePort();
     const dev = new DevSession(variant.dir, { port, env: { ...process.env, DATABASE_URL: "", LOG_LEVEL: "error" }, events: (e) => events.push(e) });
     cleanups.push(() => dev.close());
     expect((await dev.rebuild()).ok).toBe(true);

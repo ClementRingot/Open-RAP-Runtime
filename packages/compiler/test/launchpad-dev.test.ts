@@ -4,28 +4,11 @@
  */
 
 import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
-import { createServer } from "node:net";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import { launchpadDevPlan, LaunchpadDevSession, type LaunchpadDevEvent } from "../src/launchpad/dev.js";
-import { fixtureVariant } from "./helpers.js";
-
-/**
- * Ports no other process listens on, given by the system: random ports collided with the servers
- * of the other test files running at the same time (EADDRINUSE).
- */
-async function freePorts(count: number): Promise<number[]> {
-  const servers = await Promise.all(
-    Array.from({ length: count }, () => new Promise<ReturnType<typeof createServer>>((resolve) => {
-      const server = createServer();
-      server.listen(0, "127.0.0.1", () => resolve(server));
-    })),
-  );
-  const ports = servers.map((s) => (s.address() as { port: number }).port);
-  await Promise.all(servers.map((s) => new Promise((resolve) => s.close(resolve))));
-  return ports;
-}
+import { fixtureVariant, freePorts } from "./helpers.js";
 
 const SERVICE = "/sap/opu/odata4/sap/zrt_ui_travel_o4/srvd/sap/zrt_ui_travel/0001/";
 
