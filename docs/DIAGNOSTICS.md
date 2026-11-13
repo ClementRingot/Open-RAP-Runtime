@@ -105,6 +105,7 @@ exit code is 1 as soon as there is an error (or a warning with `--warnings-as-er
 | LPD007 | warning | Role of a tile missing from the `rapt/authorizations.json` of the applications (the IdP must still give it) |
 | LPD008 | error | Malformed space or page in `launchpad.json` (title, pages, sections, roles) (D48) |
 | LPD009 | error | Malformed `source` application (not a path, or with `build`), folder not found, or application that does not build with the launchpad (D69) |
+| LPD010 | error / warning | `rapt launchpad dev`: application without a local `url` with a port, port taken by another application or by the launchpad, no application with sources (errors); application without sources, not started (warning) (D75) |
 | SEED001 | error | Unreadable or malformed `rapt/seed.json` (object table → array of rows expected) |
 | SEED002 | error | `rapt/seed.json`: table or field unknown to the application |
 | NR001 | error | Unreadable or malformed `rapt/number-ranges.json`: object longer than 10 characters, interval longer than 2 characters, non-numeric or inverted bounds |

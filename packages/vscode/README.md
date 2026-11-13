@@ -24,6 +24,11 @@ Source code, issues and releases: [GitHub](https://github.com/ClementRingot/Open
 - **RAP: Start rapt dev**: the application runs with a PGlite database and is rebuilt on each
   save. The status bar shows the state (building, ready, errors) and opens the application in one
   click.
+- **RAP: Start the launchpad (rapt dev, all the applications)**: `rapt launchpad dev`, every
+  application of `launchpad.json` in development on the port of its URL (8081, 8082…), behind the
+  launchpad on `http://localhost:8090/`; each save rebuilds its application. Also in the context
+  menu and the title bar of `launchpad.json`. One session at a time: starting the launchpad
+  stops *rapt dev* of an application, and the other way round.
 - **RAP: Build the application…**: either the **launchpad of the workspace** with every
   application of the workspace (`rapt launchpad`: each project with a service definition joins
   the same launchpad) or the **application alone** (`rapt build`, standalone), into the folder of
@@ -57,7 +62,9 @@ Source code, issues and releases: [GitHub](https://github.com/ClementRingot/Open
 - Context menus of the explorer (project folder, `.abapgit.xml`) in three groups (create,
   project, application), buttons in the title bar of the RAP sources. The commands that are not
   possible yet are greyed out: outside a project, only *New complete business object…* is
-  active; *Floorplan*, *rapt dev* and *Build the application* wait for a service definition.
+  active; *Floorplan*, *rapt dev* and *Build the application* wait for a service definition;
+  the launchpad commands wait for an application or a `launchpad.json`; *Open the application*
+  waits until the session serves, *Stop rapt dev* until one runs.
 
 A project is an abapGit folder: the folder that contains `.abapgit.xml` (otherwise, the parent of
 a `src` folder).

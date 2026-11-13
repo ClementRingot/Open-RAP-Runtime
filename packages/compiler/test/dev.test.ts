@@ -2,7 +2,7 @@ import { existsSync, lstatSync, mkdirSync, mkdtempSync, readFileSync, renameSync
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
-import { DevSession, linkFolder, runtimeDependencies, type DevEvent } from "../src/dev.js";
+import { DevSession, linkFolder, realPath, runtimeDependencies, type DevEvent } from "../src/dev.js";
 import { fixtureVariant } from "./helpers.js";
 
 const SERVICE = "sap/opu/odata4/sap/zrt_ui_travel_o4/srvd/sap/zrt_ui_travel/0001";
@@ -48,7 +48,7 @@ describe("rapt dev", () => {
 
     expect((await dev.rebuild()).ok).toBe(true);
     expect(lines).toContain(`rapt dev: ready at ${base}`);
-    expect(dev.outDir).toBe(path.join(variant.dir, ".rapt", "dev"));
+    expect(dev.outDir).toBe(path.join(realPath(variant.dir), ".rapt", "dev"));
     expect(lstatSync(path.join(dev.outDir, "node_modules")).isSymbolicLink()).toBe(true);
     expect(existsSync(path.join(dev.outDir, "vendor"))).toBe(false);
     expect((await fetch(`${base}ui/index.html`)).status).toBe(200);

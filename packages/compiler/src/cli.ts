@@ -18,6 +18,7 @@ import { countDiagnostics, formatDiagnostic, type Diagnostics } from "./diagnost
 import { buildLaunchpad } from "./gen/launchpad/index.js";
 import { loadProject } from "./input/project.js";
 import { buildModel, type BuildOptions } from "./ir/builder.js";
+import { LaunchpadDevSession, type LaunchpadDevOptions } from "./launchpad/dev.js";
 import { registerApp, type RegisterResult } from "./launchpad/workspace.js";
 import { COMPILER_VERSION } from "./version.js";
 
@@ -31,6 +32,9 @@ Usage:
                                                  from their sources into <dir>/apps/<id>
   rapt launchpad add <src> [--launchpad <file>]  add the application of <src> to the launchpad of the workspace
                                                  (created, titled "Launchpad", when there is none)
+  rapt launchpad dev <launchpad.json> [--port n] the launchpad of the workspace in development: each application
+                                                 with sources as in rapt dev, on the port of its url, behind the
+                                                 launchpad (default port 8090), all rebuilt on change
   rapt dev   <src> [--port <n>] [--out <dir>]    build, run with an embedded database, rebuild on change
   rapt new   <src> <Entity> [--prefix Z…]        write the sources of a new business object (and their XML),
                                                  and add the application to the launchpad of the workspace
@@ -54,10 +58,11 @@ Options:
   --path <path>      service root path (default: /sap/opu/odata4/sap/<binding>/srvd/sap/<srvd>/0001/)
   --runtime <dir>    @open-rap/runtime package to embed in the application (default: next to rapt)
   --out <path>       output file (rapt ir) or folder (rapt build, rapt launchpad, rapt dev: <src>/.rapt/dev)
-  --port <n>         port of the application (rapt dev, default: PORT, else 8080)
-  --host <address>   interface of rapt dev (default 127.0.0.1; 0.0.0.0 to open it to the network)
+  --port <n>         port of the application (rapt dev, default: PORT, else 8080), of the launchpad
+                     (rapt launchpad dev, default 8090)
+  --host <address>   interface of rapt dev, rapt launchpad dev (default 127.0.0.1; 0.0.0.0: the network)
   --json             machine-readable output (rapt check, rapt build, rapt launchpad, rapt new…: one JSON
-                     object; rapt dev: one JSON event per line)
+                     object; rapt dev, rapt launchpad dev: one JSON event per line)
   --prefix <Z…>      prefix of the object names (rapt new, default Z): ZRT → zrt_travel, ZRT_R_Travel…
   --description <t>  description of the business object (rapt new)
   --from <name>      rapt generate: the object the new one derives from (view ← table, projection ← view,
@@ -167,6 +172,9 @@ export async function main(argv: string[]): Promise<number> {
   if (command === "launchpad") {
     if (source === "add") {
       return launchpadAddCommand(parsed.positionals[2], parsed.values, parsed.values["json"] === true);
+    }
+    if (source === "dev") {
+      return launchpadDev(parsed.positionals[2], parsed.values, parsed.values["json"] === true);
     }
     return launchpadCommand(source, parsed.values, parsed.values["json"] === true);
   }
@@ -454,6 +462,39 @@ async function dev(source: string, generate: GenerateOptions, out: unknown, port
     }
   });
   await session.watch();
+  await stopped;
+  return 0;
+}
+
+/** `rapt launchpad dev <launchpad.json>`: the launchpad and its applications in development (D75); runs until SIGINT or SIGTERM. */
+async function launchpadDev(file: string | undefined, values: Record<string, unknown>, json: boolean): Promise<number> {
+  if (file === undefined) {
+    process.stderr.write(`rapt launchpad dev needs the launchpad.json, e.g. rapt launchpad dev launchpad.json\n`);
+    return 2;
+  }
+  const options: LaunchpadDevOptions = {};
+  if (typeof values["host"] === "string") options.host = values["host"];
+  if (typeof values["out"] === "string") options.outDir = values["out"];
+  if (typeof values["runtime"] === "string") options.runtimeDir = values["runtime"];
+  if (json) options.events = (event) => process.stdout.write(`${JSON.stringify(event)}\n`);
+  if (typeof values["port"] === "string") {
+    const value = Number(values["port"]);
+    if (!Number.isInteger(value) || value <= 0 || value > 65535) {
+      process.stderr.write(`invalid --port ${values["port"]}\n`);
+      return 2;
+    }
+    options.port = value;
+  }
+  const session = new LaunchpadDevSession(file, options);
+  const stopped = new Promise<void>((resolve) => {
+    for (const signal of ["SIGINT", "SIGTERM"] as const) {
+      process.once(signal, () => void session.close().then(resolve));
+    }
+  });
+  if (!(await session.start())) {
+    await session.close();
+    return 1;
+  }
   await stopped;
   return 0;
 }
