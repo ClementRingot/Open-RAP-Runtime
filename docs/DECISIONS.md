@@ -1604,9 +1604,12 @@ _The issues moved to the repository itself once public: see D74._
   and `rapt.devMode` grey out *Open the application* until the session serves and *Stop* without
   a session; the launchpad commands need an application or a `launchpad.json`
   (`rapt.hasApp || rapt.hasLaunchpad`). The roots of the sessions are real paths (no Windows 8.3
-  short name, which `fs.watch` does not support).
+  short name, which `fs.watch` does not support). The regenerations run one at a time; one that
+  throws (a file that cannot be written) is reported (`launchpad-failed`) and the next change of
+  `launchpad.json` or of an application tries again.
 - **Why**: the launchpad is how the applications of a workspace are used together (navigation,
   counters); developing them one at a time hides the result, and Docker is too slow for each save.
 - **Tests**: `compiler/test/launchpad-dev.test.ts` (plan and LPD010, an application behind the
-  launchpad, regeneration on a change of `launchpad.json`, ports freed on close),
+  launchpad, regeneration on a change of `launchpad.json`, ports freed on close, a launchpad that cannot be
+  written then generated on the next change),
   `vscode/test/rapt.test.ts` (context keys, arguments of the sessions).

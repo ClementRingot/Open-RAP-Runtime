@@ -292,16 +292,24 @@ export class LaunchpadDevSession {
     }
   }
 
-  /** One refresh at a time, in order. */
+  /**
+   * One refresh at a time, in order. A refresh that throws (a file that cannot be written) is
+   * reported and does not stop the next ones: the chain never rejects.
+   */
   private scheduleRefresh(reconcile = false): Promise<void> {
-    this.refreshing = this.refreshing.then(async () => {
-      if (this.closed) return;
-      if (reconcile && !(await this.reconcile())) {
-        this.emit({ type: "launchpad-failed", message: "launchpad.json has errors, the previous launchpad keeps running" });
-        return;
-      }
-      await this.refresh();
-    });
+    this.refreshing = this.refreshing
+      .then(async () => {
+        if (this.closed) return;
+        if (reconcile && !(await this.reconcile())) {
+          this.emit({ type: "launchpad-failed", message: "launchpad.json has errors, the previous launchpad keeps running" });
+          return;
+        }
+        await this.refresh();
+      })
+      .catch((error: unknown) => {
+        this.config = undefined;
+        this.emit({ type: "launchpad-failed", message: `the launchpad could not be generated: ${error instanceof Error ? error.message : String(error)}` });
+      });
     return this.refreshing;
   }
 
