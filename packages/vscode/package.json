@@ -2,7 +2,7 @@
   "name": "open-rap-runtime-vscode",
   "displayName": "Open RAP Runtime",
   "description": "Check, generate and run a RAP business object without an SAP system: Open RAP Runtime, OpenUI5 and PGlite are bundled, nothing else to install.",
-  "version": "0.1.2",
+  "version": "0.2.0",
   "publisher": "clementringot",
   "private": true,
   "license": "MIT",

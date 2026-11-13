@@ -1,6 +1,6 @@
 {
   "name": "@open-rap/model",
-  "version": "0.1.2",
+  "version": "0.2.0",
   "description": "Intermediate representation (IR) shared by the Open RAP Runtime compiler and runtime.",
   "type": "module",
   "license": "MIT",
