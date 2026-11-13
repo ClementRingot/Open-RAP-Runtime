@@ -1,7 +1,7 @@
 /** rapt agent (D64): the MCP server of rapt for AI coding agents, over stdio. */
 
 import { spawn } from "node:child_process";
-import { existsSync, mkdtempSync, rmSync } from "node:fs";
+import { existsSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -59,6 +59,29 @@ describe("rapt agent", () => {
     expect((await call(server, "rapt_floorplan", { entitySet: "Order", floorplan: "worklist" }))?.structuredContent).toMatchObject({ file: "rapt/config.json", floorplan: "worklist", launchpad: { added: false } });
     expect((await call(server, "rapt_abapgit", { check: true }))?.structuredContent).toMatchObject({ written: [] });
   }, 120_000);
+
+  it("creates a Web API, which has no floorplan and stays out of the launchpad (D76)", async () => {
+    const own = mkdtempSync(path.join(tmpdir(), "rapt-agent-webapi-"));
+    try {
+      await webApi(own);
+    } finally {
+      rmSync(own, { recursive: true, force: true });
+    }
+  }, 120_000);
+
+  async function webApi(workspace: string): Promise<void> {
+    const server = new AgentServer(workspace);
+    // a UI business object first: the launchpad of the workspace
+    expect((await call(server, "rapt_new_business_object", { project: "shop", entity: "Order", prefix: "ZSH" }))?.isError).toBe(false);
+    const created = await call(server, "rapt_new_business_object", { project: "partners", entity: "Partner", prefix: "ZPA", bindingType: "webapi" });
+    expect(created?.isError).toBe(false);
+    expect(created?.structuredContent).toMatchObject({ project: "partners", written: expect.arrayContaining(["src/zpa_api_partner_o4.srvb.xml"]) });
+    expect((created?.structuredContent as { launchpad?: unknown }).launchpad).toBeUndefined();
+    // the launchpad of the workspace lists the UI application only
+    expect(readFileSync(path.join(workspace, "launchpad.json"), "utf8")).toContain('"shop"');
+    expect(readFileSync(path.join(workspace, "launchpad.json"), "utf8")).not.toContain("partners");
+    expect((await call(server, "rapt_floorplan", { project: "partners" }))?.structuredContent).toMatchObject({ sets: [], webApi: true });
+  }
 
   it("refuses paths outside the workspace and reports the errors of a project", async () => {
     const server = new AgentServer(workspace);

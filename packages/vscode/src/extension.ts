@@ -20,6 +20,8 @@ import {
   resolveCli,
   runJson,
   summary,
+  newArgs,
+  SERVICE_KINDS,
   validEntityName,
   GENERATE_KINDS,
   LAUNCHPAD_FILE,
@@ -302,6 +304,15 @@ async function newBo(uri?: vscode.Uri): Promise<void> {
   if (root === undefined) {
     return;
   }
+  // a Fiori application, or a Web API for other systems: the type of the service binding (D76)
+  const kind = await vscode.window.showQuickPick(
+    SERVICE_KINDS.map((k) => ({ label: k.label, detail: k.detail, service: k })),
+    { title: "RAP: new business object", placeHolder: "What is the service for?", ignoreFocusOut: true },
+  );
+  if (kind === undefined) {
+    return;
+  }
+  const webApi = kind.service.bindingType === "webapi";
   const entity = await vscode.window.showInputBox({
     title: "RAP: new business object",
     prompt: "Entity name (e.g. Travel, SalesOrder)",
@@ -326,7 +337,7 @@ async function newBo(uri?: vscode.Uri): Promise<void> {
     return;
   }
   try {
-    const result = await runJson<NewResult>(cli(), ["new", root, entity, "--prefix", prefix, "--description", description, ...launchpadArgs()], root);
+    const result = await runJson<NewResult>(cli(), [...newArgs(root, entity, prefix, description, kind.service.bindingType), ...launchpadArgs()], root);
     if (!result.ok) {
       void vscode.window.showErrorMessage(`RAP: ${result.error ?? "creation failed"}`);
       return;
@@ -337,7 +348,8 @@ async function newBo(uri?: vscode.Uri): Promise<void> {
     if (behavior !== undefined) {
       await vscode.window.showTextDocument(vscode.Uri.file(path.join(root, behavior)));
     }
-    const action = await vscode.window.showInformationMessage(`RAP: ${entity} created (${result.written.length} files).`, "Start rapt dev");
+    const created = webApi ? `RAP: ${entity} created as a Web API (${result.written.length} files): no UI, not in the launchpad; rapt dev serves it with a development OAuth server.` : `RAP: ${entity} created (${result.written.length} files).`;
+    const action = await vscode.window.showInformationMessage(created, "Start rapt dev");
     if (action !== undefined) {
       await devStart(root);
     }
@@ -478,6 +490,10 @@ async function newObject(root: string, kind?: string): Promise<void> {
 async function floorplan(root: string): Promise<void> {
   const answer = await floorplans(root);
   if (answer === undefined) return;
+  if (answer.webApi === true) {
+    void vscode.window.showInformationMessage("RAP: this service is an OData V4 - Web API (service binding): it has no UI, so no floorplan. For a Fiori application, add a UI binding (New RAP object… > Service binding, type ui).");
+    return;
+  }
   if (answer.sets.length === 0) {
     void vscode.window.showWarningMessage("RAP: the service exposes no root entity.");
     return;
@@ -489,7 +505,7 @@ async function floorplan(root: string): Promise<void> {
   }
 }
 
-type FloorplanAnswer = { sets: Array<{ set: string; floorplan: string; chosen?: boolean }>; floorplans: Array<{ floorplan: string; label: string; description: string; needs: string }> };
+type FloorplanAnswer = { sets: Array<{ set: string; floorplan: string; chosen?: boolean }>; floorplans: Array<{ floorplan: string; label: string; description: string; needs: string }>; webApi?: boolean };
 
 async function floorplans(root: string): Promise<FloorplanAnswer | undefined> {
   try {

@@ -211,6 +211,7 @@ dependent ETag, remote APIs.
 | `sap-*` parameters | ✅ | Ignored. |
 | Authentication: dev mode, Bearer JWT (OIDC, JWKS) | ✅ | Browser sessions (PKCE): M6; *client credentials* tokens (technical user); development OAuth 2.0 server (`/oauth`, client credentials and PKCE) in `rapt dev` (D60). |
 | *OData V4 - Web API* binding | ✅ | Without UI annotations, value helps, side effects, feature control; active instances of a draft BO (D60). |
+| A Web API created as such (`rapt new --binding-type webapi`, *New complete business object…*), kept out of the launchpad; the UI binding preferred when a service has both | ✅ | D76; LPD011, SRVD002. |
 | `$apply`: `filter`, `groupby`, `aggregate` (`sum`, `min`, `max`, `average`, `countdistinct`, `$count`) | ✅ | With the DCL of the user; other transformations: 501 (D52). |
 | Enumeration types (`EnumType`): JSON by member name, literals `Ns.Type'M'` | ✅ | `enhanced` mode, CDS enumerated types (D55). |
 | JSON batch, `$value`, single properties | ❌ | Not in the MVP. |
@@ -256,6 +257,7 @@ dependent ETag, remote APIs.
 | Spaces and pages (`spaces` → `pages` → `sections`), assigned to roles | ✅ | Space tabs, list of the pages, last space remembered (D48). |
 | Development launchpad (`rapt dev`): application, documentation, `$metadata`, MCP | ✅ | D49. |
 | Launchpad of the workspace in development (`rapt launchpad dev`, *RAP: Start the launchpad*): every application rebuilt on save, behind the launchpad | ✅ | D75; LPD010. |
+| Web APIs never in the launchpad: not added, their tiles left out | ✅ | D76; LPD011. |
 | One "Launchpad" per workspace, applications added when they are created (`rapt new`, `rapt floorplan`, `rapt launchpad add`) | ✅ | D69; idempotent, `--launchpad`, `--no-launchpad`. |
 | Applications built with the launchpad from their sources (`source`); deployment of the complete launchpad or of one application alone | ✅ | D69; `out/launchpad/apps/<id>`, LPD009. |
 | Personalization by the user, notifications, navigation between applications from an application | ❌ | See KNOWN_GAPS. |

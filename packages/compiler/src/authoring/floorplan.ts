@@ -1,6 +1,7 @@
 /**
  * The floorplans of a project (D53, D61): the root entity sets of the service and the floorplan of
  * each, read from and written to rapt/config.json. Shared by `rapt floorplan` and `rapt agent`.
+ * A Web API (D76) has no UI, so no floorplan: no sets, `webApi` true.
  */
 
 import path from "node:path";
@@ -9,7 +10,7 @@ import { buildModel } from "../ir/builder.js";
 import { FLOORPLAN_CATALOG, readFloorplans, writeFloorplan } from "./catalog.js";
 
 export type FloorplanResult =
-  | { ok: true; root: string; sets: Array<{ set: string; floorplan: string; chosen: boolean }>; floorplans: typeof FLOORPLAN_CATALOG }
+  | { ok: true; root: string; sets: Array<{ set: string; floorplan: string; chosen: boolean }>; floorplans: typeof FLOORPLAN_CATALOG; webApi?: boolean }
   | { ok: true; root: string; file: string; set: string; floorplan: string; label: string }
   | { ok: false; root: string; error: string };
 
@@ -17,6 +18,12 @@ export type FloorplanResult =
 export function floorplans(source: string, set?: string, floorplan?: string): FloorplanResult {
   const root = path.resolve(source);
   const { model } = buildModel(loadProject(root));
+  if (model?.service.webApi === true) {
+    if (set !== undefined) {
+      return { ok: false, root, error: `${model.service.binding} is an OData V4 - Web API binding: the service has no UI, so no floorplan` };
+    }
+    return { ok: true, root, sets: [], floorplans: FLOORPLAN_CATALOG, webApi: true };
+  }
   const sets = (model?.service.entitySets ?? [])
     .filter((s) => s.valueHelp !== true && s.draftAdministrativeData !== true && model?.entities.find((e) => e.name === s.entity)?.root === true)
     .map((s) => s.name);

@@ -53,6 +53,8 @@ export interface LaunchpadAddResult {
   created: boolean;
   added: boolean;
   app?: { id: string; source: string; url: string };
+  /** The project is an OData V4 - Web API, never in the launchpad (D76). */
+  webApi?: boolean;
   error?: string;
 }
 
@@ -97,6 +99,7 @@ export function launchpadSources(file: string, text: string): string[] {
 
 /** The message of an application added to the launchpad; undefined when nothing changed. */
 export function launchpadNotice(result: LaunchpadAddResult | undefined): string | undefined {
+  if (result?.webApi === true) return "a Web API (no UI): not in the launchpad";
   if (result === undefined || (result.error === undefined && !result.added)) return undefined;
   if (result.error !== undefined) return `not added to the launchpad (${result.error})`;
   return `${result.app?.id ?? "application"} added to the launchpad${result.created ? " (created)" : ""}: ${result.file}`;
@@ -246,6 +249,25 @@ export const OBJECT_GROUPS: Array<{ id: string; label: string; pattern: RegExp }
   { id: "srvb", label: "Service bindings", pattern: /\.srvb\.xml$/i },
   { id: "abap", label: "Classes and interfaces", pattern: /\.(clas|intf)\.abap$/i },
 ];
+
+/** The kind of a service binding (abapGit XML of a SRVB): UI (category 0) or Web API (1), D76. */
+export function bindingKind(xml: string): "UI" | "Web API" | undefined {
+  const category = /<BINDING_TYPE_CATEGORY>\s*(\d)\s*<\/BINDING_TYPE_CATEGORY>/.exec(xml)?.[1];
+  if (category === "1") return "Web API";
+  if (category === "0" || /<SRVB>/.test(xml)) return "UI";
+  return undefined;
+}
+
+/** What `rapt new` creates (D76): a Fiori application, or a Web API for other systems. */
+export const SERVICE_KINDS: Array<{ bindingType: "ui" | "webapi"; label: string; detail: string }> = [
+  { bindingType: "ui", label: "Fiori application (UI)", detail: "List Report and Object Page, added to the launchpad of the workspace (OData V4 - UI binding)" },
+  { bindingType: "webapi", label: "Web API", detail: "An OData API for other systems, without UI, not in the launchpad (OData V4 - Web API binding)" },
+];
+
+/** The arguments of `rapt new` (D42, D76). */
+export function newArgs(root: string, entity: string, prefix: string, description: string, bindingType: "ui" | "webapi" = "ui"): string[] {
+  return ["new", root, entity, "--prefix", prefix, "--description", description, ...(bindingType === "webapi" ? ["--binding-type", "webapi"] : [])];
+}
 
 /** The main file of each object of a project, by group; a table written as source hides its XML. */
 export function groupObjects(fileNames: string[]): Record<string, string[]> {

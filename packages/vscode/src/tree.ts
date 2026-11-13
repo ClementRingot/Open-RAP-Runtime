@@ -2,11 +2,13 @@
  * The "RAP Objects" view (D61): the objects of the RAP projects of the workspace, grouped as in
  * the project explorer of ADT (dictionary, data definitions, behavior definitions, services…);
  * a click opens the source. Its title bar creates an object, checks the project, runs rapt dev.
+ * A service binding shows its kind, UI or Web API (D76).
  */
 
+import { readFileSync } from "node:fs";
 import path from "node:path";
 import * as vscode from "vscode";
-import { groupObjects, OBJECT_GROUPS } from "./rapt.js";
+import { bindingKind, groupObjects, OBJECT_GROUPS } from "./rapt.js";
 
 type Node = { kind: "project"; root: string } | { kind: "group"; root: string; id: string; label: string; files: string[] } | { kind: "file"; root: string; file: string };
 
@@ -38,6 +40,18 @@ export class RapObjectsProvider implements vscode.TreeDataProvider<Node> {
     }
     const item = new vscode.TreeItem(path.basename(node.file).split(".")[0]?.toUpperCase().replace(/#/g, "/") ?? node.file, vscode.TreeItemCollapsibleState.None);
     item.description = path.basename(node.file).split(".").slice(1).join(".");
+    if (/\.srvb\.xml$/i.test(node.file)) {
+      let kind: string | undefined;
+      try {
+        kind = bindingKind(readFileSync(node.file, "utf8"));
+      } catch {
+        kind = undefined;
+      }
+      if (kind !== undefined) {
+        item.description = `${kind} · ${item.description}`;
+        item.tooltip = kind === "Web API" ? "OData V4 - Web API: an API for other systems, without UI, not in the launchpad" : "OData V4 - UI: a Fiori application of the launchpad";
+      }
+    }
     item.resourceUri = vscode.Uri.file(node.file);
     item.command = { command: "vscode.open", title: "Open", arguments: [vscode.Uri.file(node.file)] };
     item.contextValue = "raptObject";

@@ -14,7 +14,8 @@ Source code, issues and releases: [GitHub](https://github.com/ClementRingot/Open
 - **Problems**: the diagnostics of `rapt check` (BDEF, CDS, behavior pool…) on each save,
   underlined in the code.
 - **RAP Objects** view: the objects of the project grouped as in the project explorer of ADT
-  (dictionary, data definitions, behavior definitions, services…).
+  (dictionary, data definitions, behavior definitions, services…); each service binding shows
+  its kind, `UI` or `Web API`.
 - **RAP: New RAP object…**: create object by object (table, view, projection, BDEF, behavior
   pool, service, binding…) with the wizard: the object types of `rapt generate` by category, as
   in the *New ABAP Repository Object* wizard of ADT, with the objects of the project to derive
@@ -42,7 +43,9 @@ Source code, issues and releases: [GitHub](https://github.com/ClementRingot/Open
   application; each complete BO and each choice of floorplan add the application and its tile,
   without touching what is already there. **RAP: Build the launchpad (all the applications)…**
   builds it with its applications (active when it exists).
-- **RAP: New complete business object…**: `rapt new` asks for the name of the entity, the prefix
+- **RAP: New complete business object…**: `rapt new` asks what the service is for — a Fiori
+  application (UI, added to the launchpad) or a Web API for other systems (no UI, never in the
+  launchpad) —, then for the name of the entity, the prefix
   and the description, writes a complete managed BO (table as a `.tabl.astabl` source, CDS,
   BDEF, behavior pool, service, initial data `rapt/seed.json`) with its abapGit files, then
   offers to start `rapt dev`. Possible in an empty folder.

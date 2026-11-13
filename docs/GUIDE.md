@@ -35,7 +35,7 @@ nothing else to install), then in the command palette (`Ctrl+Shift+P`):
 
 | Command | Effect |
 |---|---|
-| *RAP: New complete business object…* | `rapt new`: a complete managed BO (table, CDS, BDEF, behavior pool, service, binding), with initial data; possible in an empty folder |
+| *RAP: New complete business object…* | `rapt new`: a complete managed BO (table, CDS, BDEF, behavior pool, service, binding), with initial data; possible in an empty folder. It first asks what the service is for: a Fiori application (UI) or a Web API for other systems ([D76](DECISIONS.md)) |
 | *RAP: New RAP object…* | create object by object with the wizard, like *New ABAP Repository Object* of ADT: the types by category (Dictionary, Core Data Services, Behavior, Business Services, Source Code Library), a filter, a description, the fields of the type (source object, exposed entities, binding type…) |
 | *RAP: Choose the floorplan of the application…* | `rapt floorplan`: List Report, Worklist, Analytical List Page or Form Entry, with what each one needs; asked anyway before the first generation |
 | *RAP: Show the intermediate representation* | `rapt ir`: the model (`model.json`) in an editor |
@@ -59,7 +59,8 @@ chosen: the extension asks for it when it was not ([D66](DECISIONS.md)).
 The **RAP Objects** view of the explorer arranges the objects of the project like the project
 explorer of ADT (dictionary, data definitions, metadata extensions, access controls, behavior
 definitions, services, classes); its title bar creates an object, checks the project and starts
-`rapt dev` ([D61](DECISIONS.md)).
+`rapt dev` ([D61](DECISIONS.md)). Each service binding shows its kind, `UI` or `Web API`
+([D76](DECISIONS.md)).
 
 Syntax highlighting covers ABAP, CDS (DDLS, DDLX, DCL, SRVD, tables, types) and BDEF.
 
@@ -386,7 +387,8 @@ for the file in the project then its parent folders (up to the root of the git r
 otherwise creates it in the parent folder of the project; `--launchpad <file>` designates
 another one, `--no-launchpad` adds nothing. The VS Code extension puts it next to the
 `.code-workspace` (or in the first folder of the workspace). An application already present is
-never changed: titles, tiles and roles are edited by hand.
+never changed: titles, tiles and roles are edited by hand. A Web API is never added: it has no
+UI to open, and a tile on one is left out (LPD011, [D76](DECISIONS.md)).
 
 ```
 rap-apps/
@@ -476,7 +478,7 @@ Dockerfile, docker-compose.yml, keycloak/, manifest.yml   container, PostgreSQL,
 | `rapt check <src>` | diagnostics (`file:line:column: severity CODE message`), exit code 1 on error |
 | `rapt build <src> --out <dir>` | generated application |
 | `rapt dev <src>` | development loop |
-| `rapt new <src> <Entity> [--prefix ZRT] [--description …]` | complete BO, added to the launchpad of the workspace |
+| `rapt new <src> <Entity> [--prefix ZRT] [--description …] [--binding-type webapi]` | complete BO, added to the launchpad of the workspace; with `--binding-type webapi`, a Web API (no UI, not in the launchpad) |
 | `rapt generate <src> <type> <name> [--from X] [--for Y] [--expose A,B] [--root]` | one object |
 | `rapt floorplan <src> [<EntitySet> <floorplan>]` | floorplan of a root entity set; the application is added to the launchpad |
 | `rapt abapgit <src> [--check]` | missing abapGit XML files |
@@ -518,6 +520,22 @@ and `rapt floorplan`: `--launchpad <file>` (another launchpad) and `--no-launchp
 A service bound as *OData V4 - Web API* (`BINDING_TYPE_CATEGORY` 1 in the SRVB, or
 `rapt generate . binding ZAPI_TRAVEL_O4 --for ZUI_TRAVEL --binding-type webapi`) has neither UI
 nor UI annotations; a draft BO only exposes its active instances there ([D60](DECISIONS.md)).
+
+**A Web API or a Fiori application** ([D76](DECISIONS.md)): the type of the service binding
+decides, as on SAP. Choose it when the business object is created: *RAP: New complete business
+object…* asks "Fiori application (UI)" or "Web API" first; on the command line,
+`rapt new my-api Partner --prefix ZPA --binding-type webapi` writes `ZPA_API_PARTNER` and its
+binding `ZPA_API_PARTNER_O4` (category 1), without metadata extension. A Web API:
+
+- is never added to the launchpad of the workspace (`rapt new`, `rapt launchpad add`, the
+  launchpad commands of VS Code); a tile written by hand on one is left out (LPD011);
+- has no floorplan (`rapt floorplan` lists none, VS Code does not ask);
+- shows `Web API` next to its binding in the *RAP Objects* view.
+
+A service can have both bindings, as on SAP: `rapt dev` and the launchpad serve the UI one
+(SRVD002 info), `rapt dev . --binding ZPA_API_PARTNER_O4` the Web API. To turn an application
+into a Web API, change `BINDING_TYPE_CATEGORY` of its binding to `1` (or add a Web API binding
+with *New RAP object… > Service binding*).
 
 In development, `rapt dev` serves an OAuth 2.0 server under `/oauth`:
 

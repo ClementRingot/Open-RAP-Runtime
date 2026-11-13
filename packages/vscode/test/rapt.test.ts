@@ -4,7 +4,7 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { afterEach, describe, expect, it } from "vitest";
-import { agentServers, appLabel, appRoots, devArgs, devContext, feedbackUrl, launchpadDevArgs, terminalShims, DevProcess, GENERATE_KINDS, groupObjects, launchpadNotice, launchpadSources, menuContext, projectObjects, unchosenFloorplans, wizardArgs, workspaceLaunchpad, type CatalogEntry, type LaunchpadAddResult, diagnosticPath, findProjectRoot, LineSplitter, parseDevEvent, position, resolveCli, runJson, summary, type DevEvent } from "../src/rapt.js";
+import { agentServers, appLabel, bindingKind, newArgs, SERVICE_KINDS, appRoots, devArgs, devContext, feedbackUrl, launchpadDevArgs, terminalShims, DevProcess, GENERATE_KINDS, groupObjects, launchpadNotice, launchpadSources, menuContext, projectObjects, unchosenFloorplans, wizardArgs, workspaceLaunchpad, type CatalogEntry, type LaunchpadAddResult, diagnosticPath, findProjectRoot, LineSplitter, parseDevEvent, position, resolveCli, runJson, summary, type DevEvent } from "../src/rapt.js";
 
 const REPO = fileURLToPath(new URL("../../../", import.meta.url));
 const FIXTURE = path.join(REPO, "fixtures", "travel");
@@ -204,6 +204,30 @@ describe("the creation wizard and the objects view (D61)", () => {
       srvb: ["/p/src/zui.srvb.xml"],
     });
   });
+
+  it("creates a Fiori application or a Web API, and shows the kind of each binding (D76)", async () => {
+    expect(SERVICE_KINDS.map((k) => k.bindingType)).toEqual(["ui", "webapi"]);
+    expect(newArgs("/p", "Order", "ZOR", "Orders")).toEqual(["new", "/p", "Order", "--prefix", "ZOR", "--description", "Orders"]);
+    expect(newArgs("/p", "Order", "ZOR", "Orders", "webapi")).toEqual(["new", "/p", "Order", "--prefix", "ZOR", "--description", "Orders", "--binding-type", "webapi"]);
+    expect(bindingKind("<SRVB><BINDING_TYPE_CATEGORY>1</BINDING_TYPE_CATEGORY></SRVB>")).toBe("Web API");
+    expect(bindingKind("<SRVB><BINDING_TYPE_CATEGORY>0</BINDING_TYPE_CATEGORY></SRVB>")).toBe("UI");
+    expect(bindingKind("<SRVB><NAME>Z</NAME></SRVB>")).toBe("UI");
+    expect(bindingKind("<DDLS/>")).toBeUndefined();
+    expect(launchpadNotice({ file: "/w/launchpad.json", created: false, added: false, webApi: true })).toBe("a Web API (no UI): not in the launchpad");
+
+    const dir = mkdtempSync(path.join(tmpdir(), "rapt-vscode-webapi-"));
+    try {
+      const root = path.join(dir, "partners");
+      const created = await runJson<{ ok: boolean; written: string[]; launchpad?: LaunchpadAddResult }>(cli, newArgs(root, "Partner", "ZPA", "Partners", "webapi"), dir);
+      expect(created).toMatchObject({ ok: true, written: expect.arrayContaining(["src/zpa_api_partner_o4.srvb.xml"]) });
+      expect(created.launchpad).toBeUndefined();
+      expect(bindingKind(readFileSync(path.join(root, "src", "zpa_api_partner_o4.srvb.xml"), "utf8"))).toBe("Web API");
+      expect(await runJson(cli, ["floorplan", root], root)).toMatchObject({ ok: true, sets: [], webApi: true });
+      expect(await runJson(cli, ["launchpad", "add", root], root)).toMatchObject({ added: false, webApi: true });
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  }, 120_000);
 
   it("puts rapt on the PATH of the terminals with a shim that runs the CLI of the extension (D64)", () => {
     expect(terminalShims({ command: "rapt", args: [] })).toEqual([]);

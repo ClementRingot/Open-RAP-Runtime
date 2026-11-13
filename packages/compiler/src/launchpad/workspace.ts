@@ -41,6 +41,11 @@ export interface RegisterResult {
   added: boolean;
   app?: { id: string; source: string; url: string; service?: string };
   tile?: Record<string, unknown>;
+  /**
+   * The project is an OData V4 - Web API (D76): an API for other systems, without UI, never added
+   * to the launchpad (`added` false, no error).
+   */
+  webApi?: boolean;
   error?: string;
 }
 
@@ -135,6 +140,7 @@ function defaultTiles(source: LaunchpadSource): unknown[] {
  * Adds an application (its sources) and its tile to the launchpad of the workspace, created with
  * the title "Launchpad" when there is none. Idempotent: an application already there (same
  * sources, or same id without sources) is left as it is, and nothing the user wrote is changed.
+ * A Web API (OData V4 - Web API binding, D76) has no UI: it is not added (`webApi`).
  */
 export function registerApp(projectDir: string, options: RegisterOptions = {}): RegisterResult {
   const root = path.resolve(projectDir);
@@ -159,6 +165,9 @@ export function registerApp(projectDir: string, options: RegisterOptions = {}): 
   const { model } = buildModel(loadProject(root), options.service === undefined ? {} : { service: options.service });
   if (model === undefined) {
     return { file, created: false, added: false, error: `${root}: no application to add to the launchpad (a service definition is needed; rapt check ${root})` };
+  }
+  if (model.service.webApi === true) {
+    return { file, created: false, added: false, webApi: true };
   }
   let id = slug(path.basename(root));
   if (!ID.test(id)) id = slug(model.service.name);
