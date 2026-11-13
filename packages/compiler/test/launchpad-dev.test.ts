@@ -94,4 +94,30 @@ describe("rapt launchpad dev", () => {
     await expect(fetch(`${base}/launchpad/config`)).rejects.toThrow();
     await expect(fetch(`http://localhost:${appPort}/ui/index.html`)).rejects.toThrow();
   }, 120_000);
+
+  it("reports a launchpad that cannot be written, and generates it on the next change", async () => {
+    const variant = fixtureVariant({});
+    cleanups.push(variant.cleanup);
+    const port = 20000 + Math.floor(Math.random() * 20000);
+    const file = workspace([]);
+    const source = { title: "Launchpad", apps: [{ id: "travel", source: variant.dir, url: `http://localhost:${port + 1}/` }], groups: [] };
+    writeFileSync(file, JSON.stringify(source));
+    // a file where the folder of the launchpad goes: writing it fails
+    const outDir = path.join(path.dirname(file), "out");
+    writeFileSync(outDir, "");
+    const events: LaunchpadDevEvent[] = [];
+    const session = new LaunchpadDevSession(file, { port, outDir, env: { ...process.env, DATABASE_URL: "", LOG_LEVEL: "error" }, events: (e) => events.push(e) });
+    cleanups.push(() => session.close());
+
+    expect(await session.start()).toBe(true);
+    expect(events).toContainEqual({ type: "launchpad-failed", message: expect.stringMatching(/^the launchpad could not be generated: /) });
+    expect(events.some((e) => e.type === "launchpad-ready")).toBe(false);
+
+    // the folder can be written now: the next change of launchpad.json generates the launchpad
+    rmSync(outDir);
+    mkdirSync(outDir);
+    writeFileSync(file, JSON.stringify({ ...source, title: "Workspace" }));
+    await expect.poll(() => events.some((e) => e.type === "launchpad-ready"), { timeout: 30_000, interval: 200 }).toBe(true);
+    await expect(session.close()).resolves.toBeUndefined();
+  }, 120_000);
 });
