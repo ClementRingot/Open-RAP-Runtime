@@ -12,6 +12,7 @@ abapGit.
 npm install -g open-rap-runtime        # or: npx open-rap-runtime <command>
 rapt new my-project Travel --prefix ZRT
 rapt dev my-project                  # http://localhost:8080/, rebuilt on every save
+rapt launchpad dev launchpad.json    # every application of the workspace, behind http://localhost:8090/
 rapt check my-project                # diagnostics file:line:column (--json for tools)
 rapt build my-project --out dist     # the deployable application
 rapt agent .                         # MCP server (stdio) of rapt for AI coding agents

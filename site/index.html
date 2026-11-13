@@ -109,6 +109,7 @@
             <li>Install the extension (it contains everything: rapt, OpenUI5, an embedded database).</li>
             <li><em>RAP: New complete business object…</em> creates a managed BO with data, and adds it to the launchpad of the workspace.</li>
             <li><em>RAP: Start rapt dev</em> asks for the floorplan (List Report, Worklist…) and opens the application; it is rebuilt on each save.</li>
+            <li>With several applications, <em>RAP: Start the launchpad</em> runs them all, each rebuilt on save, behind the launchpad of the workspace.</li>
             <li><em>RAP: New RAP object…</em> adds views, BDEFs, services… as in ADT. <code>rapt</code> is also on the PATH of the terminals, and the agent mode of VS Code finds <code>rapt agent</code>.</li>
           </ol>
         </div>
@@ -119,6 +120,9 @@
 rapt new my-project Travel --prefix ZRT
 rapt dev my-project
 # http://localhost:8080/
+rapt launchpad dev launchpad.json
+# every application of the workspace,
+# behind http://localhost:8090/
 
 rapt check my-project       # diagnostics
 rapt build my-project --out dist

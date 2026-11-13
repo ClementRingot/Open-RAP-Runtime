@@ -63,6 +63,8 @@ rapt dev my-project                         # http://localhost:8080/ — rebuilt
   files for the import into SAP).
 - **Development loop** `rapt dev`: embedded database, rebuild on each save, positioned
   diagnostics (`file:line:column`), development launchpad with the built-in documentation.
+  `rapt launchpad dev launchpad.json` does the same for every application of the workspace, each
+  on the port of its URL, behind the launchpad (`http://localhost:8090/`).
 - **Modes**: `standard` (strictly as on SAP, activatable on SAP) or `enhanced` (extensions:
   mandatory fields checked automatically, managed BO on a custom entity, CDS enumerated types
   exposed as OData `EnumType`).
@@ -81,7 +83,8 @@ rapt dev my-project                         # http://localhost:8080/ — rebuilt
   by the database view.
 - **Security**: OIDC (Keycloak, SAP Cloud Identity Services, Entra ID…), Web API bindings with
   OAuth 2.0 (client credentials, PKCE), authorization objects and `AUTHORITY-CHECK`, DCL, roles.
-- **One launchpad per workspace**: each application is added to it when it is created; ship
+- **One launchpad per workspace**: each application is added to it when it is created; develop
+  them together behind it (`rapt launchpad dev`, *RAP: Start the launchpad* in VS Code); ship
   either the launchpad with all its applications (`rapt launchpad`) or one application alone
   (`rapt build`).
 - **Deployment**: Docker, `docker compose`, SAP BTP Cloud Foundry (`cf push`), any Node.js
