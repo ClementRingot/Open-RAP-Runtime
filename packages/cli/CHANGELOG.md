@@ -1,5 +1,12 @@
 # open-rap-runtime
 
+## 0.2.1
+
+### Patch Changes
+
+- @open-rap/compiler@0.2.1
+  - @open-rap/runtime@0.2.1
+
 ## 0.2.0
 
 ### Minor Changes

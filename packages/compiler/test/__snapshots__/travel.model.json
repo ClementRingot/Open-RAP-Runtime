@@ -2,7 +2,7 @@
   "formatVersion": 1,
   "generator": {
     "name": "open-rap-runtime",
-    "version": "0.2.0"
+    "version": "0.2.1"
   },
   "service": {
     "name": "ZRT_UI_TRAVEL",
