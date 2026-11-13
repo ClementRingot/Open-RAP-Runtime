@@ -1,6 +1,6 @@
 {
   "name": "@open-rap/compiler",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "description": "Compiles SAP RAP sources (abapGit format) into a standalone Node.js OData V4 application.",
   "type": "module",
   "license": "MIT",
