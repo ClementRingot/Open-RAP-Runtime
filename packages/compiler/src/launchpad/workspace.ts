@@ -18,7 +18,8 @@ export const DEFAULT_LAUNCHPAD_TITLE = "Launchpad";
 export const DEFAULT_SECTION = "Applications";
 /** How many folders above the project the existing launchpad is looked for. */
 const SEARCH_DEPTH = 4;
-const LAUNCHPAD_PORT = 8090;
+/** The port of the launchpad run locally (npm start, rapt launchpad dev). */
+export const LAUNCHPAD_PORT = 8090;
 
 export interface LaunchpadLocation {
   file: string;

@@ -41,6 +41,7 @@ nothing else to install), then in the command palette (`Ctrl+Shift+P`):
 | *RAP: Show the intermediate representation* | `rapt ir`: the model (`model.json`) in an editor |
 | *RAP: Build the launchpad (all the applications)…* | `rapt launchpad`: the launchpad of the workspace and all its applications ([D69](DECISIONS.md)) |
 | *RAP: Start rapt dev* | builds, starts and opens the development launchpad; restarts on each save |
+| *RAP: Start the launchpad (rapt dev, all the applications)* | `rapt launchpad dev`: every application of the launchpad in development, behind the launchpad ([D75](DECISIONS.md)) |
 | *RAP: Check the BO* | `rapt check`: diagnostics in the Problems tab (also on each save) |
 | *RAP: Build the application…* | either the **launchpad with all the applications** (`rapt launchpad`) or the **application alone** (`rapt build`, standalone) |
 | *RAP: Generate the abapGit files* | `rapt abapgit`: the missing XML files for the import into SAP |
@@ -426,6 +427,15 @@ separately. The content is organized in groups, or in **spaces and pages** ([D48
 }
 ```
 
+**The launchpad in development** ([D75](DECISIONS.md)): `rapt launchpad dev launchpad.json`
+starts `rapt dev` for each application with sources (`source`), each on the port of its `url`
+(`http://localhost:8081/`…), and the launchpad in front of them on `http://localhost:8090/`
+(`--port`, `--host`). Each save rebuilds its application; a change of `launchpad.json` updates
+the launchpad, starts the added applications and stops the removed ones. The applications with
+`build` are not started (LPD010 warning); two applications on the same port, or an application
+without a local port, are errors (LPD010). `--json` writes one event per line, with the `app`
+of the application.
+
 ## 10. Shipping
 
 Two ways to deploy ([D69](DECISIONS.md)):
@@ -472,6 +482,7 @@ Dockerfile, docker-compose.yml, keycloak/, manifest.yml   container, PostgreSQL,
 | `rapt abapgit <src> [--check]` | missing abapGit XML files |
 | `rapt mcp <src>` | MCP tools (`rapt/mcp.json`) |
 | `rapt launchpad <launchpad.json> --out <dir>` | launchpad, and the applications of their sources (`source`) |
+| `rapt launchpad dev <launchpad.json> [--port 8090]` | development loop of all the applications of the launchpad, behind it |
 | `rapt launchpad add <src> [--launchpad f]` | adds the application to the launchpad of the workspace (created when missing) |
 | `rapt ir <src> [--out f]` | intermediate representation (JSON) |
 | `rapt agent [<workspace>]` | MCP server (stdio) of rapt for AI coding agents (§13) |

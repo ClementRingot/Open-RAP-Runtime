@@ -124,10 +124,10 @@
       },
       {
         "command": "rapt.openUi",
-        "title": "Open the application",
+        "title": "Open the application (or the launchpad)",
         "category": "RAP",
         "icon": "$(globe)",
-        "enablement": "rapt.devRunning"
+        "enablement": "rapt.devReady"
       },
       {
         "command": "rapt.showLog",
@@ -196,7 +196,14 @@
         "title": "Build the launchpad (all the applications)…",
         "category": "RAP",
         "icon": "$(layout)",
-        "enablement": "rapt.hasLaunchpad"
+        "enablement": "rapt.hasApp || rapt.hasLaunchpad"
+      },
+      {
+        "command": "rapt.launchpadDev",
+        "title": "Start the launchpad (rapt dev, all the applications)",
+        "category": "RAP",
+        "icon": "$(rocket)",
+        "enablement": "rapt.hasApp || rapt.hasLaunchpad"
       },
       {
         "command": "rapt.refreshObjects",
@@ -213,7 +220,7 @@
         },
         {
           "command": "rapt.openUi",
-          "when": "rapt.devRunning"
+          "when": "rapt.devReady"
         },
         {
           "command": "rapt.generate",
@@ -255,6 +262,16 @@
           "command": "rapt.build",
           "when": "explorerResourceIsFolder || resourceFilename == .abapgit.xml",
           "group": "rapt3_app@3"
+        },
+        {
+          "command": "rapt.launchpadDev",
+          "when": "resourceFilename == launchpad.json",
+          "group": "rapt4_launchpad@1"
+        },
+        {
+          "command": "rapt.launchpad",
+          "when": "resourceFilename == launchpad.json",
+          "group": "rapt4_launchpad@2"
         }
       ],
       "editor/title": [
@@ -264,8 +281,13 @@
           "group": "navigation@90"
         },
         {
+          "command": "rapt.launchpadDev",
+          "when": "!rapt.devRunning && resourceFilename == launchpad.json",
+          "group": "navigation@90"
+        },
+        {
           "command": "rapt.openUi",
-          "when": "rapt.devRunning",
+          "when": "rapt.devReady",
           "group": "navigation@90"
         },
         {
@@ -291,9 +313,24 @@
           "group": "navigation@3"
         },
         {
+          "command": "rapt.launchpadDev",
+          "when": "view == raptObjects && !rapt.devRunning && (rapt.hasApp || rapt.hasLaunchpad)",
+          "group": "navigation@4"
+        },
+        {
+          "command": "rapt.openUi",
+          "when": "view == raptObjects && rapt.devReady",
+          "group": "navigation@5"
+        },
+        {
+          "command": "rapt.devStop",
+          "when": "view == raptObjects && rapt.devRunning",
+          "group": "navigation@6"
+        },
+        {
           "command": "rapt.refreshObjects",
           "when": "view == raptObjects",
-          "group": "navigation@4"
+          "group": "navigation@7"
         },
         {
           "command": "rapt.newBo",
@@ -301,9 +338,14 @@
           "group": "1_create@1"
         },
         {
-          "command": "rapt.launchpad",
-          "when": "view == raptObjects && rapt.hasLaunchpad",
+          "command": "rapt.launchpadDev",
+          "when": "view == raptObjects && (rapt.hasApp || rapt.hasLaunchpad)",
           "group": "2_launchpad@1"
+        },
+        {
+          "command": "rapt.launchpad",
+          "when": "view == raptObjects && (rapt.hasApp || rapt.hasLaunchpad)",
+          "group": "2_launchpad@2"
         }
       ],
       "view/item/context": [

@@ -1582,3 +1582,31 @@ _The issues moved to the repository itself once public: see D74._
   `open-rap-runtime-feedback` points to the new place; its issues stay readable. The rest of D71
   holds (fields filled from the query string, version and environment from the extension).
 - **Tests**: `compiler/test/docs.test.ts` (no link to the former name of the repository).
+
+## D75 — The launchpad of the workspace in development
+
+- **Context**: `rapt dev` runs one application with its development launchpad (D49); with several
+  applications in a workspace (D69), the launchpad with all of them only existed as a build
+  (`rapt launchpad`, then Docker). The commands of the extension were also active when they could
+  not work (open the application before it serves, stop without a session).
+- **Decision**: `rapt launchpad dev <launchpad.json> [--port 8090] [--host] [--json]` starts a
+  `rapt dev` session for each application with `source`, on the port of its `url`, and serves the
+  launchpad (its configuration resolved from the models of the sessions) on port 8090. The
+  launchpad waits until every application is built, then follows their rebuilds; a change of
+  `launchpad.json` adds, removes or restarts the sessions and regenerates the launchpad. Checks
+  (LPD010): an application with `build` is not started (warning); a URL that is not local or
+  without a port, a port taken twice or by the launchpad, no application with sources are errors.
+  The files go to `.rapt/launchpad` next to `launchpad.json`. In VS Code, *RAP: Start the
+  launchpad (rapt dev, all the applications)* (palette, context menu and title bar of
+  `launchpad.json`, view of the RAP objects) asks for the missing floorplans then runs it. The
+  extension keeps a single session: starting an application or the launchpad stops the other,
+  since both use the same `.rapt/dev` and ports. Context keys `rapt.devRunning`, `rapt.devReady`
+  and `rapt.devMode` grey out *Open the application* until the session serves and *Stop* without
+  a session; the launchpad commands need an application or a `launchpad.json`
+  (`rapt.hasApp || rapt.hasLaunchpad`). The roots of the sessions are real paths (no Windows 8.3
+  short name, which `fs.watch` does not support).
+- **Why**: the launchpad is how the applications of a workspace are used together (navigation,
+  counters); developing them one at a time hides the result, and Docker is too slow for each save.
+- **Tests**: `compiler/test/launchpad-dev.test.ts` (plan and LPD010, an application behind the
+  launchpad, regeneration on a change of `launchpad.json`, ports freed on close),
+  `vscode/test/rapt.test.ts` (context keys, arguments of the sessions).

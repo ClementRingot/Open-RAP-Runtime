@@ -9,7 +9,7 @@
  */
 
 import { spawn, type ChildProcess } from "node:child_process";
-import { existsSync, lstatSync, mkdirSync, readdirSync, readFileSync, readlinkSync, rmSync, symlinkSync, unlinkSync, watch, writeFileSync, type FSWatcher } from "node:fs";
+import { existsSync, lstatSync, mkdirSync, readdirSync, readFileSync, readlinkSync, realpathSync, rmSync, symlinkSync, unlinkSync, watch, writeFileSync, type FSWatcher } from "node:fs";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
 import { generateApplication, writeFiles, type GenerateOptions } from "./build.js";
@@ -78,6 +78,18 @@ export function formatDevEvent(event: DevEvent): { line: string; error: boolean 
   }
 }
 
+/** The lines of an event in the text output: one per diagnostic and a summary, else formatDevEvent. */
+export function devEventLines(event: DevEvent): Array<{ line: string; error: boolean }> {
+  if (event.type === "diagnostics") {
+    return [
+      ...event.diagnostics.map((d) => ({ line: formatDiagnostic(d), error: d.severity === "error" })),
+      { line: `rapt dev: ${event.counts.error} error(s), ${event.counts.warning} warning(s), ${event.counts.info} info`, error: false },
+    ];
+  }
+  const text = formatDevEvent(event);
+  return text === undefined ? [] : [text];
+}
+
 export interface RebuildResult {
   ok: boolean;
   diagnostics?: Diagnostics;
@@ -85,8 +97,22 @@ export interface RebuildResult {
 
 /** Folders written by a build; the others (data/, node_modules) are kept between builds. */
 const GENERATED = ["model", "db", "odata", "abap", "ui", "mcp", "home", "docs"];
-const READY = "rapt-dev-ready";
+/** The line a development server writes once it listens. */
+export const READY = "rapt-dev-ready";
 const SCHEMA_STAMP = ".schema.sql";
+
+/**
+ * The real path of a folder or file that exists (else the path): on Windows, fs.watch of a short
+ * 8.3 path (C:\Users\CLMENT~1\…, the temporary folder of a user name with an accent) aborts the
+ * process in libuv.
+ */
+export function realPath(p: string): string {
+  try {
+    return realpathSync.native(p);
+  } catch {
+    return p;
+  }
+}
 
 export class DevSession {
   public readonly root: string;
@@ -96,6 +122,8 @@ export class DevSession {
   private readonly out: (line: string) => void;
   private readonly err: (line: string) => void;
   private readonly runtimeDir: string | undefined;
+  /** The model of the running build (the launchpad of `rapt launchpad dev` reads its service, D75). */
+  public model: Model | undefined;
   private server: ChildProcess | undefined;
   /** One watcher per folder: the recursive fs.watch of Linux loses files replaced by a rename. */
   private readonly watchers = new Map<string, FSWatcher>();
@@ -108,7 +136,7 @@ export class DevSession {
     source: string,
     private readonly options: DevOptions = {},
   ) {
-    this.root = path.resolve(source);
+    this.root = realPath(path.resolve(source));
     this.outDir = path.resolve(options.outDir ?? path.join(this.root, ".rapt", "dev"));
     this.env = options.env ?? process.env;
     this.port = options.port ?? Number(this.env["PORT"] ?? 8080);
@@ -159,9 +187,11 @@ export class DevSession {
     writeFileSync(path.join(this.outDir, "dev-server.mjs"), devServer(pathToFileURL(path.join(this.runtimeDir!, "dist", "index.js")).href));
     this.resetDatabaseOnSchemaChange();
     if (!(await this.startServer())) {
+      this.model = undefined;
       this.emit({ type: "server-failed" });
       return { ok: false, diagnostics };
     }
+    this.model = result.model;
     this.emit({ type: "ready", url: this.uiUrl });
     return { ok: true, diagnostics };
   }
@@ -192,15 +222,7 @@ export class DevSession {
       this.options.events(event);
       return;
     }
-    if (event.type === "diagnostics") {
-      for (const d of event.diagnostics) {
-        (d.severity === "error" ? this.err : this.out)(formatDiagnostic(d));
-      }
-      this.out(`rapt dev: ${event.counts.error} error(s), ${event.counts.warning} warning(s), ${event.counts.info} info`);
-      return;
-    }
-    const text = formatDevEvent(event);
-    if (text !== undefined) {
+    for (const text of devEventLines(event)) {
       (text.error ? this.err : this.out)(text.line);
     }
   }

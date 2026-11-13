@@ -12,7 +12,10 @@ import {
   appRoots,
   diagnosticPath,
   DevProcess,
+  devArgs,
+  devContext,
   findProjectRoot,
+  launchpadDevArgs,
   position,
   resolveCli,
   runJson,
@@ -53,7 +56,18 @@ let extensionPath = "";
 let output: vscode.OutputChannel;
 let diagnostics: vscode.DiagnosticCollection;
 let status: vscode.StatusBarItem;
-let dev: { process: DevProcess; root: string; url?: string; opened?: boolean } | undefined;
+let dev:
+  | {
+      process: DevProcess;
+      mode: "app" | "launchpad";
+      /** The project (app), the folder of launchpad.json (launchpad). */
+      root: string;
+      /** The projects it builds, by application id (launchpad: from the `apps` event). */
+      roots: Map<string, string>;
+      url?: string;
+      opened?: boolean;
+    }
+  | undefined;
 /** Files with diagnostics, by project root (to clear them on the next run). */
 const reported = new Map<string, vscode.Uri[]>();
 const checkTimers = new Map<string, NodeJS.Timeout>();
@@ -226,8 +240,8 @@ async function build(root: string): Promise<void> {
       return;
     }
     if (mode.launchpad) {
-      if (await gatherApps(file, apps)) {
-        await buildLaunchpad(file, apps);
+      if (await prepareLaunchpad(file, true, apps)) {
+        await buildLaunchpad(file);
       }
       return;
     }
@@ -471,7 +485,7 @@ async function floorplan(root: string): Promise<void> {
   const set = answer.sets.length === 1 ? answer.sets[0] : (await vscode.window.showQuickPick(answer.sets.map((s) => ({ label: s.set, description: s.chosen ? s.floorplan : "to choose", s })), { title: "RAP: floorplan of the application", placeHolder: "Root entity set" }))?.s;
   if (set === undefined) return;
   if (await pickFloorplan(root, answer, set, false)) {
-    void vscode.window.showInformationMessage(`RAP: floorplan of ${set.set} saved (rapt/config.json).${dev?.root === root ? "" : " Start rapt dev to see it."}`);
+    void vscode.window.showInformationMessage(`RAP: floorplan of ${set.set} saved (rapt/config.json).${devCovers(root) ? "" : " Start rapt dev to see it."}`);
   }
 }
 
@@ -542,37 +556,72 @@ async function showIr(root: string): Promise<void> {
   }
 }
 
-/** "Build the launchpad": the launchpad of the workspace (D69), else a launchpad.json of the workspace. */
-async function launchpad(): Promise<void> {
+/**
+ * The launchpad.json of the launchpad commands: the one clicked in the explorer, else the launchpad
+ * of the workspace (D69), else one of the workspace. Without any, the launchpad of the workspace
+ * when the workspace has applications: rapt launchpad add creates it with them (D72).
+ */
+async function pickLaunchpad(uri?: unknown): Promise<string | undefined> {
+  if (uri instanceof vscode.Uri && uri.scheme === "file" && path.basename(uri.fsPath) === LAUNCHPAD_FILE) {
+    return uri.fsPath;
+  }
   const own = launchpadFile();
-  let file = own !== undefined && existsSync(own) ? own : undefined;
-  if (file === undefined) {
-    const files = await vscode.workspace.findFiles(`**/${LAUNCHPAD_FILE}`, EXCLUDE, 20);
-    file = files.length <= 1 ? files[0]?.fsPath : (await vscode.window.showQuickPick(files.map((f) => ({ label: vscode.workspace.asRelativePath(f), f })), { placeHolder: LAUNCHPAD_FILE }))?.f.fsPath;
+  if (own !== undefined && existsSync(own)) {
+    return own;
   }
-  if (file === undefined) {
-    void vscode.window.showWarningMessage("RAP: no launchpad yet. It is created with the first application (\"New complete business object\", \"Choose the floorplan of the application\").");
-    return;
+  const files = await vscode.workspace.findFiles(`**/${LAUNCHPAD_FILE}`, EXCLUDE, 20);
+  if (files.length > 0) {
+    return files.length === 1 ? files[0]?.fsPath : (await vscode.window.showQuickPick(files.map((f) => ({ label: vscode.workspace.asRelativePath(f), f })), { placeHolder: LAUNCHPAD_FILE }))?.f.fsPath;
   }
-  if (file === own) {
-    const apps = await workspaceApps();
-    if (!(await gatherApps(file, apps))) return;
-    await buildLaunchpad(file, apps);
-    return;
+  if (own !== undefined && (await workspaceApps()).length > 0) {
+    return own;
   }
-  await buildLaunchpad(file);
+  void vscode.window.showWarningMessage("RAP: no application in the workspace yet. The launchpad gathers the applications: create one first (\"New complete business object\").");
+  return undefined;
+}
+
+/**
+ * Before generating or running a launchpad: when it is the launchpad of the workspace, each
+ * application of the workspace in it (D72); then the floorplan of each application of its sources,
+ * asked when missing (D66), and their abapGit files for a deployment (D73). False when cancelled.
+ */
+async function prepareLaunchpad(file: string, deploy: boolean, apps?: string[]): Promise<boolean> {
+  const own = launchpadFile();
+  let checked: string[] = [];
+  if (own !== undefined && samePath(file, own)) {
+    checked = apps ?? (await workspaceApps());
+    if (!(await gatherApps(file, checked, deploy))) return false;
+  }
+  const done = new Set(checked.map((c) => path.resolve(c)));
+  for (const source of launchpadSources(file, existsSync(file) ? readFileSync(file, "utf8") : "")) {
+    if (done.has(path.resolve(source)) || !existsSync(source)) continue;
+    if (!(await ensureFloorplans(source))) {
+      return false;
+    }
+    if (deploy) await ensureAbapGit(source);
+  }
+  return true;
+}
+
+/** "Build the launchpad": rapt launchpad of the launchpad of the workspace (D69, D72). */
+async function launchpad(uri?: unknown): Promise<void> {
+  const file = await pickLaunchpad(uri);
+  if (file === undefined) return;
+  if (await prepareLaunchpad(file, true)) {
+    await buildLaunchpad(file);
+  }
 }
 
 /**
  * The applications of the workspace in its launchpad (D72): the floorplan of each one is asked when
  * missing, application by application, then the application is added (what is there is kept).
  */
-async function gatherApps(file: string, apps: string[]): Promise<boolean> {
+async function gatherApps(file: string, apps: string[], abapGit = true): Promise<boolean> {
   for (const app of apps) {
     if (!(await ensureFloorplans(app))) {
       return false;
     }
-    await ensureAbapGit(app);
+    if (abapGit) await ensureAbapGit(app);
     try {
       notifyLaunchpad(await runJson<LaunchpadAddResult>(cli(), ["launchpad", "add", app, "--launchpad", file], app));
     } catch (e) {
@@ -583,16 +632,8 @@ async function gatherApps(file: string, apps: string[]): Promise<boolean> {
   return true;
 }
 
-/** rapt launchpad <launchpad.json> --out <folder>: the launchpad and the applications of its sources. */
-async function buildLaunchpad(file: string, checked: string[] = []): Promise<void> {
-  const done = new Set(checked.map((c) => path.resolve(c)));
-  for (const source of launchpadSources(file, readFileSync(file, "utf8"))) {
-    if (done.has(path.resolve(source)) || !existsSync(source)) continue;
-    if (!(await ensureFloorplans(source))) {
-      return;
-    }
-    await ensureAbapGit(source);
-  }
+/** rapt launchpad <launchpad.json> --out <folder>: the launchpad and the applications of its sources (prepared by prepareLaunchpad). */
+async function buildLaunchpad(file: string): Promise<void> {
   const base = path.dirname(file);
   const target = await vscode.window.showInputBox({ prompt: "Folder of the generated launchpad (with its applications)", value: path.join(base, "out", "launchpad"), ignoreFocusOut: true });
   if (target === undefined) return;
@@ -728,6 +769,7 @@ function onDevEvent(root: string, event: DevEvent): void {
     case "ready":
       if (dev !== undefined) {
         dev.url = event.url;
+        setDevContext();
       }
       showStatus("$(radio-tower)", `RAP: ${new URL(event.url).host}`, "rapt.openUi", `${event.url}\nClick to open the application`);
       output.appendLine(`[dev] ready: ${event.url}`);
@@ -760,26 +802,143 @@ function onDevEvent(root: string, event: DevEvent): void {
   }
 }
 
+function samePath(a: string, b: string): boolean {
+  return process.platform === "win32" ? path.resolve(a).toLowerCase() === path.resolve(b).toLowerCase() : path.resolve(a) === path.resolve(b);
+}
+
+/** Whether the running session rebuilds this project (rapt dev of it, or of the launchpad with it). */
+function devCovers(root: string): boolean {
+  if (dev === undefined) return false;
+  return dev.mode === "app" ? samePath(dev.root, root) : [...dev.roots.values()].some((r) => samePath(r, root));
+}
+
+function setDevContext(): void {
+  for (const [key, value] of Object.entries(devContext(dev))) {
+    void vscode.commands.executeCommand("setContext", key, value);
+  }
+}
+
+/** The events of rapt launchpad dev: those of each application (with its id), and of the launchpad (D75). */
+function onLaunchpadEvent(file: string, event: DevEvent): void {
+  const session = dev;
+  if (session === undefined) return;
+  if ("app" in event && event.app !== undefined) {
+    const root = session.roots.get(event.app);
+    const name = event.app;
+    switch (event.type) {
+      case "building":
+        showStatus("$(sync~spin)", `RAP: building ${name}…`, "rapt.devStop", "Stop rapt launchpad dev");
+        output.appendLine(`[${name}] building ${event.root}`);
+        return;
+      case "diagnostics":
+        if (root !== undefined) publish(root, event.diagnostics);
+        output.appendLine(`[${name}] ${summary(event.counts)}`);
+        return;
+      case "failed":
+        showStatus("$(error)", `RAP: ${name}: errors${event.running ? " (previous version running)" : ""}`, "workbench.actions.view.problems");
+        return;
+      case "server-failed":
+        showStatus("$(error)", `RAP: ${name}: the server did not start`, "rapt.showLog");
+        return;
+      case "ready":
+        output.appendLine(`[${name}] ready: ${event.url}`);
+        if (session.url !== undefined) {
+          showStatus("$(radio-tower)", `RAP: launchpad ${new URL(session.url).host}`, "rapt.openUi", `${session.url}\nClick to open the launchpad`);
+        }
+        return;
+      case "database-reset":
+        output.appendLine(`[${name}] the schema changed: development database reset`);
+        void vscode.window.showInformationMessage(`RAP: ${name}: the schema changed, the development database was reset.`);
+        return;
+      case "error":
+        output.appendLine(`[${name}] ${event.message}`);
+        void vscode.window.showErrorMessage(`RAP: ${name}: ${event.message}`);
+        return;
+      case "changed":
+        output.appendLine(`[${name}] ${event.file} changed`);
+        return;
+      case "server-stopped":
+        output.appendLine(`[${name}] the server stopped (code ${event.code})`);
+        return;
+      case "log":
+        output.appendLine(`[${name}] ${event.line}`);
+        return;
+    }
+  }
+  switch (event.type) {
+    case "apps":
+      session.roots = new Map(event.apps.map((a) => [a.id, a.root]));
+      output.appendLine(`[launchpad] ${event.apps.map((a) => `${a.id} at ${a.url}`).join(", ")}`);
+      return;
+    case "launchpad-diagnostics":
+      publish(file, event.diagnostics.map((d) => (d.path === undefined && d.file === undefined ? { ...d, path: file } : d)));
+      return;
+    case "launchpad-waiting":
+      output.appendLine(`[launchpad] waiting for ${event.apps.join(", ")} to build`);
+      return;
+    case "launchpad-ready":
+      session.url = event.url;
+      setDevContext();
+      showStatus("$(radio-tower)", `RAP: launchpad ${new URL(event.url).host}`, "rapt.openUi", `${event.url}\nClick to open the launchpad`);
+      output.appendLine(`[launchpad] ready: ${event.url}`);
+      if (config().get<boolean>("dev.openUi") === true && session.opened !== true) {
+        session.opened = true;
+        void vscode.env.openExternal(vscode.Uri.parse(event.url));
+      }
+      return;
+    case "launchpad-failed":
+      output.appendLine(`[launchpad] ${event.message}`);
+      showStatus("$(error)", "RAP: launchpad errors", "workbench.actions.view.problems", event.message);
+      return;
+    case "changed":
+      output.appendLine(`[launchpad] ${event.file} changed`);
+      return;
+    case "log":
+      output.appendLine(event.line);
+      return;
+    default:
+      return;
+  }
+}
+
+/** Starts a session, after stopping the running one: a single one, the applications share their ports and their builds. */
+async function startSession(mode: "app" | "launchpad", root: string, args: string[], onEvent: (event: DevEvent) => void): Promise<void> {
+  await devStop();
+  const child = new DevProcess(cli(), args, root, onEvent, (line) => output.appendLine(line));
+  const session: NonNullable<typeof dev> = { process: child, mode, root, roots: mode === "app" ? new Map([["", root]]) : new Map() };
+  dev = session;
+  setDevContext();
+  const name = mode === "app" ? "rapt dev" : "rapt launchpad dev";
+  showStatus("$(sync~spin)", `RAP: starting ${name}…`, "rapt.devStop", `Stop ${name}`);
+  void child.exited.then((code) => {
+    if (dev === session) {
+      dev = undefined;
+      setDevContext();
+      showStatus("$(debug-start)", "RAP: dev stopped", "rapt.devStart");
+      if (code !== 0 && code !== null) {
+        cliFailed(new Error(`${name} stopped (code ${code}), see the Problems panel and the Open RAP Runtime log`));
+      }
+    }
+  });
+}
+
 async function devStart(root: string): Promise<void> {
   if (!(await ensureFloorplans(root))) {
     return;
   }
-  await devStop();
   const port = config().get<number>("dev.port") ?? 8080;
-  const child = new DevProcess(cli(), root, port, (event) => onDevEvent(root, event), (line) => output.appendLine(line));
-  const session: NonNullable<typeof dev> = { process: child, root };
-  dev = session;
-  void vscode.commands.executeCommand("setContext", "rapt.devRunning", true);
-  void child.exited.then((code) => {
-    if (dev === session) {
-      dev = undefined;
-      void vscode.commands.executeCommand("setContext", "rapt.devRunning", false);
-      showStatus("$(debug-start)", "RAP: dev stopped", "rapt.devStart");
-      if (code !== 0 && code !== null) {
-        cliFailed(new Error(`rapt dev stopped (code ${code}), see the Open RAP Runtime log`));
-      }
-    }
-  });
+  await startSession("app", root, devArgs(root, port), (event) => onDevEvent(root, event));
+}
+
+/**
+ * "Start the launchpad (rapt dev, all the applications)": rapt launchpad dev on the launchpad of the
+ * workspace (D75), each application of the workspace in it first, with its floorplan chosen (D66, D72).
+ */
+async function launchpadDevStart(uri?: unknown): Promise<void> {
+  const file = await pickLaunchpad(uri);
+  if (file === undefined) return;
+  if (!(await prepareLaunchpad(file, false))) return;
+  await startSession("launchpad", path.dirname(file), launchpadDevArgs(file), (event) => onLaunchpadEvent(file, event));
 }
 
 async function devStop(): Promise<void> {
@@ -787,7 +946,7 @@ async function devStop(): Promise<void> {
   dev = undefined;
   if (current !== undefined) {
     await current.process.stop();
-    void vscode.commands.executeCommand("setContext", "rapt.devRunning", false);
+    setDevContext();
     showStatus("$(debug-start)", "RAP: dev stopped", "rapt.devStart");
   }
 }
@@ -855,6 +1014,7 @@ export function activate(context: vscode.ExtensionContext): void {
     vscode.commands.registerCommand("rapt.floorplan", withProject(floorplan)),
     vscode.commands.registerCommand("rapt.ir", withProject(showIr)),
     vscode.commands.registerCommand("rapt.launchpad", launchpad),
+    vscode.commands.registerCommand("rapt.launchpadDev", launchpadDevStart),
     vscode.commands.registerCommand("rapt.refreshObjects", () => objectsView?.refresh()),
     vscode.window.registerTreeDataProvider("raptObjects", (objectsView = new RapObjectsProvider())),
     vscode.workspace.onDidCreateFiles(() => objectsView?.refresh()),
@@ -865,7 +1025,7 @@ export function activate(context: vscode.ExtensionContext): void {
         return;
       }
       const root = findProjectRoot(document.uri.fsPath, vscode.workspace.getWorkspaceFolder(document.uri)?.uri.fsPath);
-      if (root === undefined || dev?.root === root || document.uri.fsPath.includes(`${path.sep}.rapt${path.sep}`)) {
+      if (root === undefined || devCovers(root) || document.uri.fsPath.includes(`${path.sep}.rapt${path.sep}`)) {
         return;
       }
       clearTimeout(checkTimers.get(root));

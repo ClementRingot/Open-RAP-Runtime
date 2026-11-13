@@ -264,8 +264,8 @@ export function validEntityName(name: string): boolean {
   return /^[A-Za-z][A-Za-z0-9]*$/.test(name);
 }
 
-/** An event of `rapt dev --json`. */
-export type DevEvent =
+/** An event of `rapt dev --json`; in `rapt launchpad dev --json`, with the id of its application. */
+export type AppDevEvent =
   | { type: "building"; root: string }
   | { type: "changed"; file: string }
   | { type: "diagnostics"; diagnostics: RaptDiagnostic[]; counts: Counts }
@@ -276,6 +276,40 @@ export type DevEvent =
   | { type: "server-failed" }
   | { type: "server-stopped"; code: number }
   | { type: "log"; stream: "stdout" | "stderr"; line: string };
+
+/** An event of `rapt dev --json` or `rapt launchpad dev --json` (D75). */
+export type DevEvent =
+  | (AppDevEvent & { app?: string })
+  | { type: "apps"; file: string; apps: Array<{ id: string; root: string; url: string }> }
+  | { type: "launchpad-diagnostics"; diagnostics: RaptDiagnostic[]; counts: Counts }
+  | { type: "launchpad-waiting"; apps: string[] }
+  | { type: "launchpad-ready"; url: string }
+  | { type: "launchpad-failed"; message: string };
+
+/** `rapt dev <root>`: one application. */
+export function devArgs(root: string, port: number): string[] {
+  return ["dev", root, "--port", String(port), "--json"];
+}
+
+/** `rapt launchpad dev <launchpad.json>`: the launchpad and each application with sources (D75). */
+export function launchpadDevArgs(file: string): string[] {
+  return ["launchpad", "dev", file, "--json"];
+}
+
+/** The session of rapt dev of the extension: one application, or the launchpad of the workspace. */
+export interface DevState {
+  mode: "app" | "launchpad";
+  /** Its URL, once it serves. */
+  url?: string;
+}
+
+/**
+ * The context keys of a session (D75): the commands that need it are greyed out without it (stop,
+ * open: once its URL is known), and the menus show the start of the other mode.
+ */
+export function devContext(state: DevState | undefined): Record<"rapt.devRunning" | "rapt.devReady" | "rapt.devMode", boolean | string> {
+  return { "rapt.devRunning": state !== undefined, "rapt.devReady": state?.url !== undefined, "rapt.devMode": state?.mode ?? "" };
+}
 
 /** How to start the CLI: `node <cli.js>`, or a `rapt` command found on the PATH. */
 export interface Cli {
@@ -466,13 +500,13 @@ export function runJson<T = RaptResult>(cli: Cli, args: string[], cwd: string): 
   });
 }
 
-/** `rapt dev <root> --json`: events until stop(). */
+/** `rapt dev … --json`, `rapt launchpad dev … --json` (devArgs, launchpadDevArgs): events until stop(). */
 export class DevProcess {
   private readonly child: ChildProcess;
   public readonly exited: Promise<number | null>;
 
-  public constructor(cli: Cli, root: string, port: number, onEvent: (event: DevEvent) => void, onError: (line: string) => void) {
-    this.child = spawnCli(cli, ["dev", root, "--port", String(port), "--json"], root);
+  public constructor(cli: Cli, args: string[], cwd: string, onEvent: (event: DevEvent) => void, onError: (line: string) => void) {
+    this.child = spawnCli(cli, args, cwd);
     const out = new LineSplitter();
     const err = new LineSplitter();
     this.child.stdout?.setEncoding("utf8").on("data", (chunk: string) => out.push(chunk).forEach((line) => onEvent(parseDevEvent(line))));
@@ -494,7 +528,7 @@ export class DevProcess {
     return this.child.exitCode === null && this.child.signalCode === null;
   }
 
-  /** SIGINT: rapt dev stops its server and exits (on Windows, the server stops when rapt dev exits). */
+  /** SIGINT: rapt dev stops its servers and exits (on Windows, the servers stop when rapt dev exits). */
   public async stop(): Promise<void> {
     if (this.running) {
       this.child.kill("SIGINT");

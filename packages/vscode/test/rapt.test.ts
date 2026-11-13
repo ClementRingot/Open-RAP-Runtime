@@ -4,7 +4,7 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { afterEach, describe, expect, it } from "vitest";
-import { agentServers, appLabel, appRoots, feedbackUrl, terminalShims, DevProcess, GENERATE_KINDS, groupObjects, launchpadNotice, launchpadSources, menuContext, projectObjects, unchosenFloorplans, wizardArgs, workspaceLaunchpad, type CatalogEntry, type LaunchpadAddResult, diagnosticPath, findProjectRoot, LineSplitter, parseDevEvent, position, resolveCli, runJson, summary, type DevEvent } from "../src/rapt.js";
+import { agentServers, appLabel, appRoots, devArgs, devContext, feedbackUrl, launchpadDevArgs, terminalShims, DevProcess, GENERATE_KINDS, groupObjects, launchpadNotice, launchpadSources, menuContext, projectObjects, unchosenFloorplans, wizardArgs, workspaceLaunchpad, type CatalogEntry, type LaunchpadAddResult, diagnosticPath, findProjectRoot, LineSplitter, parseDevEvent, position, resolveCli, runJson, summary, type DevEvent } from "../src/rapt.js";
 
 const REPO = fileURLToPath(new URL("../../../", import.meta.url));
 const FIXTURE = path.join(REPO, "fixtures", "travel");
@@ -60,6 +60,15 @@ describe("rapt from the extension", () => {
     expect(summary({ error: 1, warning: 2, info: 0 })).toBe("1 error, 2 warnings");
   });
 
+  it("greys out the commands of a session until it serves (D75)", () => {
+    expect(devContext(undefined)).toEqual({ "rapt.devRunning": false, "rapt.devReady": false, "rapt.devMode": "" });
+    // starting: stop is possible, opening is not yet
+    expect(devContext({ mode: "launchpad" })).toEqual({ "rapt.devRunning": true, "rapt.devReady": false, "rapt.devMode": "launchpad" });
+    expect(devContext({ mode: "app", url: "http://localhost:8080/" })).toEqual({ "rapt.devRunning": true, "rapt.devReady": true, "rapt.devMode": "app" });
+    expect(devArgs("/w/bo", 8080)).toEqual(["dev", "/w/bo", "--port", "8080", "--json"]);
+    expect(launchpadDevArgs("/w/launchpad.json")).toEqual(["launchpad", "dev", "/w/launchpad.json", "--json"]);
+  });
+
   it("runs rapt check --json", async () => {
     const dir = copy();
     const cli = resolveCli({ workspaceFolders: [REPO], execPath: process.execPath, nodePath: process.execPath });
@@ -76,7 +85,7 @@ describe("rapt from the extension", () => {
     const dir = copy();
     const events: DevEvent[] = [];
     const port = 20000 + Math.floor(Math.random() * 20000);
-    const dev = new DevProcess(resolveCli({ workspaceFolders: [REPO], execPath: process.execPath, nodePath: process.execPath }), dir, port, (e) => events.push(e), () => undefined);
+    const dev = new DevProcess(resolveCli({ workspaceFolders: [REPO], execPath: process.execPath, nodePath: process.execPath }), devArgs(dir, port), dir, (e) => events.push(e), () => undefined);
     cleanups.push(() => dev.stop());
     await expect.poll(() => events.find((e) => e.type === "ready"), { timeout: 60_000, interval: 200 }).toEqual({ type: "ready", url: `http://localhost:${port}/` });
     expect((await fetch(`http://localhost:${port}/ui/index.html`)).status).toBe(200);
