@@ -9,7 +9,7 @@ writes an `AGENTS.md` in the projects it creates.
 A TypeScript compiler (pnpm monorepo) that turns the sources of a RAP BO (abapGit format) into a
 Node.js application: OData V4, RAP managed runtime, ABAP transpiled by abaplint, PostgreSQL,
 OpenUI5 UI. Read [README.md](README.md), [docs/GUIDE.md](docs/GUIDE.md) and the list of decisions
-[docs/DECISIONS.md](docs/DECISIONS.md) (D1 to D79) first.
+[docs/DECISIONS.md](docs/DECISIONS.md) (D1 to D80) first.
 
 ```
 packages/model/      types of the IR (model.json) and shared derivations (OData, value helps, MCP)
@@ -50,8 +50,10 @@ after a change to the compiler.
    difference goes to the `enhanced` mode (D45) or into [KNOWN_GAPS.md](KNOWN_GAPS.md).
 2. **No proprietary SAP library** (no SAPUI5, no `sap.fe`, no `sap.ushell`, no CAP);
    dependencies under permissive licenses, listed in [LICENSES.md](LICENSES.md), pinned versions.
-3. **Do not work around abaplint**: an ABAP feature the transpiler does not handle is documented
-   in KNOWN_GAPS.md (with the workaround) rather than patched.
+3. **Do not patch abaplint**: the `@abaplint/*` packages are used as published, never patched.
+   An ABAP feature the transpiler or its runtime mishandles is fixed in our own layers (the
+   rewriting pass, the kernel, the database adapter: D2, D26, D80), with tests, or documented in
+   KNOWN_GAPS.md with the workaround; no upstream issue is required.
 4. **One decision per feature**: add a `Dnn` entry to docs/DECISIONS.md (context, decision, why,
    tests), update docs/FEATURES.md, docs/DIAGNOSTICS.md (new codes), KNOWN_GAPS.md and the guide.
 5. **Positioned diagnostics**: `file:line:column`, one code per problem (`CDS0xx`, `BDEF0xx`,

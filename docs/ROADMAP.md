@@ -27,11 +27,11 @@ Two rules frame the work below:
 
 | Phase | Decisions | Why in this order |
 |---|---|---|
-| **0. Measure** | Fiori elements protocol conformance · round trip to SAP BTP · conformance metrics in the CI · abaplint gaps reported upstream (ongoing) | Makes the Fiori elements gaps measurable, at a moderate cost and without risk for the existing code. Upstream delays are external: the issues start early. |
+| **0. Measure** | Fiori elements protocol conformance · round trip to SAP BTP · conformance metrics in the CI · abaplint gaps fixed in our layers | Makes the Fiori elements gaps measurable, at a moderate cost and without risk for the existing code. The gaps of abaplint are fixed early, in the rewriting pass and the kernel. |
 | **1. Transactional Fiori elements** | Complete draft protocol (`SiblingEntity` first) · nested `$expand`, `any`/`all`, JSON batch · applied side effects | `SiblingEntity` blocks the draft List Report of Fiori elements, the rest of the draft blocks the Object Page. The order follows the failing protocol cases. |
 | **2. Fiori elements generation and analytics** | Generation of Fiori elements applications · ALP and OVP driven by annotations · extended `$apply` | Fiori elements applications are generated once they work. The analytical list page needs `Aggregation.ApplySupported`. |
 | **3. ABAP test foundation** | ABAP Unit · catchable SQL errors | ABAP Unit is a tool and an oracle: the same tests run on the trial and here. Catchable SQL errors are small and unlock negative tests. |
-| **4. CDS and RAP fidelity** | CDS views · currencies and conversion exits · late numbering · complete EML · events, change documents, extensions, attachments · exact decimals (upstream) | The core of RAP, in the order of frequency of use in real RAP code. |
+| **4. CDS and RAP fidelity** | CDS views · currencies and conversion exits · late numbering · complete EML · events, change documents, extensions, attachments · exact decimals | The core of RAP, in the order of frequency of use in real RAP code. |
 | **5. Standard layer** | Repository of the released objects · extended and multilingual standard views | The repository makes the refusal exact and feeds the standard views, so that only views released on SAP BTP are provided. |
 | **6. Tools** | ABAP debugging · data preview, SQL trace, runtime errors · ATC-like checks and clean-up | The SQL trace and the runtime errors reuse the source maps of the debugger. |
 | **7. Complements** | Real-time collaborative draft · OData V2 | The collaborative draft depends on the public documentation of its protocol; OData V2 has the lowest priority. |
@@ -43,6 +43,7 @@ parallel with phase 1.
 
 The numbers are provisional: each decision takes the next free number of
 [DECISIONS.md](DECISIONS.md) when its pull request is opened, and the table below is updated.
+The sections below use the provisional numbers, unless they say "final".
 
 | Provisional | Final | Decision | Phase |
 |---|---|---|---|
@@ -69,7 +70,7 @@ The numbers are provisional: each decision takes the next free number of
 | D99 | — | Round-trip protocol to an SAP BTP ABAP trial | 0 |
 | D100 | — | Conformance metrics in the CI | 0 |
 | D101 | — | ATC-like quality checks and clean-up | 6 |
-| D102 | — | abaplint gaps reported upstream | 0 (ongoing) |
+| D102 | D80 | abaplint gaps fixed in our layers, without upstream issue | 0 |
 
 ## Phase 0: measure
 
@@ -91,9 +92,11 @@ The numbers are provisional: each decision takes the next free number of
   identical to SAP BTP, normalized `$metadata` difference, green protocol cases, identical
   ABAP Unit results, number of known gaps per section. The CI fails when an indicator goes back
   compared to `main`; the website publishes the report and its history.
-- **abaplint gaps upstream (D102).** Each gap of the transpiler and runtime listed in
-  KNOWN_GAPS.md is checked again on the latest versions, then reported upstream with a minimal
-  reproduction; the link goes to the *Tracking* column.
+- **abaplint gaps (provisional D102, final D80).** Each gap of the transpiler and runtime listed in KNOWN_GAPS.md was
+  checked again on the latest versions (2.14.33) and fixed in our layers when possible: exact
+  classic SQL writes and `DELETE dbtab FROM @wa` by the kernel, typed aggregates, `SELECT …
+  ENDSELECT` with a field list, `int8` loop bounds, enumerated objects as text. No upstream issue
+  (decision of the maintainer); the packed arithmetic of the runtime stays a known gap.
 
 ## Phase 1: transactional Fiori elements
 
@@ -152,8 +155,10 @@ The numbers are provisional: each decision takes the next free number of
 - **Events, change documents, extensions, attachments (D89).** `RAISE ENTITY EVENT` published
   after the commit, local event handlers; change documents written by the managed runtime;
   `extensible` and extensions merged in the IR; `Edm.Stream` attachments with `$value`.
-- **Exact decimals (D90).** Exact packed arithmetic and exact classic SQL writes are fixed
-  upstream (D102); fidelity tests wait for them. The seventh decimal of `TIMESTAMPL` stays lost.
+- **Exact decimals (D90).** The classic SQL writes from a work area or a table are exact (final D80);
+  `UPDATE … SET` and the packed arithmetic of the abaplint runtime (JavaScript numbers) are left:
+  an exact arithmetic would need a decimal operand rewriting of every expression, to weigh. The
+  seventh decimal of `TIMESTAMPL` stays lost.
 
 ## Phase 5: standard layer
 

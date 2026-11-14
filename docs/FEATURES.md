@@ -117,13 +117,13 @@ dependent ETag, remote APIs.
 | Feature | Status | Note |
 |---|---|---|
 | `SELECT` on the tables and CDS entities of the project: `SINGLE`, `INTO TABLE`, `APPENDING`, `CORRESPONDING`, `WHERE` (including `IN` on a range, `LIKE`, `BETWEEN`, `EXISTS`), `ORDER BY` (including `PRIMARY KEY`), `UP TO n ROWS`, `GROUP BY`/`HAVING`, aggregates, joins, `FOR ALL ENTRIES` | ✅ | Views in ABAP format of the `rapt_abap` schema, in the transaction of the LUW (D26). Test `rap-variant-sql.test.ts`. |
-| Existence check `SELECT SINGLE @abap_true … INTO @DATA(x)`, `MAX`/`MIN` in an inline declaration | ✅ | Declared by the rewriting pass (abaplint does not type them). |
+| Existence check `SELECT SINGLE @abap_true … INTO @DATA(x)`, `MAX`/`MIN`/`SUM`/`AVG`/`COUNT` in an inline declaration | ✅ | Declared by the rewriting pass (abaplint does not type them, D80). |
 | Other literals, aggregates or expressions in an inline declaration | ❌ | Diagnostic ABP009: declare the target. |
-| `SELECT … ENDSELECT` | 🟡 | With `SELECT *` only (ABP007 otherwise). |
+| `SELECT … ENDSELECT` | ✅ | With a field list: read into a table, then `LOOP AT` (D80); ABP007 for an inline target, a list of targets, `PACKAGE SIZE`. |
 | `OPEN CURSOR`, `FETCH NEXT CURSOR` | 🟡 | Not ABAP Cloud (refused by the check, as on SAP); supported by the runtime. |
 | Types of the CDS entities in the ABP (`DATA ls TYPE zr_travel`) | ✅ | "Shadow" tables (D19, D26). |
 | `MESSAGE … INTO` | ✅ | Texts of the message classes of the project. |
-| `INSERT`, `UPDATE`, `MODIFY`, `DELETE` in the saver (`save_modified`) | ✅ | Exact `MAPPING FROM ENTITY` and `INDICATORS SET STRUCTURE %control` (kernel); classic writes through the `rapt_abap` views and their triggers (D30). |
+| `INSERT`, `UPDATE`, `MODIFY`, `DELETE` in the saver (`save_modified`) | ✅ | Exact `MAPPING FROM ENTITY` and `INDICATORS SET STRUCTURE %control` (kernel); `dbtab FROM @wa`, `FROM TABLE @itab`, `INSERT INTO dbtab VALUES` exact by the kernel too, `DELETE dbtab FROM @wa` included (D80); `UPDATE … SET`, `DELETE FROM … WHERE` through the `rapt_abap` views and their triggers (D30). Test `rap-variant-sql-writes.test.ts`. |
 | `INSERT`, `UPDATE`, `MODIFY`, `DELETE` in a handler; `WITH` | ❌ | Diagnostic ABP007: the RAP runtime writes the BO, change it with EML. |
 
 ## Remote APIs in the ABP (D31)

@@ -161,7 +161,9 @@ describe("ABAP generation of the fixture", () => {
     const write = await generate({ [ABP]: (c) => c.replace("    DELETE travels WHERE OverallStatus IS NOT INITIAL.", "    UPDATE zrt_travel SET description = 'x' WHERE travel_id = '1'.\n    DELETE travels WHERE OverallStatus IS NOT INITIAL.") });
     expect(write.diagnostics).toContainEqual(expect.objectContaining({ code: "ABP007", message: expect.stringContaining("UPDATE on a database table is only possible in the saver class") }));
     const loop = await generate({ [ABP]: (c) => c.replace("    DELETE travels WHERE OverallStatus IS NOT INITIAL.", "    SELECT travel_id FROM zrt_travel INTO @DATA(one_id).\n    ENDSELECT.\n    DELETE travels WHERE OverallStatus IS NOT INITIAL.") });
-    expect(loop.diagnostics).toContainEqual(expect.objectContaining({ code: "ABP007", message: expect.stringContaining("SELECT … ENDSELECT with a field list") }));
+    expect(loop.diagnostics).toContainEqual(expect.objectContaining({ code: "ABP007", message: expect.stringContaining("SELECT … ENDSELECT with a field list into an inline declaration is not supported") }));
+    const package_ = await generate({ [ABP]: (c) => c.replace("    DELETE travels WHERE OverallStatus IS NOT INITIAL.", "    DATA ids TYPE STANDARD TABLE OF zrt_travel-travel_id WITH EMPTY KEY.\n    SELECT travel_id FROM zrt_travel INTO TABLE @ids PACKAGE SIZE 10.\n    ENDSELECT.\n    DELETE travels WHERE OverallStatus IS NOT INITIAL.") });
+    expect(package_.diagnostics).toContainEqual(expect.objectContaining({ code: "ABP007", message: expect.stringContaining("PACKAGE SIZE") }));
   });
 
   it("accepts ABAP SQL reads of the tables and CDS entities of the project (D26)", async () => {
@@ -175,6 +177,17 @@ describe("ABAP generation of the fixture", () => {
       "    SELECT SINGLE FROM zrt_travel AS t FIELDS MAX( t~travel_id ) AS max_id INTO @FINAL(max_id).",
       "    SELECT MIN( BeginDate ) FROM zrt_r_travel INTO @DATA(first_date).",
       "    IF exists = abap_true AND max_id > first_date. ENDIF.",
+      "    SELECT SINGLE FROM zrt_travel FIELDS SUM( booking_fee ) INTO @DATA(fees).",
+      "    SELECT AVG( booking_fee ) FROM zrt_travel INTO @DATA(average_fee).",
+      "    SELECT COUNT( DISTINCT currency_code ) FROM zrt_travel INTO @DATA(currencies).",
+      "    DATA one_id TYPE zrt_travel-travel_id.",
+      "    SELECT travel_id FROM zrt_travel WHERE travel_id <> @one_id INTO @one_id.",
+      "      DATA(found) = one_id.",
+      "    ENDSELECT.",
+      "    DATA rows TYPE STANDARD TABLE OF i WITH EMPTY KEY.",
+      "    DATA offset TYPE int8.",
+      "    LOOP AT rows INTO DATA(row) FROM offset + 1 TO lines( rows ).",
+      "    ENDLOOP.",
       "    SELECT FROM zrt_r_travel AS t INNER JOIN zrt_r_booking AS b ON b~TravelUUID = t~TravelUUID FIELDS t~TravelID, b~BookingID",
       "      FOR ALL ENTRIES IN @keys WHERE t~TravelUUID = @keys-TravelUUID AND b~BookingID <> @ls_travel-TravelID INTO TABLE @DATA(joined).",
     ].join("\n");
@@ -184,6 +197,13 @@ describe("ABAP generation of the fixture", () => {
     expect(rewritten).toContain("DATA exists TYPE abap_boolean. SELECT SINGLE @abap_true FROM zrt_travel WHERE travel_id = '00000001' INTO @exists.");
     expect(rewritten).toContain("DATA max_id TYPE zrt_travel-travel_id. SELECT SINGLE FROM zrt_travel AS t FIELDS MAX( t~travel_id ) AS max_id INTO @max_id.");
     expect(rewritten).toContain("WHERE t~TravelUUID = @keys-TravelUUID AND b~BookingID <> @( ls_travel-TravelID ) INTO TABLE @DATA(joined).");
+    // D102: aggregates typed, a SELECT loop with a field list read into a table, integer LOOP bounds
+    expect(rewritten).toContain("DATA fees TYPE zrt_travel-booking_fee. SELECT SINGLE FROM zrt_travel FIELDS SUM( booking_fee ) INTO @fees.");
+    expect(rewritten).toContain("DATA average_fee TYPE f. SELECT AVG( booking_fee ) FROM zrt_travel INTO @average_fee.");
+    expect(rewritten).toContain("DATA currencies TYPE int8. SELECT COUNT( DISTINCT currency_code ) FROM zrt_travel INTO @currencies.");
+    expect(rewritten).toContain("DATA lt_rapt_select_1 LIKE STANDARD TABLE OF one_id WITH EMPTY KEY. SELECT travel_id FROM zrt_travel WHERE travel_id <> @one_id INTO TABLE @lt_rapt_select_1. LOOP AT lt_rapt_select_1 INTO one_id.");
+    expect(rewritten).toMatch(/DATA\(found\) = one_id\.\n\s*ENDLOOP\./);
+    expect(rewritten).toContain("LOOP AT rows INTO DATA(row) FROM CONV i( offset + 1 ) TO CONV i( lines( rows ) ).");
   });
 
   it("types the saver of an additional or unmanaged save and allows its ABAP SQL writes", async () => {
@@ -200,6 +220,10 @@ describe("ABAP generation of the fixture", () => {
       "    DELETE zrt_booking FROM TABLE @delete-booking MAPPING FROM ENTITY.",
       "    DATA ls_travel TYPE zrt_travel.",
       "    UPDATE zrt_travel SET description = @ls_travel-description WHERE travel_uuid = @ls_travel-travel_uuid.",
+      "    INSERT zrt_travel FROM @ls_travel.",
+      "    MODIFY zrt_travel FROM TABLE @( VALUE #( ( ls_travel ) ) ).",
+      "    INSERT INTO zrt_travel VALUES @ls_travel.",
+      "    DELETE zrt_travel FROM @ls_travel.",
       "    APPEND new_message_with_text( text = 'saved' ) TO reported-%other.",
       "  ENDMETHOD.",
       "  METHOD cleanup.",
@@ -211,18 +235,44 @@ describe("ABAP generation of the fixture", () => {
     expect(diagnostics.filter((d) => d.severity === "error")).toEqual([]);
     expect(rewritten).toContain("METHODS save_modified IMPORTING create TYPE zrap_dt_zrt_r_travel=>ts_request_change update TYPE zrap_dt_zrt_r_travel=>ts_request_change delete TYPE zrap_dt_zrt_r_travel=>ts_request_delete CHANGING reported TYPE zrap_dt_zrt_r_travel=>ts_reported_late.");
     expect(rewritten).toContain("zrap_eml=>sql_write( operation = `UPDATE` table = `ZRT_TRAVEL` rows = update-travel indicators = abap_true ).");
-    // no saver, a saver without save option, DELETE … FROM @wa
+    // D102: the classic writes from a work area or a table are written by the kernel, exactly
+    expect(rewritten).toContain("zrap_eml=>sql_write_table( operation = `INSERT` table = `ZRT_TRAVEL` row = ls_travel ).");
+    expect(rewritten).toContain("zrap_eml=>sql_write_table( operation = `MODIFY` table = `ZRT_TRAVEL` rows = VALUE #( ( ls_travel ) ) ).");
+    expect(rewritten).toContain("zrap_eml=>sql_write_table( operation = `DELETE` table = `ZRT_TRAVEL` row = ls_travel ).");
+    expect(rewritten.match(/sql_write_table\( operation = `INSERT`/g)).toHaveLength(2);
+    expect(rewritten).toContain("UPDATE zrt_travel SET description = @ls_travel-description WHERE travel_uuid = @ls_travel-travel_uuid.");
+    // no saver, a saver without save option
     const missing = await generate({ "zrt_r_travel.bdef.asbdef": additional });
     expect(missing.diagnostics).toContainEqual(expect.objectContaining({ code: "ABP002", message: expect.stringContaining("needs a saver class") }));
     const unused = await generate({ [ABP]: (c) => `${c}\n${saver}\n` });
     expect(unused.diagnostics).toContainEqual(expect.objectContaining({ code: "ABP003", message: expect.stringContaining("is not called") }));
-    const wa = await generate({ "zrt_r_travel.bdef.asbdef": additional, [ABP]: (c) => `${c}\n${saver.replace("    DATA ls_travel TYPE zrt_travel.", "    DATA ls_travel TYPE zrt_travel.\n    DELETE zrt_travel FROM @ls_travel.")}\n` });
-    expect(wa.diagnostics).toContainEqual(expect.objectContaining({ code: "ABP007", message: expect.stringContaining("DELETE dbtab FROM @wa") }));
+  });
+
+  it("converts enumerated objects to the name of their constant where ABAP does (D102)", async () => {
+    const types = "    TYPES: BEGIN OF ENUM ty_mode BASE TYPE c,\n             mode_read VALUE IS INITIAL,\n             mode_write VALUE 'W',\n           END OF ENUM ty_mode.\n";
+    const code = [
+      "    DATA mode TYPE ty_mode.",
+      "    DATA copy TYPE ty_mode.",
+      "    DATA text TYPE string.",
+      "    mode = mode_write.",
+      "    copy = mode.",
+      "    text = mode.",
+      "    text = |{ mode WIDTH = 12 }| && mode_read && CONV string( mode ) && CONV c( mode ).",
+      "    IF mode = mode_read. ENDIF.",
+      "    DELETE travels WHERE OverallStatus IS NOT INITIAL.",
+    ].join("\n");
+    const { diagnostics, rewritten } = await generate({ [ABP]: (c) => c.replace("CLASS lhc_travel DEFINITION INHERITING FROM cl_abap_behavior_handler.\n  PRIVATE SECTION.\n", `CLASS lhc_travel DEFINITION INHERITING FROM cl_abap_behavior_handler.\n  PRIVATE SECTION.\n${types}`).replace("    DELETE travels WHERE OverallStatus IS NOT INITIAL.", code) });
+    expect(diagnostics.filter((d) => d.severity === "error")).toEqual([]);
+    const call = (operand: string): string => `zrap_eml=>enum_text( value = CONV c( ${operand} ) members = \`[["MODE_READ",""],["MODE_WRITE","W"]]\` )`;
+    expect(rewritten).toContain("    mode = mode_write.\n    copy = mode.\n");
+    expect(rewritten).toContain(`    text = ${call("mode")}.`);
+    expect(rewritten).toContain(`    text = |{ ${call("mode")} WIDTH = 12 }| && ${call("mode_read")} && CONV string( ${call("mode")} ) && CONV c( ${call("mode")} ).`);
+    expect(rewritten).toContain("    IF mode = mode_read. ENDIF.");
   });
 
   it("reports SELECT results that abaplint cannot type and unknown tables", async () => {
     const line = readFixture(ABP).split("\n").findIndex((l) => l === "    DELETE travels WHERE OverallStatus IS NOT INITIAL.") + 1;
-    const untyped = await generate({ [ABP]: (c) => c.replace("    DELETE travels WHERE OverallStatus IS NOT INITIAL.", "    SELECT SINGLE FROM zrt_travel FIELDS SUM( booking_fee ) INTO @DATA(fees). DELETE travels WHERE OverallStatus IS NOT INITIAL.") });
+    const untyped = await generate({ [ABP]: (c) => c.replace("    DELETE travels WHERE OverallStatus IS NOT INITIAL.", "    SELECT SINGLE FROM zrt_travel FIELDS booking_fee * 2 AS fees INTO @DATA(fees). DELETE travels WHERE OverallStatus IS NOT INITIAL.") });
     expect(untyped.diagnostics).toContainEqual(expect.objectContaining({ code: "ABP009", message: expect.stringContaining("inline declaration fees"), file: `src/${ABP}`, line }));
     const unknown = await generate({ [ABP]: (c) => c.replace("    DELETE travels WHERE OverallStatus IS NOT INITIAL.", "    SELECT SINGLE carrier_id FROM zrt_carrier INTO @DATA(carrier). DELETE travels WHERE OverallStatus IS NOT INITIAL.") });
     expect(unknown.diagnostics).toContainEqual(expect.objectContaining({ code: "ABP004", file: `src/${ABP}`, line }));

@@ -12,7 +12,7 @@ import { installODataClient } from "../abap/odata-client.js";
 import { installUtilities } from "../abap/utils.js";
 import { installBackground } from "../abap/background.js";
 import { installMail } from "../abap/mail.js";
-import { abapGlobal, abapString, appendRow, component, rowsOf, type AbapData } from "../abap/convert.js";
+import { abapGlobal, abapString, appendRow, component, getAbapValue, rowsOf, type AbapData } from "../abap/convert.js";
 import { isInitial } from "../values.js";
 import { entityOfTable, type BoEntity } from "./bo.js";
 import type { RapRuntime, Statement } from "./runtime.js";
@@ -317,6 +317,45 @@ export function installKernel(runtime: RapRuntime): void {
     const source = single ? [input?.["row"]] : rowsOf(input?.["rows"]);
     const rows = source.map((row) => ({ values: bridge.readRow(row, bo), control: bridge.readControl(row, bo) }));
     const { subrc, dbcnt } = await runtime.context().tx.writeMapped(bo, operation, rows, single, isTrue(input?.["indicators"]));
+    setSubrc(subrc);
+    abap.builtin.sy.get().dbcnt.set(dbcnt);
+  };
+
+  // an enumerated object converted to text (D102): the name of its constant (30 characters, upper
+  // case), `<illegal enum value>` for a value of no constant, as in ABAP
+  kernel.enum_text = (input: Input): AbapData => {
+    const value = abapString(input?.["value"]).trim();
+    let members: Array<[string, string]> = [];
+    try {
+      members = JSON.parse(abapString(input?.["members"])) as Array<[string, string]>;
+    } catch {
+      members = [];
+    }
+    const member = members.find(([, v]) => v.trim() === value || (/^-?\d+$/.test(value) && /^-?\d+$/.test(v.trim()) && Number(v) === Number(value)));
+    return new abap.types.String().set(member === undefined ? "<illegal enum value>" : member[0].slice(0, 30));
+  };
+
+  // INSERT|UPDATE|MODIFY|DELETE dbtab FROM [TABLE] @source, without MAPPING FROM ENTITY (D102)
+  kernel.sql_write_table = async (input: Input): Promise<void> => {
+    const operation = abapString(input?.["operation"]).toUpperCase();
+    const name = abapString(input?.["table"]);
+    const table = model.model.tables.find((t) => same(t.name, name));
+    if (table === undefined) {
+      throw new RapRuntimeError(`${operation} ${name}: no table ${name} in the application`);
+    }
+    const single = input?.["rows"] === undefined;
+    const source = single ? [input?.["row"]] : rowsOf(input?.["rows"]);
+    const rows = source.map((row) => {
+      const values: Row = {};
+      for (const column of table.columns) {
+        const data = row === undefined ? undefined : component(row, column.name);
+        if (!column.client && data !== undefined) {
+          values[column.name] = getAbapValue(data, column.type);
+        }
+      }
+      return values;
+    });
+    const { subrc, dbcnt } = await runtime.context().tx.writeTable(table, operation, rows, single);
     setSubrc(subrc);
     abap.builtin.sy.get().dbcnt.set(dbcnt);
   };

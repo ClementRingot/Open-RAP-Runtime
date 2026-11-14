@@ -429,6 +429,17 @@ const ZRAP_EML = `CLASS zrap_eml DEFINITION PUBLIC ABSTRACT FINAL.
                 rows       TYPE ANY TABLE OPTIONAL
                 row        TYPE any OPTIONAL
                 indicators TYPE abap_bool DEFAULT abap_false.
+    "! An enumerated object converted to text (D102): the name of its constant, upper case.
+    CLASS-METHODS enum_text
+      IMPORTING value       TYPE simple
+                members     TYPE string
+      RETURNING VALUE(text) TYPE string.
+    "! INSERT|UPDATE|MODIFY|DELETE dbtab FROM [TABLE] @source, without MAPPING FROM ENTITY (saver only, D102).
+    CLASS-METHODS sql_write_table
+      IMPORTING operation TYPE string
+                table     TYPE string
+                rows      TYPE ANY TABLE OPTIONAL
+                row       TYPE any OPTIONAL.
 ${HTTP_KERNEL_DEFINITIONS}${UTILS_KERNEL_DEFINITIONS}${QUERY_KERNEL_DEFINITIONS}ENDCLASS.
 
 CLASS zrap_eml IMPLEMENTATION.
@@ -473,6 +484,12 @@ CLASS zrap_eml IMPLEMENTATION.
   ENDMETHOD.
 
   METHOD sql_write.
+  ENDMETHOD.
+
+  METHOD sql_write_table.
+  ENDMETHOD.
+
+  METHOD enum_text.
   ENDMETHOD.
 
 ${HTTP_KERNEL_IMPLEMENTATIONS}

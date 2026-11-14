@@ -1773,3 +1773,47 @@ _The issues moved to the repository itself once public: see D74._
   naming a decision, one request or batch per step); `scripts/lib/fe-har.test.mjs` (a synthetic
   HAR: service root, multipart, placeholders, captures, nothing secret kept, the command line);
   `dev.test.ts` (`--fe-check`: one event per session, URLs that answer).
+
+## D80 — The gaps of abaplint fixed in our layers, without patch nor upstream issue
+
+- **Context**: KNOWN_GAPS.md listed gaps of `@abaplint/transpiler` and `@abaplint/runtime`. Each
+  one was reproduced again on the latest versions (2.14.33, core 2.120.107, to which the project
+  moved first) with a minimal program run on the database client of abaplint: the packed
+  arithmetic through JavaScript numbers; the classic SQL writes passing packed values as
+  JavaScript numbers (`12345678901234567000` for `12345678901234567890.12`); `DELETE dbtab FROM
+  @wa` sent without condition (every row deleted); the inline declaration of `SUM`, `AVG`,
+  `COUNT( DISTINCT … )` typed void; `SELECT … ENDSELECT` with a field list filling the target with
+  the whole row; an `int8` bound of `LOOP AT … FROM/TO` ("Cannot mix BigInt"); an enumerated
+  object converted to text giving its base value (`1` instead of `M`). The maintainer chose not to
+  report them upstream, and to fix what can be fixed in the project, without patching abaplint.
+- **Decision**: the fixes go in our own layers; rule 3 of AGENTS.md says it.
+  - **Classic SQL writes** (`INSERT|UPDATE|MODIFY|DELETE dbtab FROM @wa`, `FROM TABLE @itab`,
+    `INSERT INTO dbtab VALUES @wa`, in the saver): the rewriting pass calls the kernel
+    (`sql_write_table`), which reads the rows by the columns of the table with their exact value
+    and writes them like `MAPPING FROM ENTITY` (same code: sy-subrc 4 for a missing or duplicate
+    row, a duplicate in `FROM TABLE` is a runtime error, sy-dbcnt). `DELETE dbtab FROM @wa` deletes
+    the row of its key. `UPDATE … SET`, `DELETE FROM … WHERE`, a subquery or a dynamic table stay
+    with the transpiler.
+  - **Aggregates in an inline declaration**: `SUM` gets the type of the column, `AVG` `f`, `COUNT`
+    `int8`, like `MAX`/`MIN` already (D26); the other untyped results keep ABP009.
+  - **`SELECT … ENDSELECT` with a field list**: `INTO TABLE` of a table declared `LIKE STANDARD
+    TABLE OF target`, then `LOOP AT … INTO target`, its `ENDSELECT` written `ENDLOOP`; an inline
+    target, a list of targets, `PACKAGE SIZE` and `APPENDING` are refused (ABP007).
+  - **`LOOP AT … FROM/TO`**: the bounds become `CONV i( … )`.
+  - **Enumerated objects as text**: after the rewrite, the syntax of the transpiler's registry (the
+    clean-room base makes the check run through the behavior pools) finds the operands that are
+    enumerated objects (variables by their type; constants, which abaplint types as their base type,
+    by their declaration) converted to text: an embedded expression of a string template, an
+    operand of `&&`, `CONV string|c( … )`, an assignment to a character-like variable. They become
+    `zrap_eml=>enum_text( value = CONV <base>( x ) members = … )`: the name of the constant, upper
+    case, `<illegal enum value>` for another value, as in ABAP.
+  - Left as known gaps: the packed arithmetic of the runtime (it would need every arithmetic
+    expression rewritten), `UPDATE … SET` of packed values, the cursors (not ABAP Cloud).
+- **Why**: the gaps are fixed now, for the users, without waiting for releases of abaplint nor
+  forking it; each fix is local, tested, and goes away by removing its rewrite if abaplint fixes
+  the gap one day. Patching published packages would make each version upgrade a merge.
+- **Tests**: `abap-generate.test.ts` (the rewrites: kernel writes, typed aggregates, the SELECT
+  loop, the bounds, the enumerated objects, the forms still refused); `rap-variant-sql-writes.test.ts`
+  (a 30-digit amount and a 7-decimal stamp written exactly, `DELETE … FROM @wa` deleting one row,
+  a duplicate refused with sy-subrc 4); `rap-variant-sql.test.ts` (`SUM` inline, a SELECT loop with
+  a field list, an `int8` bound, enumerated objects as text, run).

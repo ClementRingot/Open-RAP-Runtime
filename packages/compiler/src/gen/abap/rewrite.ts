@@ -394,6 +394,10 @@ export interface RewriteContext {
   current?: { name: string; part: "definition" | "implementation" } | undefined;
   /** Consumption model classes of a service consumption model (SCM2), upper case. */
   modelProviders?: Set<string>;
+  /** SELECT loops being rewritten (D102): true when the loop became INTO TABLE and LOOP AT. */
+  selectLoops?: boolean[];
+  /** Counter of the variables the rewrite declares. */
+  generated?: number;
 }
 
 /**
@@ -512,11 +516,11 @@ function rewriteStatement(kind: string, tokens: Tok[], edits: SourceEdits, conte
       throw new RewriteError("ABP007", `${tokens[0]?.upper ?? ""} on a database table is only possible in the saver class (save_modified, with additional or unmanaged save): the RAP runtime writes the business object, change it with EML (MODIFY ENTITIES)`, tokens[0]);
     }
     const mapping = tokens.some((t, n) => t.upper === "MAPPING" && tokens[n + 1]?.upper === "FROM" && tokens[n + 2]?.upper === "ENTITY");
-    if (kind === "DeleteDatabase" && !mapping && tokens[2]?.upper === "FROM" && tokens[3]?.str === "@") {
-      // the transpiler drops the work area of DELETE dbtab FROM @wa: the statement would delete every row
-      throw new RewriteError("ABP007", "DELETE dbtab FROM @wa is not supported by the transpiler (it would delete every row): use DELETE FROM dbtab WHERE …, DELETE dbtab FROM TABLE @itab or MAPPING FROM ENTITY", tokens[0]);
+    if (mapping) {
+      lowerEntityMapping(tokens, edits);
+    } else {
+      lowerTableWrite(tokens, edits);
     }
-    lowerEntityMapping(tokens, edits);
     return;
   }
   if (kind === "MethodDef" && inSaver && context.current?.part === "definition" && rewriteSaverMethod(tokens, edits, context)) {
@@ -525,14 +529,28 @@ function rewriteStatement(kind: string, tokens: Tok[], edits: SourceEdits, conte
   if (SQL_CTE.has(kind)) {
     throw new RewriteError("ABP007", "common table expressions (WITH) are not supported by the transpiler", tokens[0]);
   }
-  if (kind === "SelectLoop" && !selectsAllFields(tokens)) {
-    throw new RewriteError("ABP007", "SELECT … ENDSELECT with a field list is not supported by the transpiler (the loop reads whole rows into the target): use SELECT *, or INTO TABLE and LOOP AT", tokens[0]);
-  }
-  if (kind === "Select" || kind === "SelectLoop") {
-    hostComponentsAsExpressions(tokens, edits);
-    if (kind === "Select") {
-      declareSelectTarget(tokens, edits);
+  if (kind === "EndSelect") {
+    if (context.selectLoops?.pop() === true) {
+      edits.replace(tokens[0] as Tok, tokens[0] as Tok, "ENDLOOP");
     }
+    return;
+  }
+  if (kind === "SelectLoop") {
+    hostComponentsAsExpressions(tokens, edits);
+    const rewritten = !selectsAllFields(tokens);
+    if (rewritten) {
+      selectLoopAsTable(tokens, edits, context);
+    }
+    (context.selectLoops ??= []).push(rewritten);
+    return;
+  }
+  if (kind === "Select") {
+    hostComponentsAsExpressions(tokens, edits);
+    declareSelectTarget(tokens, edits);
+    return;
+  }
+  if (kind === "Loop") {
+    loopBoundsAsIntegers(tokens, edits);
     return;
   }
   const head = `${tokens[0]?.upper ?? ""} ${tokens[1]?.upper ?? ""}`;
@@ -652,6 +670,111 @@ function lowerEntityMapping(tokens: Tok[], edits: SourceEdits): void {
   edits.replace(tokens[0] as Tok, end, `${KERNEL}=>sql_write( operation = ${literal(operation)} table = ${literal(table.str)} ${isTable ? "rows" : "row"} = ${operand}${flags} )`);
 }
 
+/**
+ * `INSERT|UPDATE|MODIFY|DELETE dbtab FROM [TABLE] @source` and `INSERT INTO dbtab VALUES @source`
+ * (D102): written by the kernel, which reads the rows by the columns of the table with their exact
+ * values. The transpiler passes packed numbers (amounts, TIMESTAMPL) through JavaScript numbers
+ * (about 15 significant digits) and drops the work area of `DELETE dbtab FROM @wa` (the statement
+ * would delete every row). The other forms (`UPDATE dbtab SET … WHERE`, `DELETE FROM dbtab WHERE`,
+ * a subquery, a dynamic table) are left to the transpiler.
+ */
+function lowerTableWrite(tokens: Tok[], edits: SourceEdits): void {
+  const operation = tokens[0]?.upper ?? "";
+  const last = tokens[tokens.length - 1] as Tok;
+  const end = last.str === "." ? tokens.length - 1 : tokens.length;
+  let table: Tok | undefined;
+  let sourceStart: number;
+  let isTable = false;
+  if (operation === "INSERT" && tokens[1]?.upper === "INTO" && tokens[3]?.upper === "VALUES") {
+    table = tokens[2];
+    sourceStart = 4;
+  } else if (tokens[2]?.upper === "FROM" && tokens[1] !== undefined && tokens[1].upper !== "FROM" && tokens[1].str !== "(") {
+    table = tokens[1];
+    isTable = tokens[3]?.upper === "TABLE";
+    sourceStart = isTable ? 4 : 3;
+  } else {
+    return;
+  }
+  const source = tokens.slice(sourceStart, end);
+  if (table === undefined || source[0]?.str !== "@" || source.length < 2) {
+    return;
+  }
+  let operand: string;
+  if (source[1]?.str === "(") {
+    if (source[source.length - 1]?.str !== ")") return;
+    operand = joinTokens(source.slice(2, -1));
+  } else {
+    // a plain host variable, possibly with components: nothing else may follow it
+    if (!source.slice(1).every((t, n) => n % 2 === 0 ? /^[A-Za-z_%/][\w%/]*$/.test(t.str) : t.str === "-" || t.str === "->")) return;
+    operand = joinTokens(source.slice(1));
+  }
+  const close = last.str === "." ? (tokens[tokens.length - 2] as Tok) : last;
+  edits.replace(tokens[0] as Tok, close, `${KERNEL}=>sql_write_table( operation = ${literal(operation)} table = ${literal(table.str)} ${isTable ? "rows" : "row"} = ${operand} )`);
+}
+
+/**
+ * `SELECT <fields> … INTO [CORRESPONDING FIELDS OF] @target … ENDSELECT` (D102): the transpiler
+ * moves whole rows into the target, so a loop with a field list becomes `SELECT … INTO TABLE` of a
+ * table like the target, then `LOOP AT … INTO target` (its ENDSELECT becomes ENDLOOP). The forms
+ * that do not map (an inline declaration, a list of targets, PACKAGE SIZE, APPENDING) are refused.
+ */
+function selectLoopAsTable(tokens: Tok[], edits: SourceEdits, context: RewriteContext): void {
+  const refuse = (detail: string, at?: Tok): never => {
+    throw new RewriteError("ABP007", `SELECT … ENDSELECT with a field list ${detail}: use SELECT *, or INTO TABLE and LOOP AT`, at ?? tokens[0]);
+  };
+  const into = tokens.findIndex((t) => t.upper === "INTO");
+  if (into < 0) refuse("needs INTO");
+  if (tokens.some((t, n) => (t.upper === "PACKAGE" && tokens[n + 1]?.upper === "SIZE") || t.upper === "APPENDING")) refuse("and PACKAGE SIZE or APPENDING is not supported");
+  let target = into + 1;
+  const corresponding = tokens[target]?.upper === "CORRESPONDING";
+  if (corresponding) {
+    if (tokens[target + 1]?.upper !== "FIELDS" || tokens[target + 2]?.upper !== "OF") refuse("is not supported in this form", tokens[target]);
+    target += 3;
+  }
+  if (tokens[target]?.str !== "@") refuse("into a list of targets is not supported", tokens[target]);
+  const name = tokens[target + 1];
+  if (name === undefined || name.upper === "DATA" || name.upper === "FINAL" || name.str === "(") refuse("into an inline declaration is not supported", name);
+  let last = target + 1;
+  while ((tokens[last + 1]?.str === "-" || tokens[last + 1]?.str === "->") && tokens[last + 2] !== undefined && adjacent(tokens[last] as Tok, tokens[last + 1] as Tok)) {
+    last += 2;
+  }
+  const variable = joinTokens(tokens.slice(target + 1, last + 1));
+  const table = `lt_rapt_select_${(context.generated = (context.generated ?? 0) + 1)}`;
+  edits.replace(tokens[target] as Tok, tokens[last] as Tok, `TABLE @${table}`);
+  edits.replace(tokens[0] as Tok, tokens[0] as Tok, `DATA ${table} LIKE STANDARD TABLE OF ${variable} WITH EMPTY KEY. ${tokens[0]?.str ?? "SELECT"}`);
+  const period = tokens[tokens.length - 1] as Tok;
+  if (period.str === ".") {
+    edits.replace(period, period, `. LOOP AT ${table} INTO ${variable}.`);
+  }
+}
+
+const LOOP_CLAUSES = new Set(["FROM", "TO", "STEP", "WHERE", "USING", "INTO", "ASSIGNING", "REFERENCE", "TRANSPORTING", "GROUP", "."]);
+
+/**
+ * `LOOP AT itab … FROM n TO m` (D102): the runtime mixes BigInt and numbers when a bound is an
+ * int8 (the paging of a query gives int8), so the bounds become `CONV i( … )`; an index is an
+ * integer in ABAP anyway.
+ */
+function loopBoundsAsIntegers(tokens: Tok[], edits: SourceEdits): void {
+  for (const keyword of ["FROM", "TO"]) {
+    const start = tokens.findIndex((t, n) => t.upper === keyword && n > 2 && tokens[n - 1]?.upper !== "REFERENCE");
+    if (start < 0) continue;
+    let end = start + 1;
+    let depth = 0;
+    while (end < tokens.length) {
+      const t = tokens[end] as Tok;
+      if (t.str.endsWith("(")) depth++;
+      if (t.str.startsWith(")")) depth--;
+      if (depth === 0 && end > start + 1 && LOOP_CLAUSES.has(t.upper)) break;
+      if (depth === 0 && end === start + 1 && LOOP_CLAUSES.has(t.upper)) break;
+      end++;
+    }
+    const operand = tokens.slice(start + 1, end);
+    if (operand.length === 0 || (operand.length === 1 && /^\d+$/.test(operand[0]?.str ?? ""))) continue;
+    edits.replace(operand[0] as Tok, operand[operand.length - 1] as Tok, `CONV i( ${joinTokens(operand)} )`);
+  }
+}
+
 /** `SELECT *` or `SELECT FROM … FIELDS *`. */
 function selectsAllFields(tokens: Tok[]): boolean {
   let i = 1;
@@ -692,21 +815,26 @@ function declareSelectTarget(tokens: Tok[], edits: SourceEdits): void {
   } else {
     list = tokens.slice(tokens[1]?.upper === "SINGLE" ? 2 : 1, from);
   }
-  if (list.length === 4 || list.length === 2) {
-    // an alias of the result does not change its type
-  } else if (list.length === 6 && list[4]?.upper === "AS") {
-    list = list.slice(0, 4);
-  } else {
+  // an alias of the result does not change its type
+  if (list.length >= 4 && list[list.length - 2]?.upper === "AS") {
+    list = list.slice(0, -2);
+  }
+  if (list.length !== 2 && list.length !== 4 && !(list.length === 5 && list[2]?.upper === "DISTINCT")) {
     return;
   }
   let type: string | undefined;
   const [first, second, column, close] = list;
   if (list.length === 2 && first?.str === "@" && (second?.upper === "ABAP_TRUE" || second?.upper === "ABAP_FALSE")) {
     type = "abap_boolean";
-  } else if ((first?.upper === "MAX" || first?.upper === "MIN") && second?.str === "(" && close?.str === ")" && column !== undefined) {
+  } else if (first?.upper === "COUNT" && second?.str === "(" && list[list.length - 1]?.str === ")") {
+    // COUNT( * ), COUNT( col ), COUNT( DISTINCT col ): int8
+    type = "int8";
+  } else if (list.length === 4 && (first?.upper === "MAX" || first?.upper === "MIN" || first?.upper === "SUM" || first?.upper === "AVG") && second?.str === "(" && close?.str === ")" && column !== undefined) {
     const [prefix, field] = column.str.includes("~") ? column.str.split("~") : [undefined, column.str];
     if (prefix === undefined || prefix.toUpperCase() === alias || prefix.toUpperCase() === source.upper) {
-      type = `${source.str}-${field}`;
+      // MAX, MIN: the type of the column; SUM: the type of the column (ABAP widens INT1/INT2 and
+      // DEC lengths, the values are the same); AVG: FLTP when no type is given with AS
+      type = first.upper === "AVG" ? "f" : `${source.str}-${field}`;
     }
   }
   if (type === undefined) {

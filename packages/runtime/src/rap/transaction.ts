@@ -7,7 +7,7 @@
 
 import { randomUUID } from "node:crypto";
 import { sql, type Kysely } from "kysely";
-import { abapName, derivedType, getAnnotation, same, type ActionModel, type DeterminationModel, type EntityModel, type FieldModel, type HandlerRef, type TriggerModel, type ValidationModel } from "@open-rap/model";
+import { abapName, derivedType, getAnnotation, same, type ActionModel, type DeterminationModel, type EntityModel, type FieldModel, type HandlerRef, type TableModel, type TriggerModel, type ValidationModel } from "@open-rap/model";
 import type { AbapBridge } from "../abap/bridge.js";
 import { appendRow, component, isFlagOn, rowsOf, setFlag, type AbapData } from "../abap/convert.js";
 import type { User } from "../auth/user.js";
@@ -1265,17 +1265,44 @@ export class Transaction {
     if (mapped === undefined) {
       throw new RapRuntimeError(`${bo.entity.name} has no table mapping`);
     }
-    const table = sql.id(mapped.table.name);
-    const columns = [...mapped.columns.entries()];
-    const isKey = (field: string): boolean => bo.keys.some((k) => k.name === field);
-    const typeOf = (field: string): FieldModel["type"] => (this.bo.field(bo, field) as FieldModel).type;
+    const columns = [...mapped.columns.entries()].map(([field, column]) => ({ field, column, type: (this.bo.field(bo, field) as FieldModel).type, key: bo.keys.some((k) => k.name === field) }));
+    return this.writeRows(mapped.table.name, columns, operation, rows, single, indicators);
+  }
+
+  /**
+   * `INSERT|UPDATE|MODIFY|DELETE dbtab FROM [TABLE] @source` in save_modified, without MAPPING FROM
+   * ENTITY (D102): the rows are read from the ABAP structures by the columns of the table, with
+   * their exact values (the transpiler would pass packed numbers through JavaScript numbers, and
+   * drops the work area of DELETE dbtab FROM @wa).
+   */
+  public async writeTable(table: TableModel, operation: string, rows: Row[], single: boolean): Promise<{ subrc: number; dbcnt: number }> {
+    if (!this.inSaver) {
+      throw new RapRuntimeError(`${operation} on a database table is only possible in save_modified (with additional or unmanaged save)`);
+    }
+    const columns = table.columns.filter((c) => !c.client).map((c) => ({ field: c.name, column: c.name, type: c.type, key: c.key }));
+    return this.writeRows(table.name, columns, operation, rows.map((values) => ({ values, control: undefined })), single, false);
+  }
+
+  /**
+   * Writes rows to a table: sy-subrc 4 when a row is not found (UPDATE, DELETE) or already there
+   * (INSERT of a work area); an INSERT FROM TABLE with a duplicate key is a runtime error, as in ABAP.
+   */
+  private async writeRows(
+    tableName: string,
+    columns: Array<{ field: string; column: string; type: FieldModel["type"]; key: boolean }>,
+    operation: string,
+    rows: Array<{ values: Row; control: Set<string> | undefined }>,
+    single: boolean,
+    indicators: boolean,
+  ): Promise<{ subrc: number; dbcnt: number }> {
+    const table = sql.id(tableName);
     let dbcnt = 0;
     let missing = false;
     for (const { values, control } of rows) {
-      const value = (field: string) => toSql(typeOf(field), values[field] ?? null);
-      const where = sql.join(columns.filter(([f]) => isKey(f)).map(([f, c]) => sql`${sql.id(c)} = ${value(f)}`), sql` AND `);
-      const names = sql.join(columns.map(([, c]) => sql.id(c)));
-      const list = sql.join(columns.map(([f]) => value(f)));
+      const value = (c: (typeof columns)[number]) => toSql(c.type, values[c.field] ?? null);
+      const where = sql.join(columns.filter((c) => c.key).map((c) => sql`${sql.id(c.column)} = ${value(c)}`), sql` AND `);
+      const names = sql.join(columns.map((c) => sql.id(c.column)));
+      const list = sql.join(columns.map((c) => value(c)));
       if (operation === "INSERT") {
         try {
           await withSavepoint(this.db, () => sql`INSERT INTO ${table} (${names}) VALUES (${list})`.execute(this.db));
@@ -1285,12 +1312,12 @@ export class Transaction {
             throw error;
           }
           if (!single) {
-            throw new RapRuntimeError(`INSERT ${mapped.table.name} FROM TABLE: a row with the same key exists (CX_SY_OPEN_SQL_DB)`);
+            throw new RapRuntimeError(`INSERT ${tableName} FROM TABLE: a row with the same key exists (CX_SY_OPEN_SQL_DB)`);
           }
           missing = true;
         }
       } else if (operation === "UPDATE") {
-        const sets = columns.filter(([f]) => !isKey(f) && (!indicators || control?.has(f) === true)).map(([f, c]) => sql`${sql.id(c)} = ${value(f)}`);
+        const sets = columns.filter((c) => !c.key && (!indicators || control?.has(c.field) === true)).map((c) => sql`${sql.id(c.column)} = ${value(c)}`);
         if (sets.length === 0) {
           continue;
         }
@@ -1299,8 +1326,8 @@ export class Transaction {
         dbcnt += count;
         missing ||= count === 0;
       } else if (operation === "MODIFY") {
-        const keys = sql.join(columns.filter(([f]) => isKey(f)).map(([, c]) => sql.id(c)));
-        const sets = columns.filter(([f]) => !isKey(f)).map(([, c]) => sql`${sql.id(c)} = EXCLUDED.${sql.id(c)}`);
+        const keys = sql.join(columns.filter((c) => c.key).map((c) => sql.id(c.column)));
+        const sets = columns.filter((c) => !c.key).map((c) => sql`${sql.id(c.column)} = EXCLUDED.${sql.id(c.column)}`);
         await sql`INSERT INTO ${table} (${names}) VALUES (${list}) ON CONFLICT (${keys}) DO ${sets.length === 0 ? sql`NOTHING` : sql`UPDATE SET ${sql.join(sets)}`}`.execute(this.db);
         dbcnt++;
       } else if (operation === "DELETE") {

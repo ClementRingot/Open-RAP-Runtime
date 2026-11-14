@@ -80,6 +80,17 @@ export class SourceEdits {
     this.edits.push({ start: this.offset(first.row, first.col), end: this.offset(last.endRow, last.endCol), text });
   }
 
+  /** Replaces the text between two positions (1-based row/column, the end excluded), unless it overlaps an edit. */
+  public replaceRange(start: { row: number; col: number }, end: { row: number; col: number }, text: string): boolean {
+    const from = this.offset(start.row, start.col);
+    const to = this.offset(end.row, end.col);
+    if (this.edits.some((e) => from < e.end && e.start < to)) {
+      return false;
+    }
+    this.edits.push({ start: from, end: to, text });
+    return true;
+  }
+
   public get size(): number {
     return this.edits.length;
   }

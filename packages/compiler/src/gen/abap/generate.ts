@@ -14,11 +14,13 @@ import { Dictionary } from "../../ir/dictionary.js";
 import type { Project, SourceFile } from "../../input/project.js";
 import { abaplintRegistry } from "../../ir/handlers.js";
 import { generateDerivedTypes } from "./derived-types.js";
-import { FRAMEWORK_SOURCES } from "./framework.js";
+import { FRAMEWORK_SOURCES, KERNEL_CLASS } from "./framework.js";
+import { EnumCatalog, enumTextOperands } from "./enum-text.js";
 import { QUERY_FRAMEWORK_SOURCES } from "./framework-query.js";
 import { frameworkClosure, frameworkObjectName } from "./framework-utils.js";
 import { BdefCatalog, findModelProviders, findSaverClasses, poolBdefOf, rewriteAbapFile } from "./rewrite.js";
 import { frameworkDictionary, shadowDataElement, shadowEntity, shadowTable } from "./shadow.js";
+import { SourceEdits } from "./tokens.js";
 import { replaceEnumConstants } from "./enums.js";
 
 export interface AbapSource {
@@ -158,7 +160,42 @@ export function abapSources(project: Project, model: Model, diagnostics: Diagnos
       sources.push({ fileName: util.fileName, content: util.source });
     }
   }
-  return sources;
+  return convertEnumTexts(sources);
+}
+
+/**
+ * Enumerated objects converted to text in the rewritten sources of the project (D102): found with
+ * the syntax of the transpiler's registry (the clean-room base is there, so the check runs through
+ * the behavior pools), replaced by a call of the kernel. The rewrite keeps the line numbers.
+ */
+function convertEnumTexts(sources: AbapSource[]): AbapSource[] {
+  if (!sources.some((s) => s.original !== undefined && /\bENUM\b/i.test(s.content))) {
+    return sources;
+  }
+  const registry = transpilerRegistry(sources);
+  const catalog = new EnumCatalog(registry);
+  const edits = new Map<string, SourceEdits>();
+  const objects = new Set(sources.filter((s) => s.original !== undefined && s.fileName.endsWith(".abap")).map((s) => s.fileName.split(".").slice(0, 2).join(".")));
+  for (const id of objects) {
+    const [name = "", extension = ""] = id.split(".");
+    const object = registry.getObject(extension.toUpperCase(), name.replace(/#/g, "/").toUpperCase());
+    if (!(object instanceof abaplint.ABAPObject)) {
+      continue;
+    }
+    for (const [file, operands] of enumTextOperands(registry, object, catalog, KERNEL_CLASS.toLowerCase())) {
+      const source = sources.find((s) => s.fileName.toLowerCase() === file);
+      if (source === undefined) continue;
+      const fileEdits = edits.get(source.fileName) ?? new SourceEdits(source.content);
+      for (const operand of operands) {
+        fileEdits.replaceRange(operand.start, operand.end, operand.replacement);
+      }
+      edits.set(source.fileName, fileEdits);
+    }
+  }
+  return sources.map((s) => {
+    const fileEdits = edits.get(s.fileName);
+    return fileEdits === undefined || fileEdits.size === 0 ? s : { ...s, content: fileEdits.apply() };
+  });
 }
 
 /**

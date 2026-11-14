@@ -12,6 +12,15 @@ const ABP = "zbp_rt_r_travel.clas.locals_imp.abap";
 const NS = "com.sap.gateway.srvd.zrt_ui_travel.v0001";
 
 const DEFINITIONS = `
+    TYPES: BEGIN OF ENUM ty_mode,
+             mode_read,
+             mode_write,
+           END OF ENUM ty_mode.
+    TYPES: BEGIN OF ENUM ty_level STRUCTURE level,
+             low,
+             high,
+           END OF ENUM ty_level STRUCTURE level.
+
     METHODS inspect FOR MODIFY
       IMPORTING keys FOR ACTION Travel~inspect RESULT result.
 
@@ -58,6 +67,25 @@ const IMPLEMENTATIONS = `
     SELECT travel_id FROM zrt_travel WHERE description LIKE '%Berlin%' APPENDING TABLE @travel_ids.
     DATA(appended) = concat_lines_of( table = travel_ids sep = \`,\` ).
 
+    " D102: an aggregate in an inline declaration, a SELECT loop with a field list, an int8 bound
+    SELECT SUM( booking_fee ) FROM zrt_travel INTO @DATA(fees).
+    DATA one_id TYPE zrt_travel-travel_id.
+    DATA loop_ids TYPE string.
+    SELECT travel_id FROM zrt_travel ORDER BY travel_id INTO @one_id.
+      loop_ids = |{ loop_ids }{ one_id }/|.
+    ENDSELECT.
+    DATA offset TYPE int8 VALUE 1.
+    DATA paged TYPE string.
+    LOOP AT travel_ids INTO DATA(paged_id) FROM offset + 1 TO offset + 1.
+      paged = paged_id.
+    ENDLOOP.
+    " D102: enumerated objects converted to text give the name of their constant
+    DATA mode TYPE ty_mode.
+    DATA level_text TYPE string.
+    mode = mode_write.
+    level_text = level-high.
+    DATA(enums) = |{ mode }-{ level_text }-| && mode_read && CONV string( level-low ) && |{ CONV i( mode ) }|.
+
     LOOP AT keys INTO DATA(key).
       CLEAR: ids, looped.
       SELECT FROM zrt_r_booking FIELDS BookingID, FlightPrice, FlightDate
@@ -90,7 +118,7 @@ const IMPLEMENTATIONS = `
           UPDATE FIELDS ( Description )
           WITH VALUE #( ( %tky        = key-%tky
                           Description = |{ count_2026 };{ max_fee };{ ids };{ looped };{ created_at };{ found };{ text };| &&
-                                        |{ lines( joined ) };{ currencies };{ with_bookings };{ appended }| ) ).
+                                        |{ lines( joined ) };{ currencies };{ with_bookings };{ appended };{ fees };{ loop_ids };{ paged };{ enums }| ) ).
     ENDLOOP.
 
     READ ENTITIES OF zrt_r_travel IN LOCAL MODE
@@ -191,7 +219,7 @@ describe("ABAP SQL in a behavior pool", () => {
   it("reads tables and CDS entities with the usual forms of SELECT", async () => {
     const response = await call("POST", `Travel(${T1})/${NS}.inspect`, {});
     expect(response.status, JSON.stringify(response.body)).toBe(200);
-    expect(String(response.body["Description"]).split(";")).toEqual(["2", "20.00", "0002,0001", "3", "20260110080000.0000000", "X", "Travel 00000001 accepted", "3", "EUR:3", "2", "00000001,00000002"]);
+    expect(String(response.body["Description"]).split(";")).toEqual(["2", "20.00", "0002,0001", "3", "20260110080000.0000000", "X", "Travel 00000001 accepted", "3", "EUR:3", "2", "00000001,00000002", "30.00", "00000001/00000002/00000003/", "00000002", "MODE_WRITE-HIGH-MODE_READLOW1"]);
   });
 
   it("numbers on save with SELECT MAX, also several creations of one change set", async () => {

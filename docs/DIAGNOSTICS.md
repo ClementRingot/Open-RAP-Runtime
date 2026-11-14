@@ -83,7 +83,7 @@ exit code is 1 as soon as there is an error (or a warning with `--warnings-as-er
 | ABP004 | error | ABAP error (abaplint): syntax of the original sources, complete check of the rewritten sources, at the original line |
 | ABP005 | error | Malformed EML statement or unsupported form (`OPERATIONS`, `RELATING TO`…) |
 | ABP006 | error | Unknown name in the EML or a derived type: BDEF, entity, field, association, action |
-| ABP007 | error | Unsupported construct: ABAP SQL write outside the saver class, `DELETE dbtab FROM @wa`, `WITH`, `SELECT … ENDSELECT` with a field list, `adjust_numbers`, EML on a projection, `GET PERMISSIONS`, out-of-scope derived type or handler |
+| ABP007 | error | Unsupported construct: ABAP SQL write outside the saver class, `WITH`, `SELECT … ENDSELECT` with a field list into an inline target, a list of targets or by `PACKAGE SIZE`, `adjust_numbers`, EML on a projection, `GET PERMISSIONS`, out-of-scope derived type or handler |
 | ABP008 | error | Internal error (generated ABAP) or error of the transpiler |
 | ABP009 | error | Result of a `SELECT` abaplint does not type (literal, aggregate other than `COUNT(*)`, `MAX` and `MIN`, expression) in an inline declaration: declare the target |
 | ABP010 | error | `AUTHORITY-CHECK` on a field the authorization object does not have |
