@@ -367,6 +367,33 @@ rapt dev my-project [--port 8080] [--host 0.0.0.0] [--mode enhanced]
 - No sign-in (`AUTH_MODE=none`); `DEV_ROLES` and `DEV_ATTRIBUTES` simulate a user and their
   authorizations.
 
+### Checking with SAP Fiori elements locally
+
+Open RAP Runtime generates an OpenUI5 UI and does not load SAPUI5, which is licensed by SAP
+(D79). To check the service with the real SAP Fiori elements, under your own SAP license:
+
+1. `rapt dev my-project --fe-check`: once ready, it prints the URL of the service and of its
+   `$metadata`. The service path is the one of SAP BTP (`/sap/opu/odata4/sap/<binding>/srvd/sap/<srvd>/0001/`),
+   so an application generated for SAP BTP only needs its backend pointed to
+   `http://localhost:<port>` (through the proxy of its development server: no CORS). In VS Code,
+   run it in the terminal.
+2. Run your Fiori elements application with your SAP tools; the results are yours: the project
+   publishes none.
+
+To turn what Fiori elements sends into tests of the project (contributors):
+
+1. Import a fixture on your SAP BTP trial (`rapt abapgit fixtures/travel`, then abapGit), publish
+   its service binding, open the *Preview* of Fiori elements and record the network
+   (DevTools → *Save all as HAR*), one scenario per HAR: create, edit, prepare, activate, an
+   action, a value help…
+2. `node scripts/fe-har-to-cases.mjs trial.har --scenario draft-object-page --floorplan objectPage --release <release>`
+   writes `packages/runtime/test/fe-protocol/cases/draft-object-page-har.json`: the shape of the
+   requests and the structure of the responses only, with the keys as placeholders. Map the keys
+   of the instances that already existed on SAP to seeded keys of the fixture (`--map <guid>=T1`);
+   review the request bodies, kept as recorded. Keep the HAR itself out of the repository.
+3. `npx vitest run packages/runtime/test/fe-protocol`; mark a case that fails with the decision
+   that will fix it (`"fails": "D81"`).
+
 ## 8. AI agents: MCP server
 
 `rapt mcp` writes `rapt/mcp.json`; the application then serves `/mcp`: one tool per operation of
@@ -477,7 +504,7 @@ Dockerfile, docker-compose.yml, keycloak/, manifest.yml   container, PostgreSQL,
 |---|---|
 | `rapt check <src>` | diagnostics (`file:line:column: severity CODE message`), exit code 1 on error |
 | `rapt build <src> --out <dir>` | generated application |
-| `rapt dev <src>` | development loop |
+| `rapt dev <src> [--fe-check]` | development loop; `--fe-check`: where to point an SAP Fiori elements application (§7) |
 | `rapt new <src> <Entity> [--prefix ZRT] [--description …] [--binding-type webapi]` | complete BO, added to the launchpad of the workspace; with `--binding-type webapi`, a Web API (no UI, not in the launchpad) |
 | `rapt generate <src> <type> <name> [--from X] [--for Y] [--expose A,B] [--root]` | one object |
 | `rapt floorplan <src> [<EntitySet> <floorplan>]` | floorplan of a root entity set; the application is added to the launchpad |

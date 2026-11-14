@@ -35,7 +35,9 @@ Usage:
   rapt launchpad dev <launchpad.json> [--port n] the launchpad of the workspace in development: each application
                                                  with sources as in rapt dev, on the port of its url, behind the
                                                  launchpad (default port 8090), all rebuilt on change
-  rapt dev   <src> [--port <n>] [--out <dir>]    build, run with an embedded database, rebuild on change
+  rapt dev   <src> [--port <n>] [--out <dir>]    build, run with an embedded database, rebuild on change;
+                                                 --fe-check: where to point an SAP Fiori elements application,
+                                                 run locally under your own SAP license (D79)
   rapt new   <src> <Entity> [--prefix Z…]        write the sources of a new business object (and their XML),
                                                  and add the application to the launchpad of the workspace;
                                                  --binding-type webapi: an API for other systems, without UI,
@@ -114,6 +116,7 @@ export async function main(argv: string[]): Promise<number> {
         port: { type: "string" },
         host: { type: "string" },
         json: { type: "boolean" },
+        "fe-check": { type: "boolean" },
         prefix: { type: "string" },
         description: { type: "string" },
         check: { type: "boolean" },
@@ -191,7 +194,7 @@ export async function main(argv: string[]): Promise<number> {
   if (typeof parsed.values["runtime"] === "string") options.runtimeDir = parsed.values["runtime"];
 
   if (command === "dev") {
-    return dev(source, options, parsed.values["out"], parsed.values["port"], parsed.values["json"] === true, parsed.values["host"]);
+    return dev(source, options, parsed.values["out"], parsed.values["port"], parsed.values["json"] === true, parsed.values["host"], parsed.values["fe-check"] === true);
   }
   const json = parsed.values["json"] === true;
   const project = loadProject(source);
@@ -455,8 +458,9 @@ function writeJson(command: string, root: string, diagnostics: Diagnostics, ok: 
 }
 
 /** rapt dev: runs until SIGINT or SIGTERM. */
-async function dev(source: string, generate: GenerateOptions, out: unknown, port: unknown, json: boolean, host: unknown): Promise<number> {
+async function dev(source: string, generate: GenerateOptions, out: unknown, port: unknown, json: boolean, host: unknown, feCheck: boolean): Promise<number> {
   const options: DevOptions = { ...generate };
+  if (feCheck) options.feCheck = true;
   if (typeof host === "string") options.host = host;
   if (json) options.events = (event) => process.stdout.write(`${JSON.stringify(event)}\n`);
   if (typeof out === "string") options.outDir = out;

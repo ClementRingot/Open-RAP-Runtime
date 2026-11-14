@@ -1,0 +1,368 @@
+{
+  "scenario": "draft-list-report",
+  "floorplan": "listReport",
+  "fixture": "travel-draft",
+  "source": "specification",
+  "note": "Written from the OData V4 specification and the Common vocabulary (DraftRoot, SiblingEntity of the draft protocol); the filters of the Editing Status are to be confirmed with a HAR of the SAP BTP trial.",
+  "cases": [
+    {
+      "id": "metadata-sibling-entity",
+      "fails": "D81",
+      "title": "the draft entity types expose the SiblingEntity navigation",
+      "steps": [
+        {
+          "request": {
+            "method": "GET",
+            "url": "$metadata",
+            "headers": {
+              "Accept": "application/xml"
+            }
+          },
+          "expect": {
+            "status": 200,
+            "contains": [
+              "<NavigationProperty Name=\"SiblingEntity\"",
+              "Term=\"Common.DraftRoot\""
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "editing-status-all",
+      "fails": "D81",
+      "title": "Editing Status 'All': the drafts, and the active instances without a draft of their own",
+      "confirm": "the exact $filter of the default Editing Status",
+      "steps": [
+        {
+          "request": {
+            "method": "POST",
+            "url": "Travel",
+            "headers": {
+              "Accept": "application/json;odata.metadata=minimal;IEEE754Compatible=true",
+              "OData-Version": "4.0",
+              "OData-MaxVersion": "4.0",
+              "Content-Type": "application/json;charset=UTF-8;IEEE754Compatible=true",
+              "If-Match": "*"
+            },
+            "body": {
+              "TravelID": "00000201",
+              "AgencyID": "070001",
+              "CustomerID": "000100",
+              "CurrencyCode": "EUR"
+            }
+          },
+          "capture": {
+            "draft": "TravelUUID"
+          },
+          "expect": {
+            "status": 201
+          }
+        },
+        {
+          "request": {
+            "method": "POST",
+            "url": "Travel(TravelUUID={{T1}},IsActiveEntity=true)/{{NS}}.Edit",
+            "headers": {
+              "Accept": "application/json;odata.metadata=minimal;IEEE754Compatible=true",
+              "OData-Version": "4.0",
+              "OData-MaxVersion": "4.0",
+              "Content-Type": "application/json;charset=UTF-8;IEEE754Compatible=true",
+              "If-Match": "*"
+            },
+            "body": {
+              "PreserveChanges": true
+            }
+          },
+          "expect": {
+            "status": 200
+          }
+        },
+        {
+          "batch": [
+            {
+              "method": "GET",
+              "url": "Travel?$count=true&$filter=(IsActiveEntity eq false or SiblingEntity/IsActiveEntity eq null)&$select=TravelID,Description,OverallStatus,HasActiveEntity,HasDraftEntity,IsActiveEntity&$expand=DraftAdministrativeData($select=DraftUUID,InProcessByUser)&$orderby=TravelID&$skip=0&$top=30",
+              "headers": {
+                "Accept": "application/json;odata.metadata=minimal;IEEE754Compatible=true",
+                "OData-Version": "4.0",
+                "OData-MaxVersion": "4.0"
+              }
+            }
+          ],
+          "expect": [
+            {
+              "status": 200,
+              "annotations": [
+                "@odata.count"
+              ],
+              "properties": [
+                "TravelID",
+                "IsActiveEntity",
+                "HasDraftEntity",
+                "HasActiveEntity",
+                "DraftAdministrativeData"
+              ],
+              "match": {
+                "@odata.count": 4,
+                "value": [
+                  {
+                    "TravelID": "00000001",
+                    "IsActiveEntity": false,
+                    "HasActiveEntity": true
+                  },
+                  {
+                    "TravelID": "00000002",
+                    "IsActiveEntity": true
+                  },
+                  {
+                    "TravelID": "00000003",
+                    "IsActiveEntity": true
+                  },
+                  {
+                    "TravelID": "00000201",
+                    "IsActiveEntity": false,
+                    "HasActiveEntity": false
+                  }
+                ]
+              }
+            }
+          ]
+        }
+      ],
+      "cleanup": [
+        {
+          "request": {
+            "method": "POST",
+            "url": "Travel(TravelUUID={{T1}},IsActiveEntity=false)/{{NS}}.Discard",
+            "headers": {
+              "Accept": "application/json;odata.metadata=minimal;IEEE754Compatible=true",
+              "OData-Version": "4.0",
+              "OData-MaxVersion": "4.0",
+              "Content-Type": "application/json;charset=UTF-8;IEEE754Compatible=true",
+              "If-Match": "*"
+            },
+            "body": {}
+          }
+        },
+        {
+          "request": {
+            "method": "POST",
+            "url": "Travel(TravelUUID={{draft}},IsActiveEntity=false)/{{NS}}.Discard",
+            "headers": {
+              "Accept": "application/json;odata.metadata=minimal;IEEE754Compatible=true",
+              "OData-Version": "4.0",
+              "OData-MaxVersion": "4.0",
+              "Content-Type": "application/json;charset=UTF-8;IEEE754Compatible=true",
+              "If-Match": "*"
+            },
+            "body": {}
+          }
+        }
+      ]
+    },
+    {
+      "id": "editing-status-own-draft",
+      "title": "Editing Status 'Own Draft'",
+      "confirm": "the exact $filter",
+      "steps": [
+        {
+          "request": {
+            "method": "POST",
+            "url": "Travel",
+            "headers": {
+              "Accept": "application/json;odata.metadata=minimal;IEEE754Compatible=true",
+              "OData-Version": "4.0",
+              "OData-MaxVersion": "4.0",
+              "Content-Type": "application/json;charset=UTF-8;IEEE754Compatible=true",
+              "If-Match": "*"
+            },
+            "body": {
+              "TravelID": "00000202",
+              "AgencyID": "070001",
+              "CustomerID": "000100",
+              "CurrencyCode": "EUR"
+            }
+          },
+          "capture": {
+            "draft": "TravelUUID"
+          },
+          "expect": {
+            "status": 201
+          }
+        },
+        {
+          "request": {
+            "method": "POST",
+            "url": "Travel(TravelUUID={{T1}},IsActiveEntity=true)/{{NS}}.Edit",
+            "headers": {
+              "Accept": "application/json;odata.metadata=minimal;IEEE754Compatible=true",
+              "OData-Version": "4.0",
+              "OData-MaxVersion": "4.0",
+              "Content-Type": "application/json;charset=UTF-8;IEEE754Compatible=true",
+              "If-Match": "*"
+            },
+            "body": {
+              "PreserveChanges": true
+            }
+          },
+          "expect": {
+            "status": 200
+          }
+        },
+        {
+          "batch": [
+            {
+              "method": "GET",
+              "url": "Travel?$count=true&$filter=IsActiveEntity eq false&$select=TravelID,Description,OverallStatus,HasActiveEntity,HasDraftEntity,IsActiveEntity&$expand=DraftAdministrativeData($select=DraftUUID,InProcessByUser)&$orderby=TravelID&$skip=0&$top=30",
+              "headers": {
+                "Accept": "application/json;odata.metadata=minimal;IEEE754Compatible=true",
+                "OData-Version": "4.0",
+                "OData-MaxVersion": "4.0"
+              }
+            }
+          ],
+          "expect": [
+            {
+              "status": 200,
+              "annotations": [
+                "@odata.count"
+              ],
+              "properties": [
+                "TravelID",
+                "IsActiveEntity",
+                "HasDraftEntity",
+                "HasActiveEntity",
+                "DraftAdministrativeData"
+              ],
+              "match": {
+                "value": [
+                  {
+                    "TravelID": "00000001",
+                    "IsActiveEntity": false
+                  },
+                  {
+                    "TravelID": "00000202",
+                    "IsActiveEntity": false
+                  }
+                ]
+              }
+            }
+          ]
+        }
+      ],
+      "cleanup": [
+        {
+          "request": {
+            "method": "POST",
+            "url": "Travel(TravelUUID={{T1}},IsActiveEntity=false)/{{NS}}.Discard",
+            "headers": {
+              "Accept": "application/json;odata.metadata=minimal;IEEE754Compatible=true",
+              "OData-Version": "4.0",
+              "OData-MaxVersion": "4.0",
+              "Content-Type": "application/json;charset=UTF-8;IEEE754Compatible=true",
+              "If-Match": "*"
+            },
+            "body": {}
+          }
+        },
+        {
+          "request": {
+            "method": "POST",
+            "url": "Travel(TravelUUID={{draft}},IsActiveEntity=false)/{{NS}}.Discard",
+            "headers": {
+              "Accept": "application/json;odata.metadata=minimal;IEEE754Compatible=true",
+              "OData-Version": "4.0",
+              "OData-MaxVersion": "4.0",
+              "Content-Type": "application/json;charset=UTF-8;IEEE754Compatible=true",
+              "If-Match": "*"
+            },
+            "body": {}
+          }
+        }
+      ]
+    },
+    {
+      "id": "editing-status-unchanged",
+      "title": "Editing Status 'Unchanged': active instances without a draft",
+      "confirm": "the exact $filter",
+      "steps": [
+        {
+          "request": {
+            "method": "POST",
+            "url": "Travel(TravelUUID={{T1}},IsActiveEntity=true)/{{NS}}.Edit",
+            "headers": {
+              "Accept": "application/json;odata.metadata=minimal;IEEE754Compatible=true",
+              "OData-Version": "4.0",
+              "OData-MaxVersion": "4.0",
+              "Content-Type": "application/json;charset=UTF-8;IEEE754Compatible=true",
+              "If-Match": "*"
+            },
+            "body": {
+              "PreserveChanges": true
+            }
+          },
+          "expect": {
+            "status": 200
+          }
+        },
+        {
+          "batch": [
+            {
+              "method": "GET",
+              "url": "Travel?$count=true&$filter=IsActiveEntity eq true and HasDraftEntity eq false&$select=TravelID,Description,OverallStatus,HasActiveEntity,HasDraftEntity,IsActiveEntity&$expand=DraftAdministrativeData($select=DraftUUID,InProcessByUser)&$orderby=TravelID&$skip=0&$top=30",
+              "headers": {
+                "Accept": "application/json;odata.metadata=minimal;IEEE754Compatible=true",
+                "OData-Version": "4.0",
+                "OData-MaxVersion": "4.0"
+              }
+            }
+          ],
+          "expect": [
+            {
+              "status": 200,
+              "annotations": [
+                "@odata.count"
+              ],
+              "properties": [
+                "TravelID",
+                "IsActiveEntity",
+                "HasDraftEntity",
+                "HasActiveEntity",
+                "DraftAdministrativeData"
+              ],
+              "match": {
+                "value": [
+                  {
+                    "TravelID": "00000002",
+                    "IsActiveEntity": true
+                  },
+                  {
+                    "TravelID": "00000003",
+                    "IsActiveEntity": true
+                  }
+                ]
+              }
+            }
+          ]
+        }
+      ],
+      "cleanup": [
+        {
+          "request": {
+            "method": "POST",
+            "url": "Travel(TravelUUID={{T1}},IsActiveEntity=false)/{{NS}}.Discard",
+            "headers": {
+              "Accept": "application/json;odata.metadata=minimal;IEEE754Compatible=true",
+              "OData-Version": "4.0",
+              "OData-MaxVersion": "4.0",
+              "Content-Type": "application/json;charset=UTF-8;IEEE754Compatible=true",
+              "If-Match": "*"
+            },
+            "body": {}
+          }
+        }
+      ]
+    }
+  ]
+}

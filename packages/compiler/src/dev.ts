@@ -35,6 +35,11 @@ export interface DevOptions extends Omit<GenerateOptions, "scaffold" | "transpil
   err?: (line: string) => void;
   /** Events of the session (`rapt dev --json`); replaces the text output. */
   events?: (event: DevEvent) => void;
+  /**
+   * `rapt dev --fe-check` (D79): once the server is ready, tell where to point an SAP Fiori elements
+   * application, run by the user locally under their own SAP license (no SAPUI5 is served).
+   */
+  feCheck?: boolean;
 }
 
 export type DiagnosticCounts = Record<Diagnostic["severity"], number>;
@@ -48,6 +53,7 @@ export type DevEvent =
   | { type: "failed"; running: boolean }
   | { type: "database-reset" }
   | { type: "ready"; url: string }
+  | { type: "fe-check"; origin: string; service: string; metadata: string }
   | { type: "server-failed" }
   | { type: "server-stopped"; code: number }
   | { type: "log"; stream: "stdout" | "stderr"; line: string };
@@ -69,6 +75,8 @@ export function formatDevEvent(event: DevEvent): { line: string; error: boolean 
       return { line: "rapt dev: the database schema changed, the development database is reset", error: false };
     case "ready":
       return { line: `rapt dev: ready at ${event.url}`, error: false };
+    case "fe-check":
+      return undefined; // several lines, see devEventLines
     case "server-failed":
       return { line: "rapt dev: server failed, waiting for changes", error: false };
     case "server-stopped":
@@ -85,6 +93,15 @@ export function devEventLines(event: DevEvent): Array<{ line: string; error: boo
       ...event.diagnostics.map((d) => ({ line: formatDiagnostic(d), error: d.severity === "error" })),
       { line: `rapt dev: ${event.counts.error} error(s), ${event.counts.warning} warning(s), ${event.counts.info} info`, error: false },
     ];
+  }
+  if (event.type === "fe-check") {
+    return [
+      "rapt dev: SAP Fiori elements check (D79), local and under your own SAP license: Open RAP Runtime serves no SAPUI5",
+      `rapt dev:   service   ${event.service}`,
+      `rapt dev:   metadata  ${event.metadata}`,
+      `rapt dev:   point the backend of your Fiori elements application to ${event.origin}: the service path is the one of SAP BTP`,
+      'rapt dev:   see "Checking with SAP Fiori elements locally" in the guide; the results are yours, the project publishes none',
+    ].map((line) => ({ line, error: false }));
   }
   const text = formatDevEvent(event);
   return text === undefined ? [] : [text];
@@ -131,6 +148,7 @@ export class DevSession {
   private running: Promise<void> | undefined;
   private pending = false;
   private closed = false;
+  private feCheckShown = false;
 
   public constructor(
     source: string,
@@ -160,7 +178,7 @@ export class DevSession {
     }
     let result: Awaited<ReturnType<typeof generateApplication>>;
     try {
-      const { outDir: _out, port: _port, host: _host, env: _env, out: _o, err: _e, events: _ev, ...generate } = this.options;
+      const { outDir: _out, port: _port, host: _host, env: _env, out: _o, err: _e, events: _ev, feCheck: _fe, ...generate } = this.options;
       result = await generateApplication(loadProject(this.root), { ...generate, scaffold: false });
     } catch (e) {
       this.emit({ type: "error", message: (e as Error).message });
@@ -193,6 +211,7 @@ export class DevSession {
     }
     this.model = result.model;
     this.emit({ type: "ready", url: this.uiUrl });
+    this.showFeCheck(result.model);
     return { ok: true, diagnostics };
   }
 
@@ -215,6 +234,20 @@ export class DevSession {
     this.watchers.clear();
     await this.running;
     await this.stopServer();
+  }
+
+  /** `--fe-check`: where to point an SAP Fiori elements application, once per session. */
+  private showFeCheck(model: Model | undefined): void {
+    if (this.options.feCheck !== true || this.feCheckShown || model === undefined) {
+      return;
+    }
+    this.feCheckShown = true;
+    if (model.service.webApi === true) {
+      this.emit({ type: "error", message: "--fe-check: the service is an OData V4 - Web API, without UI: SAP Fiori elements does not apply" });
+      return;
+    }
+    const origin = `http://localhost:${this.port}`;
+    this.emit({ type: "fe-check", origin, service: `${origin}${model.service.path}`, metadata: `${origin}${model.service.path}$metadata` });
   }
 
   private emit(event: DevEvent): void {

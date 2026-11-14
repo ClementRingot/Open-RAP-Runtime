@@ -46,7 +46,7 @@ The numbers are provisional: each decision takes the next free number of
 
 | Provisional | Final | Decision | Phase |
 |---|---|---|---|
-| D79 | — | Fiori elements OData protocol conformance, without SAPUI5 | 0 |
+| D79 | D79 | Fiori elements OData protocol conformance, without SAPUI5 | 0 |
 | D80 | — | Generation of Fiori elements applications, next to the OpenUI5 UI | 2 |
 | D81 | — | Complete draft protocol | 1 |
 | D82 | — | Applied side effects and `determine action` | 1 |

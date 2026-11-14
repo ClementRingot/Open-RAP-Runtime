@@ -2,7 +2,7 @@ import { existsSync, lstatSync, mkdirSync, mkdtempSync, readFileSync, renameSync
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
-import { DevSession, linkFolder, realPath, runtimeDependencies, type DevEvent } from "../src/dev.js";
+import { devEventLines, DevSession, linkFolder, realPath, runtimeDependencies, type DevEvent } from "../src/dev.js";
 import { fixtureVariant, freePort } from "./helpers.js";
 
 const SERVICE = "sap/opu/odata4/sap/zrt_ui_travel_o4/srvd/sap/zrt_ui_travel/0001";
@@ -115,6 +115,26 @@ describe("rapt dev", () => {
     expect((await dev.rebuild()).ok).toBe(true);
     expect(events.map((e) => e.type)).toEqual(["building", "diagnostics", "ready"]);
     expect(events[2]).toEqual({ type: "ready", url: `http://localhost:${port}/` });
+  });
+
+  it("tells where to point an SAP Fiori elements application, once per session (rapt dev --fe-check, D79)", async () => {
+    const variant = fixtureVariant({});
+    cleanups.push(variant.cleanup);
+    const events: DevEvent[] = [];
+    const port = await freePort();
+    const dev = new DevSession(variant.dir, { port, feCheck: true, env: { ...process.env, DATABASE_URL: "", LOG_LEVEL: "error" }, events: (e) => events.push(e) });
+    cleanups.push(() => dev.close());
+    expect((await dev.rebuild()).ok).toBe(true);
+    const origin = `http://localhost:${port}`;
+    expect(events.map((e) => e.type)).toEqual(["building", "diagnostics", "ready", "fe-check"]);
+    expect(events[3]).toEqual({ type: "fe-check", origin, service: `${origin}/${SERVICE}/`, metadata: `${origin}/${SERVICE}/$metadata` });
+    // the service answers at the URL given
+    expect((await fetch(`${origin}/${SERVICE}/$metadata`)).status).toBe(200);
+    expect((await dev.rebuild()).ok).toBe(true);
+    expect(events.filter((e) => e.type === "fe-check")).toHaveLength(1);
+    const lines = devEventLines(events[3] as DevEvent).map((l) => l.line);
+    expect(lines[0]).toContain("under your own SAP license: Open RAP Runtime serves no SAPUI5");
+    expect(lines).toContain(`rapt dev:   metadata  ${origin}/${SERVICE}/$metadata`);
   });
 
   it("finds the dependencies of the runtime, in a pnpm workspace or installed flat", () => {

@@ -1728,3 +1728,48 @@ _The issues moved to the repository itself once public: see D74._
   of the pinned versions; the workflow runs on the next release (npm needs its trusted publisher
   declared first, [DEPLOYMENT.md](DEPLOYMENT.md)).
 
+
+## D79 — SAP Fiori elements protocol conformance, without SAPUI5
+
+- **Context**: Open RAP Runtime aims at the experience of RAP with SAP Fiori elements, but
+  nothing showed which requests of Fiori elements the service answers. `sap.fe`, `sap.ovp` and
+  the flexible programming model are part of SAPUI5, under the SAP Developer License: it does not
+  clearly allow running them in the public CI of the project (the software is used on devices
+  the licensee owns or controls; no publication of information on SAP software without written
+  consent; no reverse engineering). The OData V4 protocol (OASIS) and the vocabularies of SAP
+  (`Common`, `UI`…, Apache-2.0) are public.
+- **Decision**: test the protocol, that is our server, not SAPUI5.
+  - **Protocol cases**: `packages/runtime/test/fe-protocol/cases/*.json`, replayed by
+    `fe-protocol.test.ts` against the fixtures (`travel`, `travel-draft`) on PGlite, without
+    network: requests (single or in a multipart `$batch`), `{{name}}` placeholders (seeded keys
+    `T1`…, the namespace `NS`, values captured from a response), and the **structure** of the
+    responses: status, properties present, control annotations, headers, severity and target of
+    `sap-messages`. Values (`match`) are only checked by the cases written by hand, on the data of
+    the fixtures. A case that cannot pass yet names the decision that will fix it (`"fails":
+    "D81"`): it runs with `it.fails`, so a case that starts passing fails the test until its marker
+    is removed.
+  - **First cases**, written from the specification and the public vocabularies (`source:
+    "specification"`): the draft List Report (Editing Status filters, `SiblingEntity`) and the
+    draft Object Page (CSRF, Edit/Prepare/Activate, `SiblingEntity`, `Prepare` running the
+    validations, `SAP__Messages`, determinations and actions on a draft). 4 of the 13 cases pass, 9 wait for D81;
+    the filters of the Editing Status are marked `confirm`, to check with a HAR.
+  - **Cases from the SAP BTP trial**: the user records a HAR of the Fiori elements preview of a
+    fixture on their own SAP BTP trial (SAP backend, SAPUI5 under the license of SAP). The HAR stays
+    with them: `scripts/fe-har-to-cases.mjs`, run locally, writes the shape of its requests (method,
+    path, system query options, OData headers, batch structure, request bodies; keys as
+    placeholders) and the structure of its responses; never cookies, tokens, host names, message
+    texts nor response values. `source: "har"` with the SAP BTP release.
+  - **The real `sap.fe`**: only run by the user, locally, under their own license.
+    `rapt dev --fe-check` prints the URLs to point a Fiori elements application to (the service
+    path is the one of SAP BTP, `/sap/opu/odata4/…`); `rapt dev` serves no SAPUI5 and the project
+    publishes no result obtained with it.
+  - With a written agreement of SAP, a CI job running `sap.fe` (pinned version, test applications
+    written by the project) could be added; the agreement would go to LICENSES.md.
+- **Why**: the protocol is what an application of Fiori elements needs from the service; testing
+  it measures Open RAP Runtime without loading, distributing or publishing anything of SAPUI5.
+  The failing cases turn the gaps of the draft into tests, and order the work (phase 0 of
+  [ROADMAP.md](ROADMAP.md)); their rate feeds the conformance metrics (D100).
+- **Tests**: `fe-protocol.test.ts` (the case files are checked: fixtures, unique ids, `fails`
+  naming a decision, one request or batch per step); `scripts/lib/fe-har.test.mjs` (a synthetic
+  HAR: service root, multipart, placeholders, captures, nothing secret kept, the command line);
+  `dev.test.ts` (`--fe-check`: one event per session, URLs that answer).
