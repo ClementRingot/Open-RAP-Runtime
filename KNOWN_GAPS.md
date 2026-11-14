@@ -8,6 +8,19 @@ than to work around the transpiler. The overall feature coverage is tracked in
 Reference versions: `@abaplint/core` 2.120.98, `@abaplint/transpiler` 2.14.24,
 `@abaplint/runtime` 2.14.24.
 
+## Not planned
+
+What the project deliberately leaves out; the planned work is in
+[docs/ROADMAP.md](docs/ROADMAP.md).
+
+| Item | Reason |
+|---|---|
+| Classic ABAP: reports, module pools, dynpros, Adobe forms | Not part of ABAP Cloud: the target is the ABAP environment of SAP BTP, where they do not exist. |
+| Table functions (`define table function`, AMDP) | They run SQLScript, the proprietary language of SAP HANA; translating it to PostgreSQL would not be faithful. They will be refused with a positioned diagnostic. |
+| SAPUI5 (`sap.fe`, `sap.ovp`, `sap.ushell`) in the repository, the published packages or the CI | Licensed by SAP under the SAP Developer License. Compatibility with SAP Fiori elements is shown by OData protocol tests written by the project; running the real `sap.fe` against Open RAP Runtime is done by each user, locally, under their own license. Only a written agreement of SAP would change this. |
+| ABAP cleaner embedded in the tools | A Java tool: offered when the user has installed it, never shipped. |
+| Release check method by method | SAP releases objects (classes, interfaces, views), not single methods; the clean-room base only exposes the public signatures of the released classes (D24). |
+
 ## abaplint transpiler and runtime
 
 | Gap | Effect | Workaround | Tracking |
