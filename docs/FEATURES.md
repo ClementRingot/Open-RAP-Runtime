@@ -195,10 +195,10 @@ dependent ETag, remote APIs.
 | `$filter`: eq, ne, gt, ge, lt, le, and, or, not, in, parentheses, `null` | ✅ | Parameterized SQL queries. |
 | `$filter`: contains, startswith, endswith, tolower, toupper, trim, length, indexof, substring, concat, year…second, now | ✅ | `%` and `_` are literal characters. |
 | `$filter` on a to-one navigation (`_Travel/Status`) | ✅ | Scalar subquery. |
-| `$filter` with `any`/`all` on a collection | ❌ | 501 response. |
+| `$filter` with `any`/`all` on a collection | ✅ | `EXISTS` on the target view, with its access controls and the drafts of the user; members without the lambda variable are the instance of the query (D82). |
 | `$orderby`, `$top`, `$skip`, `$count` | ✅ | The keys complete the sorting: stable paging. |
 | `$select` | ✅ | Keys and ETag always read. |
-| One-level `$expand`, with nested `$select`, `$orderby`, `$filter`, `$top`, `$skip`, `$count` | ✅ | `$top`/`$skip` per parent (`row_number()`). Nested `$expand`: 501. |
+| `$expand`, nested to 5 levels, with nested `$select`, `$orderby`, `$filter`, `$top`, `$skip`, `$count` | ✅ | One query per navigation and per level for the whole page; `$top`/`$skip` per parent (`row_number()`) (D82). |
 | Simple `$search` | ✅ | ILIKE on the `@Search.defaultSearchElement` fields, each term required. |
 | `IEEE754Compatible=true` (Decimal and Int64 as strings) | ✅ | Exact JSON numbers otherwise, on read and on write. |
 | ETag (`@odata.etag`, `ETag` header), `If-Match` | ✅ | |

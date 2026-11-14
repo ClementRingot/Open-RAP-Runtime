@@ -86,7 +86,7 @@ What the project deliberately leaves out; the planned work is in
 | Custom entities: a `$filter` outside ranges (OR between elements, functions other than `contains`/`startswith`/`endswith`, comparison between elements) | `get_as_ranges` raises `cx_rap_query_filter_no_range`, as in SAP; `get_as_sql_string` stays available. Functions and expressions that cannot be translated: 501. |
 | Managed BO with unmanaged save on a custom entity (D43) | Specific to Open RAP Runtime (BDEF027 warning); no database lock: the LUWs of the application are serialized, the target API keeps its own checks. |
 | DCL access control: EML and ABAP SQL of the behavior pool | Not filtered (like `WITH PRIVILEGED ACCESS`); only the OData reads are (D35). As in RAP, changes go through the instance authorization, not through the DCL. |
-| DCL access control: other aspects (`bypass when`, user-defined aspects), paths of several associations, `$filter` on a navigation | A condition that is not evaluated grants no row (DCL002); the subquery of a `$filter` on `_Travel/…` reads the target without its DCL. |
+| DCL access control: other aspects (`bypass when`, user-defined aspects), paths of several associations | A condition that is not evaluated grants no row (DCL002). The subqueries of `$filter` on a navigation (`_Travel/…`, `any`/`all`) apply the DCL of their target (D82). |
 | `@AccessControl.authorizationCheck` | Informative: a role applies if it exists, whatever the value. |
 | Included structures (`.INCLUDE`) in the tables | Diagnostic DDIC003 |
 | Table entities (D55): `@ClientHandling.type` | Read, without effect: no client column (D9). |
@@ -108,7 +108,7 @@ What the project deliberately leaves out; the planned work is in
 | Gap | Status |
 |---|---|
 | `lt`/`le` comparisons on an initial date: in ABAP `00000000` is lower than any date; here the initial value is `NULL` and no comparison keeps it (OData semantics of `null`). | Accepted |
-| `$filter` with `any`/`all`, nested `$expand`, JSON batch, `$value` | 501 or 400 response |
+| JSON batch, `$value`; `any`/`all` on a path of several navigations or on a custom entity; nested `$expand` of a custom entity, deeper than 5 levels | 501 or 400 response |
 | `$apply` (D52): transformations other than `filter`, `groupby`, `aggregate` (`topcount`, `compute`, `concat`…), transformation after a grouping, `@Aggregation` annotation | 501 response; the aggregates are on the properties of the type, without hierarchy. |
 | Enumeration literals (D55): a single member (`Ns.Type'A'`, no `'A,B'` flags), `has` operator | The first member is taken; `has`: 400. |
 | `etag dependent by`: master with unmanaged save, or ETag field of the master that is not an administrative timestamp | The runtime does not change the ETag of the master when a dependent entity changes: `save_modified` or the application must do it (D32). |

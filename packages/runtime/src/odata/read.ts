@@ -11,6 +11,9 @@ import { badRequest, notImplemented, ODataError } from "./errors.js";
 import type { Cond, CustomQueries } from "./custom.js";
 import { currentReader, type AccessControls } from "./access.js";
 import { DEPENDENT_ETAG } from "./json.js";
+
+/** The deepest nesting of $expand (D82). */
+export const MAX_EXPAND_DEPTH = 5;
 import type { Key, ServiceRuntime, TypeInfo } from "./service.js";
 import type { AggregateItem, ApplyStep, ExpandItem, Expr, OrderItem, QueryOptions } from "./uri/ast.js";
 
@@ -135,6 +138,11 @@ export class ReadEngine {
   // expressions
 
   private column(info: TypeInfo, alias: string, path: string[]): Typed {
+    // a member of the variable of a lambda (D82): the instance of the collection
+    const scope = path.length > 1 ? this.lambdas.get(path[0] as string) : undefined;
+    if (scope !== undefined) {
+      return this.column(scope.info, scope.alias, path.slice(1));
+    }
     if (path.length === 1) {
       const name = path[0] as string;
       const { property, field } = this.service.property(info, name);
@@ -152,6 +160,11 @@ export class ReadEngine {
       const visible = this.draftVisibility(target, inner);
       if (visible !== undefined) {
         conditions.push(visible);
+      }
+      // the access controls of the target (D82)
+      const access = this.accessCondition(target, inner);
+      if (access !== undefined) {
+        conditions.push(access);
       }
       return {
         sql: sql`(SELECT ${sql.ref(`${inner}.${property.name}`)} FROM ${sql.table(target.view)} AS ${sql.id(inner)} WHERE ${sql.join(conditions, sql` AND `)} LIMIT 1)`,
@@ -317,7 +330,60 @@ export class ReadEngine {
           return expr.literal.value === true ? sql`TRUE` : sql`FALSE`;
         }
         throw badRequest("A literal is not a condition");
+      case "lambda":
+        return this.lambda(info, alias, expr);
     }
+  }
+
+  /**
+   * `nav/any(v: …)`, `nav/all(v: …)` (D82): EXISTS on the view of the collection, with the join of
+   * the navigation, the drafts of the user and the access controls of the target; members of `v`
+   * are the instance of the collection, the others the instance of the query ($it).
+   */
+  private lambda(info: TypeInfo, alias: string, expr: Extract<Expr, { kind: "lambda" }>): RawBuilder<unknown> {
+    if (expr.path.length !== 1) {
+      throw notImplemented(`${expr.op} on the path ${expr.path.join("/")}`);
+    }
+    const { navigation, target } = this.service.navigationTarget(info, expr.path[0] as string);
+    if (!navigation.collection) {
+      throw badRequest(`${navigation.name} is not a collection: ${expr.op} applies to collections`);
+    }
+    if (target.entity.kind === "custom") {
+      throw notImplemented(`${expr.op} on a custom entity`);
+    }
+    const inner = `${alias}_l${++this.lambdaCount}`;
+    const conditions = this.joinConditions(navigation, inner, alias);
+    const visible = this.draftVisibility(target, inner);
+    if (visible !== undefined) {
+      conditions.push(visible);
+    }
+    const access = this.accessCondition(target, inner);
+    if (access !== undefined) {
+      conditions.push(access);
+    }
+    let predicate: RawBuilder<unknown> | undefined;
+    if (expr.predicate !== undefined && expr.variable !== undefined) {
+      if (this.lambdas.has(expr.variable)) {
+        throw badRequest(`The lambda variable ${expr.variable} is already used`);
+      }
+      this.lambdas.set(expr.variable, { info: target, alias: inner });
+      try {
+        predicate = this.condition(info, alias, expr.predicate);
+      } finally {
+        this.lambdas.delete(expr.variable);
+      }
+    }
+    const from = sql`FROM ${sql.table(target.view)} AS ${sql.id(inner)}`;
+    if (expr.op === "any") {
+      if (predicate !== undefined) conditions.push(predicate);
+      return sql`EXISTS (SELECT 1 ${from} WHERE ${sql.join(conditions, sql` AND `)})`;
+    }
+    if (predicate === undefined) {
+      throw badRequest("all needs a lambda expression: all(v: …)");
+    }
+    // all: no instance where the predicate is not true (an empty collection is true)
+    conditions.push(sql`NOT COALESCE(${predicate}, FALSE)`);
+    return sql`NOT EXISTS (SELECT 1 ${from} WHERE ${sql.join(conditions, sql` AND `)})`;
   }
 
   /** `$search`: every term must be found in one of the search fields (case-insensitive). */
@@ -369,6 +435,10 @@ export class ReadEngine {
       };
     });
   }
+
+  /** The variables of the lambdas being translated (D82). */
+  private readonly lambdas = new Map<string, { info: TypeInfo; alias: string }>();
+  private lambdaCount = 0;
 
   /** Drafts (D54): the active instances, and the drafts in process by the user (or shared with them, D59). */
   private draftVisibility(info: TypeInfo, alias: string): RawBuilder<unknown> | undefined {
@@ -683,25 +753,34 @@ export class ReadEngine {
     return needed;
   }
 
-  /** $expand, one level: one query per navigation for all the rows of the page. */
-  private async expand(info: TypeInfo, rows: Row[], expand: ExpandItem[] | undefined): Promise<void> {
+  /**
+   * $expand: one query per navigation and per level for all the rows of the page, nested to
+   * MAX_EXPAND_DEPTH levels (D82).
+   */
+  private async expand(info: TypeInfo, rows: Row[], expand: ExpandItem[] | undefined, depth = 1): Promise<void> {
     if (expand === undefined || rows.length === 0) {
       return;
+    }
+    if (depth > MAX_EXPAND_DEPTH) {
+      throw badRequest(`$expand is nested deeper than ${MAX_EXPAND_DEPTH} levels`);
     }
     const items: ExpandItem[] = expand.flatMap((item): ExpandItem[] => (item.path[0] === "*" ? [...info.navigations.keys()].map((n) => ({ path: [n], options: {} })) : [item]));
     for (const item of items) {
       if (item.path.length !== 1) {
         throw notImplemented(`$expand of the path ${item.path.join("/")}`);
       }
-      if (item.options.expand !== undefined) {
-        throw notImplemented("Nested $expand (one level is supported)");
-      }
       const { navigation, target } = this.service.navigationTarget(info, item.path[0] as string);
+      const nested = item.options.expand;
       const alias = "t0";
       const targetFields = navigation.on.map((p) => p.target);
-      const needed = [...targetFields, ...(navigation.sibling === true ? ["IsActiveEntity"] : [])];
+      const needed = [...targetFields, ...(navigation.sibling === true ? ["IsActiveEntity"] : []), ...this.neededForExpand(target, nested)];
       const properties = this.selectedProperties(target, item.options, needed);
+      // the navigations expanded on the target, kept when the rows are stripped
+      const kept = (nested ?? []).flatMap((n) => (n.path[0] === "*" ? [...target.navigations.keys()] : [n.path[0] as string])).flatMap((n) => [n, `${n}@odata.count`]);
       if (target.entity.kind === "custom") {
+        if (nested !== undefined) {
+          throw notImplemented("Nested $expand of a custom entity");
+        }
         await this.customExpand(rows, target, navigation, item, properties, needed);
         continue;
       }
@@ -710,7 +789,7 @@ export class ReadEngine {
       const attach = (matches: Row[]): void => {
         for (const row of rows) {
           const mine = matches.filter((m) => navigation.on.every((p) => m[p.target] === row[p.source]) && (navigation.sibling !== true || m["IsActiveEntity"] !== row["IsActiveEntity"]));
-          row[navigation.name] = navigation.collection ? mine.map((m) => strip(m, properties, needed)) : mine[0] === undefined ? null : strip(mine[0], properties, needed);
+          row[navigation.name] = navigation.collection ? mine.map((m) => strip(m, properties, needed, kept)) : mine[0] === undefined ? null : strip(mine[0], properties, needed, kept);
         }
       };
       if (distinct.length === 0) {
@@ -733,6 +812,7 @@ export class ReadEngine {
       }
       const { rows: raw } = await query.execute(this.db());
       const matches = raw.map((r) => this.rowFrom(target, r, properties));
+      await this.expand(target, matches, nested, depth + 1);
       attach(matches);
       if (navigation.collection && item.options.count === true) {
         const countWhere = this.where(target, alias, { ...(item.options.filter === undefined ? {} : { filter: item.options.filter }) }, [inCondition]);
@@ -747,12 +827,17 @@ export class ReadEngine {
   }
 }
 
-/** Removes the fields read only to join, unless selected. */
-function strip(row: Row, properties: string[], needed: string[]): Row {
+/** Removes the fields read only to join, unless selected; keeps the nested expansions. */
+function strip(row: Row, properties: string[], needed: string[], kept: string[] = []): Row {
   void needed;
   const copy: Row = {};
   for (const p of properties) {
     copy[p] = row[p];
+  }
+  for (const k of kept) {
+    if (row[k] !== undefined) {
+      copy[k] = row[k];
+    }
   }
   if (row[DEPENDENT_ETAG] !== undefined) {
     copy[DEPENDENT_ETAG] = row[DEPENDENT_ETAG];

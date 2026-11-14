@@ -1901,3 +1901,29 @@ _The issues moved to the repository itself once public: see D74._
 - **Tests**: `draft.test.ts` (a message stored by Prepare with its target, none on an active
   instance, removed when the validation runs again without error, the annotation); the protocol
   cases `metadata-messages` and `state-messages-on-draft` pass: the 13 cases of D79 pass.
+
+## D82 — Nested `$expand`, `any` and `all`
+
+- **Context**: SAP Fiori elements expands several levels (a child and its own associations) and
+  filters on collections (`_Booking/any(b: …)`); the service answered 501. The subquery of a
+  `$filter` on a to-one navigation also read its target without its access controls (a known gap
+  of D35).
+- **Decision**:
+  - **`$expand`** is recursive: one query per navigation and per level for all the rows of the
+    page (no N+1), with the options of each level; at most 5 levels (400 beyond), not on a custom
+    entity.
+  - **`any` and `all`** on a collection navigation of the query: `EXISTS` (any) and
+    `NOT EXISTS (… AND NOT predicate)` (all, true for an empty collection) on the view of the
+    target, with the join of the navigation, the drafts of the user and the access controls of the
+    target; a member that starts with the variable is the instance of the collection, the others
+    the instance of the query (`$it`); `any()` without lambda.
+  - The subqueries of a `$filter` or `$orderby` on a to-one navigation apply the access controls of
+    their target too.
+  - JSON batch and `$value` stay for later (part of the provisional D83).
+- **Why**: the requests of Fiori elements on lists and Object Pages, translated to SQL without
+  reading the instances one by one, and the access controls applied wherever a target is read.
+- **Tests**: `odata-read.test.ts` (two and three levels, five levels and refusal beyond, `any`
+  with and without lambda, `all` on empty collections, `$it`, `not` and combination, refusal on a
+  to-one navigation). The access controls of the subqueries are not isolated by a test: in the
+  fixture, the DCL of the bookings follows their travel, so both sides of a navigation filter the
+  same rows.

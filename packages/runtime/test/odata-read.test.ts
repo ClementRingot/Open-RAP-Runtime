@@ -181,6 +181,28 @@ describe("Object Page", () => {
     expect(parent.json["TravelID"]).toBe("00000001");
   });
 
+  it("expands nested navigations, to five levels (D82)", async () => {
+    const booking = await get(`Booking(${B4})?$select=BookingID&$expand=_Travel($select=TravelID;$expand=_Booking($select=BookingID;$orderby=BookingID desc;$count=true))`);
+    expect(booking.status, booking.text).toBe(200);
+    expect(booking.json["_Travel"]).toMatchObject({ TravelID: "00000002", "_Booking@odata.count": 1, _Booking: [{ BookingID: "0001" }] });
+    const travels = await get(`Travel?$orderby=TravelID&$top=1&$select=TravelID&$expand=_Booking($select=BookingID;$orderby=BookingID;$top=2;$expand=_Travel($select=TravelID))`);
+    expect(values(travels)[0]).toMatchObject({ TravelID: "00000001", _Booking: [{ BookingID: "0001", _Travel: { TravelID: "00000001" } }, { BookingID: "0002", _Travel: { TravelID: "00000001" } }] });
+    const five = "_Booking($expand=_Travel($expand=_Booking($expand=_Travel($expand=_Booking))))";
+    expect((await get(`Travel(${T2})?$expand=${five}`)).status).toBe(200);
+    expect((await get(`Travel(${T2})?$expand=_Booking($expand=_Travel($expand=${five}))`)).status).toBe(400);
+  });
+
+  it("filters with any and all on a collection navigation (D82)", async () => {
+    expect(ids(await get("Travel?$filter=_Booking/any(b:b/FlightPrice gt 700)&$orderby=TravelID&$select=TravelID"))).toEqual(["00000001"]);
+    expect(ids(await get("Travel?$filter=_Booking/any()&$orderby=TravelID&$select=TravelID"))).toEqual(["00000001", "00000002"]);
+    // all: true for an empty collection
+    expect(ids(await get("Travel?$filter=_Booking/all(b:b/CarrierID eq 'LH')&$orderby=TravelID&$select=TravelID"))).toEqual(["00000002", "00000003"]);
+    // a member without the variable is the travel ($it); not and lambdas combine
+    expect(ids(await get("Travel?$filter=_Booking/any(b:b/CurrencyCode ne CurrencyCode)&$select=TravelID"))).toEqual([]);
+    expect(ids(await get("Travel?$filter=not _Booking/any(b:b/CarrierID eq 'AF') and TravelID ne '00000003'&$orderby=TravelID&$select=TravelID"))).toEqual(["00000002"]);
+    expect((await get("Booking?$filter=_Travel/any(t:t/TravelID eq '1')")).status).toBe(400);
+  });
+
   it("filters on a to-one navigation path", async () => {
     const r = await get(`Booking?$filter=_Travel/OverallStatus eq 'A'&$select=BookingID,BookingUUID`);
     expect(values(r).map((b) => b["BookingUUID"])).toEqual([B4]);

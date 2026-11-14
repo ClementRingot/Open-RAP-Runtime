@@ -51,7 +51,7 @@ The sections below use the provisional numbers, unless they say "final".
 | D80 | — | Generation of Fiori elements applications, next to the OpenUI5 UI | 2 |
 | D81 | D81 | Complete draft protocol (a: `SiblingEntity`; b: logic of the BO on the draft; c: state messages) | 1 |
 | D82 | — | Applied side effects and `determine action` | 1 |
-| D83 | — | OData complements: (a) nested `$expand`, `any`/`all`, JSON batch, `$value`; (b) extended `$apply` | 1, 2 |
+| D83 | D82 (part of a) | OData complements: (a) nested `$expand` and `any`/`all` (final D82), JSON batch, `$value`; (b) extended `$apply` | 1, 2 |
 | D84 | — | ALP and OVP driven by CDS annotations | 2 |
 | D85 | — | OData V2 at the Gateway URL | 7 |
 | D86 | — | CDS: joins, WHERE, paths, parameters, unions, hierarchies, `$session`, aggregates | 4 |

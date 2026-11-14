@@ -8,7 +8,9 @@ export type Expr =
   | { kind: "binary"; op: "eq" | "ne" | "gt" | "ge" | "lt" | "le" | "and" | "or"; left: Expr; right: Expr }
   | { kind: "not"; operand: Expr }
   | { kind: "in"; operand: Expr; list: Expr[] }
-  | { kind: "call"; name: string; args: Expr[] };
+  | { kind: "call"; name: string; args: Expr[] }
+  /** `_Booking/any(b: b/FlightPrice gt 100)`, `_Booking/all(…)` (D82). */
+  | { kind: "lambda"; op: "any" | "all"; path: string[]; variable?: string; predicate?: Expr };
 
 export interface OrderItem {
   path: string[];

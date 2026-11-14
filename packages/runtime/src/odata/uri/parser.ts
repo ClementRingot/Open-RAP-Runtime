@@ -203,7 +203,23 @@ class ExpressionParser extends EmbeddedActionsParser {
       {
         ALT: () => {
           const path = this.SUBRULE(this.memberPath);
-          return this.ACTION(() => ({ kind: "member", path }) as Expr);
+          let lambda: Expr | undefined;
+          // a lambda on a collection navigation (D82): path/any(v: predicate), path/all(v: predicate)
+          this.OPTION(() => {
+            this.CONSUME(Slash);
+            const op = img(this.CONSUME2(Identifier)).toLowerCase() as "any" | "all";
+            this.CONSUME2(LParen);
+            let variable: string | undefined;
+            let predicate: Expr | undefined;
+            this.OPTION1(() => {
+              variable = img(this.CONSUME3(Identifier));
+              this.CONSUME(Colon);
+              predicate = this.SUBRULE2(this.orExpr);
+            });
+            this.CONSUME2(RParen);
+            lambda = this.ACTION(() => ({ kind: "lambda", op, path, ...(variable === undefined ? {} : { variable }), ...(predicate === undefined ? {} : { predicate }) }) as Expr);
+          });
+          return this.ACTION(() => lambda ?? ({ kind: "member", path } as Expr));
         },
       },
     ]}),
@@ -212,9 +228,13 @@ class ExpressionParser extends EmbeddedActionsParser {
   public memberPath = this.RULE("memberPath", (): string[] => {
     const path: string[] = [];
     this.OR([{ ALT: () => path.push(img(this.CONSUME(Identifier))) }, { ALT: () => path.push(img(this.CONSUME(DollarName))) }]);
-    this.MANY(() => {
-      this.CONSUME(Slash);
-      this.OR1([{ ALT: () => path.push(img(this.CONSUME1(Identifier))) }, { ALT: () => path.push(img(this.CONSUME1(DollarName))) }]);
+    this.MANY({
+      // not the any/all of a lambda (D82)
+      GATE: () => !(this.LA(2).tokenType === Identifier && /^(any|all)$/i.test(this.LA(2).image) && this.LA(3).tokenType === LParen),
+      DEF: () => {
+        this.CONSUME(Slash);
+        this.OR1([{ ALT: () => path.push(img(this.CONSUME1(Identifier))) }, { ALT: () => path.push(img(this.CONSUME1(DollarName))) }]);
+      },
     });
     return path;
   });
