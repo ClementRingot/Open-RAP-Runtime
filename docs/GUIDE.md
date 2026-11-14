@@ -380,19 +380,28 @@ Open RAP Runtime generates an OpenUI5 UI and does not load SAPUI5, which is lice
 2. Run your Fiori elements application with your SAP tools; the results are yours: the project
    publishes none.
 
-To turn what Fiori elements sends into tests of the project (contributors):
+To turn what Fiori elements sends into tests of the project (contributors, D79, D83):
 
-1. Import a fixture on your SAP BTP trial (`rapt abapgit fixtures/travel`, then abapGit), publish
-   its service binding, open the *Preview* of Fiori elements and record the network
-   (DevTools → *Save all as HAR*), one scenario per HAR: create, edit, prepare, activate, an
-   action, a value help…
-2. `node scripts/fe-har-to-cases.mjs trial.har --scenario draft-object-page --floorplan objectPage --release <release>`
-   writes `packages/runtime/test/fe-protocol/cases/draft-object-page-har.json`: the shape of the
-   requests and the structure of the responses only, with the keys as placeholders. Map the keys
-   of the instances that already existed on SAP to seeded keys of the fixture (`--map <guid>=T1`);
-   review the request bodies, kept as recorded. Keep the HAR itself out of the repository.
-3. `npx vitest run packages/runtime/test/fe-protocol`; mark a case that fails with the decision
-   that will fix it (`"fails": "D81"`).
+1. The SAP BTP ABAP trial is shared: every object gets a suffix of your own.
+   `rapt abapgit <fixture> --suffix CR1 --out ../trial-copy` writes a renamed copy (`ZRT_TRAVEL`
+   → `ZRT_TRAVELCR1`, every reference included; a name too long for its type keeps its start);
+   push it to a Git repository of yours, link it to a package of yours with abapGit for ADT,
+   pull, activate, publish the service binding and copy the URL of its Fiori elements *Preview*.
+2. `node scripts/fe-record-trial.mjs --url <preview URL> --release <release>` opens Chromium:
+   sign in, then play each scenario the terminal describes (list and Editing Status, create,
+   edit, a refused activation, discard, an action, a value help, side effects, a child) and press
+   Enter. Each scenario is recorded in its own HAR, limited to the OData service (no SAPUI5
+   resource is written), and turned at once into
+   `packages/runtime/test/fe-protocol/cases/trial-<scenario>-har.json`: the shape of the requests
+   and the structure of the responses, keys and namespace as placeholders; the HAR is then
+   deleted. The session of the browser stays in `~/.rapt/`. `--scenarios create,edit` records some
+   of them only.
+3. Review the request bodies, kept as recorded, then `npx vitest run packages/runtime/test/fe-protocol`;
+   mark a case that fails with the decision that will fix it (`"fails": "D81"`).
+
+A HAR recorded by hand (DevTools → *Save all as HAR*) is turned into cases by
+`node scripts/fe-har-to-cases.mjs trial.har --scenario <name> --floorplan objectPage --release <release>`
+(`--map <guid>=T1` for an instance that existed on SAP before).
 
 ## 8. AI agents: MCP server
 
@@ -508,7 +517,7 @@ Dockerfile, docker-compose.yml, keycloak/, manifest.yml   container, PostgreSQL,
 | `rapt new <src> <Entity> [--prefix ZRT] [--description …] [--binding-type webapi]` | complete BO, added to the launchpad of the workspace; with `--binding-type webapi`, a Web API (no UI, not in the launchpad) |
 | `rapt generate <src> <type> <name> [--from X] [--for Y] [--expose A,B] [--root]` | one object |
 | `rapt floorplan <src> [<EntitySet> <floorplan>]` | floorplan of a root entity set; the application is added to the launchpad |
-| `rapt abapgit <src> [--check]` | missing abapGit XML files |
+| `rapt abapgit <src> [--check]` | missing abapGit XML files; `--suffix XYZ --out <dir>`: a renamed copy for a shared SAP system (§7) |
 | `rapt mcp <src>` | MCP tools (`rapt/mcp.json`) |
 | `rapt launchpad <launchpad.json> --out <dir>` | launchpad, and the applications of their sources (`source`) |
 | `rapt launchpad dev <launchpad.json> [--port 8090]` | development loop of all the applications of the launchpad, behind it |

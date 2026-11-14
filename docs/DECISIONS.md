@@ -1927,3 +1927,42 @@ _The issues moved to the repository itself once public: see D74._
   to-one navigation). The access controls of the subqueries are not isolated by a test: in the
   fixture, the DCL of the bookings follows their travel, so both sides of a navigation filter the
   same rows.
+
+## D83 — Recording the Fiori elements protocol on the SAP BTP trial: guided, on a renamed copy
+
+- **Context**: the cases of D79 were to come from HAR files recorded by hand in the DevTools, on the
+  SAP BTP ABAP trial. Before building on it, the option was weighed against the others (a
+  specification only, replaying a `.http` file, a browser driving SAP Fiori elements alone, a
+  recording guided by a script). Two facts weigh: the trial is a system shared by its users, whose
+  objects need a suffix of their own (the SAP tutorials name them `…_###`), and a trial account
+  lasts 30 days by default, so the recording is done again with each account and each release. A
+  raw HAR also holds cookies, tokens and the code of SAPUI5.
+- **Decision**: keep the trial as the oracle (what Fiori elements sends and what SAP answers), with
+  a recording guided by a script, on a copy renamed for the shared system.
+  - **`rapt abapgit <src> --suffix XYZ --out <dir>`** writes a copy of the abapGit files whose
+    objects (Z, Y) all end with the suffix, in their file names and in every reference (CDS, BDEF,
+    ABAP, XML), in the case of each reference. A name too long for its type (16 characters for a
+    table, 20 for a message class, 10 for an authorization object, 30 otherwise) keeps its start;
+    a collision is an error. The project is not changed.
+  - **`scripts/fe-record-trial.mjs`**, run by the user on their machine (Playwright, Apache-2.0,
+    their own browser session kept in `~/.rapt/`): it opens the preview, the user signs in, then
+    plays each scenario the terminal describes and presses Enter. Each scenario is recorded in its
+    own HAR, limited to `/sap/opu/odata4/` while recording (no SAPUI5 resource is written), turned
+    at once into a case file (`trial-<scenario>-har.json`) and deleted. The user drives the UI: the
+    script never drives SAP Fiori elements itself (fragile, and closer to what its license
+    restricts).
+  - The namespace of the service, which changes with the suffix, becomes the placeholder `{{NS}}`
+    of the cases.
+  - `scripts/fe-har-to-cases.mjs` stays for a HAR recorded by hand; replaying the known requests of
+    a `.http` file against the trial is left to the round trip (D99).
+- **Why**: the same scenarios, recorded the same way at each release, with as little sensitive data
+  on the disk as possible; the cases keep the shape of standard OData requests, re-expressed on
+  the fixtures of the project.
+- **Not yet possible**: the scenarios need the draft variant of the fixture on the trial, which
+  only exists in the tests (its draft tables are not DDIC objects), and the authorization object
+  `ZAO_TRAVL` of the fixture names the field `ZAGENCY`, which the repository does not define: both
+  are for the round trip (D99).
+- **Tests**: `rename.test.ts` (names, lengths, case, collisions, a copy that compiles, the project
+  unchanged); `fe-record.test.mjs` (a headless browser on a local page that plays the preview: one
+  case file, the service only, no cookie nor resource, the HAR deleted); `fe-har.test.mjs` (the
+  namespace placeholder).

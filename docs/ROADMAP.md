@@ -67,6 +67,7 @@ The sections below use the provisional numbers, unless they say "final".
 | D96 | — | ABAP Unit: `rapt test` and VS Code | 3 |
 | D97 | — | ABAP debugging in VS Code | 6 |
 | D98 | — | Data preview, SQL trace, runtime errors | 6 |
+| — | D83 | Guided recording of the Fiori elements protocol on the SAP BTP trial, renamed copy for a shared system | 0 |
 | D99 | — | Round-trip protocol to an SAP BTP ABAP trial | 0 |
 | D100 | — | Conformance metrics in the CI | 0 |
 | D101 | — | ATC-like quality checks and clean-up | 6 |

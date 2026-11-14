@@ -212,8 +212,14 @@ function replaceDeep(value, keys) {
   return value;
 }
 
+/**
+ * The namespace of the service (`com.sap.gateway.srvd.<definition>.v0001`), which changes with the
+ * suffix of the objects on a shared system (D83): the placeholder `{{NS}}` of the cases.
+ */
+const NAMESPACE = /\bcom\.sap\.gateway\.srvd\.[a-z0-9_]+\.v\d{4}\b/gi;
+
 function requestOf(method, url, headers, bodyText, keys, isBatchPart, contentId) {
-  const request = { method: method.toUpperCase(), url: keys.replace(url), headers: requestHeaders(headers, isBatchPart) };
+  const request = { method: method.toUpperCase(), url: keys.replace(url).replace(NAMESPACE, "{{NS}}"), headers: requestHeaders(headers, isBatchPart) };
   if (bodyText !== undefined && bodyText !== "") {
     const json = parseJson(bodyText);
     request.body = json === undefined ? keys.replace(bodyText) : replaceDeep(json, keys);

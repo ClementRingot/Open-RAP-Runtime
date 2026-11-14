@@ -113,7 +113,9 @@ describe("SAP Fiori elements protocol cases from a HAR (D79)", () => {
     expect(create.expect).toEqual({ status: 201, properties: ["TravelUUID", "IsActiveEntity", "HasActiveEntity"], annotations: ["@odata.etag"], headers: ["location"] });
     expect(change.request).toEqual({ method: "PATCH", url: "Travel(TravelUUID={{k1}},IsActiveEntity=false)", headers: { "Content-Type": "application/json", "If-Match": "*" }, body: { Description: "Typed by the user" } });
     expect(prepare.expect).toMatchObject({ status: 200, headers: ["sap-messages"], messages: [{ numericSeverity: 4, target: "BeginDate" }] });
-    expect(edit.request.url).toBe("Travel(TravelUUID={{T1}},IsActiveEntity=true)/com.sap.gateway.srvd.zrt_ui_travel.v0001.Edit");
+    // the namespace of the service changes with the suffix of the objects (D83)
+    expect(edit.request.url).toBe("Travel(TravelUUID={{T1}},IsActiveEntity=true)/{{NS}}.Edit");
+    expect(prepare.request.url).toBe("Travel(TravelUUID={{k1}},IsActiveEntity=false)/{{NS}}.Prepare");
     const text = JSON.stringify(file);
     for (const secret of ["SAP_SESSIONID", "c2VjcmV0", "sap-client", "abc123", "trial-example", "A text of the system", "Some private text", "sap-ui-core", "edmx"]) {
       expect(text, secret).not.toContain(secret);

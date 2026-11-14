@@ -215,7 +215,7 @@ dependent ETag, remote APIs.
 | `$apply`: `filter`, `groupby`, `aggregate` (`sum`, `min`, `max`, `average`, `countdistinct`, `$count`) | ✅ | With the DCL of the user; other transformations: 501 (D52). |
 | Enumeration types (`EnumType`): JSON by member name, literals `Ns.Type'M'` | ✅ | `enhanced` mode, CDS enumerated types (D55). |
 | JSON batch, `$value`, single properties | ❌ | Not in the MVP. |
-| SAP Fiori elements protocol cases (draft List Report and Object Page) | 🟡 | Requests of Fiori elements replayed without SAPUI5 (`fe-protocol.test.ts`): the 13 cases pass (D81); cases from HARs of an SAP BTP trial with `scripts/fe-har-to-cases.mjs`; `rapt dev --fe-check` (D79). |
+| SAP Fiori elements protocol cases (draft List Report and Object Page) | 🟡 | Requests of Fiori elements replayed without SAPUI5 (`fe-protocol.test.ts`): the 13 cases pass (D81); cases recorded on an SAP BTP trial by `scripts/fe-record-trial.mjs`, on a copy renamed by `rapt abapgit --suffix` (D83), or from a HAR with `scripts/fe-har-to-cases.mjs`; `rapt dev --fe-check` (D79). |
 
 ## Generated UI (OpenUI5)
 

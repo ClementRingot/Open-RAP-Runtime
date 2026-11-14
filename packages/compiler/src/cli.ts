@@ -1,10 +1,11 @@
 #!/usr/bin/env node
 /** rapt: command line of the RAP → Node.js compiler. */
 
-import { mkdirSync, realpathSync, writeFileSync } from "node:fs";
+import { copyFileSync, existsSync, mkdirSync, realpathSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { generateAbapGitFiles, type AbapGitResult } from "./authoring/abapgit.js";
+import { renameProject } from "./authoring/rename.js";
 import { generateObject, OBJECT_KINDS } from "./authoring/generate.js";
 import { FLOORPLAN_CATALOG, OBJECT_CATALOG } from "./authoring/catalog.js";
 import { floorplans } from "./authoring/floorplan.js";
@@ -42,7 +43,9 @@ Usage:
                                                  and add the application to the launchpad of the workspace;
                                                  --binding-type webapi: an API for other systems, without UI,
                                                  not in the launchpad
-  rapt abapgit <src> [--check]                   write the abapGit XML files the sources lack
+  rapt abapgit <src> [--check]                   write the abapGit XML files the sources lack;
+                                                 --suffix XYZ --out <dir>: a copy whose objects all end with
+                                                 XYZ, for a shared SAP system such as the SAP BTP trial (D83)
   rapt mcp   <src>                               write rapt/mcp.json: the MCP tools of the service, to describe;
                                                  the application then serves them at /mcp
   rapt generate <src> <kind> <name> [--from X]   write one new object (table, view, projection, behavior,
@@ -128,6 +131,7 @@ export async function main(argv: string[]): Promise<number> {
         launchpad: { type: "string" },
         "no-launchpad": { type: "boolean" },
         "warnings-as-errors": { type: "boolean" },
+        suffix: { type: "string" },
         help: { type: "boolean", short: "h" },
       },
     });
@@ -174,6 +178,9 @@ export async function main(argv: string[]): Promise<number> {
     return generateCommand(source, parsed.positionals[2], parsed.positionals[3], parsed.values, parsed.values["json"] === true);
   }
   if (command === "abapgit") {
+    if (typeof parsed.values["suffix"] === "string") {
+      return renamedCopyCommand(source, parsed.values["suffix"], parsed.values["out"], parsed.values["json"] === true);
+    }
     return abapGitCommand(source, parsed.values["check"] === true, parsed.values["json"] === true);
   }
   if (command === "launchpad") {
@@ -256,6 +263,56 @@ export async function main(argv: string[]): Promise<number> {
       process.stderr.write(`unknown command ${command}\n\n${USAGE}`);
       return 2;
   }
+}
+
+/** `rapt abapgit <src> --suffix XYZ --out <dir>` (D83): the abapGit copy of the project, every object renamed with the suffix. */
+function renamedCopyCommand(source: string, suffix: string, out: unknown, json: boolean): number {
+  if (typeof out !== "string") {
+    process.stderr.write("rapt abapgit --suffix needs --out <dir>: the renamed copy is written there, the project is not changed\n");
+    return 2;
+  }
+  let project: ReturnType<typeof loadProject>;
+  let missing: string[];
+  try {
+    project = loadProject(source);
+    missing = generateAbapGitFiles(source, { check: true }).written;
+  } catch (error) {
+    process.stderr.write(`${(error as Error).message}\n`);
+    return 2;
+  }
+  const result = renameProject(project, suffix);
+  if (missing.length > 0) {
+    result.errors.push(`the abapGit files are not complete (${missing.join(", ")}): run rapt abapgit ${source} first`);
+  }
+  if (result.errors.length === 0) {
+    const root = path.resolve(out);
+    for (const file of result.files) {
+      mkdirSync(path.dirname(path.join(root, file.path)), { recursive: true });
+      writeFileSync(path.join(root, file.path), file.content);
+    }
+    for (const extra of [".abapgit.xml", "src/package.devc.xml"]) {
+      const from = path.join(project.root, extra);
+      if (existsSync(from) && !result.files.some((f) => f.path === extra)) {
+        mkdirSync(path.dirname(path.join(root, extra)), { recursive: true });
+        copyFileSync(from, path.join(root, extra));
+      }
+    }
+  }
+  if (json) {
+    process.stdout.write(`${JSON.stringify({ command: "abapgit", ok: result.errors.length === 0, root: path.resolve(source), suffix, out: path.resolve(out), renamed: result.renamed, files: result.files.length, errors: result.errors })}\n`);
+    return result.errors.length === 0 ? 0 : 1;
+  }
+  for (const error of result.errors) {
+    process.stderr.write(`error: ${error}\n`);
+  }
+  if (result.errors.length > 0) {
+    return 1;
+  }
+  for (const r of result.renamed) {
+    process.stdout.write(`${r.from} → ${r.to}\n`);
+  }
+  process.stdout.write(`${result.files.length} files written to ${path.resolve(out)}\n`);
+  return 0;
 }
 
 function abapGitCommand(source: string, check: boolean, json: boolean): number {
