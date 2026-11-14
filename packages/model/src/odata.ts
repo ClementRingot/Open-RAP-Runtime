@@ -76,6 +76,8 @@ export interface ODataEntityType {
   operationControl: string[];
   /** Fields under instance feature control. */
   fieldControl: string[];
+  /** The state messages of a draft (D81): the property SAP__Messages, annotated Common.Messages. */
+  stateMessages?: true;
 }
 
 export interface ODataEntitySet {
@@ -350,6 +352,8 @@ export function buildODataService(model: Model): ODataService {
       operationControl: [],
       // a Web API (D60) does not expose the feature control
       fieldControl: model.service.webApi === true ? [] : properties.filter((p) => p.dynamic).map((p) => p.name),
+      // the state messages of a draft (D81), in a service with a UI
+      ...(entity.draft !== undefined && !("admin" in entity.draft) && model.service.webApi !== true ? { stateMessages: true as const } : {}),
     };
     const etag = behavior.base?.etag;
     const etagAllowed = behavior.projection === undefined || behavior.projection.useEtag;
@@ -550,5 +554,8 @@ export function fieldControlTypeName(entityType: ODataEntityType): string {
 
 /** Virtual properties of instance feature control. */
 export const ENTITY_CONTROL = "__EntityControl";
+/** The state messages of an instance (D81), a collection of the complex type SAP__Message. */
+export const STATE_MESSAGES = "SAP__Messages";
+export const STATE_MESSAGE_TYPE = "SAP__Message";
 export const OPERATION_CONTROL = "__OperationControl";
 export const FIELD_CONTROL = "__FieldControl";

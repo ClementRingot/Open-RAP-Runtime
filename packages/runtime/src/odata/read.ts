@@ -4,7 +4,7 @@
  */
 
 import { sql, type RawBuilder } from "kysely";
-import type { AbapType, EdmType, FieldModel, ODataNavigation } from "@open-rap/model";
+import { STATE_MESSAGES, type AbapType, type EdmType, type FieldModel, type ODataNavigation } from "@open-rap/model";
 import type { Database } from "../db/database.js";
 import { fromSql, literalToCanonical, toSql, type CanonicalValue, type UrlLiteral } from "../values.js";
 import { badRequest, notImplemented, ODataError } from "./errors.js";
@@ -429,8 +429,8 @@ export class ReadEngine {
       selected = [];
       for (const path of options.select) {
         const name = path[0] as string;
-        if (name.startsWith("__")) {
-          continue; // instance feature control (also its members: __OperationControl/accept), computed by the RAP runtime
+        if (name.startsWith("__") || name === STATE_MESSAGES) {
+          continue; // instance feature control (also its members: __OperationControl/accept) and state messages (D81), computed by the RAP runtime
         }
         if (path.length > 1 || name.includes(".")) {
           if (name.includes(".")) {

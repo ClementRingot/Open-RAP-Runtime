@@ -11,7 +11,7 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { createApp } from "../src/app.js";
 import { createDatabase, PGLITE_PARSERS, type Database } from "../src/db/database.js";
 import { RapRuntime } from "../src/rap/runtime.js";
-import { B2, DRAFT_CHANGES, generatedVariant, SEED, SERVICE, T1, type GeneratedFixture } from "./helpers.js";
+import { B2, DRAFT_CHANGES, generatedVariant, SEED, SERVICE, T1, T2, type GeneratedFixture } from "./helpers.js";
 
 const NS = "com.sap.gateway.srvd.zrt_ui_travel.v0001";
 let fixture: GeneratedFixture;
@@ -151,6 +151,14 @@ describe("draft", () => {
     const prepared = await alice.inject({ method: "POST", url: `${SERVICE}${travel(uuid, false)}/${NS}.Prepare`, headers: HEADERS, payload: "{}" });
     expect(prepared.statusCode).toBe(200);
     expect(JSON.parse(String(prepared.headers["sap-messages"]))).toEqual([expect.objectContaining({ message: "Begin date and end date are required", numericSeverity: 4 })]);
+    // the state messages of the draft (SAP__Messages), replaced when the validation runs again
+    expect(fixture.metadata).toContain('<Annotation Term="Common.Messages" Path="SAP__Messages"/>');
+    const stated = (await call(alice, "GET", `${travel(uuid, false)}?$select=TravelUUID,SAP__Messages`)).body["SAP__Messages"];
+    expect(stated).toEqual([expect.objectContaining({ message: "Begin date and end date are required", numericSeverity: 4, target: "BeginDate", transition: false })]);
+    expect((await call(alice, "GET", `${travel(T2, true)}?$select=SAP__Messages`)).body["SAP__Messages"]).toEqual([]);
+    expect((await call(alice, "PATCH", travel(uuid, false), { BeginDate: "2027-04-01", EndDate: "2027-04-05" })).status).toBe(200);
+    expect((await alice.inject({ method: "POST", url: `${SERVICE}${travel(uuid, false)}/${NS}.Prepare`, headers: HEADERS, payload: "{}" })).statusCode).toBe(200);
+    expect((await call(alice, "GET", `${travel(uuid, false)}?$select=SAP__Messages`)).body["SAP__Messages"]).toEqual([]);
     // an action on the draft changes the draft, not the active instances
     expect((await call(alice, "POST", `${travel(uuid, false)}/${NS}.acceptTravel`, {})).body).toMatchObject({ IsActiveEntity: false, OverallStatus: "A" });
     expect(values(await call(alice, "GET", "Travel?$filter=IsActiveEntity eq true and TravelID eq '00000110'"))).toEqual([]);

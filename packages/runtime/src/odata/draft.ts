@@ -26,7 +26,7 @@ import { keyOf, keyString, type BoAssociation, type BoEntity } from "../rap/bo.j
 import { operationId, type ActionResult, type Transaction } from "../rap/transaction.js";
 import { ODATA_MODE, Responses, type AccessMode, type Row } from "../rap/types.js";
 import { fromSql, initialValue, isInitial, toSql, type CanonicalValue } from "../values.js";
-import { badRequest, methodNotAllowed, notFound, notImplemented, ODataError } from "./errors.js";
+import { badRequest, methodNotAllowed, notFound, notImplemented, NUMERIC_SEVERITY, ODataError } from "./errors.js";
 import type { HandlerContext, ODataRequest, Target } from "./handler.js";
 import { etagValue } from "./json.js";
 import type { Key } from "./service.js";
@@ -124,6 +124,7 @@ export class DraftRuntime {
       }
     }
     await sql`DELETE FROM ${sql.table(this.table(bo))} WHERE ${this.where(bo, row)}`.execute(db);
+    await sql`DELETE FROM "rapt_draft_message" WHERE "DraftUUID" = ${row.DraftUUID} AND "Entity" = ${bo.entity.name} AND "Instance" = ${keyString(bo, keyOf(bo, row))}`.execute(db);
   }
 
   private async removeDraft(db: Kysely<unknown>, root: BoEntity, row: Row & { DraftUUID: string }): Promise<void> {
@@ -627,7 +628,59 @@ export class DraftRuntime {
         }
       }
     }
-    return this.withLogic(tx, root, (shadow) => shadow.prepare(items), { writeOnFailure: true });
+    const ran: Array<{ bo: BoEntity; validation: string; keys: Row[] }> = [];
+    const responses = await this.withLogic(tx, root, (shadow) => shadow.prepare(items, ran), { writeOnFailure: true });
+    await this.storeStateMessages(tx.db, row.DraftUUID, ran, responses);
+    return responses;
+  }
+
+  /**
+   * The state messages of a draft (D81): the messages of the validations that ran replace their
+   * previous messages on the same instances; a state area without message removes its messages.
+   */
+  private async storeStateMessages(db: Kysely<unknown>, draftUuid: string, ran: Array<{ bo: BoEntity; validation: string; keys: Row[] }>, responses: Responses): Promise<void> {
+    const instance = (bo: BoEntity, key: Row): string => keyString(bo, keyOf(bo, key));
+    for (const run of ran) {
+      for (const key of run.keys) {
+        await sql`DELETE FROM "rapt_draft_message" WHERE "DraftUUID" = ${draftUuid} AND "Entity" = ${run.bo.entity.name} AND "Instance" = ${instance(run.bo, key)} AND "Validation" = ${run.validation}`.execute(db);
+      }
+    }
+    for (const invalid of responses.invalidated) {
+      const bo = this.writes.rap.bo.find(invalid.entity);
+      if (bo !== undefined) {
+        await sql`DELETE FROM "rapt_draft_message" WHERE "DraftUUID" = ${draftUuid} AND "Entity" = ${bo.entity.name} AND "Instance" = ${instance(bo, invalid.key)} AND "StateArea" = ${invalid.stateArea}`.execute(db);
+      }
+    }
+    let position = 0;
+    for (const entry of responses.reported) {
+      const bo = entry.entity === undefined ? undefined : this.writes.rap.bo.find(entry.entity);
+      const set = entry.entity === undefined ? undefined : this.writes.setOfBase(entry.entity);
+      if (entry.source === undefined || entry.key === undefined || bo === undefined || set === undefined) {
+        continue;
+      }
+      const [message] = this.writes.messages([entry], { set, key: entry.key }, new Set(["S", "I", "W", "E", " "]));
+      if (message === undefined) {
+        continue;
+      }
+      const value = { code: message.code, message: message.message, target: message.target ?? "", additionalTargets: [], transition: false, numericSeverity: NUMERIC_SEVERITY[message.severity], longtextUrl: null };
+      await sql`INSERT INTO "rapt_draft_message" ("DraftUUID", "Entity", "Instance", "Validation", "StateArea", "Position", "Message") VALUES (${draftUuid}, ${bo.entity.name}, ${instance(bo, entry.key)}, ${entry.source}, ${entry.stateArea ?? ""}, ${position++}, ${JSON.stringify(value)}::jsonb)`.execute(db);
+    }
+  }
+
+  /** The state messages of draft instances (D81), by instance (keyString of the base key). */
+  public async stateMessages(db: Kysely<unknown>, bo: BoEntity, keys: Row[]): Promise<Map<string, unknown[]>> {
+    const result = new Map<string, unknown[]>();
+    if (keys.length === 0) {
+      return result;
+    }
+    const instances = keys.map((k) => keyString(bo, keyOf(bo, k)));
+    const { rows } = await sql<{ Instance: string; Message: unknown }>`SELECT "Instance", "Message" FROM "rapt_draft_message" WHERE "Entity" = ${bo.entity.name} AND "Instance" IN (${sql.join(instances)}) ORDER BY "Position"`.execute(db);
+    for (const row of rows) {
+      const list = result.get(row.Instance) ?? [];
+      list.push(typeof row.Message === "string" ? (JSON.parse(row.Message) as unknown) : row.Message);
+      result.set(row.Instance, list);
+    }
+    return result;
   }
 
   // -------------------------------------------------------------------------------------------

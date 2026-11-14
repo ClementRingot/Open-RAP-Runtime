@@ -49,7 +49,7 @@ The sections below use the provisional numbers, unless they say "final".
 |---|---|---|---|
 | D79 | D79 | Fiori elements OData protocol conformance, without SAPUI5 | 0 |
 | D80 | — | Generation of Fiori elements applications, next to the OpenUI5 UI | 2 |
-| D81 | D81 | Complete draft protocol (a: `SiblingEntity`; b: logic of the BO on the draft) | 1 |
+| D81 | D81 | Complete draft protocol (a: `SiblingEntity`; b: logic of the BO on the draft; c: state messages) | 1 |
 | D82 | — | Applied side effects and `determine action` | 1 |
 | D83 | — | OData complements: (a) nested `$expand`, `any`/`all`, JSON batch, `$value`; (b) extended `$apply` | 1, 2 |
 | D84 | — | ALP and OVP driven by CDS annotations | 2 |

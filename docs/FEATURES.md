@@ -97,7 +97,7 @@ dependent ETag, remote APIs.
 | Exception classes implementing `if_abap_behv_message` | ✅ | Clean-room `cx_root` base (D24); attributes of the message resolved by name. |
 | `%element` → OData `target` | ✅ | Relative to the resource of the request, otherwise absolute `/Set(key)/Property`. |
 | Severities → OData error or `sap-messages` header | ✅ | |
-| `%state_area`, state messages | 🟡 | Without draft, the messages are returned as transition messages. |
+| `%state_area`, state messages | ✅ | Draft: the messages of the validations run by `Prepare` are stored per instance, read in `SAP__Messages` (`Common.Messages`); a `%state_area` without message removes the messages of its area (D81). Without draft, transition messages. |
 
 ## EML in the ABP
 
@@ -215,7 +215,7 @@ dependent ETag, remote APIs.
 | `$apply`: `filter`, `groupby`, `aggregate` (`sum`, `min`, `max`, `average`, `countdistinct`, `$count`) | ✅ | With the DCL of the user; other transformations: 501 (D52). |
 | Enumeration types (`EnumType`): JSON by member name, literals `Ns.Type'M'` | ✅ | `enhanced` mode, CDS enumerated types (D55). |
 | JSON batch, `$value`, single properties | ❌ | Not in the MVP. |
-| SAP Fiori elements protocol cases (draft List Report and Object Page) | 🟡 | Requests of Fiori elements replayed without SAPUI5 (`fe-protocol.test.ts`): 11 of 13 cases pass, the state messages (`SAP__Messages`) wait for the rest of the complete draft (D81); cases from HARs of an SAP BTP trial with `scripts/fe-har-to-cases.mjs`; `rapt dev --fe-check` (D79). |
+| SAP Fiori elements protocol cases (draft List Report and Object Page) | 🟡 | Requests of Fiori elements replayed without SAPUI5 (`fe-protocol.test.ts`): the 13 cases pass (D81); cases from HARs of an SAP BTP trial with `scripts/fe-har-to-cases.mjs`; `rapt dev --fe-check` (D79). |
 
 ## Generated UI (OpenUI5)
 

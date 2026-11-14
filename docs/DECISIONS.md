@@ -1879,3 +1879,25 @@ _The issues moved to the repository itself once public: see D74._
   `Prepare` with its message, an action on a draft, the deletion of an active child in an edited
   draft, the active instance untouched); the protocol cases `prepare-runs-validations`,
   `determination-on-draft-change`, `action-on-draft` pass (11 of 13).
+
+## D81 — Complete draft protocol (c): state messages
+
+- **Context**: SAP Fiori elements shows the messages of the validations of a draft next to its
+  fields, and keeps them while the user corrects the draft: they are state messages, read in the
+  property `SAP__Messages` that the annotation `Common.Messages` points to. They were only
+  returned as transition messages.
+- **Decision**:
+  - The draft entity types of a service with a UI have the property `SAP__Messages`, a collection
+    of the complex type `SAP__Message` (`code`, `message`, `target`, `additionalTargets`,
+    `transition`, `numericSeverity`, `longtextUrl`), and the annotation `Common.Messages`. Like the
+    feature control, the property is computed by the runtime: an active instance has none.
+  - `Prepare` stores the messages of the validations it ran (table `rapt_draft_message`, per
+    draft, instance, validation and `%state_area`): they replace the previous messages of the same
+    validation on the same instance; a reported entry with a `%state_area` and no message removes
+    the messages of its area. The target is relative to the instance (`BeginDate`).
+  - The messages go with the draft: removed with an instance of the draft, its discard or its
+    activation.
+- **Why**: the state messages of RAP, with their invalidation rules, on the store of the draft.
+- **Tests**: `draft.test.ts` (a message stored by Prepare with its target, none on an active
+  instance, removed when the validation runs again without error, the annotation); the protocol
+  cases `metadata-messages` and `state-messages-on-draft` pass: the 13 cases of D79 pass.

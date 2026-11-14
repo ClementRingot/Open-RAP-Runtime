@@ -174,7 +174,7 @@ What the project deliberately leaves out; the planned work is in
 | Actions of the application on a draft | Instance actions run (D81); static and factory actions: 501, activate first. |
 | `draft query view`, `with draft` on a BO with unmanaged save | Not supported. |
 | Collaborative draft (D59) | No real time (WebSocket): the Object Page reads the draft again every 5 s; no field lock; `ShareAll` ignored; joining a draft only checks the Edit authorization; two-segment navigation `DraftAdministrativeData/DraftAdministrativeUser`: read `DraftAdministrativeUser?$filter=DraftUUID eq …`. |
-| State messages (`%state_area`) | Returned as transition messages on activation. |
+| State messages (D81) | Stored by `Prepare` and read in `SAP__Messages` of the draft entity types only (on SAP, every entity type of a UI service has the property); the messages of a refused activation are returned, not stored (the LUW is rolled back). |
 | Exclusive lock | Taken over by another user after 15 minutes without a change, as on SAP; no adjustable duration. |
 
 ## Floorplans (D53)

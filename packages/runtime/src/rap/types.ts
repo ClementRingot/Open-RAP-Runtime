@@ -42,6 +42,15 @@ export interface ReportedEntry {
   /** `%global`, or a message without instance (`%other`). */
   global: boolean;
   stateArea?: string;
+  /** The validation that reported the message (D81: the state messages of a draft). */
+  source?: string;
+}
+
+/** A reported entry with a state area and without message: the state messages of the area are invalid (D81). */
+export interface InvalidatedEntry {
+  entity: string;
+  key: Row;
+  stateArea: string;
 }
 
 export interface MappedEntry {
@@ -55,11 +64,13 @@ export class Responses {
   public failed: FailedEntry[] = [];
   public reported: ReportedEntry[] = [];
   public mapped: MappedEntry[] = [];
+  public invalidated: InvalidatedEntry[] = [];
 
   public add(other: Responses): this {
     this.failed.push(...other.failed);
     this.reported.push(...other.reported);
     this.mapped.push(...other.mapped);
+    this.invalidated.push(...other.invalidated);
     return this;
   }
 

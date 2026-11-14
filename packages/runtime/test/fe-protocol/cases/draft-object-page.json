@@ -249,7 +249,6 @@
     },
     {
       "id": "metadata-messages",
-      "fails": "D81",
       "title": "the entity types carry SAP__Messages, annotated with Common.Messages",
       "steps": [
         {
@@ -345,7 +344,6 @@
     },
     {
       "id": "state-messages-on-draft",
-      "fails": "D81",
       "title": "after Prepare, the draft gives its state messages in SAP__Messages",
       "steps": [
         {

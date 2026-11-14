@@ -302,7 +302,7 @@ export class Transaction {
    * `draft determine action Prepare` (D81): the determinations on save, then the validations it
    * names, for the instances of the draft changed since its active image (or created).
    */
-  public async prepare(items: Array<{ bo: BoEntity; kind: "validation" | "determination"; name: string }>): Promise<Responses> {
+  public async prepare(items: Array<{ bo: BoEntity; kind: "validation" | "determination"; name: string }>, ran: Array<{ bo: BoEntity; validation: string; keys: Row[] }> = []): Promise<Responses> {
     const responses = new Responses();
     for (const kind of ["determination", "validation"] as const) {
       for (const item of items.filter((i) => i.kind === kind)) {
@@ -312,7 +312,14 @@ export class Transaction {
         }
         const keys = this.triggeredInLuw(item.bo, definition.triggers);
         if (keys.length > 0) {
-          responses.add(await this.runDetermination(item.bo, definition, keys, true));
+          const result = await this.runDetermination(item.bo, definition, keys, true);
+          if (kind === "validation") {
+            for (const entry of result.reported) {
+              entry.source = definition.name;
+            }
+            ran.push({ bo: item.bo, validation: definition.name, keys });
+          }
+          responses.add(result);
         }
       }
     }

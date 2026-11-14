@@ -18,13 +18,14 @@ import {
   findEntity,
   OPERATION_CONTROL,
   same,
+  STATE_MESSAGES,
   type ActionModel,
   type EdmType,
   type FieldModel,
   type ODataOperation,
 } from "@open-rap/model";
 import type { Kysely } from "kysely";
-import type { BoEntity } from "../rap/bo.js";
+import { keyOf, keyString, type BoEntity } from "../rap/bo.js";
 import type { RapRuntime } from "../rap/runtime.js";
 import { operationId, type ActionResult, type CreateRequest, type Transaction } from "../rap/transaction.js";
 import { ODATA_MODE, RapRuntimeError, Responses, type FailCause, type FailedEntry, type ReportedEntry, type Row } from "../rap/types.js";
@@ -151,7 +152,7 @@ export class RapWriteHandler implements WriteHandler {
   }
 
   /** The entity set exposing a base entity. */
-  private setOfBase(entity: string): SetInfo | undefined {
+  public setOfBase(entity: string): SetInfo | undefined {
     return [...this.sets.values()].find((s) => same(s.bo.entity.name, entity));
   }
 
@@ -834,6 +835,14 @@ export class RapWriteHandler implements WriteHandler {
       return;
     }
     const selected = (name: string): boolean => options.select === undefined || options.select.some((p) => p[0] === "*" || p[0] === name);
+    // the state messages of the drafts (D81); none for an active instance
+    if (type.stateMessages === true && selected(STATE_MESSAGES) && this.drafts !== undefined) {
+      const instance = (row: Record<string, unknown>): Row => this.baseKey(set, Object.fromEntries(type.keys.map((k) => [k, (row[k] ?? null) as CanonicalValue])));
+      const messages = await this.drafts.stateMessages(this.db, set.bo, rows.filter((row) => row["IsActiveEntity"] === false).map(instance));
+      for (const row of rows) {
+        row[STATE_MESSAGES] = row["IsActiveEntity"] === false ? (messages.get(keyString(set.bo, keyOf(set.bo, instance(row)))) ?? []) : [];
+      }
+    }
     const wantEntity = type.entityControl !== undefined && selected(ENTITY_CONTROL);
     const wantOperations = type.operationControl.length > 0 && selected(OPERATION_CONTROL);
     const wantFields = type.fieldControl.length > 0 && selected(FIELD_CONTROL);

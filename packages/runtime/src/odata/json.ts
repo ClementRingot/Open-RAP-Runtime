@@ -1,6 +1,6 @@
 /** OData V4 JSON (odata.metadata=minimal): entities, collections, ETags, IEEE754Compatible. */
 
-import { ENTITY_CONTROL, FIELD_CONTROL, OPERATION_CONTROL } from "@open-rap/model";
+import { ENTITY_CONTROL, FIELD_CONTROL, OPERATION_CONTROL, STATE_MESSAGES } from "@open-rap/model";
 import { RawJsonNumber, toJson, type CanonicalValue, type JsonValue } from "../values.js";
 import type { ReadEngine, Row } from "./read.js";
 import type { ServiceRuntime, TypeInfo } from "./service.js";
@@ -60,7 +60,7 @@ export class JsonWriter {
       const { property } = this.service.property(info, name);
       result[name] = toJson(property.edm, (row[name] ?? null) as CanonicalValue, ctx.ieee754);
     }
-    for (const control of [ENTITY_CONTROL, OPERATION_CONTROL, FIELD_CONTROL]) {
+    for (const control of [ENTITY_CONTROL, OPERATION_CONTROL, FIELD_CONTROL, STATE_MESSAGES]) {
       const value = row[control];
       if (value !== undefined && isSelected(options, control)) {
         result[control] = value as unknown as JsonValue;

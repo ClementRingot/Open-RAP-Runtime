@@ -7,6 +7,8 @@ import {
   buildODataService,
   CONTAINER_NAME,
   ENTITY_CONTROL,
+  STATE_MESSAGE_TYPE,
+  STATE_MESSAGES,
   exposedBehavior,
   FIELD_CONTROL,
   fieldControlTypeName,
@@ -181,6 +183,9 @@ class CsdlBuilder {
     if (type.fieldControl.length > 0) {
       children.push(el("Property", { Name: FIELD_CONTROL, Type: this.qualified(fieldControlTypeName(type)) }));
     }
+    if (type.stateMessages === true) {
+      children.push(el("Property", { Name: STATE_MESSAGES, Type: `Collection(${this.qualified(STATE_MESSAGE_TYPE)})`, Nullable: "false" }));
+    }
     for (const navigation of type.navigations) {
       const targetType = this.qualified(navigation.targetType);
       children.push(
@@ -218,6 +223,22 @@ class CsdlBuilder {
       if (type.fieldControl.length > 0) {
         result.push(el("ComplexType", { Name: fieldControlTypeName(type) }, ...type.fieldControl.map((f) => el("Property", { Name: f, Type: "Edm.Byte", Nullable: "false" }))));
       }
+    }
+    if (this.service.entityTypes.some((t) => t.stateMessages === true)) {
+      // the state messages of a draft (D81)
+      result.push(
+        el(
+          "ComplexType",
+          { Name: STATE_MESSAGE_TYPE },
+          el("Property", { Name: "code", Type: "Edm.String", Nullable: "false" }),
+          el("Property", { Name: "message", Type: "Edm.String", Nullable: "false" }),
+          el("Property", { Name: "target", Type: "Edm.String" }),
+          el("Property", { Name: "additionalTargets", Type: "Collection(Edm.String)", Nullable: "false" }),
+          el("Property", { Name: "transition", Type: "Edm.Boolean", Nullable: "false" }),
+          el("Property", { Name: "numericSeverity", Type: "Edm.Byte", Nullable: "false" }),
+          el("Property", { Name: "longtextUrl", Type: "Edm.String" }),
+        ),
+      );
     }
     for (const complex of this.service.complexTypes) {
       result.push(
@@ -529,6 +550,7 @@ class CsdlBuilder {
     children.push(...this.sideEffects(type, entity));
     const label = str(getAnnotation(a, "EndUserText.label"));
     if (label !== undefined) children.push(annotation("Common.Label", { String: label }));
+    if (type.stateMessages === true) children.push(annotation("Common.Messages", { Path: STATE_MESSAGES }));
     this.annotations(this.qualified(type.name), children);
   }
 

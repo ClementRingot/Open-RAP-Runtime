@@ -463,6 +463,17 @@ function draftTables(model: Model): string[] {
   }
   if (statements.length > 0) {
     statements.unshift("-- drafts (D54)");
+    statements.push(`CREATE TABLE IF NOT EXISTS "rapt_draft_message" (
+  "DraftUUID" uuid NOT NULL,
+  "Entity" varchar(40) NOT NULL,
+  "Instance" text NOT NULL,
+  "Validation" varchar(40) NOT NULL DEFAULT '',
+  "StateArea" varchar(40) NOT NULL DEFAULT '',
+  "Position" integer NOT NULL,
+  "Message" jsonb NOT NULL
+);
+CREATE INDEX IF NOT EXISTS "rapt_draft_message_idx" ON "rapt_draft_message" ("DraftUUID", "Entity", "Instance");
+`);
     statements.push(`CREATE TABLE IF NOT EXISTS "rapt_draft_admin" (
   "DraftUUID" uuid PRIMARY KEY,
   "CreationDateTime" timestamptz(6) NOT NULL DEFAULT now(),

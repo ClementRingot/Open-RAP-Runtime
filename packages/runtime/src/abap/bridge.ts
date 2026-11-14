@@ -207,6 +207,11 @@ export class AbapBridge {
       for (const row of rowsOf(reported === undefined ? undefined : component(reported, alias))) {
         const message = await this.message(component(row, "%msg"));
         if (message === undefined) {
+          // a state area without message invalidates the state messages of the area (D81)
+          const area = this.readText(row, "%state_area");
+          if (area !== "") {
+            responses.invalidated.push({ entity: entity.entity.name, key: this.readKey(row, entity), stateArea: area });
+          }
           continue;
         }
         const elements: string[] = [];
