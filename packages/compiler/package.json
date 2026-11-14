@@ -51,8 +51,8 @@
     "build": "tsc -p tsconfig.build.json && node scripts/copy-docs.mjs"
   },
   "dependencies": {
-    "@abaplint/core": "2.120.98",
-    "@abaplint/transpiler": "2.14.24",
+    "@abaplint/core": "2.120.107",
+    "@abaplint/transpiler": "2.14.33",
     "@open-rap/model": "workspace:*",
     "chevrotain": "13.2.0",
     "fast-xml-parser": "5.12.0"

@@ -5,8 +5,8 @@ This file lists what is not (yet) supported, in particular the ABAP features
 than to work around the transpiler. The overall feature coverage is tracked in
 [docs/FEATURES.md](docs/FEATURES.md).
 
-Reference versions: `@abaplint/core` 2.120.98, `@abaplint/transpiler` 2.14.24,
-`@abaplint/runtime` 2.14.24.
+Reference versions: `@abaplint/core` 2.120.107, `@abaplint/transpiler` 2.14.33,
+`@abaplint/runtime` 2.14.33.
 
 ## Not planned
 

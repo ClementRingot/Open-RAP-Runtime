@@ -45,7 +45,7 @@
     "build": "tsc -p tsconfig.build.json"
   },
   "dependencies": {
-    "@abaplint/runtime": "2.14.24",
+    "@abaplint/runtime": "2.14.33",
     "@open-rap/model": "workspace:*",
     "chevrotain": "13.2.0",
     "fast-xml-parser": "5.12.0",

@@ -13,8 +13,8 @@ Check command: `pnpm licenses list --prod` (and `--dev`).
 
 | Package | Version | License | Use | Checked on |
 |---|---|---|---|---|
-| `@abaplint/core` | 2.120.98 | MIT | ABAP and CDS parsing, syntax check | 2026-11-09 |
-| `@abaplint/transpiler` | 2.14.24 | MIT | Transpilation of the behavior pool to JavaScript | 2026-11-09 |
+| `@abaplint/core` | 2.120.107 | MIT | ABAP and CDS parsing, syntax check | 2026-11-14 |
+| `@abaplint/transpiler` | 2.14.33 | MIT | Transpilation of the behavior pool to JavaScript | 2026-11-14 |
 | `chevrotain` | 13.2.0 | Apache-2.0 | BDEF and SRVD grammars | 2026-11-09 |
 | `fast-xml-parser` | 5.12.0 | MIT | Reading of the abapGit XML files (TABL, DTEL, DOMA, MSAG, SRVB) | 2026-11-09 |
 
@@ -36,7 +36,7 @@ No external dependency.
 | `chevrotain` | 13.2.0 | Apache-2.0 | Grammar of the OData URLs (`$filter`, `$orderby`, `$select`, `$expand`) | 2026-11-09 |
 | `jose` | 6.2.16 | MIT | Verification of JWTs and JWKS (OIDC) | 2026-11-09 |
 | `nodemailer` | 10.5.0 | MIT-0 | MIME composition and SMTP sending of the mails of `cl_bcs_mail_message` (D41) | 2026-11-11 |
-| `@abaplint/runtime` | 2.14.24 | MIT | Execution of the transpiled JavaScript of the ABP (ABAP types and statements) | 2026-11-09 |
+| `@abaplint/runtime` | 2.14.33 | MIT | Execution of the transpiled JavaScript of the ABP (ABAP types and statements) | 2026-11-14 |
 | `fast-xml-parser` | 5.12.0 | MIT | Reading of the `$metadata` of the remote OData services (client proxy, D31) | 2026-11-10 |
 
 Transitive dependencies (production): MIT for most of them (`avvio`, `find-my-way`,

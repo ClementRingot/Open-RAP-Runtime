@@ -63,11 +63,11 @@ importers:
   packages/compiler:
     dependencies:
       '@abaplint/core':
-        specifier: 2.120.98
-        version: 2.120.98
+        specifier: 2.120.107
+        version: 2.120.107
       '@abaplint/transpiler':
-        specifier: 2.14.24
-        version: 2.14.24
+        specifier: 2.14.33
+        version: 2.14.33
       '@open-rap/model':
         specifier: workspace:*
         version: link:../model
@@ -83,8 +83,8 @@ importers:
   packages/runtime:
     dependencies:
       '@abaplint/runtime':
-        specifier: 2.14.24
-        version: 2.14.24
+        specifier: 2.14.33
+        version: 2.14.33
       '@open-rap/model':
         specifier: workspace:*
         version: link:../model
@@ -167,15 +167,15 @@ importers:
 
 packages:
 
-  '@abaplint/core@2.120.98':
-    resolution: {integrity: sha512-rHaWJu1VF+oKHTEzXFrULUHBzB8JgfrG8xLzKZn4H2hi1Gp/fG9y1zr2W/JpLH6nu0UZWrEfx7HiTap6zYMYsw==}
+  '@abaplint/core@2.120.107':
+    resolution: {integrity: sha512-xosWdJ/BFBST66YdazPobjGWW8dJW0gDXHFCnsYX5ZrZa5R+PqPrKgikfYc8wBxJx8st/D2BiSdVrvOlLh9rDg==}
     engines: {node: '>=22.0.0'}
 
-  '@abaplint/runtime@2.14.24':
-    resolution: {integrity: sha512-loGZvMnfxgU2swqeT/s+c3p5sGFHCy3SZdpXmT5zbvfs29rt3fB6/BHfPeqWnL9Y067R/RCRCDBRoOJf0NwL+w==}
+  '@abaplint/runtime@2.14.33':
+    resolution: {integrity: sha512-def8YF8WdFL0DT3deXT4p+Hh3lF8LFXICYgkuBLZQcQPzPPDyypmYxABdhUH+ZSCaynO73hQREjxE7nQTQX2wQ==}
 
-  '@abaplint/transpiler@2.14.24':
-    resolution: {integrity: sha512-6bxOL1eFg2JfgipgqdMmi1gOAHs9zzpHCtTC1p4FCU9xK8jWse5wijFMhL957GZZjOEN0UC924HdqYIhPWlVgA==}
+  '@abaplint/transpiler@2.14.33':
+    resolution: {integrity: sha512-yaaHW1myi3ovD2JMP1sj/rRzw6h7arRLOcsJzymKXeZEshmAJKaLC6XZ7PXq2CC9jxwrfmi3WVONRgvxa7UwrQ==}
 
   '@adobe/css-tools@4.5.0':
     resolution: {integrity: sha512-6OzddxPio9UiWTCemp4N8cYLV2ZN1ncRnV1cVGtve7dhPOtRkleRyx32GQCYSwDYgaHU3USMm84tNsvKzRCa1Q==}
@@ -1853,19 +1853,19 @@ packages:
 
 snapshots:
 
-  '@abaplint/core@2.120.98':
+  '@abaplint/core@2.120.107':
     dependencies:
       fast-xml-parser: 5.12.0
       json5: 2.2.3
       vscode-languageserver-types: 3.18.5
 
-  '@abaplint/runtime@2.14.24':
+  '@abaplint/runtime@2.14.33':
     dependencies:
       temporal-polyfill: 1.0.8
 
-  '@abaplint/transpiler@2.14.24':
+  '@abaplint/transpiler@2.14.33':
     dependencies:
-      '@abaplint/core': 2.120.98
+      '@abaplint/core': 2.120.107
       source-map: 0.8.0
 
   '@adobe/css-tools@4.5.0': {}
