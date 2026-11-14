@@ -50,6 +50,8 @@ export interface ODataNavigation {
   insertable: boolean;
   /** Create by association under instance feature control (__OperationControl/<nav>). */
   insertableDynamic: boolean;
+  /** SiblingEntity (D81): the ON pairs are the keys, and IsActiveEntity is the opposite one. */
+  sibling?: true;
 }
 
 export interface ODataEntityType {
@@ -405,6 +407,9 @@ export function buildODataService(model: Model): ODataService {
       };
       if (partner !== undefined) {
         navigation.partner = partner.name;
+      }
+      if (association.sibling === true) {
+        navigation.sibling = true;
       }
       entityType.navigations.push(navigation);
       if (navigation.insertableDynamic && model.service.webApi !== true) {

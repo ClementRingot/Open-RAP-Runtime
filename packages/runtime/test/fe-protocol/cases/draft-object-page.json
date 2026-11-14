@@ -130,7 +130,6 @@
     },
     {
       "id": "sibling-entity-of-active",
-      "fails": "D81",
       "title": "the SiblingEntity of an active instance with a draft is the draft",
       "steps": [
         {
@@ -190,7 +189,6 @@
     },
     {
       "id": "sibling-entity-expand",
-      "fails": "D81",
       "title": "SiblingEntity in $expand of the draft gives the active instance",
       "steps": [
         {

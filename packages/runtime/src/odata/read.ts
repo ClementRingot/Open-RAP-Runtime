@@ -4,7 +4,7 @@
  */
 
 import { sql, type RawBuilder } from "kysely";
-import type { AbapType, EdmType, FieldModel } from "@open-rap/model";
+import type { AbapType, EdmType, FieldModel, ODataNavigation } from "@open-rap/model";
 import type { Database } from "../db/database.js";
 import { fromSql, literalToCanonical, toSql, type CanonicalValue, type UrlLiteral } from "../values.js";
 import { badRequest, notImplemented, ODataError } from "./errors.js";
@@ -148,7 +148,11 @@ export class ReadEngine {
       }
       const { property, field } = this.service.property(target, path[1] as string);
       const inner = `${alias}_${navigation.name.replace(/\W/g, "")}`;
-      const conditions = navigation.on.map((p) => sql`${sql.ref(`${inner}.${p.target}`)} = ${sql.ref(`${alias}.${p.source}`)}`);
+      const conditions = this.joinConditions(navigation, inner, alias);
+      const visible = this.draftVisibility(target, inner);
+      if (visible !== undefined) {
+        conditions.push(visible);
+      }
       return {
         sql: sql`(SELECT ${sql.ref(`${inner}.${property.name}`)} FROM ${sql.table(target.view)} AS ${sql.id(inner)} WHERE ${sql.join(conditions, sql` AND `)} LIMIT 1)`,
         abap: field.type,
@@ -366,12 +370,29 @@ export class ReadEngine {
     });
   }
 
+  /** Drafts (D54): the active instances, and the drafts in process by the user (or shared with them, D59). */
+  private draftVisibility(info: TypeInfo, alias: string): RawBuilder<unknown> | undefined {
+    if (info.entity.draft === undefined || "admin" in info.entity.draft) {
+      return undefined;
+    }
+    const user = currentReader()?.abapName ?? "";
+    return sql`(${sql.ref(`${alias}.IsActiveEntity`)} OR EXISTS (SELECT 1 FROM "rapt_draft_admin" "dra" WHERE "dra"."DraftUUID" = ${sql.ref(`${alias}.DraftUUID`)} AND ("dra"."InProcessByUser" = ${user} OR EXISTS (SELECT 1 FROM "rapt_draft_user" "dru" WHERE "dru"."DraftUUID" = "dra"."DraftUUID" AND "dru"."UserID" = ${user}))))`;
+  }
+
+  /** The join of a navigation, target `inner` to source `outer`; SiblingEntity (D81): the opposite IsActiveEntity. */
+  private joinConditions(navigation: ODataNavigation, inner: string, outer: string): RawBuilder<unknown>[] {
+    const conditions = navigation.on.map((p) => sql`${sql.ref(`${inner}.${p.target}`)} = ${sql.ref(`${outer}.${p.source}`)}`);
+    if (navigation.sibling === true) {
+      conditions.push(sql`${sql.ref(`${inner}.IsActiveEntity`)} <> ${sql.ref(`${outer}.IsActiveEntity`)}`);
+    }
+    return conditions;
+  }
+
   private where(info: TypeInfo, alias: string, options: QueryOptions, extra: RawBuilder<unknown>[]): RawBuilder<unknown> {
     const conditions = [...extra];
-    // drafts (D54): the active instances, and the drafts in process by the user
-    if (info.entity.draft !== undefined && !("admin" in info.entity.draft)) {
-      const user = currentReader()?.abapName ?? "";
-      conditions.push(sql`(${sql.ref(`${alias}.IsActiveEntity`)} OR EXISTS (SELECT 1 FROM "rapt_draft_admin" "dra" WHERE "dra"."DraftUUID" = ${sql.ref(`${alias}.DraftUUID`)} AND ("dra"."InProcessByUser" = ${user} OR EXISTS (SELECT 1 FROM "rapt_draft_user" "dru" WHERE "dru"."DraftUUID" = "dra"."DraftUUID" AND "dru"."UserID" = ${user}))))`);
+    const visible = this.draftVisibility(info, alias);
+    if (visible !== undefined) {
+      conditions.push(visible);
     }
     const access = this.accessCondition(info, alias);
     if (access !== undefined) {
@@ -627,7 +648,7 @@ export class ReadEngine {
   /** Scope of a navigation from a source instance: conditions on the target alias t0. */
   public async navigationScope(source: TypeInfo, key: Key, navigation: string): Promise<{ target: TypeInfo; scope: RawBuilder<unknown>[]; collection: boolean } | undefined> {
     const { navigation: nav, target } = this.service.navigationTarget(source, navigation);
-    const parent = await this.readOne(source, key, { select: nav.on.map((p) => [p.source]) });
+    const parent = await this.readOne(source, key, { select: [...nav.on.map((p) => [p.source]), ...(nav.sibling === true ? [["IsActiveEntity"]] : [])] });
     if (parent === undefined) {
       return undefined;
     }
@@ -639,6 +660,9 @@ export class ReadEngine {
       const value = parent[p.source] as CanonicalValue;
       return value === null ? sql`${sql.ref(`t0.${p.target}`)} IS NULL` : sql`${sql.ref(`t0.${p.target}`)} = ${toSql(field.type, value)}`;
     });
+    if (nav.sibling === true) {
+      scope.push(sql`${sql.ref("t0.IsActiveEntity")} = ${parent["IsActiveEntity"] !== true}`);
+    }
     return { target, scope, collection: nav.collection };
   }
 
@@ -647,13 +671,13 @@ export class ReadEngine {
     for (const item of expand ?? []) {
       if (item.path[0] === "*") {
         for (const nav of info.navigations.values()) {
-          needed.push(...nav.on.map((p) => p.source));
+          needed.push(...nav.on.map((p) => p.source), ...(nav.sibling === true ? ["IsActiveEntity"] : []));
         }
         continue;
       }
       const nav = info.navigations.get(item.path[0] ?? "");
       if (nav !== undefined) {
-        needed.push(...nav.on.map((p) => p.source));
+        needed.push(...nav.on.map((p) => p.source), ...(nav.sibling === true ? ["IsActiveEntity"] : []));
       }
     }
     return needed;
@@ -675,7 +699,7 @@ export class ReadEngine {
       const { navigation, target } = this.service.navigationTarget(info, item.path[0] as string);
       const alias = "t0";
       const targetFields = navigation.on.map((p) => p.target);
-      const needed = [...targetFields];
+      const needed = [...targetFields, ...(navigation.sibling === true ? ["IsActiveEntity"] : [])];
       const properties = this.selectedProperties(target, item.options, needed);
       if (target.entity.kind === "custom") {
         await this.customExpand(rows, target, navigation, item, properties, needed);
@@ -685,7 +709,7 @@ export class ReadEngine {
       const distinct = [...new Map(tuples.map((t) => [JSON.stringify(t), t])).values()].filter((t) => t.every((v) => v !== null));
       const attach = (matches: Row[]): void => {
         for (const row of rows) {
-          const mine = matches.filter((m) => navigation.on.every((p) => m[p.target] === row[p.source]));
+          const mine = matches.filter((m) => navigation.on.every((p) => m[p.target] === row[p.source]) && (navigation.sibling !== true || m["IsActiveEntity"] !== row["IsActiveEntity"]));
           row[navigation.name] = navigation.collection ? mine.map((m) => strip(m, properties, needed)) : mine[0] === undefined ? null : strip(mine[0], properties, needed);
         }
       };

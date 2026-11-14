@@ -33,7 +33,7 @@ dependent ETag, remote APIs.
 | `late numbering` | ❌ | Needs the `adjust_numbers` phase of a saver. |
 | `with additional save`, `with unmanaged save` (header or entity, `with full data`) | ✅ | Saver class `lsc_…`: `save_modified` and `cleanup`; unmanaged: reads and locks through the CDS view (D30). Tests `rap-variant-additional-save`, `rap-variant-unmanaged-save`. |
 | Saver inheriting from `cl_abap_behavior_saver_failed` (`failed` in `save_modified`) | ✅ | Rolls back the LUW, managed write included; message returned to the client. |
-| `with draft`, `draft table`, `total etag`, `draft action Edit / Activate optimized / Discard / Resume`, `draft determine action Prepare` | ✅ | Draft tables, `IsActiveEntity`, exclusive lock, activation by the managed runtime (D54). See the gaps in [KNOWN_GAPS.md](../KNOWN_GAPS.md). |
+| `with draft`, `draft table`, `total etag`, `draft action Edit / Activate optimized / Discard / Resume`, `draft determine action Prepare` | ✅ | Draft tables, `IsActiveEntity`, exclusive lock, activation by the managed runtime (D54); `SiblingEntity` in paths, `$filter` and `$expand`, the draft of the user only (D81). See the gaps in [KNOWN_GAPS.md](../KNOWN_GAPS.md). |
 | `unmanaged` implementation | ❌ | Out of the target (managed BO). |
 | `with privileged mode` | ✅ | `PRIVILEGED` skips the authorization checks. |
 | `changedocuments`, `event`, `extensible` | ❌ | No equivalent infrastructure. |
@@ -191,7 +191,7 @@ dependent ETag, remote APIs.
 |---|---|---|
 | Service document, `$metadata` (CSDL with annotations) | ✅ | |
 | GET collection, GET entity (short and named key) | ✅ | |
-| Navigation `Entity(…)/_Assoc`, key on the navigation, `/$count` | ✅ | |
+| Navigation `Entity(…)/_Assoc`, key on the navigation, `/$count` | ✅ | A single-valued navigation without target: 204 (D81). |
 | `$filter`: eq, ne, gt, ge, lt, le, and, or, not, in, parentheses, `null` | ✅ | Parameterized SQL queries. |
 | `$filter`: contains, startswith, endswith, tolower, toupper, trim, length, indexof, substring, concat, year…second, now | ✅ | `%` and `_` are literal characters. |
 | `$filter` on a to-one navigation (`_Travel/Status`) | ✅ | Scalar subquery. |
@@ -215,7 +215,7 @@ dependent ETag, remote APIs.
 | `$apply`: `filter`, `groupby`, `aggregate` (`sum`, `min`, `max`, `average`, `countdistinct`, `$count`) | ✅ | With the DCL of the user; other transformations: 501 (D52). |
 | Enumeration types (`EnumType`): JSON by member name, literals `Ns.Type'M'` | ✅ | `enhanced` mode, CDS enumerated types (D55). |
 | JSON batch, `$value`, single properties | ❌ | Not in the MVP. |
-| SAP Fiori elements protocol cases (draft List Report and Object Page) | 🟡 | Requests of Fiori elements replayed without SAPUI5 (`fe-protocol.test.ts`): 4 of 13 cases pass, the others wait for the complete draft (D81); cases from HARs of an SAP BTP trial with `scripts/fe-har-to-cases.mjs`; `rapt dev --fe-check` (D79). |
+| SAP Fiori elements protocol cases (draft List Report and Object Page) | 🟡 | Requests of Fiori elements replayed without SAPUI5 (`fe-protocol.test.ts`): 8 of 13 cases pass, the others wait for the rest of the complete draft (D81); cases from HARs of an SAP BTP trial with `scripts/fe-har-to-cases.mjs`; `rapt dev --fe-check` (D79). |
 
 ## Generated UI (OpenUI5)
 
@@ -238,7 +238,7 @@ dependent ETag, remote APIs.
 | Messages (errors, success) | ✅ | `MessageBox`, `MessageToast`, `MessagePopover`. |
 | Buttons according to the authorizations of the user | ✅ | Create hidden without the global create authorization (`$permissions`); Edit, Delete, actions and creation of children disabled per instance (`__EntityControl`, `__OperationControl`, D36). Test `ui-authorizations.test.ts`. |
 | Worklist, Analytical List Page, Overview Page, Form entry floorplans | ✅ | `ui` of `rapt/config.json`, written by `rapt floorplan` or the VS Code command (D61), which asks for it before generating the application (D66); `@UI.chart` charts in SVG, `@UI.selectionVariant` tabs (D53). |
-| Draft in the UI: creation and editing in a draft, fields saved, Save / Discard, editing status in the list | ✅ | D54; as in Fiori Elements: *Editing Status* filter, draft of the user instead of the active instance, *Locked by X*, `DraftIndicator`, *Keep Draft* / *Discard Draft* (D58). |
+| Draft in the UI: creation and editing in a draft, fields saved, Save / Discard, editing status in the list | ✅ | D54; as in Fiori Elements: *Editing Status* filter (with `SiblingEntity`, D81), draft of the user instead of the active instance, *Locked by X*, `DraftIndicator`, *Keep Draft* / *Discard Draft* (D58). |
 | Collaborative draft (`with collaborative draft`, `draft action Share`) | ✅ | Users of the draft, invitation, joining with Edit, refresh every 5 s (D59). |
 | Values of an enumerated type: labels, choice list in edit mode and in the filter | ✅ | `enhanced` mode (D55). |
 

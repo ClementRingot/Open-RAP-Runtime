@@ -114,6 +114,23 @@ describe("draft", () => {
     expect((await call(alice, "PATCH", travel(T1, true), { Description: "Direct change" })).status).toBe(200);
   });
 
+  it("navigates to the sibling of an instance, the draft of the user only (SiblingEntity, D81)", async () => {
+    expect(fixture.metadata).toContain('<NavigationProperty Name="SiblingEntity" Type="');
+    expect((await call(alice, "POST", `${travel(T1, true)}/${NS}.Edit`, {})).status).toBe(200);
+    // Alice: the draft is the sibling of the active instance, and the other way round
+    expect((await call(alice, "GET", `${travel(T1, true)}/SiblingEntity`)).body).toMatchObject({ TravelUUID: T1, IsActiveEntity: false });
+    expect((await call(alice, "GET", `${travel(T1, false)}?$expand=SiblingEntity($select=IsActiveEntity,Description)`)).body["SiblingEntity"]).toMatchObject({ IsActiveEntity: true, Description: "Direct change" });
+    // Bob does not see the draft of Alice: no sibling, the active instance is listed (locked)
+    expect((await call(bob, "GET", `${travel(T1, true)}/SiblingEntity`)).status).toBe(204);
+    const all = "$filter=(IsActiveEntity eq false or SiblingEntity/IsActiveEntity eq null) and TravelID eq '00000001'&$select=IsActiveEntity";
+    expect(values(await call(alice, "GET", `Travel?${all}`))).toEqual([expect.objectContaining({ IsActiveEntity: false })]);
+    expect(values(await call(bob, "GET", `Travel?${all}`))).toEqual([expect.objectContaining({ IsActiveEntity: true })]);
+    const locked = "$filter=IsActiveEntity eq true and HasDraftEntity eq true and SiblingEntity/IsActiveEntity eq null&$select=TravelID";
+    expect(values(await call(bob, "GET", `Travel?${locked}`))).toEqual([expect.objectContaining({ TravelID: "00000001" })]);
+    expect(values(await call(alice, "GET", `Travel?${locked}`))).toEqual([]);
+    expect((await call(alice, "POST", `${travel(T1, false)}/${NS}.Discard`, {})).status).toBe(204);
+  });
+
   it("gives the administrative data of the draft", async () => {
     const edit = await call(bob, "POST", `${travel(T1, true)}/${NS}.Edit`, {});
     expect(edit.status, JSON.stringify(edit.body)).toBe(200);

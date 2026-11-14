@@ -7,7 +7,6 @@
   "cases": [
     {
       "id": "metadata-sibling-entity",
-      "fails": "D81",
       "title": "the draft entity types expose the SiblingEntity navigation",
       "steps": [
         {
@@ -30,7 +29,6 @@
     },
     {
       "id": "editing-status-all",
-      "fails": "D81",
       "title": "Editing Status 'All': the drafts, and the active instances without a draft of their own",
       "confirm": "the exact $filter of the default Editing Status",
       "steps": [

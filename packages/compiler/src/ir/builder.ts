@@ -364,6 +364,8 @@ function checkExposedTypes(model: Model, diagnostics: Diagnostics): void {
 /** The entity of the administrative data of the drafts (D54), a table of the runtime. */
 export const DRAFT_ADMIN_ENTITY = "DraftAdministrativeData";
 export const DRAFT_ADMIN_TABLE = "rapt_draft_admin";
+/** The navigation of a draft entity to its sibling (D81). */
+export const SIBLING_ENTITY = "SiblingEntity";
 /** The users of the collaborative drafts (D59). */
 export const DRAFT_USER_ENTITY = "DraftAdministrativeUser";
 export const DRAFT_USER_TABLE = "rapt_draft_user";
@@ -416,6 +418,9 @@ function applyDraft(model: Model, diagnostics: Diagnostics): void {
       }
     }
     entity.associations.push({ name: DRAFT_ADMIN_ENTITY, target: DRAFT_ADMIN_ENTITY, kind: "association", cardinality: { min: 0, max: 1 }, on: [{ source: "DraftUUID", target: "DraftUUID" }] });
+    // SiblingEntity (D81): the draft of an active instance, or the active instance of a draft
+    const keys = entity.fields.filter((f) => f.key && f.draft !== true).map((f) => ({ source: f.name, target: f.name }));
+    entity.associations.push({ name: SIBLING_ENTITY, target: entity.name, kind: "association", cardinality: { min: 0, max: 1 }, on: keys, sibling: true });
     entity.draft = { view: `${entity.sqlView ?? sqlName(entity.name)}_all`.slice(0, 63), table: info.table, base: base.name, root: info.root, ...(info.collaborative ? { collaborative: true as const } : {}) };
   }
   const text = (length: number): FieldModel["type"] => ({ kind: "char", length });

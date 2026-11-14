@@ -172,7 +172,7 @@ What the project deliberately leaves out; the planned work is in
 |---|---|
 | Determinations and validations while editing the draft (`on modify` on the draft, `Prepare` that validates) | Not run in the draft: they run on activation; `Prepare` returns the draft without a check. |
 | Actions of the application on a draft | 501 response: activate first. |
-| `SiblingEntity`, `draft query view`, `with draft` on a BO with unmanaged save | Not supported (the list gets the effect of `SiblingEntity` through `DraftAdministrativeData/InProcessByUser`, D58). |
+| `draft query view`, `with draft` on a BO with unmanaged save | Not supported. |
 | Collaborative draft (D59) | No real time (WebSocket): the Object Page reads the draft again every 5 s; no field lock; `ShareAll` ignored; joining a draft only checks the Edit authorization; two-segment navigation `DraftAdministrativeData/DraftAdministrativeUser`: read `DraftAdministrativeUser?$filter=DraftUUID eq …`. |
 | State messages (`%state_area`) | Returned as transition messages on activation. |
 | Exclusive lock | Taken over by another user after 15 minutes without a change, as on SAP; no adjustable duration. |

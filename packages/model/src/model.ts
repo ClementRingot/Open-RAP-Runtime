@@ -305,6 +305,11 @@ export interface AssociationModel {
   on: Array<{ source: string; target: string }>;
   /** Projections: the association of the projected entity it redirects. */
   baseAssociation?: string;
+  /**
+   * SiblingEntity of a draft entity (D81): the instance of the same key (the ON pairs) with the
+   * opposite IsActiveEntity, the draft of the user only.
+   */
+  sibling?: true;
   src?: SourceRef;
 }
 

@@ -1751,7 +1751,7 @@ _The issues moved to the repository itself once public: see D74._
   - **First cases**, written from the specification and the public vocabularies (`source:
     "specification"`): the draft List Report (Editing Status filters, `SiblingEntity`) and the
     draft Object Page (CSRF, Edit/Prepare/Activate, `SiblingEntity`, `Prepare` running the
-    validations, `SAP__Messages`, determinations and actions on a draft). 4 of the 13 cases pass, 9 wait for D81;
+    validations, `SAP__Messages`, determinations and actions on a draft). 4 of the 13 cases passed, 9 waited for D81 (8 pass after D81 a);
     the filters of the Editing Status are marked `confirm`, to check with a HAR.
   - **Cases from the SAP BTP trial**: the user records a HAR of the Fiori elements preview of a
     fixture on their own SAP BTP trial (SAP backend, SAPUI5 under the license of SAP). The HAR stays
@@ -1817,3 +1817,30 @@ _The issues moved to the repository itself once public: see D74._
   (a 30-digit amount and a 7-decimal stamp written exactly, `DELETE … FROM @wa` deleting one row,
   a duplicate refused with sy-subrc 4); `rap-variant-sql.test.ts` (`SUM` inline, a SELECT loop with
   a field list, an `int8` bound, enumerated objects as text, run).
+
+## D81 — Complete draft protocol (a): `SiblingEntity`
+
+- **Context**: SAP Fiori elements finds the draft of an active instance, and the other way
+  round, with the navigation `SiblingEntity` of the draft protocol, and filters the List Report
+  with it (Editing Status *All*: `IsActiveEntity eq false or SiblingEntity/IsActiveEntity eq
+  null`). The service had no such navigation: the protocol cases of D79 failed, and the OpenUI5 UI
+  filtered on `DraftAdministrativeData/InProcessByUser` with the name of the user (D58).
+- **Decision**: D81 is delivered in parts; part (a) is `SiblingEntity`.
+  - Each exposed entity of a draft BO gets the to-one association `SiblingEntity` to itself: the
+    ON pairs are its keys without `IsActiveEntity`, and a flag `sibling` adds the condition
+    `IsActiveEntity` opposite. Its target is read with the visibility of the drafts of the user
+    (D54, D59): the sibling of an active instance is the draft of the user, none when another
+    user edits it.
+  - Supported in a path (`Travel(…,IsActiveEntity=true)/SiblingEntity`), in `$filter` and
+    `$orderby` (`SiblingEntity/IsActiveEntity eq null`) and in `$expand`.
+  - A single-valued navigation without target answers 204 No Content, as OData V4 says (it was
+    404).
+  - The OpenUI5 UI filters the Editing Status with `SiblingEntity` (*All*, and *Locked by another
+    user*: `HasDraftEntity eq true and SiblingEntity/IsActiveEntity eq null`), without the name of
+    the user.
+- **Why**: the filter of the List Report of Fiori elements works as on SAP BTP, and the UI uses
+  the protocol instead of a workaround; the visibility rule of the drafts is the one of the reads.
+- **Tests**: `draft.test.ts` (sibling of the active instance and of the draft, the view of another
+  user, the *All* and *Locked* filters); the protocol cases `metadata-sibling-entity`,
+  `editing-status-all`, `sibling-entity-of-active`, `sibling-entity-expand` pass (8 of 13);
+  `ui-draft.test.ts` in the browser.

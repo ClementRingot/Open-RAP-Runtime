@@ -1928,26 +1928,26 @@ export const LIST_CONTROLLER = `sap.ui.define([
     },
 
     /**
-     * The draft condition of the list (D58), as Fiori Elements: all (the own drafts, and the
-     * active instances without an own draft), own drafts, locked by another user, no changes.
+     * The draft condition of the list (D58, D81), as Fiori Elements, with SiblingEntity (the draft of
+     * the user): all (the own drafts, and the active instances without an own draft), own drafts,
+     * locked by another user (a draft the user does not see), no changes.
      */
     _draftClause: function () {
       if (!this._page().draft) {
         return "";
       }
-      var sMe = String(this.getOwnerComponent().getModel("ui").getProperty("/user") || "").replace(/'/g, "''");
       var oStatus = this.byId("filter_EditingStatus");
       var sStatus = oStatus ? oStatus.getSelectedKey() : "";
       if (sStatus === "own") {
         return "IsActiveEntity eq false";
       }
       if (sStatus === "locked") {
-        return "IsActiveEntity eq true and HasDraftEntity eq true" + (sMe ? " and DraftAdministrativeData/InProcessByUser ne '" + sMe + "'" : "");
+        return "IsActiveEntity eq true and HasDraftEntity eq true and SiblingEntity/IsActiveEntity eq null";
       }
       if (sStatus === "unchanged") {
         return "IsActiveEntity eq true and HasDraftEntity eq false";
       }
-      return sMe ? "IsActiveEntity eq false or HasDraftEntity eq false or DraftAdministrativeData/InProcessByUser ne '" + sMe + "'" : "IsActiveEntity eq true or HasActiveEntity eq false";
+      return "(IsActiveEntity eq false or SiblingEntity/IsActiveEntity eq null)";
     },
 
     _service: function () {

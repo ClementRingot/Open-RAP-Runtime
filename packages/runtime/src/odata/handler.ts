@@ -187,7 +187,7 @@ export class ODataHandler {
   }
 
   /** Resolves the segments of a read to an entity set, an optional key and a navigation scope. */
-  private async resolve(segments: Segment[]): Promise<{ info: TypeInfo; key?: Key; scope: import("kysely").RawBuilder<unknown>[]; single: boolean; count: boolean }> {
+  private async resolve(segments: Segment[]): Promise<{ info: TypeInfo; key?: Key; scope: import("kysely").RawBuilder<unknown>[]; single: boolean; count: boolean; toOne: boolean }> {
     const [first, ...rest] = segments;
     if (first === undefined || first.kind !== "entitySet") {
       throw badRequest("The resource path must start with an entity set");
@@ -197,6 +197,7 @@ export class ODataHandler {
     let scope: import("kysely").RawBuilder<unknown>[] = [];
     let single = key !== undefined;
     let count = false;
+    let toOne = false;
     for (const segment of rest) {
       if (segment.kind === "count") {
         if (single) {
@@ -219,12 +220,13 @@ export class ODataHandler {
       scope = navigation.scope;
       key = segment.key === undefined ? undefined : this.service.key(info, segment.key);
       single = !navigation.collection || key !== undefined;
+      toOne = !navigation.collection && key === undefined;
       if (key !== undefined) {
         // the instance must be reached through the navigation: keep its scope
         scope = [...scope, ...this.read.keyConditions(info, key)];
       }
     }
-    const result: { info: TypeInfo; key?: Key; scope: import("kysely").RawBuilder<unknown>[]; single: boolean; count: boolean } = { info, scope, single, count };
+    const result: { info: TypeInfo; key?: Key; scope: import("kysely").RawBuilder<unknown>[]; single: boolean; count: boolean; toOne: boolean } = { info, scope, single, count, toOne };
     if (key !== undefined) {
       result.key = key;
     }
@@ -232,7 +234,7 @@ export class ODataHandler {
   }
 
   private async get(target: Target, ctx: HandlerContext): Promise<ODataResponse> {
-    const { info, key, scope, single, count } = await this.resolve(target.segments);
+    const { info, key, scope, single, count, toOne } = await this.resolve(target.segments);
     if (count) {
       const n = await this.read.count(info, target.options, scope);
       return { status: 200, headers: { "Content-Type": "text/plain", "OData-Version": "4.0" }, body: String(n) };
@@ -242,6 +244,10 @@ export class ODataHandler {
         key !== undefined && scope.length === 0
           ? await this.read.readOne(info, key, target.options)
           : (await this.read.readCollection(info, { ...target.options, top: 1 }, scope, false)).rows[0];
+      if (row === undefined && toOne) {
+        // a single-valued navigation without target (OData V4: 204 No Content)
+        return { status: 204, headers: { "OData-Version": "4.0" }, body: "" };
+      }
       if (row === undefined) {
         throw notFound(`${info.set.name}${key === undefined ? "" : this.service.keyPredicate(info, key)}`);
       }
