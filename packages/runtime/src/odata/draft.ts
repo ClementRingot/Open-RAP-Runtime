@@ -5,23 +5,26 @@
  * writes on drafts and the actions of the draft:
  *
  * - POST on the root collection creates a draft; POST through a composition of a draft creates a
- *   draft child; PATCH and DELETE change or remove drafts, without determinations or validations;
+ *   draft child; PATCH and DELETE change or remove drafts. The logic of the BO runs on the draft
+ *   (D81): the determinations on modify after each change, the actions of the application, and
+ *   Prepare (the determinations and validations it names), in a transaction whose buffer holds
+ *   the draft;
  * - Edit copies an active instance and its compositions into a draft (exclusive: one draft per
  *   instance, in process by one user; a draft unchanged for 15 minutes may be taken over);
  * - Activate applies the draft to the active instances through the managed runtime in the LUW of
  *   the request (creations, changes and deletions of the composition tree; determinations,
  *   validations and the saver run), then removes the draft;
- * - Discard removes the draft, Resume takes it over again, Prepare returns it.
+ * - Discard removes the draft, Resume takes it over again.
  *
  * Active instances that have a draft cannot be changed directly (409).
  */
 
 import { randomUUID } from "node:crypto";
 import { sql, type Kysely } from "kysely";
-import type { FieldModel } from "@open-rap/model";
-import type { BoAssociation, BoEntity } from "../rap/bo.js";
-import { operationId, type Transaction } from "../rap/transaction.js";
-import { Responses, type AccessMode, type Row } from "../rap/types.js";
+import { same, type FieldModel } from "@open-rap/model";
+import { keyOf, keyString, type BoAssociation, type BoEntity } from "../rap/bo.js";
+import { operationId, type ActionResult, type Transaction } from "../rap/transaction.js";
+import { ODATA_MODE, Responses, type AccessMode, type Row } from "../rap/types.js";
 import { fromSql, initialValue, isInitial, toSql, type CanonicalValue } from "../values.js";
 import { badRequest, methodNotAllowed, notFound, notImplemented, ODataError } from "./errors.js";
 import type { HandlerContext, ODataRequest, Target } from "./handler.js";
@@ -239,6 +242,9 @@ export class DraftRuntime {
     }
     // other operations: on active instances only
     if (last?.kind === "operation") {
+      if (isDraft && key !== undefined && navigation === undefined) {
+        return this.actionOnDraft(tx, request, set, key.key, last.name, outcome, user);
+      }
       if (isDraft) {
         throw notImplemented(`${last.name} on a draft: activate the draft first`);
       }
@@ -253,7 +259,7 @@ export class DraftRuntime {
           await this.checkNotLocked(db, parent.set, parent.key);
           return undefined;
         }
-        const created = await this.createChild(db, parent.set, parent.key, navigation, body, user);
+        const created = await this.createChild(tx, parent.set, parent.key, navigation, body, user);
         return { ...outcome(minimal ? 204 : 201), entity: created, location: this.writes.path(created.set, created.key) };
       }
       if (key === undefined) {
@@ -279,14 +285,22 @@ export class DraftRuntime {
     await this.owned(db, set, row, user);
     if (request.method === "PATCH" || request.method === "PUT") {
       this.checkEtag(request, set, row);
-      await this.update(db, set, row, parseObject(request.body), request.method === "PUT", user);
-      return { ...outcome(minimal ? 204 : 200), entity: { set, key: { ...this.writes.projectedKey(set, key.key), IsActiveEntity: false } } };
+      const fields = await this.update(db, set, row, parseObject(request.body), request.method === "PUT", user);
+      // the determinations on modify of the changed fields (D81)
+      const responses = await this.withLogic(tx, await this.rootOf(db, set.bo, row.DraftUUID), async (shadow) => {
+        shadow.recordDraftChange(set.bo, row, "update", fields);
+        return new Responses();
+      });
+      this.writes.failIf(responses, set, { ...this.writes.projectedKey(set, key.key), IsActiveEntity: false });
+      return { ...outcome(minimal ? 204 : 200), entity: { set, key: { ...this.writes.projectedKey(set, key.key), IsActiveEntity: false } }, messages: this.writes.messages(responses.reported, { set, key: key.key }) };
     }
     if (request.method === "DELETE") {
       if (set.bo.parent === undefined) {
         await this.removeDraft(db, set.bo, row);
       } else {
-        await this.remove(db, set.bo, row);
+        // the deletion runs in the buffer of the draft: its determinations follow (D81)
+        const responses = await this.withLogic(tx, await this.rootOf(db, set.bo, row.DraftUUID), (shadow) => shadow.delete(set.bo, [{ key: keyOf(set.bo, row) }], ODATA_MODE));
+        this.writes.failIf(responses, set, { ...this.writes.projectedKey(set, key.key), IsActiveEntity: false });
         await this.touchAdmin(db, row.DraftUUID, user);
       }
       return outcome(204);
@@ -371,12 +385,25 @@ export class DraftRuntime {
     const draftUuid = randomUUID();
     await this.newDraft(tx.db, set.bo, draftUuid, user);
     await this.insert(tx.db, set.bo, row, draftUuid, false);
-    await this.createInline(tx.db, set, row, draftUuid, body);
+    const created = [{ bo: set.bo, row }, ...(await this.createInline(tx.db, set, row, draftUuid, body))];
+    await this.determineCreated(tx, set, set.bo, draftUuid, created);
     return { set, key: { ...this.writes.projectedKey(set, row), IsActiveEntity: false } };
   }
 
+  /** The determinations on modify of instances created in a draft (D81). */
+  private async determineCreated(tx: Transaction, set: SetInfo, bo: BoEntity, draftUuid: string, created: Array<{ bo: BoEntity; row: Row }>): Promise<void> {
+    const responses = await this.withLogic(tx, await this.rootOf(tx.db, bo, draftUuid), async (shadow) => {
+      for (const instance of created) {
+        shadow.recordDraftChange(instance.bo, instance.row, "create", new Set(instance.bo.fields.map((f) => f.name)));
+      }
+      return new Responses();
+    });
+    this.writes.failIf(responses, set, undefined);
+  }
+
   /** Deep insert in a draft: the children given inline. */
-  private async createInline(db: Kysely<unknown>, set: SetInfo, parentRow: Row, draftUuid: string, body: Record<string, unknown>): Promise<void> {
+  private async createInline(db: Kysely<unknown>, set: SetInfo, parentRow: Row, draftUuid: string, body: Record<string, unknown>): Promise<Array<{ bo: BoEntity; row: Row }>> {
+    const created: Array<{ bo: BoEntity; row: Row }> = [];
     for (const [name, value] of Object.entries(body)) {
       const nav = set.info.navigations.get(name);
       if (nav === undefined || nav.kind !== "composition") {
@@ -389,16 +416,18 @@ export class DraftRuntime {
         const { values, fields } = this.draftValues(childSet, childBody, false, true, false);
         const row = this.newRow(childSet, { ...values, ...this.foreignKey(association, parentRow) }, new Set([...fields, ...association.on.map((p) => p.target)]));
         await this.insert(db, childSet.bo, row, draftUuid, false);
-        await this.createInline(db, childSet, row, draftUuid, childBody);
+        created.push({ bo: childSet.bo, row }, ...(await this.createInline(db, childSet, row, draftUuid, childBody)));
       }
     }
+    return created;
   }
 
   private foreignKey(association: BoAssociation, parent: Row): Row {
     return Object.fromEntries(association.on.map((p) => [p.target, parent[p.source] ?? null]));
   }
 
-  private async createChild(db: Kysely<unknown>, parentSet: SetInfo, parentKey: Row, navigation: string, body: Record<string, unknown>, user: string): Promise<{ set: SetInfo; key: Key }> {
+  private async createChild(tx: Transaction, parentSet: SetInfo, parentKey: Row, navigation: string, body: Record<string, unknown>, user: string): Promise<{ set: SetInfo; key: Key }> {
+    const db = tx.db;
     const nav = parentSet.info.navigations.get(navigation);
     if (nav === undefined || nav.kind !== "composition" || !nav.insertable) {
       throw methodNotAllowed(`${parentSet.info.set.name}/${navigation}: creation through this navigation is not allowed`);
@@ -413,12 +442,13 @@ export class DraftRuntime {
     const { values, fields } = this.draftValues(childSet, body, false, true, false);
     const row = this.newRow(childSet, { ...values, ...this.foreignKey(association, parent) }, new Set([...fields, ...association.on.map((p) => p.target)]));
     await this.insert(db, childSet.bo, row, parent.DraftUUID, false);
-    await this.createInline(db, childSet, row, parent.DraftUUID, body);
+    const created = [{ bo: childSet.bo, row }, ...(await this.createInline(db, childSet, row, parent.DraftUUID, body))];
+    await this.determineCreated(tx, childSet, childSet.bo, parent.DraftUUID, created);
     await this.touchAdmin(db, parent.DraftUUID, user);
     return { set: childSet, key: { ...this.writes.projectedKey(childSet, row), IsActiveEntity: false } };
   }
 
-  private async update(db: Kysely<unknown>, set: SetInfo, row: Row & { DraftUUID: string; HasActiveEntity: boolean }, body: Record<string, unknown>, replace: boolean, user: string): Promise<void> {
+  private async update(db: Kysely<unknown>, set: SetInfo, row: Row & { DraftUUID: string; HasActiveEntity: boolean }, body: Record<string, unknown>, replace: boolean, user: string): Promise<Set<string>> {
     const { values, fields } = this.draftValues(set, body, replace, false, row.HasActiveEntity);
     for (const key of set.bo.keys) {
       fields.delete(key.name);
@@ -432,6 +462,172 @@ export class DraftRuntime {
     }
     await this.touch(db, set.bo, row);
     await this.touchAdmin(db, row.DraftUUID, user);
+    return fields;
+  }
+
+  // -------------------------------------------------------------------------------------------
+  // the logic of the BO on a draft (D81)
+
+  /** The root of the draft an instance belongs to. */
+  private async rootOf(db: Kysely<unknown>, bo: BoEntity, draftUuid: string): Promise<{ bo: BoEntity; row: Row & { DraftUUID: string; HasActiveEntity: boolean } }> {
+    let root = bo;
+    while (root.parent !== undefined) {
+      root = root.parent.target;
+    }
+    const { rows } = await sql<Record<string, unknown>>`SELECT * FROM ${sql.table(this.table(root))} WHERE "DraftUUID" = ${draftUuid}`.execute(db);
+    if (rows[0] === undefined) {
+      throw notFound(`the draft ${draftUuid}`);
+    }
+    return { bo: root, row: this.rowOf(root, rows[0]) };
+  }
+
+  /** Puts a draft tree in the buffer of a transaction; returns the instances it holds. */
+  private async materialize(shadow: Transaction, bo: BoEntity, row: Row & { DraftUUID: string; HasActiveEntity: boolean }, seeded: Map<string, BoEntity>): Promise<void> {
+    await shadow.seedDraft(bo, row, row.HasActiveEntity);
+    seeded.set(`${bo.entity.name}|${keyString(bo, row)}`, bo);
+    for (const composition of bo.compositions) {
+      const child = composition.target;
+      const drafts = await this.children(shadow.db, composition, row);
+      for (const draft of drafts) {
+        await this.materialize(shadow, child, draft, seeded);
+      }
+      if (row.HasActiveEntity) {
+        // the active children the draft removed
+        const actives = (await shadow.readByAssociation(bo, composition, [keyOf(bo, row)])).results.map((r) => r.target);
+        for (const active of actives.filter((a) => !drafts.some((d) => keyString(child, d) === keyString(child, a)))) {
+          await shadow.seedDraftDeletion(child, active);
+          seeded.set(`${child.entity.name}|${keyString(child, active)}`, child);
+        }
+      }
+    }
+  }
+
+  /**
+   * Runs the logic of the BO on a draft (D81): a transaction of its own holds the draft tree in its
+   * buffer (the changes of the active instances, the creations, the deletions); `run` makes its
+   * change there, the determinations on modify follow, and the buffer is written back to the draft
+   * tables. What the handlers did in the database is rolled back: only the draft tables change.
+   */
+  private async withLogic(tx: Transaction, root: { bo: BoEntity; row: Row & { DraftUUID: string; HasActiveEntity: boolean } }, run: (shadow: Transaction) => Promise<Responses>, options: { writeOnFailure?: boolean } = {}): Promise<Responses> {
+    const db = tx.db;
+    const seeded = new Map<string, BoEntity>();
+    let image: ReturnType<Transaction["draftInstances"]> = [];
+    let responses = new Responses();
+    await sql`SAVEPOINT rapt_draft_logic`.execute(db);
+    try {
+      await this.writes.rap.shadow(db, tx.user, async (shadow) => {
+        await this.materialize(shadow, root.bo, root.row, seeded);
+        responses = await run(shadow);
+        if (!responses.hasFailed) {
+          responses.add(await shadow.determineOnModify());
+        }
+        image = shadow.draftInstances();
+      });
+    } finally {
+      await sql`ROLLBACK TO SAVEPOINT rapt_draft_logic`.execute(db);
+      await sql`RELEASE SAVEPOINT rapt_draft_logic`.execute(db);
+    }
+    if (!responses.hasFailed || options.writeOnFailure === true) {
+      await this.writeBack(db, image, seeded, root.row.DraftUUID);
+    }
+    return responses;
+  }
+
+  /** Writes the buffer of a draft transaction to the draft tables. */
+  private async writeBack(db: Kysely<unknown>, image: ReturnType<Transaction["draftInstances"]>, seeded: Map<string, BoEntity>, draftUuid: string): Promise<void> {
+    const present = new Set<string>();
+    for (const instance of image) {
+      const bo = instance.bo;
+      const id = `${bo.entity.name}|${keyString(bo, instance.row)}`;
+      if (bo.behavior.draftTable === undefined || (!seeded.has(id) && !instance.created)) {
+        continue; // not an instance of this draft (read by a handler)
+      }
+      present.add(id);
+      const existing = await this.draft(db, bo, instance.row);
+      if (instance.deleted) {
+        if (existing !== undefined) {
+          await this.remove(db, bo, existing);
+        }
+        continue;
+      }
+      if (existing === undefined) {
+        await this.insert(db, bo, instance.row, draftUuid, !instance.created);
+        continue;
+      }
+      const stored = bo.fields.filter((f) => f.expression === undefined && !bo.keys.some((k) => k.name === f.name));
+      const changed = stored.filter((f) => JSON.stringify(existing[f.name] ?? null) !== JSON.stringify(instance.row[f.name] ?? null));
+      if (changed.length > 0) {
+        await sql`UPDATE ${sql.table(this.table(bo))} SET ${sql.join(changed.map((f) => sql`${sql.id(f.name)} = ${toSql(f.type, (instance.row[f.name] ?? null) as CanonicalValue)}`))} WHERE ${this.where(bo, instance.row)}`.execute(db);
+        await this.touch(db, bo, instance.row);
+      }
+    }
+    // instances created in the draft and removed by the logic leave the buffer
+    for (const [id, bo] of seeded) {
+      if (!present.has(id) && bo.behavior.draftTable !== undefined) {
+        const key = JSON.parse(id.slice(id.indexOf("|") + 1)) as unknown[];
+        const row = Object.fromEntries(bo.keys.map((k, i) => [k.name, key[i] ?? null])) as Row;
+        const existing = await this.draft(db, bo, row);
+        if (existing !== undefined) {
+          await this.remove(db, bo, existing);
+        }
+      }
+    }
+  }
+
+  /** An action of the application on a draft instance (D81). */
+  private async actionOnDraft(tx: Transaction, request: ODataRequest, set: SetInfo, key: Row, qualifiedName: string, outcome: (status: number) => Outcome, user: string): Promise<Outcome> {
+    const name = qualifiedName.replace(/^.*\./, "");
+    const operation = this.writes.service.operation(set.info, name, false);
+    const action = set.bo.behavior.actions.find((a) => same(a.name, operation.action));
+    if (action === undefined || operation.kind !== "action" || action.static || action.factory) {
+      throw notImplemented(`${name} on a draft: activate the draft first`);
+    }
+    if (request.method !== "POST") {
+      throw methodNotAllowed(`The action ${name} is called with POST`);
+    }
+    const param = this.writes.actionParameters(operation, action, request);
+    const row = await this.draft(tx.db, set.bo, key);
+    if (row === undefined) {
+      throw notFound(this.writes.path(set, { ...this.writes.projectedKey(set, key), IsActiveEntity: false }));
+    }
+    await this.owned(tx.db, set, row, user);
+    let results: ActionResult[] = [];
+    const responses = await this.withLogic(tx, await this.rootOf(tx.db, set.bo, row.DraftUUID), async (shadow) => {
+      const executed = await shadow.execute(set.bo, action, [{ key: keyOf(set.bo, row), param }], ODATA_MODE);
+      results = executed.results;
+      return executed.responses;
+    });
+    if (responses.hasFailed) {
+      throw this.writes.error(responses, { set, key });
+    }
+    await this.touchAdmin(tx.db, row.DraftUUID, user);
+    const base: Outcome = { ...outcome(200), messages: this.writes.messages(responses.reported, { set, key }) };
+    if (operation.returnType === undefined) {
+      return { ...base, status: 204 };
+    }
+    const result = this.writes.actionResult(base, set, action.result?.entity ?? "$self", operation, results);
+    // the result of the draft instance is the draft
+    if (result.entity !== undefined && result.entity.set === set) {
+      return { ...result, entity: { set, key: { ...result.entity.key, IsActiveEntity: false } } };
+    }
+    return { ...result, ...(result.entities === undefined ? {} : { entities: result.entities.map((e) => (e.set === set ? { set, key: { ...e.key, IsActiveEntity: false } } : e)) }) };
+  }
+
+  /** Prepare (D81): the determinations and validations of `draft determine action Prepare`, their messages as state messages. */
+  private async prepare(tx: Transaction, set: SetInfo, row: Row & { DraftUUID: string; HasActiveEntity: boolean }): Promise<Responses> {
+    const root = await this.rootOf(tx.db, set.bo, row.DraftUUID);
+    const items: Array<{ bo: BoEntity; kind: "validation" | "determination"; name: string }> = [];
+    const entities = this.writes.rap.bo.entities.filter((e) => e.bdef === root.bo.bdef);
+    for (const [kind, names] of [["validation", root.bo.behavior.draftPrepare?.validations ?? []], ["determination", root.bo.behavior.draftPrepare?.determinations ?? []]] as const) {
+      for (const qualified of names) {
+        const [alias, name] = qualified.includes("~") ? (qualified.split("~") as [string, string]) : [undefined, qualified];
+        const bo = alias === undefined ? root.bo : entities.find((e) => same(e.behavior.alias ?? e.entity.name, alias) || same(e.entity.name, alias));
+        if (bo !== undefined) {
+          items.push({ bo, kind, name });
+        }
+      }
+    }
+    return this.withLogic(tx, root, (shadow) => shadow.prepare(items), { writeOnFailure: true });
   }
 
   // -------------------------------------------------------------------------------------------
@@ -525,8 +721,9 @@ export class DraftRuntime {
       return outcome(204);
     }
     if (name === "Prepare") {
-      // the validations run at the activation, in the LUW that saves
-      return { ...outcome(200), entity: { set, key: draftKey(key) } };
+      // D81: the determinations and validations it names; their messages, failed or not, are returned
+      const responses = await this.prepare(tx, set, row);
+      return { ...outcome(200), entity: { set, key: draftKey(key) }, messages: this.writes.messages(responses.reported, { set, key }, new Set(["S", "I", "W", "E", " "])) };
     }
     // Activate
     const responses = new Responses();

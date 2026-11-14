@@ -148,6 +148,21 @@ export class RapRuntime {
     return value;
   }
 
+  /**
+   * A transaction of its own on the database connection of the running LUW, with an empty buffer
+   * (D81): the logic of the BO runs on a draft held in that buffer; it never saves. The handlers
+   * it calls see it through the context of the LUW.
+   */
+  public async shadow<T>(db: Kysely<unknown>, user: User, fn: (tx: Transaction) => Promise<T>): Promise<T> {
+    const current = this.context();
+    const services: TransactionServices = { bo: this.bo, bridge: this.bridge, now: () => this.now() };
+    if (this.customRead !== undefined) {
+      services.customRead = this.customRead;
+    }
+    const tx = new Transaction(services, db, user);
+    return this.storage.run({ ...current, tx }, () => fn(tx));
+  }
+
   /** Starts work after the current request (its failure is the work's own business). */
   private start(work: () => Promise<void>): void {
     const promise: Promise<void> = new Promise<void>((resolve) => setImmediate(resolve))

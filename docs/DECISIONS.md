@@ -1844,3 +1844,38 @@ _The issues moved to the repository itself once public: see D74._
   user, the *All* and *Locked* filters); the protocol cases `metadata-sibling-entity`,
   `editing-status-all`, `sibling-entity-of-active`, `sibling-entity-expand` pass (8 of 13);
   `ui-draft.test.ts` in the browser.
+
+## D81 — Complete draft protocol (b): the logic of the BO on the draft
+
+- **Context**: the draft was written in its tables without the logic of the BO (D54): the
+  determinations ran on activation only, `Prepare` returned the draft without a check, an action
+  of the application on a draft answered 501. SAP Fiori elements expects the draft to behave like
+  the BO: a total recomputed while typing, `Prepare` that validates before activation, an action
+  on the draft being edited.
+- **Decision**: the logic of the BO runs on the draft, in the managed runtime itself.
+  - **A transaction of its own whose buffer holds the draft.** For each request on a draft, a
+    transaction is created on the connection of the LUW (`RapRuntime.shadow`), and the draft tree
+    is put in its buffer without change events: each draft instance as a change of its active
+    instance (its image in the database), or as a creation; the active children the draft removed
+    as deletions. The handlers called by the kernel see this transaction (the context of the LUW),
+    so their EML reads and changes the draft.
+  - **The change, then the determinations.** The change of the request is recorded in this buffer:
+    a PATCH as an update event of its fields, a creation (root, child, inline children) as a
+    create event, the deletion of a child and an instance action by the managed runtime itself
+    (`delete`, `execute`). The determinations on modify follow, by rounds, as in any LUW.
+  - **`Prepare`** runs the determinations (on save) and validations that `draft determine action
+    Prepare { … }` names (`Alias~name` for a child entity), for the instances of the draft changed
+    since their active image or created; their messages, errors included, come back in
+    `sap-messages` with status 200, and the draft is kept. The compiler reads the list; a name the
+    entity does not define is BDEF030.
+  - **The buffer is written back** to the draft tables (changed fields, created and removed
+    instances); what the handlers did in the database is rolled back (a savepoint): only the draft
+    tables change, the active instances never.
+  - Activation is unchanged: the managed runtime applies the draft in the LUW of the request, with
+    the whole save sequence.
+- **Why**: the same handlers, the same buffer and the same trigger rules on the draft and on the
+  active instances, without a second implementation of RAP; the draft tables stay the store.
+- **Tests**: `draft.test.ts` (determinations on create and change of the draft and of its children,
+  `Prepare` with its message, an action on a draft, the deletion of an active child in an edited
+  draft, the active instance untouched); the protocol cases `prepare-runs-validations`,
+  `determination-on-draft-change`, `action-on-draft` pass (11 of 13).

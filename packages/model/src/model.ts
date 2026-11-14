@@ -531,6 +531,11 @@ export interface EntityBehaviorModel {
   draftTable?: string;
   /** `draft action Share` (collaborative draft, D59). */
   draftShare?: true;
+  /**
+   * `draft determine action Prepare { validation …; determination …; }` (D81): what Prepare runs,
+   * names as written (`validateDates`, `Booking~validateFlight`).
+   */
+  draftPrepare?: { validations: string[]; determinations: string[] };
   /** Handlers of the authorization and feature control methods. */
   globalAuthorizationHandler?: HandlerRef;
   instanceAuthorizationHandler?: HandlerRef;

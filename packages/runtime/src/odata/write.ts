@@ -18,6 +18,7 @@ import {
   findEntity,
   OPERATION_CONTROL,
   same,
+  type ActionModel,
   type EdmType,
   type FieldModel,
   type ODataOperation,
@@ -613,7 +614,13 @@ export class RapWriteHandler implements WriteHandler {
     return this.actionResult(base, set, action.result?.entity ?? "$self", operation, results);
   }
 
-  private actionResult(base: Outcome, set: SetInfo, resultEntity: string, operation: ODataOperation, results: ActionResult[]): Outcome {
+  /** The parameters of an action, from the body of the request (D81: also for an action on a draft). */
+  public actionParameters(operation: ODataOperation, action: ActionModel, request: ODataRequest): Row {
+    const parameterEntity = action.parameter === undefined || action.parameter === "$self" ? undefined : findEntity(this.service.model, action.parameter);
+    return this.parameters(operation, parameterEntity?.fields ?? [], request, []);
+  }
+
+  public actionResult(base: Outcome, set: SetInfo, resultEntity: string, operation: ODataOperation, results: ActionResult[]): Outcome {
     const returnType = operation.returnType as NonNullable<ODataOperation["returnType"]>;
     if (returnType.entityType) {
       const targetSet = resultEntity === "$self" ? set : this.setOf(resultEntity);

@@ -170,8 +170,8 @@ What the project deliberately leaves out; the planned work is in
 
 | Gap | Status |
 |---|---|
-| Determinations and validations while editing the draft (`on modify` on the draft, `Prepare` that validates) | Not run in the draft: they run on activation; `Prepare` returns the draft without a check. |
-| Actions of the application on a draft | 501 response: activate first. |
+| Logic of the BO on a draft (D81) | Runs in a transaction of its own whose buffer holds the draft, on each request: what the handlers write elsewhere (another instance through EML, the database) is dropped; ABAP SQL in a handler reads the active instances, not the draft (as on SAP). |
+| Actions of the application on a draft | Instance actions run (D81); static and factory actions: 501, activate first. |
 | `draft query view`, `with draft` on a BO with unmanaged save | Not supported. |
 | Collaborative draft (D59) | No real time (WebSocket): the Object Page reads the draft again every 5 s; no field lock; `ShareAll` ignored; joining a draft only checks the Edit authorization; two-segment navigation `DraftAdministrativeData/DraftAdministrativeUser`: read `DraftAdministrativeUser?$filter=DraftUUID eq …`. |
 | State messages (`%state_area`) | Returned as transition messages on activation. |

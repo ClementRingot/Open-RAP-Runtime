@@ -33,7 +33,7 @@ dependent ETag, remote APIs.
 | `late numbering` | ❌ | Needs the `adjust_numbers` phase of a saver. |
 | `with additional save`, `with unmanaged save` (header or entity, `with full data`) | ✅ | Saver class `lsc_…`: `save_modified` and `cleanup`; unmanaged: reads and locks through the CDS view (D30). Tests `rap-variant-additional-save`, `rap-variant-unmanaged-save`. |
 | Saver inheriting from `cl_abap_behavior_saver_failed` (`failed` in `save_modified`) | ✅ | Rolls back the LUW, managed write included; message returned to the client. |
-| `with draft`, `draft table`, `total etag`, `draft action Edit / Activate optimized / Discard / Resume`, `draft determine action Prepare` | ✅ | Draft tables, `IsActiveEntity`, exclusive lock, activation by the managed runtime (D54); `SiblingEntity` in paths, `$filter` and `$expand`, the draft of the user only (D81). See the gaps in [KNOWN_GAPS.md](../KNOWN_GAPS.md). |
+| `with draft`, `draft table`, `total etag`, `draft action Edit / Activate optimized / Discard / Resume`, `draft determine action Prepare` | ✅ | Draft tables, `IsActiveEntity`, exclusive lock, activation by the managed runtime (D54); `SiblingEntity` in paths, `$filter` and `$expand`, the draft of the user only; the determinations on modify run on each change of the draft, `Prepare` runs what it names and returns the messages, instance actions run on a draft (D81). See the gaps in [KNOWN_GAPS.md](../KNOWN_GAPS.md). |
 | `unmanaged` implementation | ❌ | Out of the target (managed BO). |
 | `with privileged mode` | ✅ | `PRIVILEGED` skips the authorization checks. |
 | `changedocuments`, `event`, `extensible` | ❌ | No equivalent infrastructure. |
@@ -215,7 +215,7 @@ dependent ETag, remote APIs.
 | `$apply`: `filter`, `groupby`, `aggregate` (`sum`, `min`, `max`, `average`, `countdistinct`, `$count`) | ✅ | With the DCL of the user; other transformations: 501 (D52). |
 | Enumeration types (`EnumType`): JSON by member name, literals `Ns.Type'M'` | ✅ | `enhanced` mode, CDS enumerated types (D55). |
 | JSON batch, `$value`, single properties | ❌ | Not in the MVP. |
-| SAP Fiori elements protocol cases (draft List Report and Object Page) | 🟡 | Requests of Fiori elements replayed without SAPUI5 (`fe-protocol.test.ts`): 8 of 13 cases pass, the others wait for the rest of the complete draft (D81); cases from HARs of an SAP BTP trial with `scripts/fe-har-to-cases.mjs`; `rapt dev --fe-check` (D79). |
+| SAP Fiori elements protocol cases (draft List Report and Object Page) | 🟡 | Requests of Fiori elements replayed without SAPUI5 (`fe-protocol.test.ts`): 11 of 13 cases pass, the state messages (`SAP__Messages`) wait for the rest of the complete draft (D81); cases from HARs of an SAP BTP trial with `scripts/fe-har-to-cases.mjs`; `rapt dev --fe-check` (D79). |
 
 ## Generated UI (OpenUI5)
 

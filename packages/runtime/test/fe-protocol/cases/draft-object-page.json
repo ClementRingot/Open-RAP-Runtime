@@ -272,7 +272,6 @@
     },
     {
       "id": "prepare-runs-validations",
-      "fails": "D81",
       "title": "Prepare runs the validations of draft determine action Prepare and returns their messages",
       "confirm": "status and sap-messages of a Prepare with failing validations",
       "steps": [
@@ -425,7 +424,6 @@
     },
     {
       "id": "determination-on-draft-change",
-      "fails": "D81",
       "title": "an on modify determination runs when the draft changes",
       "steps": [
         {
@@ -510,7 +508,6 @@
     },
     {
       "id": "action-on-draft",
-      "fails": "D81",
       "title": "an action of the application runs on a draft instance",
       "steps": [
         {

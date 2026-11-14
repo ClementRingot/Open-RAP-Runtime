@@ -263,6 +263,63 @@ export class Transaction {
   }
 
   // -------------------------------------------------------------------------------------------
+  // drafts (D81): the logic of the BO runs on a draft in a transaction whose buffer holds it
+
+  /**
+   * Puts an instance of a draft in the buffer, without a change event: a change of its active
+   * instance (its image in the database), or a creation when it has none.
+   */
+  public async seedDraft(bo: BoEntity, row: Row, hasActive: boolean): Promise<void> {
+    const key = keyOf(bo, row);
+    const persisted = hasActive ? (await this.instance(bo, key))?.persisted : undefined;
+    const changed = new Set(persisted === undefined ? bo.fields.map((f) => f.name) : bo.fields.filter((f) => f.expression === undefined && JSON.stringify(row[f.name] ?? null) !== JSON.stringify(persisted[f.name] ?? null)).map((f) => f.name));
+    const instance: Instance = { bo, row: { ...(persisted ?? {}), ...row }, deleted: false, changed };
+    if (persisted !== undefined) {
+      instance.persisted = { ...persisted };
+    }
+    this.instances.set(this.id(bo, key), instance);
+  }
+
+  /** An active instance that the draft removed. */
+  public async seedDraftDeletion(bo: BoEntity, key: Row): Promise<void> {
+    const instance = await this.instance(bo, key);
+    if (instance !== undefined) {
+      instance.deleted = true;
+    }
+  }
+
+  /** A change made on the draft outside the buffer (the draft tables), as a change event: it triggers the determinations. */
+  public recordDraftChange(bo: BoEntity, key: Row, kind: "create" | "update", fields: Set<string>): void {
+    this.record(bo, keyOf(bo, key), kind, fields);
+  }
+
+  /** The instances of the buffer, for the draft tables. */
+  public draftInstances(): Array<{ bo: BoEntity; row: Row; deleted: boolean; created: boolean }> {
+    return [...this.instances.values()].map((i) => ({ bo: i.bo, row: { ...i.row }, deleted: i.deleted, created: i.persisted === undefined }));
+  }
+
+  /**
+   * `draft determine action Prepare` (D81): the determinations on save, then the validations it
+   * names, for the instances of the draft changed since its active image (or created).
+   */
+  public async prepare(items: Array<{ bo: BoEntity; kind: "validation" | "determination"; name: string }>): Promise<Responses> {
+    const responses = new Responses();
+    for (const kind of ["determination", "validation"] as const) {
+      for (const item of items.filter((i) => i.kind === kind)) {
+        const definition = (kind === "validation" ? item.bo.behavior.validations : item.bo.behavior.determinations.filter((d) => d.on === "save")).find((d) => same(d.name, item.name));
+        if (definition === undefined) {
+          continue;
+        }
+        const keys = this.triggeredInLuw(item.bo, definition.triggers);
+        if (keys.length > 0) {
+          responses.add(await this.runDetermination(item.bo, definition, keys, true));
+        }
+      }
+    }
+    return responses;
+  }
+
+  // -------------------------------------------------------------------------------------------
   // checks
 
   private failure(responses: Responses, bo: BoEntity, failure: Failure, operation?: FailedOperation): void {

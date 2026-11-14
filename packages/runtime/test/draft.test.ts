@@ -11,7 +11,7 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { createApp } from "../src/app.js";
 import { createDatabase, PGLITE_PARSERS, type Database } from "../src/db/database.js";
 import { RapRuntime } from "../src/rap/runtime.js";
-import { DRAFT_CHANGES, generatedVariant, SEED, SERVICE, T1, type GeneratedFixture } from "./helpers.js";
+import { B2, DRAFT_CHANGES, generatedVariant, SEED, SERVICE, T1, type GeneratedFixture } from "./helpers.js";
 
 const NS = "com.sap.gateway.srvd.zrt_ui_travel.v0001";
 let fixture: GeneratedFixture;
@@ -129,6 +129,44 @@ describe("draft", () => {
     expect(values(await call(bob, "GET", `Travel?${locked}`))).toEqual([expect.objectContaining({ TravelID: "00000001" })]);
     expect(values(await call(alice, "GET", `Travel?${locked}`))).toEqual([]);
     expect((await call(alice, "POST", `${travel(T1, false)}/${NS}.Discard`, {})).status).toBe(204);
+  });
+
+  it("runs the logic of the BO on the draft: determinations, Prepare, actions (D81)", async () => {
+    const created = await call(alice, "POST", "Travel", { TravelID: "00000110", AgencyID: "070001", CustomerID: "000100", BookingFee: 10, CurrencyCode: "EUR" });
+    expect(created.status, JSON.stringify(created.body)).toBe(201);
+    const uuid = String(created.body["TravelUUID"]);
+    // on modify { create }: the status is set in the draft
+    expect((await call(alice, "GET", travel(uuid, false))).body).toMatchObject({ OverallStatus: "O", TotalPrice: 10 });
+    // a draft booking changes the total price of the draft travel
+    const booking = await call(alice, "POST", `${travel(uuid, false)}/_Booking`, { BookingID: "0001", CarrierID: "AF", ConnectionID: "0012", FlightDate: "2027-04-01", FlightPrice: 200, CurrencyCode: "EUR" });
+    expect(booking.status, JSON.stringify(booking.body)).toBe(201);
+    expect((await call(alice, "GET", travel(uuid, false))).body).toMatchObject({ TotalPrice: 210 });
+    expect((await call(alice, "PATCH", travel(uuid, false), { BookingFee: 30 })).status).toBe(200);
+    expect((await call(alice, "GET", travel(uuid, false))).body).toMatchObject({ TotalPrice: 230 });
+    // a booking that only exists in the draft: the handler reads the parent of a deleted booking on
+    // the database (active instances), where it is not, as on SAP: the total stays
+    expect((await call(alice, "DELETE", `Booking(BookingUUID=${String(booking.body["BookingUUID"])},IsActiveEntity=false)`)).status).toBe(204);
+    expect((await call(alice, "GET", travel(uuid, false))).body).toMatchObject({ TotalPrice: 230 });
+    // Prepare runs the validations it names: the draft stays, the messages come back
+    const prepared = await alice.inject({ method: "POST", url: `${SERVICE}${travel(uuid, false)}/${NS}.Prepare`, headers: HEADERS, payload: "{}" });
+    expect(prepared.statusCode).toBe(200);
+    expect(JSON.parse(String(prepared.headers["sap-messages"]))).toEqual([expect.objectContaining({ message: "Begin date and end date are required", numericSeverity: 4 })]);
+    // an action on the draft changes the draft, not the active instances
+    expect((await call(alice, "POST", `${travel(uuid, false)}/${NS}.acceptTravel`, {})).body).toMatchObject({ IsActiveEntity: false, OverallStatus: "A" });
+    expect(values(await call(alice, "GET", "Travel?$filter=IsActiveEntity eq true and TravelID eq '00000110'"))).toEqual([]);
+    // an edited instance: the logic changes the draft only
+    expect((await call(alice, "POST", `${travel(T1, true)}/${NS}.Edit`, {})).status).toBe(200);
+    const before = (await call(alice, "GET", travel(T1, true))).body["TotalPrice"];
+    expect((await call(alice, "PATCH", travel(T1, false), { BookingFee: 99 })).status).toBe(200);
+    expect((await call(alice, "GET", travel(T1, false))).body["TotalPrice"]).not.toBe(before);
+    expect((await call(alice, "GET", travel(T1, true))).body["TotalPrice"]).toBe(before);
+    // the deletion of an active booking in the draft: the total of the draft changes
+    const drafted = Number((await call(alice, "GET", travel(T1, false))).body["TotalPrice"]);
+    expect((await call(alice, "DELETE", `Booking(BookingUUID=${B2},IsActiveEntity=false)`)).status).toBe(204);
+    expect(Number((await call(alice, "GET", travel(T1, false))).body["TotalPrice"])).toBeCloseTo(drafted - 750.25, 2);
+    expect((await call(alice, "GET", travel(T1, true))).body["TotalPrice"]).toBe(before);
+    expect((await call(alice, "POST", `${travel(T1, false)}/${NS}.Discard`, {})).status).toBe(204);
+    expect((await call(alice, "POST", `${travel(uuid, false)}/${NS}.Discard`, {})).status).toBe(204);
   });
 
   it("gives the administrative data of the draft", async () => {

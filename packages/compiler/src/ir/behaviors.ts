@@ -261,6 +261,17 @@ function buildEntityBehavior(
   for (const item of ast.items) {
     buildItem(model, item, entity, behavior, at, ctx, checkField, checkAssociation);
   }
+  // draft determine action Prepare (D81): the validations and determinations of the entity it names
+  if (model.draftPrepare !== undefined) {
+    for (const [kind, names, known] of [
+      ["validation", model.draftPrepare.validations, model.validations.map((v) => v.name)],
+      ["determination", model.draftPrepare.determinations, model.determinations.map((d) => d.name)],
+    ] as const) {
+      for (const name of names.filter((n) => !n.includes("~") && !known.some((k) => k.toUpperCase() === n.toUpperCase()))) {
+        diagnostics.error("BDEF030", `${entity.name}: draft determine action Prepare names the ${kind} ${name}, which the entity does not define`, prepareLocs.get(model) ?? at(ast.loc));
+      }
+    }
+  }
 
   if (!isProjection) {
     const unmanagedSave = (model.saving ?? behavior.saving)?.kind === "unmanaged";
@@ -335,6 +346,9 @@ function features(options: OperationOptionAst[], at: (loc: Loc) => object, ctx: 
   }
   return result;
 }
+
+/** Where `draft determine action Prepare` is written, for its diagnostics. */
+const prepareLocs = new WeakMap<EntityBehaviorModel, object>();
 
 function buildItem(
   model: EntityBehaviorModel,
@@ -553,6 +567,13 @@ function buildItem(
           diagnostics.warning("BDEF003", `draft statement ignored: ${item.text}`, at(item.loc));
         } else if (/\bShare\b/i.test(item.text)) {
           model.draftShare = true;
+        } else if (/^draft\s+determine\s+action\s+Prepare\b/i.test(item.text)) {
+          const prepare = { validations: [] as string[], determinations: [] as string[] };
+          for (const m of (/\{([^}]*)\}/.exec(item.text)?.[1] ?? "").matchAll(/\b(validation|determination)\s+([\w~/]+)\s*;/gi)) {
+            (/^validation$/i.test(m[1] ?? "") ? prepare.validations : prepare.determinations).push(m[2] ?? "");
+          }
+          model.draftPrepare = prepare;
+          prepareLocs.set(model, at(item.loc));
         }
       } else {
         diagnostics.warning("BDEF003", `${item.what} is not supported yet and is ignored: ${item.text}`, at(item.loc));
