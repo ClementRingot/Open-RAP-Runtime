@@ -576,7 +576,9 @@ correspond to points 1 to 13 of §11 of PLAN.md. The milestones M1 to M6 are tho
   hides Create when it is refused.
 - **Create by association**: for the master entity, it has its own indicator
   (`%assoc-_Booking`), as on SAP; for a dependent entity, the update authorization of the master
-  applies. The fixture grants the creation of bookings with the update of the travel.
+  applies. The fixture grants the creation of bookings with the update of the travel. Corrected
+  by D85: SAP has no `%assoc` in the authorization types, the creation by association is
+  authorized as an update of its source.
 - **Tests**: `rap-authorizations.test.ts` (checks per profile, `$permissions`, creation of
   bookings), `ui-authorizations.test.ts` (browser: a viewer does not see Create, Edit, Delete and
   the action are disabled).
@@ -2005,7 +2007,7 @@ _The issues moved to the repository itself once public: see D74._
   repository is not activated on SAP by the tests: the first activation on the trial will confirm
   or correct the draft tables and the `trial` variant (KNOWN_GAPS.md).
 
-## D85 — The abapGit XML of metadata extensions and service bindings in the format of SAP BTP
+## D85 — First pull and activation on the SAP BTP trial: abapGit XML, `total etag`, authorizations
 
 - **Context**: the first pull of the Travel fixture on the SAP BTP ABAP trial (2611, D84) imported
   20 objects of 23. The two metadata extensions failed with `The description is missing for …`
@@ -2027,8 +2029,38 @@ _The issues moved to the repository itself once public: see D74._
   - `rapt abapgit --suffix` (D83) renames a name in a path too, as the `URI` of `SRVD_REF`
     (`…/srvd/sources/zrt_ui_travelcr1`); a name after a namespace (`/DMO/ZRT_X`) is still left
     alone.
+- **Context (activation)**: once pulled, the draft and trial variants of the fixture did not
+  activate:
+  - BDEF: `"( | changedocuments | early | extensible | late | with | {" was expected, not
+    "total".` on `total etag LastChangedAt` written on its own line: in BDL `total etag` is an
+    addition of `lock master` (`lock master total etag LastChangedAt`);
+  - behavior pool: `Only reads can be performed on the field "SY-SUBRC" in the current ABAP
+    language version.` on the six `sy-subrc = 0.` of the `trial` variant;
+  - behavior pool: `No component exists with the name "%ASSOC-_BOOKING".`, `The data object
+    "REQUESTED_AUTHORIZATIONS" does not have a component called "%ASSOC-_BOOKING".` and the same
+    for `RESULT`: the authorization types of SAP have no `%assoc` for the to-child association
+    `_Booking { create; }`; its creation is authorized as an update of the travel (*RAP -
+    Authorization* of the ABAP keyword documentation).
+  - warning: `Validation "validateMandatory" is not assigned to any determine action (not even
+    "Prepare").` for the booking.
+- **Decision (activation)**:
+  - **BDEF031**: `total etag` anywhere but right after `lock master` is an error; the `draft`
+    variant writes `lock master total etag LastChangedAt`.
+  - The `trial` variant replaces each `AUTHORITY-CHECK` and the `COND #( WHEN sy-subrc = 0 … )`
+    after it by `if_abap_behv=>auth-allowed`: it no longer writes `sy-subrc`.
+  - The authorization types (`ts_eN_gauth_req`, `ts_eN_iauth_req`, `ts_eN_iauth_r`) no longer
+    have `%assoc` (the failed responses keep it); the runtime asks the authorization of a creation
+    by association as an update of its source (`%update`). The behavior pool of the fixture no
+    longer names `%assoc-_Booking`. Open RAP Runtime has no `authorization:` addition per
+    association (`create ( authorization : … )`), which would give it its own indicator.
+  - The `Prepare` of the `draft` variant also runs `Booking~validateMandatory`.
 - **Not done**: `rapt abapgit` still never changes an existing XML file: a project written by an
-  earlier version keeps its flat DDLX and SRVB until they are deleted and written again.
+  earlier version keeps its flat DDLX and SRVB until they are deleted and written again. The
+  warnings of the secondary key `entity` (`READ TABLE … WITH KEY TravelUUID = …`) are left.
 - **Tests**: `abapgit-format.test.ts` (both writers, the Web API category, the flat binding still
   read, no flat DDLX or SRVB left in `fixtures/`); `web-api-app.test.ts`, `web-api.test.ts`,
-  `rapt.test.ts` on the new category; `rename.test.ts` (the path renamed, the namespace not).
+  `rapt.test.ts` on the new category; `rename.test.ts` (the path renamed, the namespace not);
+  `ir.test.ts` (BDEF031); `abap-generate.test.ts` (no `%assoc` in the authorization types);
+  `roundtrip.test.mjs` (the variants: `lock master total etag`, no `sy-subrc` written, no
+  `%assoc-_Booking`); `rap-authorizations.test.ts` (the creation of bookings by the update
+  authorization of the travel).

@@ -37,7 +37,15 @@ describe("variants of the fixtures (D99)", () => {
       }
       applyVariants(path.join(dir, "src"), definitions, ["draft", "trial"]);
       expect(readFileSync(path.join(dir, "src", "zrt_r_travel.bdef.asbdef"), "utf8")).toContain("draft table zrt_d_travel");
-      expect(readFileSync(path.join(dir, "src", "zbp_rt_r_travel.clas.locals_imp.abap"), "utf8")).not.toContain("AUTHORITY-CHECK");
+      const bdef = readFileSync(path.join(dir, "src", "zrt_r_travel.bdef.asbdef"), "utf8");
+      // total etag is an addition of lock master (BDEF031, refused by SAP otherwise, D85)
+      expect(bdef).toContain("lock master total etag LastChangedAt\n");
+      expect(bdef).toContain("validation Booking~validateMandatory;");
+      const pool = readFileSync(path.join(dir, "src", "zbp_rt_r_travel.clas.locals_imp.abap"), "utf8");
+      expect(pool).not.toContain("AUTHORITY-CHECK");
+      // ABAP for Cloud Development only reads sy-subrc (D85)
+      expect(pool).not.toMatch(/^\s*sy-subrc\s*=/im);
+      expect(pool).not.toContain("%assoc-_Booking");
     } finally {
       rmSync(dir, { recursive: true, force: true });
     }

@@ -224,9 +224,15 @@ function buildEntityBehavior(
         }
         break;
       }
-      case "totalEtag":
-        // the ETag of the draft: the change time of the draft, kept by the runtime (D54)
+      case "totalEtag": {
+        // the ETag of the draft: the change time of the draft, kept by the runtime (D54); in BDL an
+        // addition of lock master (lock master [unmanaged] total etag Field), refused by SAP elsewhere (D85)
+        const index = ast.options.indexOf(option);
+        if (ast.options[index - 1]?.kind !== "lockMaster") {
+          diagnostics.error("BDEF031", `${entity.name}: total etag is an addition of lock master: write lock master total etag ${option.field.text}`, at(option.loc));
+        }
         break;
+      }
       case "draftTable":
         model.draftTable = option.table.text.toLowerCase();
         break;

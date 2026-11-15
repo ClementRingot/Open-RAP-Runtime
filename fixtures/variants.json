@@ -13,12 +13,12 @@
      "persistent table zrt_travel\ndraft table zrt_d_travel"
     ],
     [
-     "etag master LocalLastChangedAt\n{\n  create;",
-     "etag master LocalLastChangedAt\ntotal etag LastChangedAt\n{\n  create;"
+     "lock master\nauthorization master",
+     "lock master total etag LastChangedAt\nauthorization master"
     ],
     [
      "  association _Booking { create; }",
-     "  association _Booking { create; with draft; }\n\n  draft action Edit;\n  draft action Activate optimized;\n  draft action Discard;\n  draft action Resume;\n  draft determine action Prepare { validation validateDates; validation validateMandatory; }"
+     "  association _Booking { create; with draft; }\n\n  draft action Edit;\n  draft action Activate optimized;\n  draft action Discard;\n  draft action Resume;\n  draft determine action Prepare { validation validateDates; validation validateMandatory; validation Booking~validateMandatory; }"
     ],
     [
      "persistent table zrt_booking",
@@ -54,28 +54,28 @@
   "files": {
    "zbp_rt_r_travel.clas.locals_imp.abap": [
     [
-     "      AUTHORITY-CHECK OBJECT 'ZAO_TRAVL' ID 'ACTVT' FIELD '01' ID 'ZAGENCY' DUMMY.",
-     "      sy-subrc = 0. \" the SAP BTP trial grants no authorization of its own (D99)"
+     "      AUTHORITY-CHECK OBJECT 'ZAO_TRAVL' ID 'ACTVT' FIELD '01' ID 'ZAGENCY' DUMMY.\n      result-%create = COND #( WHEN sy-subrc = 0 THEN if_abap_behv=>auth-allowed ELSE if_abap_behv=>auth-unauthorized ).",
+     "      \" the SAP BTP trial grants no authorization of its own (D99)\n      result-%create = if_abap_behv=>auth-allowed."
     ],
     [
-     "      AUTHORITY-CHECK OBJECT 'ZAO_TRAVL' ID 'ACTVT' FIELD '02' ID 'ZAGENCY' DUMMY.",
-     "      sy-subrc = 0. \" the SAP BTP trial grants no authorization of its own (D99)"
+     "      AUTHORITY-CHECK OBJECT 'ZAO_TRAVL' ID 'ACTVT' FIELD '02' ID 'ZAGENCY' DUMMY.\n      result-%update = COND #( WHEN sy-subrc = 0 THEN if_abap_behv=>auth-allowed ELSE if_abap_behv=>auth-unauthorized ).",
+     "      \" the SAP BTP trial grants no authorization of its own (D99)\n      result-%update = if_abap_behv=>auth-allowed."
     ],
     [
-     "      AUTHORITY-CHECK OBJECT 'ZAO_TRAVL' ID 'ACTVT' FIELD '06' ID 'ZAGENCY' DUMMY.",
-     "      sy-subrc = 0. \" the SAP BTP trial grants no authorization of its own (D99)"
+     "      AUTHORITY-CHECK OBJECT 'ZAO_TRAVL' ID 'ACTVT' FIELD '06' ID 'ZAGENCY' DUMMY.\n      result-%delete = COND #( WHEN sy-subrc = 0 THEN if_abap_behv=>auth-allowed ELSE if_abap_behv=>auth-unauthorized ).",
+     "      \" the SAP BTP trial grants no authorization of its own (D99)\n      result-%delete = if_abap_behv=>auth-allowed."
     ],
     [
-     "      AUTHORITY-CHECK OBJECT 'ZAO_TRAVL' ID 'ACTVT' FIELD '01' ID 'ZAGENCY' DUMMY.",
-     "      sy-subrc = 0. \" the SAP BTP trial grants no authorization of its own (D99)"
+     "      AUTHORITY-CHECK OBJECT 'ZAO_TRAVL' ID 'ACTVT' FIELD '01' ID 'ZAGENCY' DUMMY.\n      result-%action-copyTravel = COND #( WHEN sy-subrc = 0 THEN if_abap_behv=>auth-allowed ELSE if_abap_behv=>auth-unauthorized ).",
+     "      \" the SAP BTP trial grants no authorization of its own (D99)\n      result-%action-copyTravel = if_abap_behv=>auth-allowed."
     ],
     [
-     "      AUTHORITY-CHECK OBJECT 'ZAO_TRAVL' ID 'ACTVT' FIELD '02' ID 'ZAGENCY' FIELD travel-AgencyID.",
-     "      sy-subrc = 0. \" the SAP BTP trial grants no authorization of its own (D99)"
+     "      AUTHORITY-CHECK OBJECT 'ZAO_TRAVL' ID 'ACTVT' FIELD '02' ID 'ZAGENCY' FIELD travel-AgencyID.\n      DATA(update) = COND #( WHEN sy-subrc = 0 THEN if_abap_behv=>auth-allowed ELSE if_abap_behv=>auth-unauthorized ).",
+     "      \" the SAP BTP trial grants no authorization of its own (D99)\n      DATA(update) = if_abap_behv=>auth-allowed."
     ],
     [
-     "      AUTHORITY-CHECK OBJECT 'ZAO_TRAVL' ID 'ACTVT' FIELD '06' ID 'ZAGENCY' FIELD travel-AgencyID.",
-     "      sy-subrc = 0. \" the SAP BTP trial grants no authorization of its own (D99)"
+     "      AUTHORITY-CHECK OBJECT 'ZAO_TRAVL' ID 'ACTVT' FIELD '06' ID 'ZAGENCY' FIELD travel-AgencyID.\n      DATA(delete) = COND #( WHEN sy-subrc = 0 THEN if_abap_behv=>auth-allowed ELSE if_abap_behv=>auth-unauthorized ).",
+     "      \" the SAP BTP trial grants no authorization of its own (D99)\n      DATA(delete) = if_abap_behv=>auth-allowed."
     ]
    ],
    "zrt_r_travel.dcls.asdcls": [

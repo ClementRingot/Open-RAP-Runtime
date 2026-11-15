@@ -49,14 +49,13 @@ CLASS lhc_travel IMPLEMENTATION.
       result-%create = COND #( WHEN sy-subrc = 0 THEN if_abap_behv=>auth-allowed ELSE if_abap_behv=>auth-unauthorized ).
       result-%action-copyTravel = result-%create.
     ENDIF.
-    " a change of the travel: update, its actions and the creation of its bookings
+    " a change of the travel: update and its actions; the creation of its bookings is authorized as an update
     IF requested_authorizations-%update = if_abap_behv=>mk-on OR requested_authorizations-%action-acceptTravel = if_abap_behv=>mk-on
-       OR requested_authorizations-%action-deductDiscount = if_abap_behv=>mk-on OR requested_authorizations-%assoc-_Booking = if_abap_behv=>mk-on.
+       OR requested_authorizations-%action-deductDiscount = if_abap_behv=>mk-on.
       AUTHORITY-CHECK OBJECT 'ZAO_TRAVL' ID 'ACTVT' FIELD '02' ID 'ZAGENCY' DUMMY.
       result-%update = COND #( WHEN sy-subrc = 0 THEN if_abap_behv=>auth-allowed ELSE if_abap_behv=>auth-unauthorized ).
       result-%action-acceptTravel = result-%update.
       result-%action-deductDiscount = result-%update.
-      result-%assoc-_Booking = result-%update.
     ENDIF.
     IF requested_authorizations-%delete = if_abap_behv=>mk-on.
       AUTHORITY-CHECK OBJECT 'ZAO_TRAVL' ID 'ACTVT' FIELD '06' ID 'ZAGENCY' DUMMY.
@@ -85,8 +84,7 @@ CLASS lhc_travel IMPLEMENTATION.
                       %update                 = update
                       %delete                 = delete
                       %action-acceptTravel    = update
-                      %action-deductDiscount  = update
-                      %assoc-_Booking         = update ) TO result.
+                      %action-deductDiscount  = update ) TO result.
     ENDLOOP.
   ENDMETHOD.
 

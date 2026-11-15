@@ -97,6 +97,26 @@ describe("ABAP generation of the fixture", () => {
     expect(locals).toContain('abap.Classes[\'CLAS-ZBP_RT_R_TRAVEL-LHC_TRAVEL\']');
   });
 
+  it("has no %assoc in the authorization types: a creation by association is authorized as an update (D85)", () => {
+    const project = loadProject(FIXTURE_DIR);
+    const { model } = buildModel(project);
+    if (model === undefined) {
+      throw new Error("no model");
+    }
+    const types = abapSources(project, model, new Diagnostics()).find((s) => s.fileName.startsWith(I))?.content ?? "";
+    const structure = (name: string): string => {
+      const start = types.indexOf(`BEGIN OF ${name}`);
+      const end = types.indexOf(`END OF ${name}`, start);
+      return start < 0 || end < 0 ? "" : types.slice(start, end);
+    };
+    for (const name of ["ts_e1_gauth_req", "ts_e1_iauth_req", "ts_e1_iauth_r"]) {
+      expect(structure(name)).toContain("%update");
+      expect(structure(name)).not.toContain("%assoc");
+    }
+    // the failed responses keep it
+    expect(structure("ts_e1_failr")).toContain("%assoc");
+  });
+
   it("keeps the line numbers of the original sources", async () => {
     const { rewritten } = await generate();
     expect(rewritten.split("\n").length).toBe(readFixture(ABP).split("\n").length);

@@ -291,10 +291,11 @@ export function generateDerivedTypes(model: Model, behavior: BehaviorModel): Der
         ...(controlled.associations.length > 0 ? [{ component: "%assoc", type: `ts_e${e}_${suffix}_asc` }] : []),
       ];
     };
-    w.structure(derivedType.globalAuthRequest(e), [...flags(["%create", "%update", "%delete"]), ...actionPart, ...assocPart]);
+    // no %assoc: the creation by association is authorized as an update of its source (D85)
+    w.structure(derivedType.globalAuthRequest(e), [...flags(["%create", "%update", "%delete"]), ...actionPart]);
     w.alias(derivedType.globalAuthResult(e), derivedType.globalAuthRequest(e));
-    w.structure(derivedType.instanceAuthRequest(e), [...flags(["%update", "%delete"]), ...actionPart, ...assocPart]);
-    w.structure(`ts_e${e}_iauth_r`, [{ include: derivedType.tky(e), as: "%tky" }, ...flags(["%update", "%delete"]), ...actionPart, ...assocPart], derivedType.instanceAuthResult(e));
+    w.structure(derivedType.instanceAuthRequest(e), [...flags(["%update", "%delete"]), ...actionPart]);
+    w.structure(`ts_e${e}_iauth_r`, [{ include: derivedType.tky(e), as: "%tky" }, ...flags(["%update", "%delete"]), ...actionPart], derivedType.instanceAuthResult(e));
     w.structure(`ts_e${e}_feat`, [...featureParts("ifc", "instance", ["update", "delete"]), { component: "%field", type: derivedType.fieldControl(e) }]);
     w.alias(derivedType.instanceFeaturesRequest(e), `ts_e${e}_feat`);
     w.structure(`ts_e${e}_ifeat_r`, [{ include: derivedType.tky(e), as: "%tky" }, { include: `ts_e${e}_feat`, as: "%features" }], derivedType.instanceFeaturesResult(e));
