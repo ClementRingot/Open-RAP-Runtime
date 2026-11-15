@@ -1,0 +1,96 @@
+{
+ "$comment": "Variants of fixtures/travel (D99), shared by the tests (packages/runtime/test/helpers.ts) and scripts/btp-roundtrip.mjs. Each file: exact replacements [from, to], applied in order, once each; null removes the file.",
+ "draft": {
+  "description": "The Travel fixture as a draft BO (D54): with draft, draft tables, draft actions.",
+  "files": {
+   "zrt_r_travel.bdef.asbdef": [
+    [
+     "strict ( 2 );",
+     "strict ( 2 );\nwith draft;"
+    ],
+    [
+     "persistent table zrt_travel",
+     "persistent table zrt_travel\ndraft table zrt_d_travel"
+    ],
+    [
+     "etag master LocalLastChangedAt\n{\n  create;",
+     "etag master LocalLastChangedAt\ntotal etag LastChangedAt\n{\n  create;"
+    ],
+    [
+     "  association _Booking { create; }",
+     "  association _Booking { create; with draft; }\n\n  draft action Edit;\n  draft action Activate optimized;\n  draft action Discard;\n  draft action Resume;\n  draft determine action Prepare { validation validateDates; validation validateMandatory; }"
+    ],
+    [
+     "persistent table zrt_booking",
+     "persistent table zrt_booking\ndraft table zrt_d_booking"
+    ],
+    [
+     "  association _Travel;\n\n  field ( numbering",
+     "  association _Travel { with draft; }\n\n  field ( numbering"
+    ]
+   ],
+   "zrt_c_travel.bdef.asbdef": [
+    [
+     "strict ( 2 );",
+     "strict ( 2 );\nuse draft;"
+    ],
+    [
+     "  use action copyTravel;",
+     "  use action copyTravel;\n\n  use action Edit;\n  use action Activate;\n  use action Discard;\n  use action Resume;\n  use action Prepare;"
+    ],
+    [
+     "  use association _Booking { create; }",
+     "  use association _Booking { create; with draft; }"
+    ],
+    [
+     "  use association _Travel;",
+     "  use association _Travel { with draft; }"
+    ]
+   ]
+  }
+ },
+ "trial": {
+  "description": "For the SAP BTP trial (D99): a user cannot grant themselves authorizations there, so the authorization checks and the access conditions are left out, as the SAP tutorials do.",
+  "files": {
+   "zbp_rt_r_travel.clas.locals_imp.abap": [
+    [
+     "      AUTHORITY-CHECK OBJECT 'ZAO_TRAVL' ID 'ACTVT' FIELD '01' ID 'ZAGENCY' DUMMY.",
+     "      sy-subrc = 0. \" the SAP BTP trial grants no authorization of its own (D99)"
+    ],
+    [
+     "      AUTHORITY-CHECK OBJECT 'ZAO_TRAVL' ID 'ACTVT' FIELD '02' ID 'ZAGENCY' DUMMY.",
+     "      sy-subrc = 0. \" the SAP BTP trial grants no authorization of its own (D99)"
+    ],
+    [
+     "      AUTHORITY-CHECK OBJECT 'ZAO_TRAVL' ID 'ACTVT' FIELD '06' ID 'ZAGENCY' DUMMY.",
+     "      sy-subrc = 0. \" the SAP BTP trial grants no authorization of its own (D99)"
+    ],
+    [
+     "      AUTHORITY-CHECK OBJECT 'ZAO_TRAVL' ID 'ACTVT' FIELD '01' ID 'ZAGENCY' DUMMY.",
+     "      sy-subrc = 0. \" the SAP BTP trial grants no authorization of its own (D99)"
+    ],
+    [
+     "      AUTHORITY-CHECK OBJECT 'ZAO_TRAVL' ID 'ACTVT' FIELD '02' ID 'ZAGENCY' FIELD travel-AgencyID.",
+     "      sy-subrc = 0. \" the SAP BTP trial grants no authorization of its own (D99)"
+    ],
+    [
+     "      AUTHORITY-CHECK OBJECT 'ZAO_TRAVL' ID 'ACTVT' FIELD '06' ID 'ZAGENCY' FIELD travel-AgencyID.",
+     "      sy-subrc = 0. \" the SAP BTP trial grants no authorization of its own (D99)"
+    ]
+   ],
+   "zrt_r_travel.dcls.asdcls": [
+    [
+     "\n    where ( AgencyID ) = aspect pfcg_auth( ZAO_TRAVL, ZAGENCY, ACTVT = '03' );",
+     ";"
+    ]
+   ],
+   "zrt_c_booking.dcls.asdcls": [
+    [
+     "\n    where ( _Travel.AgencyID ) = aspect pfcg_auth( ZAO_TRAVL, ZAGENCY, ACTVT = '03' );",
+     ";"
+    ]
+   ],
+   "zao_travl.suso.xml": null
+  }
+ }
+}

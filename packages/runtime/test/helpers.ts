@@ -335,22 +335,21 @@ export function testLaunchpad(appDir: string, appUrl: string): { config: Launchp
   return { config: resolution.model, uiDir: path.join(work, "ui") };
 }
 
+/** The variants of the Travel fixture (D99), shared with scripts/btp-roundtrip.mjs. */
+const VARIANTS = JSON.parse(readFileSync(new URL("../../../fixtures/variants.json", import.meta.url), "utf8")) as Record<string, { files: Record<string, Array<[string, string]> | null> }>;
+
+/** The changes of a variant of fixtures/variants.json, for generatedVariant. */
+export function variantChanges(name: string): Record<string, (content: string) => string> {
+  const variant = VARIANTS[name];
+  if (variant === undefined) {
+    throw new Error(`unknown variant ${name}`);
+  }
+  return Object.fromEntries(
+    Object.entries(variant.files)
+      .filter((entry): entry is [string, Array<[string, string]>] => entry[1] !== null)
+      .map(([file, replacements]) => [file, (content: string) => edit(content, replacements)]),
+  );
+}
+
 /** The Travel fixture as a draft BO (D54): `with draft`, draft tables, draft actions. */
-export const DRAFT_CHANGES: Record<string, (content: string) => string> = {
-  "zrt_r_travel.bdef.asbdef": (c) =>
-    edit(c, [
-      ["strict ( 2 );", "strict ( 2 );\nwith draft;"],
-      ["persistent table zrt_travel", "persistent table zrt_travel\ndraft table zrt_d_travel"],
-      ["etag master LocalLastChangedAt\n{\n  create;", "etag master LocalLastChangedAt\ntotal etag LastChangedAt\n{\n  create;"],
-      ["  association _Booking { create; }", "  association _Booking { create; with draft; }\n\n  draft action Edit;\n  draft action Activate optimized;\n  draft action Discard;\n  draft action Resume;\n  draft determine action Prepare { validation validateDates; validation validateMandatory; }"],
-      ["persistent table zrt_booking", "persistent table zrt_booking\ndraft table zrt_d_booking"],
-      ["  association _Travel;\n\n  field ( numbering", "  association _Travel { with draft; }\n\n  field ( numbering"],
-    ]),
-  "zrt_c_travel.bdef.asbdef": (c) =>
-    edit(c, [
-      ["strict ( 2 );", "strict ( 2 );\nuse draft;"],
-      ["  use action copyTravel;", "  use action copyTravel;\n\n  use action Edit;\n  use action Activate;\n  use action Discard;\n  use action Resume;\n  use action Prepare;"],
-      ["  use association _Booking { create; }", "  use association _Booking { create; with draft; }"],
-      ["  use association _Travel;", "  use association _Travel { with draft; }"],
-    ]),
-};
+export const DRAFT_CHANGES: Record<string, (content: string) => string> = variantChanges("draft");

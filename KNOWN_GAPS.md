@@ -166,6 +166,14 @@ What the project deliberately leaves out; the planned work is in
 | Elements of the standard views | The commonly used ones; the other elements of the SAP views (and their associations) do not exist. |
 | Value help | A single value help per element (the first one if several, without `qualifier`); `useForValidation` checked in the UI, not by the service (as in RAP); no `distinctValues`, nor `presentationVariantQualifier`. |
 
+## Round trip to SAP BTP (D84)
+
+| Gap | Status |
+|---|---|
+| The authorization object `ZAO_TRAVL` of `fixtures/travel` names the authorization field `ZAGENCY`, which the fixture does not define (nor its data element, nor the object class `ZRT`) | The Travel fixture does not activate on SAP as is; the `trial` variant leaves the authorizations out. To fix with the first activation results. |
+| The `trial` variant replaces each `AUTHORITY-CHECK` by `sy-subrc = 0.` and the access conditions by an unconditional `grant select` | A trial user cannot be granted authorizations of their own; the behavior of the authorizations is not compared with SAP. |
+| Draft tables written for SAP: element names, types and the reference fields of the amounts derived from the model | Not compared with the tables ADT generates until the first activation on the trial. |
+
 ## Draft (D54)
 
 | Gap | Status |

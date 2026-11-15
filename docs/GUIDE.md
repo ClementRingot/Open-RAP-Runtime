@@ -383,10 +383,14 @@ Open RAP Runtime generates an OpenUI5 UI and does not load SAPUI5, which is lice
 To turn what Fiori elements sends into tests of the project (contributors, D79, D83):
 
 1. The SAP BTP ABAP trial is shared: every object gets a suffix of your own.
-   `rapt abapgit <fixture> --suffix CR1 --out ../trial-copy` writes a renamed copy (`ZRT_TRAVEL`
-   → `ZRT_TRAVELCR1`, every reference included; a name too long for its type keeps its start);
-   push it to a Git repository of yours, link it to a package of yours with abapGit for ADT,
-   pull, activate, publish the service binding and copy the URL of its Fiori elements *Preview*.
+   `node scripts/btp-roundtrip.mjs --suffix CR1 --out ../trial-travel` writes the abapGit
+   repository of the draft variant of the Travel fixture for the trial (D84): renamed
+   (`ZRT_TRAVEL` → `ZRT_TRAVELCR1`, every reference included), with the draft tables SAP needs,
+   without the authorization checks a trial user cannot be granted, with an `expected.json` and a
+   `README.md` of the steps: push it to a Git repository of yours, link it to a package of yours
+   with abapGit for ADT, pull, activate, publish the service binding and copy the URL of its Fiori
+   elements *Preview*. (`rapt abapgit <src> --suffix CR1 --out <dir>` renames any project the
+   same way.)
 2. `node scripts/fe-record-trial.mjs --url <preview URL> --release <release>` opens Chromium:
    sign in, then play each scenario the terminal describes (list and Editing Status, create,
    edit, a refused activation, discard, an action, a value help, side effects, a child) and press

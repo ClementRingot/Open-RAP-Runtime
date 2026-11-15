@@ -6,6 +6,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { generateAbapGitFiles, type AbapGitResult } from "./authoring/abapgit.js";
 import { renameProject } from "./authoring/rename.js";
+import { draftTableFiles } from "./authoring/draft-tables.js";
 import { generateObject, OBJECT_KINDS } from "./authoring/generate.js";
 import { FLOORPLAN_CATALOG, OBJECT_CATALOG } from "./authoring/catalog.js";
 import { floorplans } from "./authoring/floorplan.js";
@@ -280,7 +281,17 @@ function renamedCopyCommand(source: string, suffix: string, out: unknown, json: 
     process.stderr.write(`${(error as Error).message}\n`);
     return 2;
   }
+  // the draft tables SAP needs and Open RAP Runtime creates itself (D99)
+  const built = buildModel(project);
+  const drafts = built.model === undefined ? [] : draftTableFiles(built.model, new Set(project.files.filter((f) => f.type === "TABL").map((f) => f.name)));
+  for (const table of drafts) {
+    project.files.push({ path: `src/${table.fileName}`, absolute: path.join(project.sourceRoot, table.fileName), name: table.name, type: "TABL", extension: "xml", fileName: table.fileName, content: table.content });
+  }
   const result = renameProject(project, suffix);
+  result.errors.push(...drafts.flatMap((t) => t.errors));
+  if (built.model === undefined) {
+    result.errors.push(`the project does not build: run rapt check ${source}`);
+  }
   if (missing.length > 0) {
     result.errors.push(`the abapGit files are not complete (${missing.join(", ")}): run rapt abapgit ${source} first`);
   }

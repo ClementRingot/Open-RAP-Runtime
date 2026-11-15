@@ -9,7 +9,7 @@ writes an `AGENTS.md` in the projects it creates.
 A TypeScript compiler (pnpm monorepo) that turns the sources of a RAP BO (abapGit format) into a
 Node.js application: OData V4, RAP managed runtime, ABAP transpiled by abaplint, PostgreSQL,
 OpenUI5 UI. Read [README.md](README.md), [docs/GUIDE.md](docs/GUIDE.md) and the list of decisions
-[docs/DECISIONS.md](docs/DECISIONS.md) (D1 to D83) first.
+[docs/DECISIONS.md](docs/DECISIONS.md) (D1 to D84) first.
 
 ```
 packages/model/      types of the IR (model.json) and shared derivations (OData, value helps, MCP)
@@ -60,7 +60,8 @@ after a change to the compiler.
    `ABP0xx`…), the right severity; never an uncaught exception on a wrong source.
 6. **Tests**: each feature has its tests (compiler and runtime; browser for the UI). Variants of
    the fixture go through `generatedVariant` / `fixtureVariant` rather than changing
-   `fixtures/travel` (whose snapshots are the reference).
+   `fixtures/travel` (whose snapshots are the reference); a variant also needed on SAP (draft,
+   SAP BTP trial) is written in `fixtures/variants.json` (D84).
 7. **Generated UI**: ES5 JavaScript in TypeScript strings (`gen/ui/static.ts`); mind the escaping
    (`\\d` in the TS gives `\d` in the JS). The ids of the controls are used by the browser tests.
 8. **Everything in English**: documentation, website, code, comments, messages, the README of

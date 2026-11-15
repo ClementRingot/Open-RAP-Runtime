@@ -1966,3 +1966,41 @@ _The issues moved to the repository itself once public: see D74._
   unchanged); `fe-record.test.mjs` (a headless browser on a local page that plays the preview: one
   case file, the service only, no cookie nor resource, the HAR deleted); `fe-har.test.mjs` (the
   namespace placeholder).
+
+## D84 — Round trip to the SAP BTP trial (a): the repository for the trial
+
+- **Context**: D99 of the plan compares Open RAP Runtime with SAP BTP on the same sources, and D83
+  records the protocol of Fiori elements on the trial. Three things kept the fixtures from being
+  imported there: the draft variant only existed in the tests; its draft tables are created by
+  Open RAP Runtime and are not DDIC objects; and a trial user cannot be granted authorizations of
+  their own (the SAP tutorials replace the access conditions by `true`), while the Travel fixture
+  checks the authorization object `ZAO_TRAVL` in its handlers and its access controls. The field
+  `ZAGENCY` of this object is also not defined by the fixture.
+- **Decision**:
+  - **`fixtures/variants.json`**: the variants needed both by the tests and on SAP, as exact
+    replacements per file (`null` removes a file). `draft` is the draft BO of D54 (the tests build
+    `DRAFT_CHANGES` from it); `trial` leaves the authorizations out: `AUTHORITY-CHECK` becomes
+    `sy-subrc = 0.` on the same line, the access conditions an unconditional `grant select`, and the
+    authorization object is removed.
+  - **Draft tables for SAP**: `rapt abapgit --suffix --out` adds to the copy the draft tables the
+    BDEFs name and the project does not define, as the ABAP keyword documentation asks: the client
+    first, a field per element of the CDS entity with its name and type (its data element, else the
+    built-in type), the currency or unit reference of the amounts, and the admin include
+    `SYCH_BDL_DRAFT_ADMIN_INC` (group `%ADMIN`). The project itself is not changed: Open RAP Runtime
+    keeps creating its draft tables.
+  - **`scripts/btp-roundtrip.mjs --suffix CR1 --out <dir>`** copies a fixture (default
+    `fixtures/travel`), applies variants (default `draft,trial`), writes the renamed repository
+    with its draft tables, an `expected.json` (variants, objects and their new names, the service
+    path) and a `README.md` of the steps on the trial (abapGit for ADT, activation, preview,
+    recording with D83, `$metadata`).
+  - Still to come (D99 b): the activation results and the `$metadata` of SAP kept in
+    `conformance/btp/<release>/`, the sources SAP must refuse (`fixtures/negative/`), the requests
+    of reference in a `.http` file, and their comparison with Open RAP Runtime.
+- **Why**: one definition of each variant, for the tests and for SAP; the user only pushes,
+  pulls and activates.
+- **Tests**: `roundtrip.test.mjs` (the variants: order, removal, text not found, unknown variant,
+  applied to the fixture; the repository: renamed files, draft tables with client, elements,
+  reference fields and admin include, no authorization, `expected.json`, `README.md`, an existing
+  folder refused); the draft tests run on the variant read from `fixtures/variants.json`. The
+  repository is not activated on SAP by the tests: the first activation on the trial will confirm
+  or correct the draft tables and the `trial` variant (KNOWN_GAPS.md).
