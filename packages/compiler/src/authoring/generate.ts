@@ -17,7 +17,7 @@ import { Diagnostics } from "../diagnostics.js";
 import { filesOfType, loadProject, type Project } from "../input/project.js";
 import { Dictionary } from "../ir/dictionary.js";
 import { EntityResolver } from "../ir/entities.js";
-import { generateAbapGitFiles } from "./abapgit.js";
+import { generateAbapGitFiles, srvbXml } from "./abapgit.js";
 
 export const OBJECT_KINDS = {
   table: "database table (.tabl.astabl)",
@@ -529,31 +529,7 @@ function domainXml(name: string, description: string, type: AbapType): string {
 }
 
 function bindingSource(name: string, service: string, description: string, webApi = false): string {
-  const services = `    <SERVICES>
-     <item>
-      <NAME>${name.toUpperCase()}</NAME>
-      <VERSIONS>
-       <item>
-        <SERVICE_VERSION>0001</SERVICE_VERSION>
-        <SERVICE_DEFINITION>${service.toUpperCase()}</SERVICE_DEFINITION>
-        <RELEASE_STATE>NOT_RELEASED</RELEASE_STATE>
-       </item>
-      </VERSIONS>
-     </item>
-    </SERVICES>`;
-  const header = xmlElement(
-    "SRVB",
-    [
-      ["NAME", name.toUpperCase()],
-      ["DESCRIPTION", description.slice(0, 60)],
-      ["LANGUAGE", "EN"],
-      ["BINDING_TYPE", "ODATA"],
-      ["BINDING_TYPE_VERSION", "V4"],
-      ["BINDING_TYPE_CATEGORY", webApi ? "1" : "0"],
-    ],
-    3,
-  );
-  return abapGitXml("SRVB", header.replace(/\n {3}<\/SRVB>$/, `\n${services}\n   </SRVB>`));
+  return srvbXml({ name, service, description, webApi });
 }
 
 // ------------------------------------------------------------------------------------- command

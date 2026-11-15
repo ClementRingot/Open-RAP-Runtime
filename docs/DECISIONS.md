@@ -2004,3 +2004,31 @@ _The issues moved to the repository itself once public: see D74._
   folder refused); the draft tests run on the variant read from `fixtures/variants.json`. The
   repository is not activated on SAP by the tests: the first activation on the trial will confirm
   or correct the draft tables and the `trial` variant (KNOWN_GAPS.md).
+
+## D85 — The abapGit XML of metadata extensions and service bindings in the format of SAP BTP
+
+- **Context**: the first pull of the Travel fixture on the SAP BTP ABAP trial (2611, D84) imported
+  20 objects of 23. The two metadata extensions failed with `The description is missing for …`
+  and the service binding with `Object description is missing`, then `Import of object … failed`.
+  Their XML put the fields directly under `<DDLX>` and `<SRVB>`. The abapGit of SAP BTP writes
+  them in sub-structures (`SAP-samples/abap-platform-rap-workshops`,
+  `SAP-samples/abap-partner-reference-application`): a DDLX has `METADATA` (`NAME`,
+  `DESCRIPTION`, `MASTER_LANGUAGE`); a SRVB has `METADATA` (`NAME`, `TYPE` `SRVB/SVB`,
+  `DESCRIPTION`, `LANGUAGE`, `MASTER_LANGUAGE`) and `CONTENT` (`BIND_TYPE`, `BIND_TYPE_CATEGORY`
+  1 for a Web API only, `BIND_TYPE_VERSION`, and per service its definition in
+  `SERVICE_CONTENT/item/SRVD_REF`). The flat XML of BDEF and SRVD is the one SAP writes, and they
+  imported.
+- **Decision**:
+  - `ddlxXml` and `srvbXml` (`authoring/abapgit.ts`) write this format, for `rapt abapgit`,
+    `rapt new` and `rapt generate … binding`. A binding is written unpublished, without
+    `ABAP_LANGU_VERSION` (that of the package applies).
+  - `readSrvbXml` reads both formats; the VS Code extension reads both categories.
+  - The DDLX and SRVB of `fixtures/` are rewritten in this format.
+  - `rapt abapgit --suffix` (D83) renames a name in a path too, as the `URI` of `SRVD_REF`
+    (`…/srvd/sources/zrt_ui_travelcr1`); a name after a namespace (`/DMO/ZRT_X`) is still left
+    alone.
+- **Not done**: `rapt abapgit` still never changes an existing XML file: a project written by an
+  earlier version keeps its flat DDLX and SRVB until they are deleted and written again.
+- **Tests**: `abapgit-format.test.ts` (both writers, the Web API category, the flat binding still
+  read, no flat DDLX or SRVB left in `fixtures/`); `web-api-app.test.ts`, `web-api.test.ts`,
+  `rapt.test.ts` on the new category; `rename.test.ts` (the path renamed, the namespace not).

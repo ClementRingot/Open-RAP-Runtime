@@ -57,7 +57,8 @@ export function renameProject(project: Project, suffix: string): RenameResult {
     return { files: [], renamed, errors };
   }
   const longestFirst = [...renamed].sort((a, b) => b.from.length - a.from.length);
-  const pattern = new RegExp(`(?<![A-Za-z0-9_/])(${longestFirst.map((r) => escape(r.from)).join("|")})(?![A-Za-z0-9_])`, "gi");
+  // not inside a longer name, nor after a namespace (/DMO/ZRT_X); a path (…/srvd/sources/zrt_x, D85) is renamed
+  const pattern = new RegExp(`(?<![A-Za-z0-9_])(?<!(?<![A-Za-z0-9_/])/[A-Za-z0-9_]+/)(${longestFirst.map((r) => escape(r.from)).join("|")})(?![A-Za-z0-9_])`, "gi");
   const byName = new Map(renamed.map((r) => [r.from, r.to]));
   const replace = (text: string): string => text.replace(pattern, (match: string) => withCaseOf(match, byName.get(match.toUpperCase()) ?? match));
   const files: RenameResult["files"] = [];

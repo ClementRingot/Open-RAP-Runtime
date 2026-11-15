@@ -231,6 +231,9 @@ describe("the creation wizard and the objects view (D61)", () => {
     expect(bindingKind("<SRVB><BINDING_TYPE_CATEGORY>1</BINDING_TYPE_CATEGORY></SRVB>")).toBe("Web API");
     expect(bindingKind("<SRVB><BINDING_TYPE_CATEGORY>0</BINDING_TYPE_CATEGORY></SRVB>")).toBe("UI");
     expect(bindingKind("<SRVB><NAME>Z</NAME></SRVB>")).toBe("UI");
+    // the abapGit of SAP BTP (D85)
+    expect(bindingKind("<SRVB><CONTENT><BIND_TYPE>ODATA</BIND_TYPE><BIND_TYPE_CATEGORY>1</BIND_TYPE_CATEGORY></CONTENT></SRVB>")).toBe("Web API");
+    expect(bindingKind("<SRVB><CONTENT><BIND_TYPE>ODATA</BIND_TYPE></CONTENT></SRVB>")).toBe("UI");
     expect(bindingKind("<DDLS/>")).toBeUndefined();
     expect(launchpadNotice({ file: "/w/launchpad.json", created: false, added: false, webApi: true })).toBe("a Web API (no UI): not in the launchpad");
 

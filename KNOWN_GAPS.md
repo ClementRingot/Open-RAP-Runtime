@@ -173,6 +173,7 @@ What the project deliberately leaves out; the planned work is in
 | The authorization object `ZAO_TRAVL` of `fixtures/travel` names the authorization field `ZAGENCY`, which the fixture does not define (nor its data element, nor the object class `ZRT`) | The Travel fixture does not activate on SAP as is; the `trial` variant leaves the authorizations out. To fix with the first activation results. |
 | The `trial` variant replaces each `AUTHORITY-CHECK` by `sy-subrc = 0.` and the access conditions by an unconditional `grant select` | A trial user cannot be granted authorizations of their own; the behavior of the authorizations is not compared with SAP. |
 | Draft tables written for SAP: element names, types and the reference fields of the amounts derived from the model | Not compared with the tables ADT generates until the first activation on the trial. |
+| The DDLX and SRVB written flat were refused by the abapGit of SAP BTP at the first pull (D85) | Written in the format of SAP BTP since D85; an existing flat XML file of a project is not rewritten by `rapt abapgit`. |
 
 ## Draft (D54)
 

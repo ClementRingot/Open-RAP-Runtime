@@ -16,7 +16,7 @@ let t: TestApp;
 beforeAll(async () => {
   fixture = await generatedVariant({
     ...DRAFT_CHANGES,
-    "zrt_ui_travel_o4.srvb.xml": (c) => edit(c, [["<BINDING_TYPE_CATEGORY>0</BINDING_TYPE_CATEGORY>", "<BINDING_TYPE_CATEGORY>1</BINDING_TYPE_CATEGORY>"]]),
+    "zrt_ui_travel_o4.srvb.xml": (c) => edit(c, [["<BIND_TYPE>ODATA</BIND_TYPE>", "<BIND_TYPE>ODATA</BIND_TYPE>\n     <BIND_TYPE_CATEGORY>1</BIND_TYPE_CATEGORY>"]]),
   });
   t = await writableApp(Promise.resolve(fixture), { devOAuth: true });
 }, 180_000);

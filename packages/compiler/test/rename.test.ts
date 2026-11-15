@@ -28,9 +28,19 @@ describe("renamed copy for a shared SAP system (D83)", () => {
     expect(file("zrt_c_travelcr1.bdef.asbdef")).toContain("define behavior for ZRT_C_Travelcr1 alias Travel");
     expect(file("zbp_rt_r_travelcr1.clas.locals_imp.abap")).toMatch(/zrt_r_travelcr1/i);
     expect(file("zrt_ui_travel_o4cr1.srvb.xml")).toContain("<NAME>ZRT_UI_TRAVEL_O4CR1</NAME>");
+    // a name in a path is renamed: the service definition of a binding (D85)
+    expect(file("zrt_ui_travel_o4cr1.srvb.xml")).toContain("<URI>/sap/bc/adt/ddic/srvd/sources/zrt_ui_travelcr1</URI>");
     // a name that contains another one is renamed as a whole
     expect(result.files.some((f) => /ZRT_TRAVELCR1_LOG|zrt_travelcr1_/i.test(f.content))).toBe(false);
     expect(result.files.every((f) => !/[^/]\b(zrt_[a-z_]+|zbp_rt_r_travel)\b(?!cr1)/i.test(f.content.replace(/zrt_[a-z_]*cr1/gi, "")))).toBe(true);
+  });
+
+  it("leaves a name of a namespace alone", () => {
+    const project = loadProject(FIXTURE_DIR);
+    const pool = (f: { fileName: string }): boolean => f.fileName === "zbp_rt_r_travel.clas.locals_imp.abap";
+    const files = project.files.map((f) => (pool(f) ? { ...f, content: `${f.content}\n" see /DMO/ZRT_TRAVEL and zrt_travel\n` } : f));
+    const result = renameProject({ ...project, files }, "cr1");
+    expect(result.files.find((f) => f.path === "src/zbp_rt_r_travelcr1.clas.locals_imp.abap")?.content).toContain('" see /DMO/ZRT_TRAVEL and zrt_travelcr1\n');
   });
 
   it("refuses a suffix that is not letters and digits, or that leaves no room", () => {

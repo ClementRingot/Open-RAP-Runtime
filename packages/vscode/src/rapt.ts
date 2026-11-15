@@ -254,9 +254,9 @@ export const OBJECT_GROUPS: Array<{ id: string; label: string; pattern: RegExp }
   { id: "abap", label: "Classes and interfaces", pattern: /\.(clas|intf)\.abap$/i },
 ];
 
-/** The kind of a service binding (abapGit XML of a SRVB): UI (category 0) or Web API (1), D76. */
+/** The kind of a service binding (abapGit XML of a SRVB): UI (category 0 or none) or Web API (1), D76, D85. */
 export function bindingKind(xml: string): "UI" | "Web API" | undefined {
-  const category = /<BINDING_TYPE_CATEGORY>\s*(\d)\s*<\/BINDING_TYPE_CATEGORY>/.exec(xml)?.[1];
+  const category = /<BIND(?:ING)?_TYPE_CATEGORY>\s*(\d)\s*<\/BIND(?:ING)?_TYPE_CATEGORY>/.exec(xml)?.[1];
   if (category === "1") return "Web API";
   if (category === "0" || /<SRVB>/.test(xml)) return "UI";
   return undefined;

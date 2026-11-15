@@ -117,6 +117,61 @@ function adtObjectXml(serializer: string, type: string, name: string, descriptio
   );
 }
 
+const escapeXml = (text: string): string => text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+const leaf = (tag: string, value: string, indent: number): string => `${" ".repeat(indent)}<${tag}>${escapeXml(value)}</${tag}>`;
+const block = (tag: string, children: string[], indent: number): string => `${" ".repeat(indent)}<${tag}>\n${children.join("\n")}\n${" ".repeat(indent)}</${tag}>`;
+
+/**
+ * The abapGit XML of a metadata extension, as the abapGit of SAP BTP writes it: its fields in
+ * `METADATA` (a flat `<DDLX>` is refused at import: "The description is missing", D85).
+ */
+export function ddlxXml(name: string, description: string): string {
+  return abapGitXml("DDLX", block("DDLX", [block("METADATA", [leaf("NAME", name.toUpperCase(), 5), leaf("DESCRIPTION", truncate(description), 5), leaf("MASTER_LANGUAGE", "EN", 5)], 4)], 3));
+}
+
+export interface ServiceBindingXml {
+  /** The binding (SRVB). */
+  name: string;
+  /** The service definition (SRVD) it binds. */
+  service: string;
+  description: string;
+  /** OData V4 - Web API (`BIND_TYPE_CATEGORY` 1) instead of OData V4 - UI (D60). */
+  webApi?: boolean;
+}
+
+/**
+ * The abapGit XML of an OData V4 service binding, as the abapGit of SAP BTP writes it: `METADATA`
+ * and `CONTENT`, the service definition in `SRVD_REF`, the category only for a Web API (a flat
+ * `<SRVB>` is refused at import: "Object description is missing", D85). Not published.
+ */
+export function srvbXml(binding: ServiceBindingXml): string {
+  const name = binding.name.toUpperCase();
+  const service = binding.service.toUpperCase();
+  const metadata = block("METADATA", [leaf("NAME", name, 5), leaf("TYPE", "SRVB/SVB", 5), leaf("DESCRIPTION", truncate(binding.description), 5), leaf("LANGUAGE", "EN", 5), leaf("MASTER_LANGUAGE", "EN", 5)], 4);
+  const version = block(
+    "item",
+    [
+      leaf("SERVICE_VERSION", "0001", 9),
+      leaf("RELEASE_STATE", "NOT_RELEASED", 9),
+      block("SRVD_REF", [leaf("URI", `/sap/bc/adt/ddic/srvd/sources/${service.toLowerCase()}`, 10), leaf("TYPE", "SRVD/SRV", 10), leaf("NAME", service, 10)], 9),
+      block("BIND_TYPE_DATA", [block("CONTENT", [leaf("ENCODING", "base64", 11)], 10)], 9),
+    ],
+    8,
+  );
+  const content = block(
+    "CONTENT",
+    [
+      block("BIND_TYPE_IMPL", [leaf("NAME", name, 6)], 5),
+      leaf("BIND_TYPE", "ODATA", 5),
+      ...(binding.webApi === true ? [leaf("BIND_TYPE_CATEGORY", "1", 5)] : []),
+      leaf("BIND_TYPE_VERSION", "V4", 5),
+      block("SERVICES", [block("item", [leaf("SERVICE_NAME", service, 7), block("SERVICE_CONTENT", [version], 7)], 6)], 5),
+    ],
+    4,
+  );
+  return abapGitXml("SRVB", block("SRVB", [metadata, content], 3));
+}
+
 function classXml(name: string, files: SourceFile[]): string {
   const main = files.find((f) => f.extension === "abap")?.content ?? "";
   const behavior = /\bfor\s+behavior\s+of\s+(\S+?)\s*[.\s]/i.exec(main)?.[1];
@@ -174,7 +229,7 @@ function objectXml(type: string, name: string, files: SourceFile[]): string | { 
     case "DDLX": {
       const ddlx = source("asddlxs") ?? "";
       const target = /\bannotate\s+(?:entity|view)\s+(\S+)/i.exec(ddlx)?.[1];
-      return adtObjectXml("DDLX", "DDLX/EX", name, cdsLabel(ddlx) ?? `Metadata extension of ${target?.toUpperCase() ?? name}`);
+      return ddlxXml(name, cdsLabel(ddlx) ?? `Metadata extension of ${target?.toUpperCase() ?? name}`);
     }
     case "DCLS": {
       const dcl = source("asdcls") ?? "";

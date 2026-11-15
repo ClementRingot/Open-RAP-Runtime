@@ -557,7 +557,7 @@ and `rapt floorplan`: `--launchpad <file>` (another launchpad) and `--no-launchp
 
 ## 12b. Web APIs and OAuth 2.0
 
-A service bound as *OData V4 - Web API* (`BINDING_TYPE_CATEGORY` 1 in the SRVB, or
+A service bound as *OData V4 - Web API* (`BIND_TYPE_CATEGORY` 1 in the SRVB, or
 `rapt generate . binding ZAPI_TRAVEL_O4 --for ZUI_TRAVEL --binding-type webapi`) has neither UI
 nor UI annotations; a draft BO only exposes its active instances there ([D60](DECISIONS.md)).
 
@@ -579,7 +579,7 @@ ZRT_UI_TRAVEL --binding-type webapi`.
 
 A service can have both bindings, as on SAP: `rapt dev` and the launchpad serve the UI one
 (SRVD002 info), `rapt dev . --binding ZPA_API_PARTNER_O4` the Web API. To turn an application
-into a Web API, change `BINDING_TYPE_CATEGORY` of its binding to `1` (or add a Web API binding
+into a Web API, set `BIND_TYPE_CATEGORY` of its binding to `1` (or add a Web API binding
 with *New RAP object… > Service binding*).
 
 In development, `rapt dev` serves an OAuth 2.0 server under `/oauth`:
