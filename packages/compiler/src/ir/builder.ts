@@ -372,6 +372,9 @@ export const SIBLING_ENTITY = "SiblingEntity";
 /** The users of the collaborative drafts (D59). */
 export const DRAFT_USER_ENTITY = "DraftAdministrativeUser";
 export const DRAFT_USER_TABLE = "rapt_draft_user";
+/** The value help of the users of the drafts (D96), named as on SAP BTP. */
+export const DRAFT_USER_VH_ENTITY = "I_DraftAdministrativeUserVH";
+export const DRAFT_USER_VH_VIEW = "rapt_draft_user_vh";
 
 /**
  * Draft (D54): each exposed entity of a draft BO gets the key IsActiveEntity, HasActiveEntity,
@@ -438,6 +441,7 @@ function applyDraft(model: Model, diagnostics: Diagnostics): void {
   const label = (l: string): FieldModel["annotations"] => ({ endusertext: { label: l } });
   const hiddenLabel = (l: string): FieldModel["annotations"] => ({ endusertext: { label: l }, ui: { hidden: true } });
   const textOf = (annotations: FieldModel["annotations"], element: string): FieldModel["annotations"] => ({ ...annotations, objectmodel: { text: { element: [element] } } });
+  const userHelp = (annotations: FieldModel["annotations"]): FieldModel["annotations"] => ({ ...annotations, consumption: { valuehelpdefinition: [{ entity: { name: DRAFT_USER_VH_ENTITY, element: "UserID" } }] } });
   model.entities.push({
     name: DRAFT_ADMIN_ENTITY,
     kind: "view",
@@ -449,9 +453,9 @@ function applyDraft(model: Model, diagnostics: Diagnostics): void {
       { name: "DraftUUID", type: { kind: "raw", length: 16 }, key: true, annotations: hiddenLabel("Draft (Technical ID)") },
       { name: "DraftEntityType", type: text(30), key: true, annotations: hiddenLabel("Draft Entity ID") },
       { name: "CreationDateTime", type: stamp, key: false, annotations: { ...label("Draft Created On"), consumption: { filter: { selectiontype: "#INTERVAL", multipleselections: false } } } },
-      { name: "CreatedByUser", type: text(12), key: false, annotations: textOf(label("Draft Created By"), "CreatedByUserDescription") },
+      { name: "CreatedByUser", type: text(12), key: false, annotations: userHelp(textOf(label("Draft Created By"), "CreatedByUserDescription")) },
       { name: "LastChangeDateTime", type: stamp, key: false, annotations: { ...label("Draft Last Changed On"), consumption: { filter: { selectiontype: "#INTERVAL", multipleselections: false } } } },
-      { name: "LastChangedByUser", type: text(12), key: false, annotations: textOf(label("Draft Last Changed By"), "LastChangedByUserDescription") },
+      { name: "LastChangedByUser", type: text(12), key: false, annotations: userHelp(textOf(label("Draft Last Changed By"), "LastChangedByUserDescription")) },
       { name: "DraftAccessType", type: text(1), key: false, annotations: hiddenLabel("Draft Access Type") },
       { name: "ProcessingStartDateTime", type: stamp, key: false, annotations: hiddenLabel("Draft In Process Since") },
       { name: "InProcessByUser", type: text(12), key: false, annotations: textOf(hiddenLabel("Draft In Process By"), "InProcessByUserDescription") },
@@ -469,6 +473,22 @@ function applyDraft(model: Model, diagnostics: Diagnostics): void {
     draft: { admin: true },
   });
   model.service.entitySets.push({ name: DRAFT_ADMIN_ENTITY, entity: DRAFT_ADMIN_ENTITY, draftAdministrativeData: true });
+  // D96: the users of the drafts as a value help of the creator and of the last changer
+  model.entities.push({
+    name: DRAFT_USER_VH_ENTITY,
+    kind: "view",
+    root: false,
+    sqlView: DRAFT_USER_VH_VIEW,
+    fields: [
+      { name: "UserID", type: text(12), key: true, annotations: { ...label("User"), objectmodel: { text: { element: ["UserDescription"] } } } },
+      { name: "UserDescription", type: text(80), key: false, annotations: label("User Name") },
+    ],
+    associations: [],
+    annotations: label("Draft User"),
+    // a view of the runtime, not of the sources
+    draft: { admin: true },
+  });
+  model.service.entitySets.push({ name: DRAFT_USER_VH_ENTITY, entity: DRAFT_USER_VH_ENTITY, valueHelp: true });
   if ([...drafted.values()].some((d) => d.collaborative)) {
     // collaborative draft (D59): the users of a draft, DraftAdministrativeData/DraftAdministrativeUser
     const admin = model.entities.find((e) => e.name === DRAFT_ADMIN_ENTITY) as EntityModel;

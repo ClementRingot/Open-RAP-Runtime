@@ -7,7 +7,7 @@ Runtime on normalized names (aliases of the vocabularies, namespace of the servi
 |---|---|---|
 | Same | 314 | |
 | Only on SAP BTP | 1 | 75 |
-| Only in Open RAP Runtime | 16 | 29 |
+| Only in Open RAP Runtime | 20 | 39 |
 | Different | 4 | 2 |
 
 ## Structure
@@ -42,6 +42,12 @@ Runtime on normalized names (aliases of the vocabularies, namespace of the servi
 | | SAP BTP | Open RAP Runtime |
 |---|---|---|
 | EntitySet | — | `self.I_CurrencyTextType` |
+
+### `self.Container/I_DraftAdministrativeUserVH`
+
+| | SAP BTP | Open RAP Runtime |
+|---|---|---|
+| EntitySet | — | `self.I_DraftAdministrativeUserVHType` |
 
 ### `self.copyTravel(self.TravelType)/ResultIsActiveEntity`
 
@@ -114,6 +120,24 @@ Runtime on normalized names (aliases of the vocabularies, namespace of the servi
 | | SAP BTP | Open RAP Runtime |
 |---|---|---|
 | Property | — | `Type=Edm.Byte Nullable=false` |
+
+### `self.I_DraftAdministrativeUserVHType`
+
+| | SAP BTP | Open RAP Runtime |
+|---|---|---|
+| Key | — | `UserID` |
+
+### `self.I_DraftAdministrativeUserVHType/UserDescription`
+
+| | SAP BTP | Open RAP Runtime |
+|---|---|---|
+| Property | — | `Type=Edm.String Nullable=false MaxLength=80` |
+
+### `self.I_DraftAdministrativeUserVHType/UserID`
+
+| | SAP BTP | Open RAP Runtime |
+|---|---|---|
+| Property | — | `Type=Edm.String Nullable=false MaxLength=12` |
 
 ### `self.TravelType/BookingFee`
 
@@ -221,6 +245,15 @@ Runtime on normalized names (aliases of the vocabularies, namespace of the servi
 |---|---|---|
 | @Capabilities.SearchRestrictions | `Record(SearchSyntax: String=https://url.sap/odata-search, Searchable: Bool=true, UnsupportedExpressions: EnumMember=Capabilities.SearchExpressions/AND Capabilities.SearchExpressions/NOT Capabilities.SearchExpressions/group)` | `Record(Searchable: Bool=false)` |
 
+### `self.Container/I_DraftAdministrativeUserVH`
+
+| | SAP BTP | Open RAP Runtime |
+|---|---|---|
+| @Capabilities.DeleteRestrictions | — | `Record(Deletable: Bool=false)` |
+| @Capabilities.InsertRestrictions | — | `Record(Insertable: Bool=false)` |
+| @Capabilities.SearchRestrictions | — | `Record(Searchable: Bool=false)` |
+| @Capabilities.UpdateRestrictions | — | `Record(QueryOptions: Record(SelectSupported: Bool=true), Updatable: Bool=false)` |
+
 ### `self.copyTravel(self.TravelType)/ResultIsActiveEntity`
 
 | | SAP BTP | Open RAP Runtime |
@@ -320,6 +353,7 @@ Runtime on normalized names (aliases of the vocabularies, namespace of the servi
 | | SAP BTP | Open RAP Runtime |
 |---|---|---|
 | @Common.IsUpperCase | `` | — |
+| @Common.ValueList | — | `Record(CollectionPath: String=I_DraftAdministrativeUserVH, Label: String=Draft User, Parameters: Collection(Record(LocalDataProperty: PropertyPath=CreatedByUser, Type=Common.ValueListParameterInOut, ValueListProperty: String=UserID), Record(Type=Common.ValueListParameterDisplayOnly, ValueListProperty: String=UserDescription)), SearchSupported: Bool=false)` |
 | @Common.ValueListReferences | `Collection(String("../../../../srvd_f4/sap/i_draftadministrativeuservh/0001;ps='srvd-zrt_ui_travel-0001';va='self.et-i_draftadministrativedata.createdbyuser'/$metadata"))` | — |
 
 ### `self.I_DraftAdministrativeDataType/DraftAccessType`
@@ -345,7 +379,27 @@ Runtime on normalized names (aliases of the vocabularies, namespace of the servi
 | | SAP BTP | Open RAP Runtime |
 |---|---|---|
 | @Common.IsUpperCase | `` | — |
+| @Common.ValueList | — | `Record(CollectionPath: String=I_DraftAdministrativeUserVH, Label: String=Draft User, Parameters: Collection(Record(LocalDataProperty: PropertyPath=LastChangedByUser, Type=Common.ValueListParameterInOut, ValueListProperty: String=UserID), Record(Type=Common.ValueListParameterDisplayOnly, ValueListProperty: String=UserDescription)), SearchSupported: Bool=false)` |
 | @Common.ValueListReferences | `Collection(String("../../../../srvd_f4/sap/i_draftadministrativeuservh/0001;ps='srvd-zrt_ui_travel-0001';va='self.et-i_draftadministrativedata.lastchangedbyuser'/$metadata"))` | — |
+
+### `self.I_DraftAdministrativeUserVHType`
+
+| | SAP BTP | Open RAP Runtime |
+|---|---|---|
+| @Common.Label | — | `String=Draft User` |
+
+### `self.I_DraftAdministrativeUserVHType/UserDescription`
+
+| | SAP BTP | Open RAP Runtime |
+|---|---|---|
+| @Common.Label | — | `String=User Name` |
+
+### `self.I_DraftAdministrativeUserVHType/UserID`
+
+| | SAP BTP | Open RAP Runtime |
+|---|---|---|
+| @Common.Label | — | `String=User` |
+| @Common.Text | — | `Path=UserDescription` |
 
 ### `self.TravelCbAControl/_Booking`
 

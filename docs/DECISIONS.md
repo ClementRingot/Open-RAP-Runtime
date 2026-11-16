@@ -2354,3 +2354,16 @@ _The issues moved to the repository itself once public: see D74._
 - **Tests**: `odata-write.test.ts` (JSON batch: atomicity group, `$id` reference, a read, a
   failed group, a group split; a property, raw values of a string, a decimal, a navigation);
   `conformance.test.ts`.
+
+## D96 — The value help of the users of the drafts
+
+- **Context**: on SAP BTP, `CreatedByUser` and `LastChangedByUser` of
+  `I_DraftAdministrativeData` have a value help (`I_DraftAdministrativeUserVH`, through a value
+  help service, D90). Open RAP Runtime had none.
+- **Decision**: a draft service exposes `I_DraftAdministrativeUserVH` (`UserID`, key, with its
+  text `UserDescription`), a view of the runtime (`rapt_draft_user_vh`) over the users of the
+  drafts (creators, last changers, users in process), named with `rapt_bususer` when the project
+  has it (D63). `CreatedByUser` and `LastChangedByUser` of the administrative data have it as
+  value help, inline (`Common.ValueList`) as every value help of Open RAP Runtime (D44), not
+  through a value help service.
+- **Tests**: `draft.test.ts` (the user of a draft in the value help, its `Common.ValueList`).

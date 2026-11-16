@@ -229,6 +229,9 @@ describe("draft", () => {
     const seen = await call(alice, "GET", `${travel(T1, true)}?$select=DraftEntityCreationDateTime&$expand=DraftAdministrativeData($select=DraftEntityType,InProcessByUser,DraftIsProcessedByMe)`);
     expect(seen.body).toMatchObject({ DraftEntityCreationDateTime: null, DraftAdministrativeData: { DraftEntityType: "ZRT_R_TRAVEL", InProcessByUser: "BOB", DraftIsProcessedByMe: false } });
     expect(values(await call(alice, "GET", `Travel?$filter=IsActiveEntity eq true and DraftAdministrativeData/DraftIsProcessedByMe eq false&$select=TravelID`)).map((r) => r["TravelID"])).toEqual(["00000001"]);
+    // D96: the users of the drafts, the value help of the creator and of the last changer
+    expect(values(await call(alice, "GET", "I_DraftAdministrativeUserVH"))).toContainEqual({ UserID: "BOB", UserDescription: "" });
+    expect(fixture.metadata).toMatch(/<Annotations Target="SAP__self\.I_DraftAdministrativeDataType\/CreatedByUser">[\s\S]*?<PropertyValue Property="CollectionPath" String="I_DraftAdministrativeUserVH"\/>/);
     expect((await call(bob, "POST", `${travel(T1, false)}/${NS}.Discard`, {})).status).toBe(204);
     expect((await call(alice, "GET", travel(T1, true))).body).toMatchObject({ HasDraftEntity: false });
   });

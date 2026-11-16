@@ -537,6 +537,12 @@ SELECT a."DraftUUID", upper(a."RootEntity")::varchar(30) AS "DraftEntityType", a
   ${description("CreatedByUser")} AS "CreatedByUserDescription", ${description("LastChangedByUser")} AS "LastChangedByUserDescription",
   ${description("InProcessByUser")} AS "InProcessByUserDescription"
 FROM "rapt_draft_admin" a;
+-- D96: the users of the drafts, with their names (value help of the administrative data)
+DROP VIEW IF EXISTS "rapt_draft_user_vh";
+CREATE VIEW "rapt_draft_user_vh" AS
+SELECT d."UserID", ${description("UserID").replace('a."UserID"', 'd."UserID"')} AS "UserDescription"
+FROM (SELECT "CreatedByUser"::varchar(12) AS "UserID" FROM "rapt_draft_admin" UNION SELECT "LastChangedByUser" FROM "rapt_draft_admin" UNION SELECT "InProcessByUser" FROM "rapt_draft_admin") d
+WHERE d."UserID" <> '';
 `);
   }
   return statements.length === 0 ? [] : ["-- active instances and drafts of the exposed entities (D54)", ...statements];
