@@ -62,7 +62,7 @@ The sections below use the provisional numbers, unless they say "final".
 | D91 | — | Catchable SQL errors in ABAP | 3 |
 | D92 | — | Conversion exits, currency decimals and currency conversion | 4 |
 | D93 | — | Real-time collaborative draft | 7 |
-| D94 | — | Repository of the released objects, "not released" refusal with successor | 5 |
+| D94 | — | Objects not in the project: APIs of SAP (released, not provided, deprecated, not released), namespaces and other repositories, sources of dependencies | 5 |
 | D95 | — | Extended and multilingual standard layer | 5 |
 | D96 | — | ABAP Unit: `rapt test` and VS Code | 3 |
 | D97 | — | ABAP debugging in VS Code | 6 |
@@ -163,12 +163,36 @@ The sections below use the provisional numbers, unless they say "final".
 
 ## Phase 5: standard layer
 
-- **Released objects (D94).** A versioned snapshot of the released objects of SAP BTP, built
-  from the Cloudification Repository of SAP (Apache-2.0) with the loader of ROSA. `rapt check`
-  stays offline and tells apart an object not released for ABAP Cloud, a deprecated object (with
-  its successor) and an object released on SAP but not provided by Open RAP Runtime. A successor
-  is offered only when it is released on SAP BTP. `rapt new` also declares ROSA among the MCP
-  servers of the created projects.
+- **Objects that are not in the project (D94).** Today an object the project uses and Open RAP
+  Runtime does not have stops the build (the transpiler runs with `unknownTypes: compileError`,
+  and abaplint reports "contains unknown", or CDS005): the application is not generated, whatever
+  the object. The Cloudification Repository of SAP (Apache-2.0, read with the loader of ROSA)
+  only lists the APIs of SAP: content under a namespace such as the Flight reference scenario
+  (`/DMO/I_Agency` is not in the SAP BTP set, although the trial has it) or the objects of other
+  software components of a customer are not there. So the check tells apart three families, from
+  a versioned snapshot of the SAP BTP set, offline:
+  - **An object of SAP** (no customer namespace, not Z or Y: `I_*`, `CL_*`, `IF_*`, SAP tables):
+    - released and provided by Open RAP Runtime: nothing to report;
+    - released on SAP BTP but not provided by Open RAP Runtime: valid on SAP, so not refused in
+      `standard` mode: a warning ("released on SAP, not provided by Open RAP Runtime", pointing to
+      KNOWN_GAPS.md), and the application is built; the ABAP that uses the object fails at runtime
+      only when it runs (a runtime error naming the object, as a short dump would), the rest of
+      the application works. A CDS view that reads or associates such a view cannot be compiled to
+      SQL: an error with the same message, and the view is listed in the needs of the standard
+      layer (D95);
+    - deprecated: a warning with its successor, offered only when released on SAP BTP (a successor
+      of SAP Cloud ERP only is named as such);
+    - not in the SAP BTP set: an error, as SAP refuses it ("not released for ABAP Cloud
+      development"): `MARA`, `CL_GUI_ALV_GRID`.
+  - **An object under a namespace** (`/DMO/`, `/XYZ/`): never "not released": an error "not in the
+    project", with the way to add its sources.
+  - **A Z or Y object not in the project** (another package, another repository): the same.
+  - **Sources of other repositories**: `rapt/config.json` declares folders of abapGit sources
+    (another repository of the customer, an open-source library, the Flight reference scenario
+    once its license is checked), compiled with the project and never written by `rapt abapgit`.
+  - The check stays per object (SAP releases objects, not methods). `rapt new` also declares ROSA
+    among the MCP servers of the created projects. Low priority: after the fidelity of the draft,
+    OData and CDS.
 - **Standard views (D95).** Only views released on SAP BTP, completed with their published
   elements; one consistent set of reference data with integrity tests; texts from CLDR (EN, FR,
   DE, then ES, IT, JA); units from UN/ECE Recommendation 20, with a mapping to the common SAP
