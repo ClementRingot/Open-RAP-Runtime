@@ -46,4 +46,14 @@ describe("utilities of ABAP Cloud", () => {
     const rows = await app.pglite.query<{ n: number }>("SELECT count(*)::int AS n FROM rapt_application_log_item");
     expect(rows.rows[0]?.n).toBe(3);
   });
+  // last: a second application replaces the kernel services of the first one
+  it("raises cx_nr_object_not_found for an interval that is not configured, as SAP (D97)", async () => {
+    const other = await writableApp(generatedVariant(utilitiesVariant({})));
+    try {
+      const response = await other.app.inject({ method: "POST", url: `${SERVICE}Travel(${T1})/${NS}.drawNumber`, headers: JSON_HEADERS, payload: "{}" });
+      expect(String((JSON.parse(response.body) as Record<string, unknown>)["Description"])).toBe("number range object ZRT_TRAVEL: interval 01 not found (configure it in rapt/number-ranges.json)");
+    } finally {
+      await other.close();
+    }
+  });
 });

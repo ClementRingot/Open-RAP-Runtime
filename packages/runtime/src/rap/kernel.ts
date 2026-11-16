@@ -282,7 +282,7 @@ export function installKernel(runtime: RapRuntime): void {
   installHttp(kernel);
   installODataClient(kernel);
   // utilities of ABAP Cloud: JSON, encodings, number ranges, application log, RTTS… (D40)
-  installUtilities(kernel, { db: () => runtime.context().tx.db, user: () => runtime.context().user.abapName });
+  installUtilities(kernel, { db: () => runtime.context().tx.db, user: () => runtime.context().user.abapName, enhanced: runtime.model.mode === "enhanced" });
   // background processing (bgPF) and e-mails, after the commit of the LUW (D41)
   installBackground(kernel, runtime);
   installMail(kernel, runtime);

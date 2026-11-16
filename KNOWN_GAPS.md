@@ -144,13 +144,12 @@ What the project deliberately leaves out; the planned work is in
 |---|---|
 | Time zone of the user | UTC: `xco_cp_time=>time_zone->user` and `->utc` give the same values, `systemtstmp_*` does not convert. |
 | Numbering and application log | Written in the LUW of the request: rolled back if it fails (on SAP, a drawn number is consumed). `use_2nd_db_connection` is ignored. |
-| Number range interval not configured | Created on the first request, from 1 to 99999999999999999999 (on SAP: `cx_nr_object_not_found`). External numbering and alphanumeric intervals not supported. |
+| Number range interval not configured | `cx_nr_object_not_found` in standard mode, as on SAP (D97); created on the first request from 1 to 99999999999999999999 in enhanced mode. External numbering and alphanumeric intervals not supported. |
 | `/ui2/cl_json` | No `generate` (dynamic data), nor `assoc_arrays`, nor `conversion_exits`, nor `type_descr`; object references are written `null`. Invalid JSON leaves the data unchanged. |
 | `xco_cp_json` | `from_abap` writes the `abap_bool`s as `"X"`/`""`; the names of the members are matched ignoring case and `_` on read. |
 | `cl_abap_regex`, `cl_abap_matcher` | Regular expression engine of JavaScript: the constructs specific to PCRE (possessive quantifiers, `\K`, recursion…) are not supported (`cx_sy_regex`, or another meaning); the POSIX syntax is approximated (classes `[:alpha:]`…, `\<`, `\>`). `FIND … REGEX object` with a `cl_abap_regex` object is not supported. |
 | RTTS | `describe_by_name` raises `cx_sy_rtti_type_not_released`; no creation of types (`cl_abap_structdescr=>create`, `CREATE DATA … TYPE HANDLE`), no attributes nor methods in `cl_abap_classdescr`. `absolute_name` comes from the qualified name of the transpiler. |
 | `cl_abap_random*` | Park-Miller generator (not cryptographic): the sequences differ from those of SAP for the same seed. No `cl_abap_random_packed*` nor `decfloat16`. |
-| `cl_abap_char_utilities=>minchar` | Missing (null character). |
 | Background processing (D41) | The operations stay in memory until they run: a process not yet run when the application stops never is (it stays `NEW`). No restart nor retry of an `ERRONEOUS` process, no queue by name (`set_name` is used for tracking), no check of the transactional phase of the call (on SAP, `save_for_execution` of a controlled operation happens in the save phase). `if_bgmc_process_monitor`: states `NEW`, `SUCCESSFUL`, `ERRONEOUS` (names specific to Open RAP Runtime). A single `COMMIT ENTITIES` per operation. |
 | E-mail (D41) | Sent after the commit of the LUW, without retry; `send( )` always returns the state `W` (waiting). No e-mail templates (`cl_bcs_mail_message=>create_instance_by_template`), nor signature, nor encryption. |
 

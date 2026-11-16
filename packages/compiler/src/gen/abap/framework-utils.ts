@@ -715,6 +715,7 @@ const CL_ABAP_CHAR_UTILITIES = `CLASS cl_abap_char_utilities DEFINITION PUBLIC F
     CLASS-DATA form_feed TYPE c LENGTH 1 READ-ONLY.
     CLASS-DATA backspace TYPE c LENGTH 1 READ-ONLY.
     CLASS-DATA maxchar TYPE c LENGTH 1 READ-ONLY.
+    CLASS-DATA minchar TYPE c LENGTH 1 READ-ONLY.
     CLASS-DATA byte_order_mark_utf8 TYPE x LENGTH 3 READ-ONLY.
     CONSTANTS charsize TYPE i VALUE 2.
     CONSTANTS endian TYPE c LENGTH 1 VALUE 'L'.
@@ -731,6 +732,7 @@ CLASS cl_abap_char_utilities IMPLEMENTATION.
     form_feed = \`\f\`.
     backspace = \`\b\`.
     maxchar = \`\uFFFD\`.
+    minchar = \`\u0000\`.
     byte_order_mark_utf8 = 'EFBBBF'.
   ENDMETHOD.
 ENDCLASS.

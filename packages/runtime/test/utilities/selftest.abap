@@ -149,6 +149,8 @@ CLASS lcl_selftest IMPLEMENTATION.
     check( name = `tab` actual = xsdbool( cl_abap_char_utilities=>horizontal_tab = |\t| ) expected = abap_true ).
     SPLIT |a{ cl_abap_char_utilities=>newline }b| AT |\n| INTO TABLE parts.
     check( name = `newline` actual = lines( parts ) expected = 2 ).
+    " D97: the lowest character, below every printable one
+    check( name = `minchar` actual = xsdbool( cl_abap_char_utilities=>minchar < cl_abap_char_utilities=>horizontal_tab AND cl_abap_char_utilities=>minchar <> cl_abap_char_utilities=>maxchar ) expected = abap_true ).
     cl_abap_string_utilities=>del_trailing_blanks( CHANGING str = trailing ).
     check( name = `trailing` actual = strlen( trailing ) expected = 4 ).
     cl_abap_string_utilities=>c2str_preserving_blanks( EXPORTING source = chars IMPORTING dest = preserved ).

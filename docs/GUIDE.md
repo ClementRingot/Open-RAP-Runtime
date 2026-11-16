@@ -279,7 +279,7 @@ background processing (`cl_bgmc_process_factory`) and e-mail (`cl_bcs_mail_messa
 | `seed.json` | `{ "table": [ { "field": "value" } ] }`: data loaded on the first start of `rapt dev` (`SEED=auto`); random UUID keys | [D42](DECISIONS.md) |
 | `seed.sql` | data in SQL | [D42](DECISIONS.md) |
 | `authorizations.json` | roles of the IdP → authorization objects and values (`{claim:agency}`: value read from the token) | [D34](DECISIONS.md) |
-| `number-ranges.json` | intervals of `cl_numberrange_runtime` | [D40](DECISIONS.md) |
+| `number-ranges.json` | intervals of `cl_numberrange_runtime` (required in `standard` mode: `cx_nr_object_not_found` otherwise, D97) | [D40](DECISIONS.md) |
 | `mcp.json` | MCP tools and their descriptions | [D47](DECISIONS.md) |
 
 ## 6. The generated UI

@@ -18,6 +18,8 @@ export interface UtilityServices {
   db(): Kysely<unknown>;
   /** The ABAP name of the user of the LUW. */
   user(): string;
+  /** D97: `enhanced` creates a number range interval that is not configured; `standard` raises, as SAP. */
+  enhanced?: boolean;
 }
 
 // ------------------------------------------------------------------------------ data objects
@@ -838,15 +840,18 @@ export function installUtilities(kernel: AbapData, services: UtilityServices): v
     const key = interval(input);
     const quantity = Math.max(intOf(input?.["quantity"]), 1);
     const db = services.db();
-    // an interval that is not configured (rapt/number-ranges.json) starts at 1
-    await sql`INSERT INTO rapt_number_range (nr_object, nr_subobject, nr_interval, nr_toyear, from_number, to_number)
-      VALUES (${key.object}, ${key.subobject}, ${key.nr}, ${key.toyear}, 1, 99999999999999999999)
-      ON CONFLICT DO NOTHING`.execute(db);
+    // an interval that is not configured (rapt/number-ranges.json): created from 1 in enhanced mode;
+    // in standard mode cx_nr_object_not_found below, as on SAP (D97)
+    if (services.enhanced === true) {
+      await sql`INSERT INTO rapt_number_range (nr_object, nr_subobject, nr_interval, nr_toyear, from_number, to_number)
+        VALUES (${key.object}, ${key.subobject}, ${key.nr}, ${key.toyear}, 1, 99999999999999999999)
+        ON CONFLICT DO NOTHING`.execute(db);
+    }
     const { rows } = await sql<{ current_number: string | null; from_number: string; to_number: string }>`SELECT current_number::text, from_number::text, to_number::text
       FROM rapt_number_range WHERE nr_object = ${key.object} AND nr_subobject = ${key.subobject} AND nr_interval = ${key.nr} AND nr_toyear = ${key.toyear}`.execute(db);
     const row = rows[0];
     if (row === undefined) {
-      return raise("cx_nr_object_not_found", `number range object ${key.object}: interval ${key.nr} not found`);
+      return raise("cx_nr_object_not_found", `number range object ${key.object}: interval ${key.nr} not found (configure it in rapt/number-ranges.json)`);
     }
     const from = BigInt(row.from_number);
     const to = BigInt(row.to_number);

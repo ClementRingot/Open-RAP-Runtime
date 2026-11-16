@@ -2367,3 +2367,16 @@ _The issues moved to the repository itself once public: see D74._
   value help, inline (`Common.ValueList`) as every value help of Open RAP Runtime (D44), not
   through a value help service.
 - **Tests**: `draft.test.ts` (the user of a draft in the value help, its `Common.ValueList`).
+
+## D97 — `minchar`, and the number range intervals as on SAP
+
+- **Context**: KNOWN_GAPS listed `cl_abap_char_utilities=>minchar` as missing, and a number range
+  interval that `rapt/number-ranges.json` does not configure was created on the first
+  `number_get`, where SAP BTP raises `cx_nr_object_not_found` (D40).
+- **Decision**:
+  - `cl_abap_char_utilities=>minchar` is the null character (U+0000), below every other one.
+  - In `standard` mode `cl_numberrange_runtime=>number_get` on an interval that is not configured
+    raises `cx_nr_object_not_found` ("… not found (configure it in rapt/number-ranges.json)"); the
+    `enhanced` mode (D45) keeps creating it from 1, a convenience of development.
+- **Tests**: `utilities.test.ts` (the self-test checks `minchar`; `cx_nr_object_not_found` without
+  configuration).
