@@ -9,8 +9,7 @@
 
 import { appendFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
-import { abapGitXml, xmlElement } from "../ddic/table-source.js";
-import { generateAbapGitFiles } from "./abapgit.js";
+import { generateAbapGitFiles, srvbXml } from "./abapgit.js";
 
 export interface NewBoOptions {
   /** Prefix of the object names (default Z): ZRT → table zrt_travel, ZRT_R_Travel, ZBP_RT_R_TRAVEL. */
@@ -331,31 +330,7 @@ define service ${n.service} {
 }
 
 function serviceBinding(n: Names): string {
-  const services = `    <SERVICES>
-     <item>
-      <NAME>${n.binding}</NAME>
-      <VERSIONS>
-       <item>
-        <SERVICE_VERSION>0001</SERVICE_VERSION>
-        <SERVICE_DEFINITION>${n.service}</SERVICE_DEFINITION>
-        <RELEASE_STATE>NOT_RELEASED</RELEASE_STATE>
-       </item>
-      </VERSIONS>
-     </item>
-    </SERVICES>`;
-  const header = xmlElement(
-    "SRVB",
-    [
-      ["NAME", n.binding],
-      ["DESCRIPTION", `${n.description} service binding (OData V4, ${n.webApi ? "Web API" : "UI"})`.slice(0, 60)],
-      ["LANGUAGE", "EN"],
-      ["BINDING_TYPE", "ODATA"],
-      ["BINDING_TYPE_VERSION", "V4"],
-      ["BINDING_TYPE_CATEGORY", n.webApi ? "1" : "0"],
-    ],
-    3,
-  );
-  return abapGitXml("SRVB", header.replace(/\n {3}<\/SRVB>$/, `\n${services}\n   </SRVB>`));
+  return srvbXml({ name: n.binding, service: n.service, description: `${n.description} service binding (OData V4, ${n.webApi ? "Web API" : "UI"})`, webApi: n.webApi });
 }
 
 function seed(n: Names): string {
@@ -397,7 +372,7 @@ finds the MCP server of rapt (tools \`rapt_check\`, \`rapt_generate\`, \`rapt_do
 - Objects: ${n.table} (table), ${n.root} (root view), ${n.projection} (projection${n.webApi ? "" : " and UI\n  annotations"}), ${n.pool.toUpperCase()} (behavior pool), ${n.service} (service).${
     n.webApi
       ? `
-- The service is an OData V4 - Web API (binding ${n.binding}, BINDING_TYPE_CATEGORY 1): an API
+- The service is an OData V4 - Web API (binding ${n.binding}, BIND_TYPE_CATEGORY 1): an API
   for other systems, without UI, outside the launchpad of the workspace. \`rapt dev .\` serves it
   with a development OAuth 2.0 server (client \`rapt-client\` / \`rapt-secret\`).`
       : ""

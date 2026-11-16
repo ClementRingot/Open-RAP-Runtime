@@ -138,7 +138,12 @@ export function featuresVariant(): Record<string, string | ((content: string) =>
         ["  validation validateDates on save { create; field BeginDate, EndDate; }", "  validation validateDates on save { create; field BeginDate, EndDate; }\n\n  side effects\n  {\n    field BookingFee affects field TotalPrice;\n  }"],
         ["  determination calculateTotalPrice on modify { create; delete; field FlightPrice, CurrencyCode; }", "  determination calculateTotalPrice on modify { create; delete; field FlightPrice, CurrencyCode; }\n  determination recalcOnDelete on modify { delete; }"],
       ]),
-    "zrt_c_travel.bdef.asbdef": (c) => edit(c, [["  use action copyTravel;", "  use action copyTravel;\n  use action listBookings;\n  use function mostExpensive;"]]),
+    "zrt_c_travel.bdef.asbdef": (c) =>
+      edit(c, [
+        // the projection exposes the side effects of the base, as on SAP (D86)
+        ["strict ( 2 );", "strict ( 2 );\nuse side effects;"],
+        ["  use action copyTravel;", "  use action copyTravel;\n  use action listBookings;\n  use function mostExpensive;"],
+      ]),
     [ABP]: (c) => {
       const first = c.indexOf("ENDCLASS.");
       const withDefinitions = `${c.slice(0, first)}${TRAVEL_DEFINITIONS.trimStart()}${c.slice(first + "ENDCLASS.".length)}`;

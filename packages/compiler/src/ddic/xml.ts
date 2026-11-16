@@ -222,18 +222,35 @@ export function readSrvbXml(xml: string): SrvbXml {
     }
     return undefined;
   };
+  /** The first element of this name, at any depth. */
+  const node = (o: unknown, key: string): unknown => {
+    if (o === null || typeof o !== "object") {
+      return undefined;
+    }
+    if (key in (o as XmlObject)) {
+      return (o as XmlObject)[key];
+    }
+    for (const value of Object.values(o as XmlObject)) {
+      const found = node(value, key);
+      if (found !== undefined) {
+        return found;
+      }
+    }
+    return undefined;
+  };
   const doc = parser.parse(xml) as XmlObject;
-  const name = find(doc, "NAME");
+  // the abapGit of SAP BTP: METADATA/NAME, CONTENT/BIND_TYPE…, SRVD_REF/NAME (D85); before: flat
+  const name = find(node(doc, "METADATA") ?? doc, "NAME");
   if (name !== undefined) result.name = name;
-  const srvd = find(doc, "SERVICE_DEFINITION");
+  const srvd = find(doc, "SERVICE_DEFINITION") ?? find(node(doc, "SRVD_REF"), "NAME");
   if (srvd !== undefined) result.serviceDefinition = srvd;
   const version = find(doc, "SERVICE_VERSION");
   if (version !== undefined) result.version = version.padStart(4, "0");
-  const bindingType = find(doc, "BINDING_TYPE");
+  const bindingType = find(doc, "BINDING_TYPE") ?? find(doc, "BIND_TYPE");
   if (bindingType !== undefined) result.bindingType = bindingType;
-  const bindingVersion = find(doc, "BINDING_TYPE_VERSION");
+  const bindingVersion = find(doc, "BINDING_TYPE_VERSION") ?? find(doc, "BIND_TYPE_VERSION");
   if (bindingVersion !== undefined) result.bindingVersion = bindingVersion;
-  const bindingCategory = find(doc, "BINDING_TYPE_CATEGORY");
+  const bindingCategory = find(doc, "BINDING_TYPE_CATEGORY") ?? find(doc, "BIND_TYPE_CATEGORY");
   if (bindingCategory !== undefined) result.bindingCategory = bindingCategory;
   // ADT serializations: srvb:version="0001", adtcore:name="ZUI_X" in the service definition reference
   if (result.version === undefined) {

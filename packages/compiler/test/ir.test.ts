@@ -131,6 +131,18 @@ describe("IR diagnostics", () => {
     expect(items.map((d) => d.code)).toEqual(["BDEF028", "BDEF028"]);
   });
 
+  it("needs total etag right after lock master (D85)", () => {
+    const draft = (c: string): string =>
+      c
+        .replace("strict ( 2 );", "strict ( 2 );\nwith draft;")
+        .replace("persistent table zrt_travel", "persistent table zrt_travel\ndraft table zrt_d_travel")
+        .replace("persistent table zrt_booking", "persistent table zrt_booking\ndraft table zrt_d_booking");
+    const apart = diagnosticsOf({ [bdef]: (c) => draft(c).replace("etag master LocalLastChangedAt\n{", "etag master LocalLastChangedAt\ntotal etag LastChangedAt\n{") });
+    expect(apart.map((d) => `${d.code} ${d.message}`)).toContain("BDEF031 ZRT_R_Travel: total etag is an addition of lock master: write lock master total etag LastChangedAt");
+    const after = diagnosticsOf({ [bdef]: (c) => draft(c).replace("lock master\n", "lock master total etag LastChangedAt\n") });
+    expect(after.map((d) => d.code)).not.toContain("BDEF031");
+  });
+
   it("checks the mapping against the CDS view and the table", () => {
     const items = diagnosticsOf({ [bdef]: (c) => c.replace("TravelID           = travel_id;", "TravelID           = agency_id;") });
     expect(items).toContainEqual(expect.objectContaining({ code: "BDEF008", message: "ZRT_R_Travel.TravelID: the BDEF maps it to agency_id, the CDS view selects travel_id" }));

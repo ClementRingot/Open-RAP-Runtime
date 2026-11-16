@@ -183,7 +183,7 @@ dependent ETag, remote APIs.
 | Standard views `I_Region`, `I_CalendarDate`, `I_TimeZone`, `I_BusinessUserBasic`, `I_ExchangeRate` | ✅ | Generated calendar, users of the IdP recorded on sign-in, exchange rates to maintain (D44). |
 | CDS expressions in the select list (CASE, CAST, calculations, SQL functions, literals, `$projection`) | ✅ | Computed by the PostgreSQL view, type inferred or given by `CAST` (CDS022 otherwise), read-only (`Core.Computed`), projections, drafts (D67). Still CDS002: `$session.user`/`client`/`system_language`, association paths, `BETWEEN`, aggregates, other functions. |
 | DCL access control (`define role … grant select on … where …`) | ✅ | OData reads filtered for the user: `aspect pfcg_auth` (filters `ACTVT = '03'`, tuples), `aspect user`, `?=`, comparisons, `like`, `is [not] null`, `and`/`or`/`not`, paths `_Assoc.Element` (to-one), `inheriting conditions from entity` (D35). Tests `rap-authorizations.test.ts`, `dcl.test.ts`. |
-| Side effects (`side effects { … }`) | ✅ | `Common.SideEffects` in the `$metadata`; the generated UI does not use them yet (the object is reloaded after a save). |
+| Side effects (`side effects { … }`, `use side effects;` of the projection) | ✅ | `Common.SideEffects` in the `$metadata` when the projection BDEF says `use side effects;`, as on SAP (D86); the generated UI does not use them yet (the object is reloaded after a save). |
 
 ## OData V4 service
 

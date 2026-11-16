@@ -123,7 +123,7 @@ describe("authorizations in the controls of the instances (D36)", () => {
     expect(seen).toMatchObject({ __EntityControl: { Updatable: false, Deletable: false }, __OperationControl: { acceptTravel: false, deductDiscount: false, copyTravel: false, _Booking: false } });
   });
 
-  it("checks the creation of bookings by the authorization of their travel (%assoc)", async () => {
+  it("checks the creation of bookings by the update authorization of their travel (D85)", async () => {
     const booking = { BookingID: "0007", CarrierID: "LH", ConnectionID: "0400", FlightDate: "2026-06-03", FlightPrice: "10.00", CurrencyCode: "EUR" };
     const viewer = await tokenOf("victor", ["travel_viewer"]);
     expect((await as(viewer, "POST", `Travel(${T1})/_Booking`, booking)).status).toBe(403);

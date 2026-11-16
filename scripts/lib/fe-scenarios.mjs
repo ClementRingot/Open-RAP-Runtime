@@ -44,7 +44,7 @@ export const SCENARIOS = [
     id: "value-help",
     floorplan: "objectPage",
     title: "A value help",
-    steps: ["Open a travel, press Edit.", "Open the value help of Agency, choose an agency.", "Press Discard Draft and confirm."],
+    steps: ["Open a travel, press Edit.", "Open the value help of Currency, choose a currency.", "Press Discard Draft and confirm."],
   },
   {
     id: "side-effects",

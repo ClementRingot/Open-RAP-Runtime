@@ -29,6 +29,7 @@ import {
   type ODataEntityType,
   type ODataOperation,
   type ODataService,
+  type SideEffectModel,
 } from "@open-rap/model";
 import { el, renderXml, type XmlElement } from "./xml.js";
 
@@ -617,12 +618,21 @@ class CsdlBuilder {
     return result;
   }
 
+  /** The side effects of the base BDEF the service exposes: a projection needs `use side effects;` (D86). */
+  private exposedSideEffects(entity: EntityModel): SideEffectModel[] {
+    const exposed = exposedBehavior(this.model, entity);
+    const projection = exposed.projection;
+    if (projection !== undefined && this.model.behaviors.find((b) => b.entities.includes(projection))?.useSideEffects !== true) {
+      return [];
+    }
+    return exposed.base?.sideEffects ?? [];
+  }
+
   /** BDEF side effects of the base entity, renamed through the projection. */
   private sideEffects(type: ODataEntityType, entity: EntityModel): XmlElement[] {
-    const behavior = exposedBehavior(this.model, entity).base;
     const result: XmlElement[] = [];
     let index = 0;
-    for (const effect of behavior?.sideEffects ?? []) {
+    for (const effect of this.exposedSideEffects(entity)) {
       if (effect.trigger.kind !== "field") {
         continue;
       }
@@ -792,7 +802,8 @@ class CsdlBuilder {
     const type = this.service.entityTypes.find((t) => t.name === operation.boundType);
     const entity = type === undefined ? undefined : findEntity(this.model, type.entity);
     const behavior = entity === undefined ? undefined : exposedBehavior(this.model, entity).base;
-    for (const effect of behavior?.sideEffects.filter((e) => e.trigger.kind === "action" && same(e.trigger.name, operation.action)) ?? []) {
+    const effects = entity === undefined ? [] : this.exposedSideEffects(entity);
+    for (const effect of effects.filter((e) => e.trigger.kind === "action" && same(e.trigger.name, operation.action))) {
       if (type === undefined || entity === undefined) {
         break;
       }

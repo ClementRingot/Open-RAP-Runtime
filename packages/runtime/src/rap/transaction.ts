@@ -400,7 +400,7 @@ export class Transaction {
     }
     const request = this.bridge.data(master, derivedType.globalAuthRequest(master.index));
     const result = this.bridge.data(master, derivedType.globalAuthResult(master.index));
-    const flags = master === bo ? requested : [{ kind: "update" as const }];
+    const flags = master === bo ? requested.map(authorizedAs) : [{ kind: "update" as const }];
     for (const op of flags) {
       setFlag(this.operationFlag(request, op), true);
     }
@@ -408,7 +408,7 @@ export class Transaction {
     const reported = this.bridge.response(master, "reported");
     await this.call(handler, { requested: request, result, failed, reported });
     for (const op of requested) {
-      const checked = master === bo ? op : { kind: "update" as const };
+      const checked = master === bo ? authorizedAs(op) : { kind: "update" as const };
       if (isFlagOn(this.operationFlag(result, checked))) {
         denied.add(operationId(op));
       }
@@ -427,7 +427,7 @@ export class Transaction {
     const masterKeys = await Promise.all(keys.map((k) => this.masterKey(bo, master, k)));
     const unique = [...new Map(masterKeys.filter((k): k is Row => k !== undefined).map((k) => [keyString(master, k), k])).values()];
     const request = this.bridge.data(master, derivedType.instanceAuthRequest(master.index));
-    const checked = master === bo ? op : { kind: "update" as const };
+    const checked = master === bo ? authorizedAs(op) : { kind: "update" as const };
     setFlag(this.operationFlag(request, checked), true);
     const result = this.bridge.data(master, derivedType.instanceAuthResult(master.index));
     const failed = this.bridge.response(master, "failed");
@@ -1610,6 +1610,14 @@ export class Transaction {
     const disabled = await this.globalFeatures(bo, operations, mode);
     return new Set(operations.map(operationId).filter((id) => !denied.has(id) && !disabled.has(id)));
   }
+}
+
+/**
+ * The operation whose authorization decides: a creation by association is authorized as an update
+ * of its source, the authorization types of SAP have no %assoc (D85).
+ */
+function authorizedAs(op: FailedOperation): FailedOperation {
+  return op.kind === "association" ? { kind: "update" } : op;
 }
 
 export function operationId(op: FailedOperation): string {

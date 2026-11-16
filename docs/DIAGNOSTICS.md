@@ -78,6 +78,7 @@ exit code is 1 as soon as there is an error (or a warning with `--warnings-as-er
 | BDEF028 | error | Draft BO (`with draft`) with an entity without a `draft table` (D54) |
 | BDEF029 | error | `with collaborative draft` without `draft action Share` (D59) |
 | BDEF030 | error | `draft determine action Prepare` names a validation or a determination the entity does not define (D81) |
+| BDEF031 | error | `total etag` anywhere but right after `lock master` (`lock master total etag Field`), refused by SAP (D85) |
 | ABP001 | error | Behavior pool not found |
 | ABP002 | error | Missing handler method, or missing saver class (with `save_modified`) for additional or unmanaged save |
 | ABP003 | warning | Handler or saver method without a matching BDEF element (including an undeclared precheck, a saver without additional or unmanaged save): it is not called |

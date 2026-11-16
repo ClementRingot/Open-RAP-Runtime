@@ -38,7 +38,7 @@ describe("rapt new --binding-type webapi (D76)", () => {
 
   it("writes a Web API binding, without metadata extension, that builds without UI", () => {
     const binding = readFileSync(path.join(api, "src", "zpa_api_partner_o4.srvb.xml"), "utf8");
-    expect(binding).toContain("<BINDING_TYPE_CATEGORY>1</BINDING_TYPE_CATEGORY>");
+    expect(binding).toContain("<BIND_TYPE_CATEGORY>1</BIND_TYPE_CATEGORY>");
     expect(binding).toContain("(OData V4, Web API)");
     expect(existsSync(path.join(api, "src", "zpa_c_partner.ddlx.asddlxs"))).toBe(false);
     expect(readFileSync(path.join(api, "src", "zpa_c_partner.ddls.asddls"), "utf8")).not.toContain("@Metadata.allowExtensions");

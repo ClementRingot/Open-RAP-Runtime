@@ -364,6 +364,8 @@ export interface BehaviorModel {
   draft?: boolean;
   /** `with collaborative draft` (D59): several users edit a draft, invited by the action Share. */
   collaborativeDraft?: true;
+  /** `use side effects;` of a projection BDEF: without it, SAP exposes no side effect of the base (D86). */
+  useSideEffects?: true;
   /** The saver class of the behavior pool (`lsc_…`), for additional and unmanaged save. */
   saver?: SaverModel;
   entities: EntityBehaviorModel[];

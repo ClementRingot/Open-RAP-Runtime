@@ -3,11 +3,11 @@
  <asx:abap xmlns:asx="http://www.sap.com/abapxml" version="1.0">
   <asx:values>
    <DDLX>
-    <NAME>ZRT_C_BOOKING</NAME>
-    <TYPE>DDLX/EX</TYPE>
-    <DESCRIPTION>Booking: UI annotations</DESCRIPTION>
-    <DESCRIPTION_TEXT_LIMIT>60</DESCRIPTION_TEXT_LIMIT>
-    <LANGUAGE>EN</LANGUAGE>
+    <METADATA>
+     <NAME>ZRT_C_BOOKING</NAME>
+     <DESCRIPTION>Booking: UI annotations</DESCRIPTION>
+     <MASTER_LANGUAGE>EN</MASTER_LANGUAGE>
+    </METADATA>
    </DDLX>
   </asx:values>
  </asx:abap>

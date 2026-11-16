@@ -171,8 +171,10 @@ What the project deliberately leaves out; the planned work is in
 | Gap | Status |
 |---|---|
 | The authorization object `ZAO_TRAVL` of `fixtures/travel` names the authorization field `ZAGENCY`, which the fixture does not define (nor its data element, nor the object class `ZRT`) | The Travel fixture does not activate on SAP as is; the `trial` variant leaves the authorizations out. To fix with the first activation results. |
-| The `trial` variant replaces each `AUTHORITY-CHECK` by `sy-subrc = 0.` and the access conditions by an unconditional `grant select` | A trial user cannot be granted authorizations of their own; the behavior of the authorizations is not compared with SAP. |
-| Draft tables written for SAP: element names, types and the reference fields of the amounts derived from the model | Not compared with the tables ADT generates until the first activation on the trial. |
+| The `trial` variant replaces each `AUTHORITY-CHECK` and its `COND #( WHEN sy-subrc = 0 … )` by `if_abap_behv=>auth-allowed` (writing `sy-subrc` is refused by ABAP Cloud, D85), and the access conditions by an unconditional `grant select` (SAP warns: `Conditions defined by full access rule in role …`) | A trial user cannot be granted authorizations of their own; the behavior of the authorizations is not compared with SAP. |
+| Draft tables written for SAP: element names, types and the reference fields of the amounts derived from the model | No message on them at the first activation on the trial (2611, D85); not compared field by field with the tables ADT generates. |
+| No `authorization:` addition per association (`create ( authorization : … )`): a creation by association is always authorized as an update of its source (D85) | As SAP by default; the own indicator `%assoc` of such an addition is not supported. |
+| The DDLX and SRVB written flat were refused by the abapGit of SAP BTP at the first pull (D85) | Written in the format of SAP BTP since D85; an existing flat XML file of a project is not rewritten by `rapt abapgit`. |
 
 ## Draft (D54)
 
