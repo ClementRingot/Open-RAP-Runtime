@@ -510,6 +510,20 @@ function rewriteStatement(kind: string, tokens: Tok[], edits: SourceEdits, conte
     edits.replace(tokens[0] as Tok, last, emlCode(statement, context));
     return;
   }
+  // ABAP for Cloud Development (D91): the system fields are read-only, function modules are not
+  // released (the message of SAP BTP for sy-subrc)
+  if ((kind === "Move" || kind === "Clear") && tokens.length > 1) {
+    // the target, as tokens: sy - subrc
+    const start = kind === "Move" ? 0 : 1;
+    const target = tokens[start];
+    const field = tokens[start + 2];
+    if (target?.upper === "SY" && tokens[start + 1]?.str === "-" && field !== undefined && (kind === "Clear" || tokens[start + 3]?.str === "=")) {
+      throw new RewriteError("ABP012", `Only reads can be performed on the field "SY-${field.upper}" in the current ABAP language version.`, target);
+    }
+  }
+  if (kind === "CallFunction") {
+    throw new RewriteError("ABP012", `CALL FUNCTION ${tokens[2]?.str ?? ""}: a function module is not released for ABAP for Cloud Development; call a released class instead`, tokens[0]);
+  }
   const inSaver = context.current !== undefined && context.saverClasses?.has(context.current.name) === true;
   if (SQL_WRITES.has(kind)) {
     if (!inSaver || context.current?.part !== "implementation") {

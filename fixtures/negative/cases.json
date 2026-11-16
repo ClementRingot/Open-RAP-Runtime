@@ -1,0 +1,97 @@
+{
+  "$comment": "Sources SAP BTP must refuse (D91). Each case is the business object of `rapt new <dir> Item --prefix <prefix>` with exact text replacements in the file whose name ends with the key; {prefix} is the prefix in lower case. `expect.code`: the diagnostic of `rapt check` in standard mode (null: accepted). `sap`: the outcome on SAP BTP, from the round trip (`scripts/btp-roundtrip.mjs --negative`): `refuses` with the exact message, `activates`, or null when not yet tried. `confirm`: what the round trip must settle.",
+  "entity": "Item",
+  "cases": [
+    {
+      "id": "control",
+      "prefix": "ZRNA",
+      "description": "The business object of rapt new, unchanged: SAP activates it.",
+      "changes": {},
+      "expect": { "code": null },
+      "sap": null
+    },
+    {
+      "id": "write-statement",
+      "prefix": "ZRNB",
+      "description": "WRITE, a statement of classic ABAP, in a handler method.",
+      "changes": { "_r_item.clas.locals_imp.abap": [["    CHECK instances IS NOT INITIAL.", "    WRITE 'x'.\n    CHECK instances IS NOT INITIAL."]] },
+      "expect": { "code": "ABP004" },
+      "sap": null
+    },
+    {
+      "id": "not-released-table",
+      "prefix": "ZRNC",
+      "description": "SELECT on MARA, a table not released for ABAP for Cloud Development.",
+      "changes": { "_r_item.clas.locals_imp.abap": [["    CHECK instances IS NOT INITIAL.", "    SELECT SINGLE matnr FROM mara INTO @DATA(material).\n    CHECK instances IS NOT INITIAL."]] },
+      "expect": { "code": "ABP004" },
+      "sap": null
+    },
+    {
+      "id": "function-module",
+      "prefix": "ZRND",
+      "description": "CALL FUNCTION of a function module not released for ABAP for Cloud Development.",
+      "changes": { "_r_item.clas.locals_imp.abap": [["    CHECK instances IS NOT INITIAL.", "    CALL FUNCTION 'POPUP_TO_CONFIRM'.\n    CHECK instances IS NOT INITIAL."]] },
+      "expect": { "code": "ABP012" },
+      "sap": null
+    },
+    {
+      "id": "write-sy-subrc",
+      "prefix": "ZRNE",
+      "description": "A value written to sy-subrc, read-only in ABAP for Cloud Development.",
+      "changes": { "_r_item.clas.locals_imp.abap": [["    CHECK instances IS NOT INITIAL.", "    sy-subrc = 0.\n    CHECK instances IS NOT INITIAL."]] },
+      "expect": { "code": "ABP012" },
+      "sap": { "release": "2611", "outcome": "refuses", "message": "Only reads can be performed on the field \"SY-SUBRC\" in the current ABAP language version." }
+    },
+    {
+      "id": "bdef-unknown-field",
+      "prefix": "ZRNF",
+      "description": "A field of the behavior definition the CDS entity does not have.",
+      "changes": { "_r_item.bdef.asbdef": [["field ( readonly ) Status,", "field ( readonly ) Unknown, Status,"]] },
+      "expect": { "code": "BDEF005" },
+      "sap": null
+    },
+    {
+      "id": "mapping-unknown-column",
+      "prefix": "ZRNG",
+      "description": "A mapping to a column the persistent table does not have.",
+      "changes": { "_r_item.bdef.asbdef": [["= status;", "= state;"]] },
+      "expect": { "code": "BDEF009" },
+      "sap": null
+    },
+    {
+      "id": "no-lock",
+      "prefix": "ZRNH",
+      "description": "A root entity without lock master.",
+      "changes": { "_r_item.bdef.asbdef": [["lock master\n", ""]] },
+      "expect": { "code": "BDEF015" },
+      "sap": null
+    },
+    {
+      "id": "missing-handler",
+      "prefix": "ZRNI",
+      "description": "A determination without its handler method.",
+      "changes": { "_r_item.clas.locals_imp.abap": [["    METHODS setStatus FOR DETERMINE ON MODIFY\n      IMPORTING keys FOR Item~setStatus.\n", ""], ["  METHOD setStatus.", "  METHOD set_status_unused."]] },
+      "expect": { "code": "ABP002" },
+      "sap": null,
+      "confirm": "SAP may only warn that the determination has no implementation."
+    },
+    {
+      "id": "database-write-in-handler",
+      "prefix": "ZRNJ",
+      "description": "DELETE on the persistent table in a handler method, outside the save sequence.",
+      "changes": { "_r_item.clas.locals_imp.abap": [["    CHECK instances IS NOT INITIAL.", "    DELETE FROM {prefix}_item WHERE status = 'X'.\n    CHECK instances IS NOT INITIAL."]] },
+      "expect": { "code": "ABP007" },
+      "sap": null,
+      "confirm": "SAP may accept it at activation and stop it at runtime (BEHAVIOR_ILLEGAL_STATEMENT)."
+    },
+    {
+      "id": "commit-in-handler",
+      "prefix": "ZRNK",
+      "description": "COMMIT WORK in a handler method.",
+      "changes": { "_r_item.clas.locals_imp.abap": [["    CHECK instances IS NOT INITIAL.", "    COMMIT WORK.\n    CHECK instances IS NOT INITIAL."]] },
+      "expect": { "code": null },
+      "sap": null,
+      "confirm": "Open RAP Runtime accepts it today; SAP may refuse it at activation (strict mode) or at runtime only."
+    }
+  ]
+}

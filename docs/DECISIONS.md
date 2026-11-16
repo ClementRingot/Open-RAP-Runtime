@@ -2219,3 +2219,28 @@ _The issues moved to the repository itself once public: see D74._
     the order of their effect on SAP Fiori elements.
 - **Tests**: `conformance.test.ts` (normalization: aliases, namespace, container, suffix, record
   type; the report of the trial 2611; `rapt conformance compare --json`, refused without `--sap`).
+
+## D91 — Sources SAP BTP must refuse: `fixtures/negative`, system fields, function modules
+
+- **Context**: the plan (provisional D99) asks for sources that SAP must refuse, so that the
+  `standard` mode refuses what SAP BTP refuses. Trying candidates on `rapt check` showed that
+  Open RAP Runtime accepted two sources ABAP for Cloud Development refuses: `sy-subrc = 0.`
+  (refused by the trial 2611 with `Only reads can be performed on the field "SY-SUBRC" in the
+  current ABAP language version.`, D85) and `CALL FUNCTION` (no function module of the project,
+  and almost none released on SAP BTP). abaplint, configured for the Cloud version, accepts both.
+- **Decision**:
+  - `fixtures/negative/cases.json`: one case per source, each the business object of `rapt new`
+    with exact text replacements and a prefix of its own (`ZRNA`…`ZRNK`), so that one pull on the
+    trial tries them all independently. `control` has no change and must activate. Each case
+    gives the diagnostic of `rapt check` (`expect.code`), the outcome on SAP BTP (`sap`, `null`
+    until the trial is tried) and, when unsure, what the trial must settle (`confirm`).
+  - `node scripts/btp-roundtrip.mjs --negative --suffix XYZ --out <dir>` writes the cases for the
+    trial, each prefix followed by the suffix of the user (3 characters at most: the table names
+    have 16), with `expected.json` and the steps.
+  - ABP012 (error), in the rewriting pass of the behavior pools: a system field written (`sy-xxx
+    = …`, `CLEAR sy-xxx`), with the message of SAP BTP; `CALL FUNCTION`, whatever the function
+    module (the released ones are not known before D94).
+  - Two cases are refused by Open RAP Runtime but may be accepted at activation by SAP
+    (`missing-handler`, `database-write-in-handler`), one accepted by Open RAP Runtime may be
+    refused by SAP (`commit-in-handler`): the trial decides, and Open RAP Runtime follows SAP.
+- **Tests**: `negative.test.mjs` (each case and its diagnostic, the repository for the trial).

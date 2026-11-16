@@ -8,6 +8,10 @@ service of the fixture (`metadata.xml`), its differences with the `$metadata` of
 (`metadata-diff.md`, written by `rapt conformance compare`, D90), and the report of the round trip
 (`REPORT.md`).
 
+The sources SAP must refuse are in `fixtures/negative/cases.json` (D91): `node
+scripts/btp-roundtrip.mjs --negative --suffix XYZ --out <dir>` writes them for the trial, and the
+outcome of SAP goes back to the `sap` member of each case.
+
 To compare a project of your own with the `$metadata` SAP BTP generated for it:
 
 ```

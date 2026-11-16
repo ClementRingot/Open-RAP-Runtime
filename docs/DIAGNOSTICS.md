@@ -90,6 +90,7 @@ exit code is 1 as soon as there is an error (or a warning with `--warnings-as-er
 | ABP009 | error | Result of a `SELECT` abaplint does not type (literal, aggregate other than `COUNT(*)`, `MAX` and `MIN`, expression) in an inline declaration: declare the target |
 | ABP010 | error | `AUTHORITY-CHECK` on a field the authorization object does not have |
 | ABP011 | warning | `AUTHORITY-CHECK` on an authorization object neither in the sources (SUSO) nor in `rapt/authorizations.json`: no role grants it |
+| ABP012 | error | Forbidden by ABAP for Cloud Development: a system field written (`sy-subrc = 0.`, `CLEAR sy-subrc`; the message of SAP BTP), `CALL FUNCTION` (no function module is released) (D91) |
 | DCL001 | error | Unreadable access control (DCL), or circular inheritance |
 | DCL002 | warning | Condition of an access control the application does not evaluate: it grants no row |
 | DCL003 | warning | Unknown element, association or entity in an access control, or not exposed by the projection: the condition grants no row |

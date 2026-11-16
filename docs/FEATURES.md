@@ -215,6 +215,7 @@ dependent ETag, remote APIs.
 | `$apply`: `filter`, `groupby`, `aggregate` (`sum`, `min`, `max`, `average`, `countdistinct`, `$count`) | ✅ | With the DCL of the user; other transformations: 501 (D52). |
 | Enumeration types (`EnumType`): JSON by member name, literals `Ns.Type'M'` | ✅ | `enhanced` mode, CDS enumerated types (D55). |
 | JSON batch, `$value`, single properties | ❌ | Not in the MVP. |
+| Sources SAP BTP must refuse (`fixtures/negative/cases.json`, `scripts/btp-roundtrip.mjs --negative`) | 🟡 | Each case refused by `rapt check` in standard mode with its diagnostic; the outcome of SAP BTP recorded per case, one known so far (D91). |
 | `$metadata` compared with SAP BTP (`rapt conformance compare <src> --sap <metadata.xml> [--suffix XYZ] [--out report.md]`) | ✅ | Both documents as facts on normalized names (aliases of the vocabularies, namespace of the service, suffix of a renamed copy); the report of the trial 2611 is kept up to date by `conformance.test.ts` (D90). |
 | SAP Fiori elements protocol cases (draft List Report and Object Page) | 🟡 | Requests of Fiori elements replayed without SAPUI5 (`fe-protocol.test.ts`): the 13 cases pass (D81); the 9 scenarios recorded on the SAP BTP trial 2611 pass (D87 to D89); cases recorded on an SAP BTP trial by `scripts/fe-record-trial.mjs`, on a copy renamed by `rapt abapgit --suffix` (D83), or from a HAR with `scripts/fe-har-to-cases.mjs`; `rapt dev --fe-check` (D79). |
 

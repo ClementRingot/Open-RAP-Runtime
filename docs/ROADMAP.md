@@ -70,6 +70,7 @@ The sections below use the provisional numbers, unless they say "final".
 | — | D83 | Guided recording of the Fiori elements protocol on the SAP BTP trial, renamed copy for a shared system | 0 |
 | — | D85 | First pull and activation on the SAP BTP trial: abapGit XML of DDLX and SRVB, `total etag`, authorizations | 0 |
 | — | D86 | `use side effects`, value help and side effects of the draft fixture | 0 |
+| — | D91 | `fixtures/negative`: sources SAP BTP must refuse, on the trial and in `rapt check`; system fields and function modules refused | 0 |
 | — | D89 | `__CreateByAssociationControl`, `Edit` under operation control, advertised actions, as on SAP BTP | 0 |
 | — | D88 | `Prefer` and `Preference-Applied`, the `ETag` of a `204`, `201` and `Location` of `Edit` and `Activate`, `204` of `Prepare`, as on SAP BTP | 0 |
 | — | D87 | The administrative data of the drafts as on SAP BTP: `I_DraftAdministrativeData`, `DraftEntityCreationDateTime`, `DraftEntityLastChangeDateTime` | 0 |

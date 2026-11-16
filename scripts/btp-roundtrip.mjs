@@ -4,6 +4,7 @@
 // draft tables SAP needs, an expected.json of what must happen on SAP, and the steps to follow.
 //
 //   node scripts/btp-roundtrip.mjs --suffix CR1 --out ../trial-travel [--variants draft,trial] [--fixture fixtures/travel]
+//   node scripts/btp-roundtrip.mjs --negative --suffix CR1 --out ../trial-negative   (the sources SAP must refuse, D91)
 
 import { execFileSync } from "node:child_process";
 import { cpSync, existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
@@ -11,19 +12,23 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { parseArgs } from "node:util";
+import { negativeCases, negativeReadme, writeNegativeCase } from "./lib/negative.mjs";
 import { applyVariants, roundTripReadme } from "./lib/roundtrip.mjs";
 
 const USAGE = `Usage: node scripts/btp-roundtrip.mjs --suffix <XYZ> --out <dir> [--variants draft,trial] [--fixture fixtures/travel]
+       node scripts/btp-roundtrip.mjs --negative --suffix <XYZ> --out <dir>
 
   --suffix    1 to 6 letters or digits of your own: the trial is shared by its users
   --variants  variants of fixtures/variants.json applied in order (default: draft,trial: the draft
               BO the Fiori elements scenarios need, without the authorizations the trial cannot grant)
+  --negative  the cases of fixtures/negative/cases.json instead (D91): one business object each,
+              its prefix followed by the suffix (at most 3 characters: the tables have 16)
 `;
 
 const root = path.join(path.dirname(fileURLToPath(import.meta.url)), "..");
 let values;
 try {
-  ({ values } = parseArgs({ options: { suffix: { type: "string" }, out: { type: "string" }, variants: { type: "string" }, fixture: { type: "string" }, help: { type: "boolean", short: "h" } } }));
+  ({ values } = parseArgs({ options: { suffix: { type: "string" }, out: { type: "string" }, variants: { type: "string" }, fixture: { type: "string" }, negative: { type: "boolean" }, help: { type: "boolean", short: "h" } } }));
 } catch (error) {
   process.stderr.write(`${error.message}\n${USAGE}`);
   process.exit(2);
@@ -42,6 +47,31 @@ const out = path.resolve(values.out);
 if (existsSync(out)) {
   process.stderr.write(`${out} exists: give a new folder\n`);
   process.exit(2);
+}
+
+if (values.negative === true) {
+  // the sources SAP must refuse (D91): each case a business object of its own, named with the suffix
+  const suffix = values.suffix.toUpperCase();
+  if (!/^[A-Z0-9]{1,3}$/.test(suffix)) {
+    process.stderr.write(`--negative: the suffix has 1 to 3 letters or digits: ${values.suffix}\n`);
+    process.exit(2);
+  }
+  const definitions = negativeCases(root);
+  const cases = [];
+  for (const c of definitions.cases) {
+    const prefix = `${c.prefix}${suffix}`;
+    writeNegativeCase(root, out, definitions, c, prefix);
+    cases.push({ id: c.id, prefix, description: c.description, code: c.expect.code, ...(c.confirm === undefined ? {} : { confirm: c.confirm }) });
+  }
+  cpSync(path.join(root, "fixtures", "travel", ".abapgit.xml"), path.join(out, ".abapgit.xml"));
+  // the files rapt new writes for a project of its own, not for SAP
+  rmSync(path.join(out, "rapt"), { recursive: true, force: true });
+  rmSync(path.join(out, "AGENTS.md"), { force: true });
+  const expected = { suffix, cases };
+  writeFileSync(path.join(out, "expected.json"), `${JSON.stringify(expected, null, 2)}\n`);
+  writeFileSync(path.join(out, "README.md"), negativeReadme(expected));
+  process.stdout.write(`${out}: ${cases.length} cases, objects ending with ${suffix}\nnext: follow ${path.join(out, "README.md")}\n`);
+  process.exit(0);
 }
 
 const work = mkdtempSync(path.join(tmpdir(), "rapt-roundtrip-"));
