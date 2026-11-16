@@ -580,12 +580,7 @@ class CsdlBuilder {
     if (type.stateMessages === true) children.push(annotation("Common.Messages", { Path: STATE_MESSAGES }));
     this.annotations(this.qualified(type.name), children);
     // D92: the controls of the instances are computed, hidden, not filterable (as on SAP BTP)
-    const controls = [
-      ...(type.createByAssociationControl.length > 0 ? [CREATE_BY_ASSOCIATION_CONTROL] : []),
-      ...(type.entityControl !== undefined ? [ENTITY_CONTROL] : []),
-      ...(type.operationControl.length > 0 ? [OPERATION_CONTROL] : []),
-    ];
-    for (const control of controls) {
+    for (const control of this.controls(type)) {
       this.annotations(`${this.qualified(type.name)}/${control}`, [annotation("Core.Computed"), annotation("UI.HiddenFilter"), annotation("UI.Hidden")]);
     }
     for (const navigation of type.navigations.filter((n) => n.kind === "composition")) {
@@ -742,12 +737,14 @@ class CsdlBuilder {
       const allowed = allowedFilterExpressions(f.annotations);
       return allowed === undefined ? [] : [{ property: f.name, allowed }];
     });
-    if (required.length === 0 && expressions.length === 0) return undefined;
+    const controls = this.controls(type);
+    if (required.length === 0 && expressions.length === 0 && controls.length === 0) return undefined;
     return annotation(
       "Capabilities.FilterRestrictions",
       {},
       record(
         "Capabilities.FilterRestrictionsType",
+        pv("Filterable", { Bool: true }),
         required.length === 0 ? undefined : pv("RequiredProperties", {}, collection(...required.map(propertyPath))),
         expressions.length === 0
           ? undefined
@@ -756,8 +753,19 @@ class CsdlBuilder {
               {},
               collection(...expressions.map((e) => record("Capabilities.FilterExpressionRestrictionType", pv("Property", { PropertyPath: e.property }), pv("AllowedExpressions", { String: e.allowed })))),
             ),
+        // D94: the controls of the instances cannot be filtered (as SAP says)
+        controls.length === 0 ? undefined : pv("NonFilterableProperties", {}, collection(...controls.map(propertyPath))),
       ),
     );
+  }
+
+  /** The control properties of the instances of a type (D89), in the order of SAP BTP. */
+  private controls(type: ODataEntityType): string[] {
+    return [
+      ...(type.createByAssociationControl.length > 0 ? [CREATE_BY_ASSOCIATION_CONTROL] : []),
+      ...(type.entityControl !== undefined ? [ENTITY_CONTROL] : []),
+      ...(type.operationControl.length > 0 ? [OPERATION_CONTROL] : []),
+    ];
   }
 
   /** The entity set of the draft root of a draft node, up its associations to the parent. */
@@ -777,16 +785,25 @@ class CsdlBuilder {
     if (set === undefined) {
       return;
     }
+    // D94: as on SAP BTP: insertable by default; delta updates, deep updates with Content-ID, and the
+    // navigations not updatable through the instance on an updatable set; $select on the updates
+    // the navigations of the draft first, as SAP orders them
+    const draftFirst = (names: ODataEntityType["navigations"]): ODataEntityType["navigations"] => [...names.filter((n) => n.name === "DraftAdministrativeData" || n.sibling === true), ...names.filter((n) => !(n.name === "DraftAdministrativeData" || n.sibling === true))];
+    const updatableNavigations = set.updatable ? draftFirst(type.navigations).map((n) => n.name) : [];
     const children: Array<XmlElement | undefined> = [
-      annotation("Capabilities.InsertRestrictions", {}, record("Capabilities.InsertRestrictionsType", pv("Insertable", { Bool: set.insertable }))),
+      set.insertable ? undefined : annotation("Capabilities.InsertRestrictions", {}, record("Capabilities.InsertRestrictionsType", pv("Insertable", { Bool: false }))),
       annotation(
         "Capabilities.UpdateRestrictions",
         {},
         record(
           "Capabilities.UpdateRestrictionsType",
+          set.updatable ? pv("DeltaUpdateSupported", { Bool: true }) : undefined,
           pv("Updatable", type.entityControl?.updatable === true && set.updatable ? { Path: `${ENTITY_CONTROL}/Updatable` } : { Bool: set.updatable }),
+          updatableNavigations.length === 0 ? undefined : pv("NonUpdatableNavigationProperties", {}, collection(...updatableNavigations.map(propertyPath))),
+          pv("QueryOptions", {}, record("Capabilities.ModificationQueryOptionsType", pv("SelectSupported", { Bool: true }))),
         ),
       ),
+      set.updatable ? annotation("Capabilities.DeepUpdateSupport", {}, record("Capabilities.DeepUpdateSupportType", pv("ContentIDSupported", { Bool: true }))) : undefined,
       annotation(
         "Capabilities.DeleteRestrictions",
         {},
@@ -795,10 +812,25 @@ class CsdlBuilder {
           pv("Deletable", type.entityControl?.deletable === true && set.deletable ? { Path: `${ENTITY_CONTROL}/Deletable` } : { Bool: set.deletable }),
         ),
       ),
-      annotation("Capabilities.SearchRestrictions", {}, record("Capabilities.SearchRestrictionsType", pv("Searchable", { Bool: set.searchable }))),
+      annotation(
+        "Capabilities.SearchRestrictions",
+        {},
+        record(
+          "Capabilities.SearchRestrictionsType",
+          pv("Searchable", { Bool: set.searchable }),
+          // D94: the terms of $search are all required, without AND, NOT nor groups (as SAP says)
+          set.searchable ? pv("UnsupportedExpressions", { EnumMember: "Capabilities.SearchExpressions/AND Capabilities.SearchExpressions/NOT Capabilities.SearchExpressions/group" }) : undefined,
+          set.searchable ? pv("SearchSyntax", { String: "https://url.sap/odata-search" }) : undefined,
+        ),
+      ),
       this.filterRestrictions(type),
+      this.controls(type).length === 0 ? undefined : annotation("Capabilities.SortRestrictions", {}, record("Capabilities.SortRestrictionsType", pv("NonSortableProperties", {}, collection(...this.controls(type).map(propertyPath))))),
+      set.draftAdministrativeData === true ? annotation("Capabilities.ReadRestrictions", {}, record("Capabilities.ReadRestrictionsType", pv("Readable", { Bool: false }))) : undefined,
     ];
-    const navigations = type.navigations.filter((n) => n.collection);
+    // D94: as on SAP BTP, the compositions (insertable or not), the association to the parent and
+    // the sibling of a draft (neither insertable nor deeply updatable)
+    const restricted = type.navigations.filter((n) => n.collection || n.kind === "toParent" || n.sibling === true);
+    const navigations = draftFirst(restricted);
     if (navigations.length > 0) {
       children.push(
         annotation(
@@ -811,14 +843,18 @@ class CsdlBuilder {
               {},
               collection(
                 ...navigations.map((n) =>
+                  // the type of the items of the collection, which SAP leaves out
                   record(
-                    "Capabilities.NavigationPropertyRestriction",
+                    undefined,
                     pv("NavigationProperty", { NavigationPropertyPath: n.name }),
-                    pv(
-                      "InsertRestrictions",
-                      {},
-                      record("Capabilities.InsertRestrictionsType", pv("Insertable", n.insertableDynamic ? { Path: `${CREATE_BY_ASSOCIATION_CONTROL}/${n.name}` } : { Bool: n.insertable })),
-                    ),
+                    n.collection || n.kind === "toParent" || set.draft?.root === true
+                      ? pv(
+                          "InsertRestrictions",
+                          {},
+                          record("Capabilities.InsertRestrictionsType", pv("Insertable", n.insertableDynamic ? { Path: `${CREATE_BY_ASSOCIATION_CONTROL}/${n.name}` } : { Bool: n.collection ? n.insertable : false })),
+                        )
+                      : undefined,
+                    n.collection ? undefined : pv("DeepUpdateSupport", {}, record("Capabilities.DeepUpdateSupportType", pv("Supported", { Bool: false }))),
                   ),
                 ),
               ),

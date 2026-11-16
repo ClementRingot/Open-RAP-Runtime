@@ -2300,3 +2300,33 @@ _The issues moved to the repository itself once public: see D74._
   - The name SAP appears only to designate the system the services are compatible with; the
     project does not present itself as a product of SAP.
 - **Tests**: none (no change of behavior).
+
+## D94 — State messages on every entity of a business object; the capabilities of SAP BTP
+
+- **Context**: on SAP BTP, `SAP__Messages` is a property of the entity types of the business
+  objects of a UI service (`TravelType`, `BookingType`; not `I_DraftAdministrativeDataType`), and
+  the entity sets carry capabilities Open RAP Runtime did not write (D90:
+  `FilterRestrictions`, `SortRestrictions`, `DeepUpdateSupport`, details of
+  `UpdateRestrictions`, of `SearchRestrictions` and of `NavigationRestrictions`).
+- **Decision**:
+  - Every entity type of a business object (an exposed entity with a behavior, or a draft
+    entity) has `SAP__Messages` and `Common.Messages` in a service with a UI; without draft the
+    property is an empty collection (no state message is stored outside a draft, D81).
+  - Entity sets, as on SAP BTP: no `InsertRestrictions` when insertable (the default);
+    `UpdateRestrictions` with `DeltaUpdateSupported`, the `NonUpdatableNavigationProperties` (every
+    navigation, those of the draft first) and `QueryOptions/SelectSupported`;
+    `DeepUpdateSupport/ContentIDSupported` on an updatable set; `SearchRestrictions` of a
+    searchable set with `UnsupportedExpressions` (`AND`, `NOT`, groups: the terms of `$search` are
+    all required) and the `SearchSyntax` of SAP; `FilterRestrictions` with `Filterable`, the
+    controls of the instances in `NonFilterableProperties` and the dates of a draft
+    (`DraftEntity*DateTime`, `CreationDateTime` and `LastChangeDateTime` of the administrative
+    data) filtered by a single interval; `SortRestrictions` with the controls in
+    `NonSortableProperties`; `ReadRestrictions/Readable` false on `I_DraftAdministrativeData`
+    (read through the navigation of an instance; the entity set itself stays readable).
+  - `NavigationRestrictions` lists the compositions (insertable or not), the association to the
+    parent (not insertable, no deep update) and `SiblingEntity` (no deep update, not insertable
+    on the root), the navigations of the draft first; its records have no `Type`.
+  - After D94: 312 facts the same, 129 different with the trial 2611.
+- **Tests**: `conformance.test.ts` (the report of the trial 2611); `csdl.test.ts` (`SAP__Messages`
+  on an entity without draft; snapshot); `odata-write.test.ts` (`SAP__Messages` empty without
+  draft).

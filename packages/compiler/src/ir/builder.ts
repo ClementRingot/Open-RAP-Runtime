@@ -410,14 +410,16 @@ function applyDraft(model: Model, diagnostics: Diagnostics): void {
     const hidden = { ui: { hidden: true } };
     // D92: as on SAP BTP, the draft fields are not offered in the filter bar
     const unfiltered = { ...hidden, consumption: { filter: { hidden: true } } };
+    // D94: the dates of a draft are filtered by a single interval (FilterExpressionRestrictions)
+    const dates = { ...hidden, consumption: { filter: { hidden: true, selectiontype: "#INTERVAL", multipleselections: false } } };
     entity.fields.push(
       { name: "IsActiveEntity", type: bool, key: true, annotations: { endusertext: { label: "Is active" }, ...unfiltered }, draft: true },
       { name: "HasActiveEntity", type: bool, key: false, annotations: { endusertext: { label: "Has active" }, ...unfiltered }, draft: true },
       { name: "HasDraftEntity", type: bool, key: false, annotations: { endusertext: { label: "Has Draft" }, ...unfiltered }, draft: true },
       { name: "DraftUUID", type: { kind: "raw", length: 16 }, key: false, annotations: { endusertext: { label: "Draft" }, ...hidden }, draft: true },
       // D87: as on SAP, the creation and last change of the draft instance (none for an active one)
-      { name: "DraftEntityCreationDateTime", type: { kind: "timestampl" }, key: false, annotations: { endusertext: { label: "Draft Created On" }, ...unfiltered }, draft: true },
-      { name: "DraftEntityLastChangeDateTime", type: { kind: "timestampl" }, key: false, annotations: { endusertext: { label: "Draft Last Changed On" }, ...unfiltered }, draft: true },
+      { name: "DraftEntityCreationDateTime", type: { kind: "timestampl" }, key: false, annotations: { endusertext: { label: "Draft Created On" }, ...dates }, draft: true },
+      { name: "DraftEntityLastChangeDateTime", type: { kind: "timestampl" }, key: false, annotations: { endusertext: { label: "Draft Last Changed On" }, ...dates }, draft: true },
     );
     for (const association of entity.associations) {
       const target = exposed.find((e) => same(e.name, association.target));
@@ -446,9 +448,9 @@ function applyDraft(model: Model, diagnostics: Diagnostics): void {
     fields: [
       { name: "DraftUUID", type: { kind: "raw", length: 16 }, key: true, annotations: hiddenLabel("Draft (Technical ID)") },
       { name: "DraftEntityType", type: text(30), key: true, annotations: hiddenLabel("Draft Entity ID") },
-      { name: "CreationDateTime", type: stamp, key: false, annotations: label("Draft Created On") },
+      { name: "CreationDateTime", type: stamp, key: false, annotations: { ...label("Draft Created On"), consumption: { filter: { selectiontype: "#INTERVAL", multipleselections: false } } } },
       { name: "CreatedByUser", type: text(12), key: false, annotations: textOf(label("Draft Created By"), "CreatedByUserDescription") },
-      { name: "LastChangeDateTime", type: stamp, key: false, annotations: label("Draft Last Changed On") },
+      { name: "LastChangeDateTime", type: stamp, key: false, annotations: { ...label("Draft Last Changed On"), consumption: { filter: { selectiontype: "#INTERVAL", multipleselections: false } } } },
       { name: "LastChangedByUser", type: text(12), key: false, annotations: textOf(label("Draft Last Changed By"), "LastChangedByUserDescription") },
       { name: "DraftAccessType", type: text(1), key: false, annotations: hiddenLabel("Draft Access Type") },
       { name: "ProcessingStartDateTime", type: stamp, key: false, annotations: hiddenLabel("Draft In Process Since") },

@@ -856,9 +856,11 @@ export class RapWriteHandler implements WriteHandler {
     }
     const selected = (name: string): boolean => options.select === undefined || options.select.some((p) => p[0] === "*" || p[0] === name);
     // the state messages of the drafts (D81); none for an active instance
-    if (type.stateMessages === true && selected(STATE_MESSAGES) && this.drafts !== undefined) {
+    if (type.stateMessages === true && selected(STATE_MESSAGES)) {
       const instance = (row: Record<string, unknown>): Row => this.baseKey(set, Object.fromEntries(type.keys.map((k) => [k, (row[k] ?? null) as CanonicalValue])));
-      const messages = await this.drafts.stateMessages(this.db, set.bo, rows.filter((row) => row["IsActiveEntity"] === false).map(instance));
+      const drafts = rows.filter((row) => row["IsActiveEntity"] === false).map(instance);
+      // D94: an entity without draft has the property, empty (no state message is stored)
+      const messages = this.drafts === undefined || drafts.length === 0 ? new Map<string, unknown[]>() : await this.drafts.stateMessages(this.db, set.bo, drafts);
       for (const row of rows) {
         row[STATE_MESSAGES] = row["IsActiveEntity"] === false ? (messages.get(keyString(set.bo, keyOf(set.bo, instance(row)))) ?? []) : [];
       }

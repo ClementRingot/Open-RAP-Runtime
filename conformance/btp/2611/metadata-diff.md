@@ -5,10 +5,10 @@ Runtime on normalized names (aliases of the vocabularies, namespace of the servi
 
 | | Structure | Annotations |
 |---|---|---|
-| Same | 298 | |
-| Only on SAP BTP | 1 | 86 |
-| Only in Open RAP Runtime | 16 | 30 |
-| Different | 4 | 7 |
+| Same | 312 | |
+| Only on SAP BTP | 1 | 77 |
+| Only in Open RAP Runtime | 16 | 29 |
+| Different | 4 | 2 |
 
 ## Structure
 
@@ -198,25 +198,15 @@ Runtime on normalized names (aliases of the vocabularies, namespace of the servi
 | @PDF.Features | `Record(ArchiveFormat: Bool=true, Border: Bool=true, CoverPage: Bool=true, DocumentDescriptionCollection: String=MyDocumentDescriptions, DocumentDescriptionReference: String=../../../../default/iwbep/common/0001/$metadata, FitToPage: Bool=true, FontName: Bool=true, FontSize: Bool=true, HeaderFooter: Bool=true, IANATimezoneFormat: Bool=true, Margin: Bool=true, Padding: Bool=true, ResultSizeDefault: Int=20000, ResultSizeMaximum: Int=20000, Signature: Bool=true, TextDirectionLayout: Bool=true, Treeview: Bool=true, UploadToFileShare: Bool=true)` | — |
 | @Support.TechnicalInfoLinks | `Record(FunctionImport: String=GetTechnicalInfoLinks, Url: String=../../../../default/iwbep/common/0001/$metadata)` | — |
 
-### `self.Container/Booking`
-
-| | SAP BTP | Open RAP Runtime |
-|---|---|---|
-| @Capabilities.DeepUpdateSupport | `Record(ContentIDSupported: Bool=true)` | — |
-| @Capabilities.FilterRestrictions | `Record(FilterExpressionRestrictions: Collection(Record(AllowedExpressions: String=SingleRange, Property: PropertyPath=DraftEntityCreationDateTime), Record(AllowedExpressions: String=SingleRange, Property: PropertyPath=DraftEntityLastChangeDateTime)), Filterable: Bool=true, NonFilterableProperties: Collection(PropertyPath("__EntityControl")))` | — |
-| @Capabilities.NavigationRestrictions | `Record(RestrictedProperties: Collection(Record(DeepUpdateSupport: Record(Supported: Bool=false), NavigationProperty: NavigationPropertyPath=SiblingEntity), Record(DeepUpdateSupport: Record(Supported: Bool=false), InsertRestrictions: Record(Insertable: Bool=false), NavigationProperty: NavigationPropertyPath=_Travel)))` | — |
-| @Capabilities.SortRestrictions | `Record(NonSortableProperties: Collection(PropertyPath("__EntityControl")))` | — |
-| @Capabilities.UpdateRestrictions | `Record(DeltaUpdateSupported: Bool=true, NonUpdatableNavigationProperties: Collection(PropertyPath("DraftAdministrativeData"), PropertyPath("SiblingEntity"), PropertyPath("_Travel")), QueryOptions: Record(SelectSupported: Bool=true), Updatable: Path=__EntityControl/Updatable)` | `Record(Updatable: Path=__EntityControl/Updatable)` |
-
 ### `self.Container/I_Currency`
 
 | | SAP BTP | Open RAP Runtime |
 |---|---|---|
 | @Capabilities.DeleteRestrictions | — | `Record(Deletable: Bool=false)` |
 | @Capabilities.InsertRestrictions | — | `Record(Insertable: Bool=false)` |
-| @Capabilities.NavigationRestrictions | — | `Record(RestrictedProperties: Collection(Record(InsertRestrictions: Record(Insertable: Bool=false), NavigationProperty: NavigationPropertyPath=_Text, Type=Capabilities.NavigationPropertyRestriction)))` |
-| @Capabilities.SearchRestrictions | — | `Record(Searchable: Bool=true)` |
-| @Capabilities.UpdateRestrictions | — | `Record(Updatable: Bool=false)` |
+| @Capabilities.NavigationRestrictions | — | `Record(RestrictedProperties: Collection(Record(InsertRestrictions: Record(Insertable: Bool=false), NavigationProperty: NavigationPropertyPath=_Text)))` |
+| @Capabilities.SearchRestrictions | — | `Record(SearchSyntax: String=https://url.sap/odata-search, Searchable: Bool=true, UnsupportedExpressions: EnumMember=Capabilities.SearchExpressions/AND Capabilities.SearchExpressions/NOT Capabilities.SearchExpressions/group)` |
+| @Capabilities.UpdateRestrictions | — | `Record(QueryOptions: Record(SelectSupported: Bool=true), Updatable: Bool=false)` |
 
 ### `self.Container/I_CurrencyText`
 
@@ -224,29 +214,14 @@ Runtime on normalized names (aliases of the vocabularies, namespace of the servi
 |---|---|---|
 | @Capabilities.DeleteRestrictions | — | `Record(Deletable: Bool=false)` |
 | @Capabilities.InsertRestrictions | — | `Record(Insertable: Bool=false)` |
-| @Capabilities.SearchRestrictions | — | `Record(Searchable: Bool=true)` |
-| @Capabilities.UpdateRestrictions | — | `Record(Updatable: Bool=false)` |
+| @Capabilities.SearchRestrictions | — | `Record(SearchSyntax: String=https://url.sap/odata-search, Searchable: Bool=true, UnsupportedExpressions: EnumMember=Capabilities.SearchExpressions/AND Capabilities.SearchExpressions/NOT Capabilities.SearchExpressions/group)` |
+| @Capabilities.UpdateRestrictions | — | `Record(QueryOptions: Record(SelectSupported: Bool=true), Updatable: Bool=false)` |
 
 ### `self.Container/I_DraftAdministrativeData`
 
 | | SAP BTP | Open RAP Runtime |
 |---|---|---|
-| @Capabilities.FilterRestrictions | `Record(FilterExpressionRestrictions: Collection(Record(AllowedExpressions: String=SingleRange, Property: PropertyPath=CreationDateTime), Record(AllowedExpressions: String=SingleRange, Property: PropertyPath=LastChangeDateTime)), Filterable: Bool=true)` | — |
-| @Capabilities.ReadRestrictions | `Record(Readable: Bool=false)` | — |
 | @Capabilities.SearchRestrictions | `Record(SearchSyntax: String=https://url.sap/odata-search, Searchable: Bool=true, UnsupportedExpressions: EnumMember=Capabilities.SearchExpressions/AND Capabilities.SearchExpressions/NOT Capabilities.SearchExpressions/group)` | `Record(Searchable: Bool=false)` |
-| @Capabilities.UpdateRestrictions | `Record(QueryOptions: Record(SelectSupported: Bool=true), Updatable: Bool=false)` | `Record(Updatable: Bool=false)` |
-
-### `self.Container/Travel`
-
-| | SAP BTP | Open RAP Runtime |
-|---|---|---|
-| @Capabilities.DeepUpdateSupport | `Record(ContentIDSupported: Bool=true)` | — |
-| @Capabilities.FilterRestrictions | `Record(FilterExpressionRestrictions: Collection(Record(AllowedExpressions: String=SingleRange, Property: PropertyPath=DraftEntityCreationDateTime), Record(AllowedExpressions: String=SingleRange, Property: PropertyPath=DraftEntityLastChangeDateTime)), Filterable: Bool=true, NonFilterableProperties: Collection(PropertyPath("__CreateByAssociationControl"), PropertyPath("__EntityControl"), PropertyPath("__OperationControl")))` | — |
-| @Capabilities.InsertRestrictions | — | `Record(Insertable: Bool=true)` |
-| @Capabilities.NavigationRestrictions | `Record(RestrictedProperties: Collection(Record(DeepUpdateSupport: Record(Supported: Bool=false), InsertRestrictions: Record(Insertable: Bool=false), NavigationProperty: NavigationPropertyPath=SiblingEntity), Record(InsertRestrictions: Record(Insertable: Path=__CreateByAssociationControl/_Booking), NavigationProperty: NavigationPropertyPath=_Booking)))` | `Record(RestrictedProperties: Collection(Record(InsertRestrictions: Record(Insertable: Path=__CreateByAssociationControl/_Booking), NavigationProperty: NavigationPropertyPath=_Booking, Type=Capabilities.NavigationPropertyRestriction)))` |
-| @Capabilities.SearchRestrictions | `Record(SearchSyntax: String=https://url.sap/odata-search, Searchable: Bool=true, UnsupportedExpressions: EnumMember=Capabilities.SearchExpressions/AND Capabilities.SearchExpressions/NOT Capabilities.SearchExpressions/group)` | `Record(Searchable: Bool=true)` |
-| @Capabilities.SortRestrictions | `Record(NonSortableProperties: Collection(PropertyPath("__CreateByAssociationControl"), PropertyPath("__EntityControl"), PropertyPath("__OperationControl")))` | — |
-| @Capabilities.UpdateRestrictions | `Record(DeltaUpdateSupported: Bool=true, NonUpdatableNavigationProperties: Collection(PropertyPath("DraftAdministrativeData"), PropertyPath("SiblingEntity"), PropertyPath("_Booking")), QueryOptions: Record(SelectSupported: Bool=true), Updatable: Path=__EntityControl/Updatable)` | `Record(Updatable: Path=__EntityControl/Updatable)` |
 
 ### `self.copyTravel(self.TravelType)/ResultIsActiveEntity`
 

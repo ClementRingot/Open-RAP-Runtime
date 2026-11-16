@@ -43,6 +43,7 @@
         <Property Name="__CreateByAssociationControl" Type="SAP__self.TravelCbAControl"/>
         <Property Name="__EntityControl" Type="SAP__self.EntityControl"/>
         <Property Name="__OperationControl" Type="SAP__self.TravelOperationControl"/>
+        <Property Name="SAP__Messages" Type="Collection(SAP__self.SAP__Message)" Nullable="false"/>
         <NavigationProperty Name="_Booking" Type="Collection(SAP__self.BookingType)" Partner="_Travel">
           <OnDelete Action="Cascade"/>
         </NavigationProperty>
@@ -63,6 +64,7 @@
         <Property Name="BookingStatus" Type="Edm.String" MaxLength="1" Nullable="false"/>
         <Property Name="LocalLastChangedAt" Type="Edm.DateTimeOffset" Precision="7"/>
         <Property Name="__EntityControl" Type="SAP__self.EntityControl"/>
+        <Property Name="SAP__Messages" Type="Collection(SAP__self.SAP__Message)" Nullable="false"/>
         <NavigationProperty Name="_Travel" Type="SAP__self.TravelType" Nullable="false" Partner="_Booking">
           <ReferentialConstraint Property="TravelUUID" ReferencedProperty="TravelUUID"/>
         </NavigationProperty>
@@ -78,6 +80,15 @@
         <Property Name="acceptTravel" Type="Edm.Boolean" Nullable="false"/>
         <Property Name="deductDiscount" Type="Edm.Boolean" Nullable="false"/>
         <Property Name="copyTravel" Type="Edm.Boolean" Nullable="false"/>
+      </ComplexType>
+      <ComplexType Name="SAP__Message">
+        <Property Name="code" Type="Edm.String" Nullable="false"/>
+        <Property Name="message" Type="Edm.String" Nullable="false"/>
+        <Property Name="target" Type="Edm.String"/>
+        <Property Name="additionalTargets" Type="Collection(Edm.String)" Nullable="false"/>
+        <Property Name="transition" Type="Edm.Boolean" Nullable="false"/>
+        <Property Name="numericSeverity" Type="Edm.Byte" Nullable="false"/>
+        <Property Name="longtextUrl" Type="Edm.String"/>
       </ComplexType>
       <Action Name="acceptTravel" IsBound="true" EntitySetPath="_it">
         <Parameter Name="_it" Type="SAP__self.TravelType" Nullable="false"/>
@@ -342,6 +353,7 @@
         <Annotation Term="Common.ChangedBy" Path="LastChangedBy"/>
         <Annotation Term="Common.ChangedAt" Path="LastChangedAt"/>
         <Annotation Term="Common.Label" String="Travel"/>
+        <Annotation Term="Common.Messages" Path="SAP__Messages"/>
       </Annotations>
       <Annotations Target="SAP__self.TravelType/__CreateByAssociationControl">
         <Annotation Term="Core.Computed"/>
@@ -362,14 +374,25 @@
         <Annotation Term="Common.Composition"/>
       </Annotations>
       <Annotations Target="SAP__self.Container/Travel">
-        <Annotation Term="Capabilities.InsertRestrictions">
-          <Record Type="Capabilities.InsertRestrictionsType">
-            <PropertyValue Property="Insertable" Bool="true"/>
-          </Record>
-        </Annotation>
         <Annotation Term="Capabilities.UpdateRestrictions">
           <Record Type="Capabilities.UpdateRestrictionsType">
+            <PropertyValue Property="DeltaUpdateSupported" Bool="true"/>
             <PropertyValue Property="Updatable" Path="__EntityControl/Updatable"/>
+            <PropertyValue Property="NonUpdatableNavigationProperties">
+              <Collection>
+                <PropertyPath>_Booking</PropertyPath>
+              </Collection>
+            </PropertyValue>
+            <PropertyValue Property="QueryOptions">
+              <Record Type="Capabilities.ModificationQueryOptionsType">
+                <PropertyValue Property="SelectSupported" Bool="true"/>
+              </Record>
+            </PropertyValue>
+          </Record>
+        </Annotation>
+        <Annotation Term="Capabilities.DeepUpdateSupport">
+          <Record Type="Capabilities.DeepUpdateSupportType">
+            <PropertyValue Property="ContentIDSupported" Bool="true"/>
           </Record>
         </Annotation>
         <Annotation Term="Capabilities.DeleteRestrictions">
@@ -380,13 +403,38 @@
         <Annotation Term="Capabilities.SearchRestrictions">
           <Record Type="Capabilities.SearchRestrictionsType">
             <PropertyValue Property="Searchable" Bool="true"/>
+            <PropertyValue Property="UnsupportedExpressions" EnumMember="Capabilities.SearchExpressions/AND Capabilities.SearchExpressions/NOT Capabilities.SearchExpressions/group"/>
+            <PropertyValue Property="SearchSyntax" String="https://url.sap/odata-search"/>
+          </Record>
+        </Annotation>
+        <Annotation Term="Capabilities.FilterRestrictions">
+          <Record Type="Capabilities.FilterRestrictionsType">
+            <PropertyValue Property="Filterable" Bool="true"/>
+            <PropertyValue Property="NonFilterableProperties">
+              <Collection>
+                <PropertyPath>__CreateByAssociationControl</PropertyPath>
+                <PropertyPath>__EntityControl</PropertyPath>
+                <PropertyPath>__OperationControl</PropertyPath>
+              </Collection>
+            </PropertyValue>
+          </Record>
+        </Annotation>
+        <Annotation Term="Capabilities.SortRestrictions">
+          <Record Type="Capabilities.SortRestrictionsType">
+            <PropertyValue Property="NonSortableProperties">
+              <Collection>
+                <PropertyPath>__CreateByAssociationControl</PropertyPath>
+                <PropertyPath>__EntityControl</PropertyPath>
+                <PropertyPath>__OperationControl</PropertyPath>
+              </Collection>
+            </PropertyValue>
           </Record>
         </Annotation>
         <Annotation Term="Capabilities.NavigationRestrictions">
           <Record Type="Capabilities.NavigationRestrictionsType">
             <PropertyValue Property="RestrictedProperties">
               <Collection>
-                <Record Type="Capabilities.NavigationPropertyRestriction">
+                <Record>
                   <PropertyValue Property="NavigationProperty" NavigationPropertyPath="_Booking"/>
                   <PropertyValue Property="InsertRestrictions">
                     <Record Type="Capabilities.InsertRestrictionsType">
@@ -532,6 +580,7 @@
           </Collection>
         </Annotation>
         <Annotation Term="Common.Label" String="Booking"/>
+        <Annotation Term="Common.Messages" Path="SAP__Messages"/>
       </Annotations>
       <Annotations Target="SAP__self.BookingType/__EntityControl">
         <Annotation Term="Core.Computed"/>
@@ -546,7 +595,23 @@
         </Annotation>
         <Annotation Term="Capabilities.UpdateRestrictions">
           <Record Type="Capabilities.UpdateRestrictionsType">
+            <PropertyValue Property="DeltaUpdateSupported" Bool="true"/>
             <PropertyValue Property="Updatable" Path="__EntityControl/Updatable"/>
+            <PropertyValue Property="NonUpdatableNavigationProperties">
+              <Collection>
+                <PropertyPath>_Travel</PropertyPath>
+              </Collection>
+            </PropertyValue>
+            <PropertyValue Property="QueryOptions">
+              <Record Type="Capabilities.ModificationQueryOptionsType">
+                <PropertyValue Property="SelectSupported" Bool="true"/>
+              </Record>
+            </PropertyValue>
+          </Record>
+        </Annotation>
+        <Annotation Term="Capabilities.DeepUpdateSupport">
+          <Record Type="Capabilities.DeepUpdateSupportType">
+            <PropertyValue Property="ContentIDSupported" Bool="true"/>
           </Record>
         </Annotation>
         <Annotation Term="Capabilities.DeleteRestrictions">
@@ -557,6 +622,46 @@
         <Annotation Term="Capabilities.SearchRestrictions">
           <Record Type="Capabilities.SearchRestrictionsType">
             <PropertyValue Property="Searchable" Bool="false"/>
+          </Record>
+        </Annotation>
+        <Annotation Term="Capabilities.FilterRestrictions">
+          <Record Type="Capabilities.FilterRestrictionsType">
+            <PropertyValue Property="Filterable" Bool="true"/>
+            <PropertyValue Property="NonFilterableProperties">
+              <Collection>
+                <PropertyPath>__EntityControl</PropertyPath>
+              </Collection>
+            </PropertyValue>
+          </Record>
+        </Annotation>
+        <Annotation Term="Capabilities.SortRestrictions">
+          <Record Type="Capabilities.SortRestrictionsType">
+            <PropertyValue Property="NonSortableProperties">
+              <Collection>
+                <PropertyPath>__EntityControl</PropertyPath>
+              </Collection>
+            </PropertyValue>
+          </Record>
+        </Annotation>
+        <Annotation Term="Capabilities.NavigationRestrictions">
+          <Record Type="Capabilities.NavigationRestrictionsType">
+            <PropertyValue Property="RestrictedProperties">
+              <Collection>
+                <Record>
+                  <PropertyValue Property="NavigationProperty" NavigationPropertyPath="_Travel"/>
+                  <PropertyValue Property="InsertRestrictions">
+                    <Record Type="Capabilities.InsertRestrictionsType">
+                      <PropertyValue Property="Insertable" Bool="false"/>
+                    </Record>
+                  </PropertyValue>
+                  <PropertyValue Property="DeepUpdateSupport">
+                    <Record Type="Capabilities.DeepUpdateSupportType">
+                      <PropertyValue Property="Supported" Bool="false"/>
+                    </Record>
+                  </PropertyValue>
+                </Record>
+              </Collection>
+            </PropertyValue>
           </Record>
         </Annotation>
         <Annotation Term="Core.OptimisticConcurrency">

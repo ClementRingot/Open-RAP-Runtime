@@ -188,6 +188,8 @@ describe("OData writes on the managed runtime", () => {
       expect.objectContaining({ TravelUUID: T2, __OperationControl: { ...allowed, acceptTravel: false }, ...bookings }),
       expect.objectContaining({ TravelUUID: T3, __OperationControl: { ...allowed, acceptTravel: true }, ...bookings }),
     ]);
+    // D94: the state messages of an entity without draft: the property, empty
+    expect((await get(`Travel(${T1})?$select=TravelID,SAP__Messages`)).body).toMatchObject({ SAP__Messages: [] });
     // a full representation advertises the actions under operation control (D89)
     const full = await get(`Travel(${T1})`);
     expect(Object.keys(full.body).filter((k) => k.startsWith("#"))).toEqual(["#com.sap.gateway.srvd.zrt_ui_travel.v0001.acceptTravel", "#com.sap.gateway.srvd.zrt_ui_travel.v0001.deductDiscount", "#com.sap.gateway.srvd.zrt_ui_travel.v0001.copyTravel"]);

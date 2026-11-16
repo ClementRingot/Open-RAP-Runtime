@@ -49,8 +49,10 @@ describe("CSDL ($metadata)", () => {
     const travel = asArray(schema["EntityType"] as Node[]).find((t) => t["@Name"] === "TravelType") as Node;
     const properties = asArray(travel["Property"] as Node[]);
     const entity = model.entities.find((e) => e.name === "ZRT_C_Travel");
-    expect(properties.filter((p) => !String(p["@Name"]).startsWith("__")).map((p) => p["@Name"])).toEqual(entity?.fields.map((f) => f.name));
+    expect(properties.filter((p) => !String(p["@Name"]).startsWith("__") && p["@Name"] !== "SAP__Messages").map((p) => p["@Name"])).toEqual(entity?.fields.map((f) => f.name));
     const byName = (n: string) => properties.find((p) => p["@Name"] === n);
+    // D94: the state messages on every entity type of a business object, draft or not
+    expect(byName("SAP__Messages")).toMatchObject({ "@Type": "Collection(SAP__self.SAP__Message)", "@Nullable": "false" });
     expect(byName("TravelUUID")).toMatchObject({ "@Type": "Edm.Guid", "@Nullable": "false" });
     expect(byName("TravelID")).toMatchObject({ "@Type": "Edm.String", "@MaxLength": "8" });
     expect(byName("BookingFee")).toMatchObject({ "@Type": "Edm.Decimal", "@Precision": "16", "@Scale": "2" });
@@ -104,6 +106,7 @@ describe("CSDL ($metadata)", () => {
       "Common.ChangedBy",
       "Common.ChangedAt",
       "Common.Label",
+      "Common.Messages",
     ]);
     const selection = annotationsOf("SAP__self.TravelType").find((a) => a["@Term"] === "UI.SelectionFields") as Node;
     expect((selection["Collection"] as Node)["PropertyPath"]).toEqual(["TravelID", "AgencyID", "CustomerID", "OverallStatus"]);

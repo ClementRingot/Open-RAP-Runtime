@@ -78,7 +78,7 @@ export interface ODataEntityType {
   createByAssociationControl: string[];
   /** Fields under instance feature control. */
   fieldControl: string[];
-  /** The state messages of a draft (D81): the property SAP__Messages, annotated Common.Messages. */
+  /** The state messages (D81): the property SAP__Messages, annotated Common.Messages; every entity type of a BO since D94. */
   stateMessages?: true;
 }
 
@@ -357,7 +357,8 @@ export function buildODataService(model: Model): ODataService {
       // a Web API (D60) does not expose the feature control
       fieldControl: model.service.webApi === true ? [] : properties.filter((p) => p.dynamic).map((p) => p.name),
       // the state messages of a draft (D81), in a service with a UI
-      ...(entity.draft !== undefined && !("admin" in entity.draft) && model.service.webApi !== true ? { stateMessages: true as const } : {}),
+      // D94: every entity type of a business object, draft or not, in a service with a UI (as on SAP BTP)
+      ...((behavior.base !== undefined || (entity.draft !== undefined && !("admin" in entity.draft))) && !(entity.draft !== undefined && "admin" in entity.draft) && model.service.webApi !== true ? { stateMessages: true as const } : {}),
     };
     const etag = behavior.base?.etag;
     const etagAllowed = behavior.projection === undefined || behavior.projection.useEtag;
