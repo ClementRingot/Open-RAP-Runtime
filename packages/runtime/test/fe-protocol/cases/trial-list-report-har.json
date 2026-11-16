@@ -1,0 +1,184 @@
+{
+  "scenario": "trial-list-report",
+  "floorplan": "listReport",
+  "fixture": "travel-draft",
+  "source": "har",
+  "release": "2611",
+  "note": "Produced by scripts/fe-har-to-cases.mjs from a HAR of the Fiori elements preview on SAP BTP: the shape of the requests and the structure of the responses only.",
+  "cases": [
+    {
+      "id": "recorded",
+      "title": "List Report: the list, its Editing Status filter, its count",
+      "steps": [
+        {
+          "request": {
+            "method": "HEAD",
+            "url": "?sap-client=100",
+            "headers": {
+              "Accept": "*/*"
+            }
+          },
+          "expect": {
+            "status": 200
+          }
+        },
+        {
+          "batch": [
+            {
+              "method": "GET",
+              "url": "Travel?sap-client=100&$count=true&$select=AgencyID,BeginDate,CurrencyCode,CustomerID,EndDate,HasActiveEntity,HasDraftEntity,IsActiveEntity,OverallStatus,TotalPrice,TravelID,TravelUUID,__EntityControl/Deletable,__EntityControl/Updatable,__OperationControl/acceptTravel,__OperationControl/copyTravel&$expand=DraftAdministrativeData($select=DraftEntityType,DraftUUID,InProcessByUser)&$filter=(IsActiveEntity eq false or SiblingEntity/IsActiveEntity eq null)&$skip=0&$top=30",
+              "headers": {
+                "Accept": "application/json;odata.metadata=minimal;IEEE754Compatible=true",
+                "Content-Type": "application/json;charset=UTF-8;IEEE754Compatible=true"
+              }
+            }
+          ],
+          "expect": [
+            {
+              "status": 200,
+              "properties": [
+                "TravelUUID",
+                "TravelID",
+                "AgencyID",
+                "CustomerID",
+                "BeginDate",
+                "EndDate",
+                "TotalPrice",
+                "CurrencyCode",
+                "OverallStatus",
+                "HasDraftEntity",
+                "HasActiveEntity",
+                "IsActiveEntity",
+                "__EntityControl",
+                "__OperationControl",
+                "DraftAdministrativeData"
+              ],
+              "annotations": [
+                "@odata.count"
+              ]
+            }
+          ],
+          "capture": {
+            "k1": "value/0/TravelUUID",
+            "k2": "value/1/TravelUUID"
+          }
+        },
+        {
+          "batch": [
+            {
+              "method": "GET",
+              "url": "Travel?sap-client=100&$count=true&$select=AgencyID,BeginDate,CurrencyCode,CustomerID,EndDate,HasActiveEntity,HasDraftEntity,IsActiveEntity,OverallStatus,TotalPrice,TravelID,TravelUUID,__EntityControl/Deletable,__EntityControl/Updatable,__OperationControl/acceptTravel,__OperationControl/copyTravel&$expand=DraftAdministrativeData($select=DraftEntityType,DraftUUID,InProcessByUser)&$filter=(IsActiveEntity eq false or SiblingEntity/IsActiveEntity eq null)&$skip=0&$top=30",
+              "headers": {
+                "Accept": "application/json;odata.metadata=minimal;IEEE754Compatible=true",
+                "Content-Type": "application/json;charset=UTF-8;IEEE754Compatible=true"
+              }
+            }
+          ],
+          "expect": [
+            {
+              "status": 200,
+              "properties": [
+                "TravelUUID",
+                "TravelID",
+                "AgencyID",
+                "CustomerID",
+                "BeginDate",
+                "EndDate",
+                "TotalPrice",
+                "CurrencyCode",
+                "OverallStatus",
+                "HasDraftEntity",
+                "HasActiveEntity",
+                "IsActiveEntity",
+                "__EntityControl",
+                "__OperationControl",
+                "DraftAdministrativeData"
+              ],
+              "annotations": [
+                "@odata.count"
+              ]
+            }
+          ]
+        },
+        {
+          "batch": [
+            {
+              "method": "GET",
+              "url": "Travel?sap-client=100&$count=true&$select=AgencyID,BeginDate,CurrencyCode,CustomerID,EndDate,HasActiveEntity,HasDraftEntity,IsActiveEntity,OverallStatus,TotalPrice,TravelID,TravelUUID,__EntityControl/Deletable,__EntityControl/Updatable,__OperationControl/acceptTravel,__OperationControl/copyTravel&$expand=DraftAdministrativeData($select=DraftEntityType,DraftUUID,InProcessByUser)&$filter=IsActiveEntity eq false&$skip=0&$top=30",
+              "headers": {
+                "Accept": "application/json;odata.metadata=minimal;IEEE754Compatible=true",
+                "Content-Type": "application/json;charset=UTF-8;IEEE754Compatible=true"
+              }
+            }
+          ],
+          "expect": [
+            {
+              "status": 200,
+              "annotations": [
+                "@odata.count"
+              ]
+            }
+          ]
+        },
+        {
+          "batch": [
+            {
+              "method": "GET",
+              "url": "Travel?sap-client=100&$count=true&$select=AgencyID,BeginDate,CurrencyCode,CustomerID,EndDate,HasActiveEntity,HasDraftEntity,IsActiveEntity,OverallStatus,TotalPrice,TravelID,TravelUUID,__EntityControl/Deletable,__EntityControl/Updatable,__OperationControl/acceptTravel,__OperationControl/copyTravel&$expand=DraftAdministrativeData($select=DraftEntityType,DraftUUID,InProcessByUser)&$filter=IsActiveEntity eq true and HasDraftEntity eq false&$skip=0&$top=30",
+              "headers": {
+                "Accept": "application/json;odata.metadata=minimal;IEEE754Compatible=true",
+                "Content-Type": "application/json;charset=UTF-8;IEEE754Compatible=true"
+              }
+            }
+          ],
+          "expect": [
+            {
+              "status": 200,
+              "properties": [
+                "TravelUUID",
+                "TravelID",
+                "AgencyID",
+                "CustomerID",
+                "BeginDate",
+                "EndDate",
+                "TotalPrice",
+                "CurrencyCode",
+                "OverallStatus",
+                "HasDraftEntity",
+                "HasActiveEntity",
+                "IsActiveEntity",
+                "__EntityControl",
+                "__OperationControl",
+                "DraftAdministrativeData"
+              ],
+              "annotations": [
+                "@odata.count"
+              ]
+            }
+          ]
+        },
+        {
+          "batch": [
+            {
+              "method": "GET",
+              "url": "Travel?sap-client=100&$count=true&$select=AgencyID,BeginDate,CurrencyCode,CustomerID,EndDate,HasActiveEntity,HasDraftEntity,IsActiveEntity,OverallStatus,TotalPrice,TravelID,TravelUUID,__EntityControl/Deletable,__EntityControl/Updatable,__OperationControl/acceptTravel,__OperationControl/copyTravel&$expand=DraftAdministrativeData($select=DraftEntityType,DraftUUID,InProcessByUser)&$filter=IsActiveEntity eq true and SiblingEntity/IsActiveEntity eq null and DraftAdministrativeData/InProcessByUser ne '' and DraftAdministrativeData/InProcessByUser ne null&$skip=0&$top=30",
+              "headers": {
+                "Accept": "application/json;odata.metadata=minimal;IEEE754Compatible=true",
+                "Content-Type": "application/json;charset=UTF-8;IEEE754Compatible=true"
+              }
+            }
+          ],
+          "expect": [
+            {
+              "status": 200,
+              "annotations": [
+                "@odata.count"
+              ]
+            }
+          ]
+        }
+      ],
+      "fails": "D87"
+    }
+  ]
+}
