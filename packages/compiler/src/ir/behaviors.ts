@@ -92,6 +92,9 @@ export function buildBehavior(name: string, ast: BdefAst, file: SourceFile, ctx:
       case "use":
         if (header.what.includes("draft")) {
           behavior.draft = true;
+        } else if (header.what === "side effects" && behavior.implementationType === "projection") {
+          // the side effects of the base BDEF, exposed by the projection as on SAP (D86)
+          behavior.useSideEffects = true;
         } else {
           diagnostics.warning("BDEF003", `use ${header.what} is ignored`, at(header.loc));
         }

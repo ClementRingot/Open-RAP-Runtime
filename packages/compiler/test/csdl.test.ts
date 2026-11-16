@@ -4,7 +4,7 @@ import { beforeAll, describe, expect, it } from "vitest";
 import { generateCsdl } from "../src/gen/csdl.js";
 import { loadProject } from "../src/input/project.js";
 import { buildModel } from "../src/ir/builder.js";
-import { FIXTURE_DIR } from "./helpers.js";
+import { FIXTURE_DIR, fixtureVariant } from "./helpers.js";
 
 type Node = Record<string, unknown>;
 let model: Model;
@@ -115,5 +115,35 @@ describe("CSDL ($metadata)", () => {
     expect(service.entityTypes[0]?.navigations[0]).toMatchObject({ name: "_Booking", insertable: true, collection: true });
     expect(service.entityTypes.map((t) => t.etag)).toEqual(["LocalLastChangedAt", "LocalLastChangedAt"]);
     expect(annotationsOf("SAP__self.Container/Booking").map((a) => a["@Term"])).toContain("Core.OptimisticConcurrency");
+  });
+});
+
+describe("side effects of the base BDEF through the projection (D86)", () => {
+  const BASE = "zrt_r_travel.bdef.asbdef";
+  const PROJECTION = "zrt_c_travel.bdef.asbdef";
+  const withSideEffects = (c: string): string =>
+    c.replace(
+      "  validation validateDates on save { create; field BeginDate, EndDate; }",
+      "  validation validateDates on save { create; field BeginDate, EndDate; }\n\n  side effects\n  {\n    field BookingFee affects field TotalPrice;\n  }",
+    );
+  const build = (changes: Parameters<typeof fixtureVariant>[0]): { xml: string; warnings: string[] } => {
+    const variant = fixtureVariant(changes);
+    try {
+      const built = buildModel(loadProject(variant.dir));
+      if (built.model === undefined) {
+        throw new Error("no model");
+      }
+      return { xml: generateCsdl(built.model), warnings: built.diagnostics.items.filter((d) => d.severity !== "info").map((d) => `${d.code} ${d.message}`) };
+    } finally {
+      variant.cleanup();
+    }
+  };
+
+  it("exposes them only when the projection BDEF says use side effects", () => {
+    const without = build({ [BASE]: withSideEffects });
+    expect(without.xml).not.toContain("Common.SideEffects");
+    const used = build({ [BASE]: withSideEffects, [PROJECTION]: (c) => c.replace("strict ( 2 );", "strict ( 2 );\nuse side effects;") });
+    expect(used.warnings).toEqual([]);
+    expect(used.xml).toMatch(/<Annotation Term="Common\.SideEffects" Qualifier="BookingFee">[\s\S]*?<String>TotalPrice<\/String>/);
   });
 });

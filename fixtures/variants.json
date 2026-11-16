@@ -27,12 +27,16 @@
     [
      "  association _Travel;\n\n  field ( numbering",
      "  association _Travel { with draft; }\n\n  field ( numbering"
+    ],
+    [
+     "  validation validateMandatory on save { create; field TravelID, AgencyID, CustomerID, CurrencyCode; }\n",
+     "  validation validateMandatory on save { create; field TravelID, AgencyID, CustomerID, CurrencyCode; }\n\n  side effects\n  {\n    field BookingFee affects field TotalPrice;\n    field CurrencyCode affects field TotalPrice;\n  }\n"
     ]
    ],
    "zrt_c_travel.bdef.asbdef": [
     [
      "strict ( 2 );",
-     "strict ( 2 );\nuse draft;"
+     "strict ( 2 );\nuse draft;\nuse side effects;"
     ],
     [
      "  use action copyTravel;",
@@ -45,6 +49,12 @@
     [
      "  use association _Travel;",
      "  use association _Travel { with draft; }"
+    ]
+   ],
+   "zrt_c_travel.ddls.asddls": [
+    [
+     "      TotalPrice,\n      CurrencyCode,\n",
+     "      TotalPrice,\n      @Consumption.valueHelpDefinition: [{ entity: { name: 'I_Currency', element: 'Currency' } }]\n      CurrencyCode,\n"
     ]
    ]
   }

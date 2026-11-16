@@ -2064,3 +2064,26 @@ _The issues moved to the repository itself once public: see D74._
   `roundtrip.test.mjs` (the variants: `lock master total etag`, no `sy-subrc` written, no
   `%assoc-_Booking`); `rap-authorizations.test.ts` (the creation of bookings by the update
   authorization of the travel).
+
+## D86 — `use side effects` and the value help of the draft fixture for the scenarios of Fiori elements
+
+- **Context**: in the Fiori elements preview of the draft fixture on the SAP BTP trial (D85), the
+  scenario `value-help` could not be played: no field has a value help. In the scenario
+  `side-effects`, Total Price was updated only on Save, not when Booking Fee was left. Both follow
+  from the sources: the fixture has no `@Consumption.valueHelpDefinition` and no `side effects`.
+  On SAP a projection BDEF exposes the side effects of its base only with the header
+  `use side effects;`. Open RAP Runtime ignored this header (BDEF003) and wrote the side effects
+  of the base in the `$metadata` of every projection.
+- **Decision**:
+  - `use side effects;` of a projection BDEF is read (`BehaviorModel.useSideEffects`); without
+    it the `$metadata` of a projection has no `Common.SideEffects`, as on SAP.
+  - The `draft` variant of `fixtures/variants.json` (the BO of the scenarios, on the trial and in
+    the draft tests) adds `side effects { field BookingFee affects field TotalPrice; field
+    CurrencyCode affects field TotalPrice; }` to the travel, `use side effects;` to its
+    projection, and a value help on `CurrencyCode` (`I_Currency`, a standard view of SAP and of
+    Open RAP Runtime, D44). The reference fixture itself is not changed.
+  - The scenario `value-help` opens the value help of Currency instead of Agency: the fixture has
+    no agency entity.
+- **Tests**: `csdl.test.ts` (no side effect without `use side effects`, the side effect with it,
+  no warning); `roundtrip.test.mjs` (the draft variant); `rap-variant-features.test.ts` (its
+  variant says `use side effects`).

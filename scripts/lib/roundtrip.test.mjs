@@ -41,6 +41,10 @@ describe("variants of the fixtures (D99)", () => {
       // total etag is an addition of lock master (BDEF031, refused by SAP otherwise, D85)
       expect(bdef).toContain("lock master total etag LastChangedAt\n");
       expect(bdef).toContain("validation Booking~validateMandatory;");
+      // the side effects and the value help the scenarios of Fiori elements play (D86)
+      expect(bdef).toContain("field BookingFee affects field TotalPrice;");
+      expect(readFileSync(path.join(dir, "src", "zrt_c_travel.bdef.asbdef"), "utf8")).toContain("use draft;\nuse side effects;");
+      expect(readFileSync(path.join(dir, "src", "zrt_c_travel.ddls.asddls"), "utf8")).toContain("@Consumption.valueHelpDefinition: [{ entity: { name: 'I_Currency', element: 'Currency' } }]\n      CurrencyCode,");
       const pool = readFileSync(path.join(dir, "src", "zbp_rt_r_travel.clas.locals_imp.abap"), "utf8");
       expect(pool).not.toContain("AUTHORITY-CHECK");
       // ABAP for Cloud Development only reads sy-subrc (D85)
