@@ -45,7 +45,10 @@
             }
           },
           "expect": {
-            "status": 200
+            "status": 201,
+            "headers": [
+              "location"
+            ]
           }
         },
         {
@@ -81,11 +84,7 @@
             "body": {}
           },
           "expect": {
-            "status": 200,
-            "properties": [
-              "TravelUUID",
-              "IsActiveEntity"
-            ]
+            "status": 204
           }
         },
         {
@@ -102,12 +101,15 @@
             "body": {}
           },
           "expect": {
-            "status": 200,
+            "status": 201,
             "match": {
               "IsActiveEntity": true,
               "HasDraftEntity": false,
               "Description": "Changed in a draft"
-            }
+            },
+            "headers": [
+              "location"
+            ]
           }
         }
       ],
@@ -148,7 +150,10 @@
             }
           },
           "expect": {
-            "status": 200
+            "status": 201,
+            "headers": [
+              "location"
+            ]
           }
         },
         {
@@ -207,7 +212,10 @@
             }
           },
           "expect": {
-            "status": 200
+            "status": 201,
+            "headers": [
+              "location"
+            ]
           }
         },
         {
@@ -313,7 +321,7 @@
             "body": {}
           },
           "expect": {
-            "status": 200,
+            "status": 204,
             "headers": [
               "sap-messages"
             ],
@@ -524,7 +532,10 @@
             }
           },
           "expect": {
-            "status": 200
+            "status": 201,
+            "headers": [
+              "location"
+            ]
           }
         },
         {

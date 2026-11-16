@@ -2126,3 +2126,32 @@ _The issues moved to the repository itself once public: see D74._
   in `$expand` and `$filter`, the dates on a draft and `null` on an active instance);
   `fe-protocol.test.ts` (`trial-list-report-har.json` passes); `roundtrip.test.mjs` (CRLF, the
   POSIX path, `--out` in step 4, a cut name).
+
+## D88 — The answers of the requests as on SAP BTP: preferences, ETag, Location
+
+- **Context**: the scenarios recorded on the SAP BTP trial (D84) give the status and the headers of
+  each answer of SAP. After D87 their first differences were there: a `PATCH` with
+  `Prefer: return=minimal` answers `204` with `Preference-Applied: return=minimal` and the new
+  `ETag`; an action called with `Prefer: handling=strict` (every action of SAP Fiori elements)
+  answers `Preference-Applied: handling=strict`; `Edit` and `Activate` answer `201 Created` with
+  the `Location` of the draft or of the active instance; `Prepare` answers `204`, its messages in
+  `sap-messages`. Open RAP Runtime answered `200` to the three actions, no `Preference-Applied`,
+  no `ETag` on a `204`.
+- **Decision**:
+  - `Preference-Applied` names the preferences applied: `return=minimal` when the entity is not
+    returned, `handling=strict` when it was asked (D88 does not refuse an action on a warning: the
+    `412` of strict handling is a gap).
+  - A `204` of `return=minimal` carries the `ETag` of the instance, read after the commit.
+  - `Edit` answers `201` and the `Location` of the draft (also when the user resumes the draft or
+    joins a collaborative draft); `Activate` answers `201` and the `Location` of the active
+    instance; `Prepare` answers `204`. `Resume`, `Discard` and `Share` are unchanged (`Discard`
+    `204` as recorded; `Resume` and `Share` were not recorded).
+  - The cases written by hand in D79 (`draft-list-report.json`, `draft-object-page.json`) follow
+    the recordings: `201` for `Edit` and `Activate`, `204` for `Prepare`.
+  - With D88 the recorded scenarios `edit`, `discard` and `action` pass; `create`, `child`,
+    `validation-error`, `side-effects` and `value-help` wait for D89 (advertised actions,
+    `__CreateByAssociationControl`).
+- **Tests**: `draft.test.ts` (Edit and Activate `201` with their `Location`,
+  `Preference-Applied`, the `ETag` of a `204`, no preference applied without `Prefer`, Prepare
+  `204`); `fe-protocol.test.ts` (the recorded scenarios); the status of `Edit` and `Activate` in
+  `draft-collaborative.test.ts` and `cds-expressions.test.ts`.

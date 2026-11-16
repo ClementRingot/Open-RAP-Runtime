@@ -700,17 +700,19 @@ export class DraftRuntime {
         throw badRequest("Edit applies to an active instance");
       }
       const body = parseObject(request.body);
+      // D88: as on SAP, 201 Created and the Location of the draft
+      const edited = (): Outcome => ({ ...outcome(201), entity: { set, key: draftKey(key) }, location: this.writes.path(set, draftKey(key)) });
       const existing = await this.draft(db, set.bo, key);
       if (existing !== undefined) {
         const admin = await this.admin(db, existing.DraftUUID);
         if (admin?.InProcessByUser === user && body["PreserveChanges"] !== true) {
-          return { ...outcome(200), entity: { set, key: draftKey(key) } };
+          return edited();
         }
         if (admin !== undefined && admin.InProcessByUser !== user && this.collaborative(set.bo)) {
           // collaborative draft (D59): the user joins the draft of the instance
           await this.addUser(db, existing.DraftUUID, user, "E");
           await this.touchAdmin(db, existing.DraftUUID, user);
-          return { ...outcome(200), entity: { set, key: draftKey(key) } };
+          return edited();
         }
         if (admin !== undefined && admin.InProcessByUser !== user && !this.expired(admin)) {
           throw new ODataError(409, "DRAFT_LOCKED", `${this.writes.path(set, this.writes.projectedKey(set, key))} is being edited by ${admin.InProcessByUser}`);
@@ -734,7 +736,7 @@ export class DraftRuntime {
       const draftUuid = randomUUID();
       await this.newDraft(db, set.bo, draftUuid, user);
       await this.copy(tx, set.bo, active, draftUuid);
-      return { ...outcome(200), entity: { set, key: draftKey(key) } };
+      return edited();
     }
     if (!isDraft) {
       throw badRequest(`${name} applies to a draft (IsActiveEntity=false)`);
@@ -776,14 +778,17 @@ export class DraftRuntime {
     if (name === "Prepare") {
       // D81: the determinations and validations it names; their messages, failed or not, are returned
       const responses = await this.prepare(tx, set, row);
-      return { ...outcome(200), entity: { set, key: draftKey(key) }, messages: this.writes.messages(responses.reported, { set, key }, new Set(["S", "I", "W", "E", " "])) };
+      // D88: as on SAP, 204 without the draft (the messages in sap-messages)
+      return { ...outcome(204), messages: this.writes.messages(responses.reported, { set, key }, new Set(["S", "I", "W", "E", " "])) };
     }
     // Activate
     const responses = new Responses();
     const activeKey = await this.activate(tx, set, row, responses);
     await this.writes.determine(tx, responses);
     await this.removeDraft(db, set.bo, row);
-    return { ...outcome(200), entity: { set, key: { ...this.writes.projectedKey(set, activeKey), IsActiveEntity: true } }, messages: this.writes.messages(responses.reported, { set, key: activeKey }) };
+    // D88: as on SAP, 201 Created and the Location of the active instance
+    const active = { ...this.writes.projectedKey(set, activeKey), IsActiveEntity: true };
+    return { ...outcome(201), entity: { set, key: active }, location: this.writes.path(set, active), messages: this.writes.messages(responses.reported, { set, key: activeKey }) };
   }
 
   /** Copies an active instance and its compositions into the draft tables. */

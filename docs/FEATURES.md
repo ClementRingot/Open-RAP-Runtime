@@ -33,7 +33,7 @@ dependent ETag, remote APIs.
 | `late numbering` | ❌ | Needs the `adjust_numbers` phase of a saver. |
 | `with additional save`, `with unmanaged save` (header or entity, `with full data`) | ✅ | Saver class `lsc_…`: `save_modified` and `cleanup`; unmanaged: reads and locks through the CDS view (D30). Tests `rap-variant-additional-save`, `rap-variant-unmanaged-save`. |
 | Saver inheriting from `cl_abap_behavior_saver_failed` (`failed` in `save_modified`) | ✅ | Rolls back the LUW, managed write included; message returned to the client. |
-| `with draft`, `draft table`, `total etag`, `draft action Edit / Activate optimized / Discard / Resume`, `draft determine action Prepare` | ✅ | Draft tables, `IsActiveEntity`, exclusive lock, activation by the managed runtime (D54); `SiblingEntity` in paths, `$filter` and `$expand`, the draft of the user only; the determinations on modify run on each change of the draft, `Prepare` runs what it names and returns the messages, instance actions run on a draft (D81); the administrative data as on SAP BTP, entity set `I_DraftAdministrativeData` with `DraftEntityType` and the `…ByMe` booleans for the user of the request, `DraftEntityCreationDateTime` and `DraftEntityLastChangeDateTime` on the draft entities (D87). See the gaps in [KNOWN_GAPS.md](../KNOWN_GAPS.md). |
+| `with draft`, `draft table`, `total etag`, `draft action Edit / Activate optimized / Discard / Resume`, `draft determine action Prepare` | ✅ | Draft tables, `IsActiveEntity`, exclusive lock, activation by the managed runtime (D54); `SiblingEntity` in paths, `$filter` and `$expand`, the draft of the user only; the determinations on modify run on each change of the draft, `Prepare` runs what it names and returns the messages (`204`, the messages in `sap-messages`; `Edit` and `Activate` answer `201` and the `Location` of the result, D88), instance actions run on a draft (D81); the administrative data as on SAP BTP, entity set `I_DraftAdministrativeData` with `DraftEntityType` and the `…ByMe` booleans for the user of the request, `DraftEntityCreationDateTime` and `DraftEntityLastChangeDateTime` on the draft entities (D87). See the gaps in [KNOWN_GAPS.md](../KNOWN_GAPS.md). |
 | `unmanaged` implementation | ❌ | Out of the target (managed BO). |
 | `with privileged mode` | ✅ | `PRIVILEGED` skips the authorization checks. |
 | `changedocuments`, `event`, `extensible` | ❌ | No equivalent infrastructure. |
@@ -201,8 +201,8 @@ dependent ETag, remote APIs.
 | `$expand`, nested to 5 levels, with nested `$select`, `$orderby`, `$filter`, `$top`, `$skip`, `$count` | ✅ | One query per navigation and per level for the whole page; `$top`/`$skip` per parent (`row_number()`) (D82). |
 | Simple `$search` | ✅ | ILIKE on the `@Search.defaultSearchElement` fields, each term required. |
 | `IEEE754Compatible=true` (Decimal and Int64 as strings) | ✅ | Exact JSON numbers otherwise, on read and on write. |
-| ETag (`@odata.etag`, `ETag` header), `If-Match` | ✅ | |
-| POST, PATCH, PUT, DELETE, deep insert, creation through a navigation | ✅ | `Location`, `Prefer: return=minimal`. |
+| ETag (`@odata.etag`, `ETag` header), `If-Match` | ✅ | The `ETag` header also on a `204` of `return=minimal` (D88). |
+| POST, PATCH, PUT, DELETE, deep insert, creation through a navigation | ✅ | `Location`, `Prefer: return=minimal` and `handling=strict` answered in `Preference-Applied`, as SAP does (D88). |
 | Bound and static actions (POST), functions (GET) | ✅ | |
 | Multipart `$batch`: reads and change sets | ✅ | One change set = one LUW, `$<Content-ID>` references, deferred responses (D23). |
 | Instance feature control in the reads | ✅ | `__EntityControl`, `__OperationControl`, `__FieldControl` (D25). |

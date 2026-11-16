@@ -73,7 +73,10 @@
             }
           },
           "expect": {
-            "status": 200
+            "status": 201,
+            "headers": [
+              "location"
+            ]
           }
         },
         {
@@ -205,7 +208,10 @@
             }
           },
           "expect": {
-            "status": 200
+            "status": 201,
+            "headers": [
+              "location"
+            ]
           }
         },
         {
@@ -301,7 +307,10 @@
             }
           },
           "expect": {
-            "status": 200
+            "status": 201,
+            "headers": [
+              "location"
+            ]
           }
         },
         {

@@ -65,12 +65,12 @@ describe("collaborative draft", () => {
   });
 
   it("lets a second user join the draft, invite a third one, and activate it together", async () => {
-    expect((await call("ALICE", "POST", `${travel(true)}/${NS}.Edit`, { PreserveChanges: true })).status).toBe(200);
+    expect((await call("ALICE", "POST", `${travel(true)}/${NS}.Edit`, { PreserveChanges: true })).status).toBe(201);
     // the active instance points to its draft: locked by ALICE
     const active = await call("BOB", "GET", `${travel(true)}?$select=HasDraftEntity&$expand=DraftAdministrativeData($select=InProcessByUser)`);
     expect(active.body).toMatchObject({ HasDraftEntity: true, DraftAdministrativeData: { InProcessByUser: "ALICE" } });
     // BOB joins the draft by Edit, and changes it
-    expect((await call("BOB", "POST", `${travel(true)}/${NS}.Edit`, { PreserveChanges: true })).status).toBe(200);
+    expect((await call("BOB", "POST", `${travel(true)}/${NS}.Edit`, { PreserveChanges: true })).status).toBe(201);
     expect((await call("BOB", "PATCH", travel(false), { Description: "Edited by Bob" })).status).toBe(200);
     expect((await call("ALICE", "GET", travel(false))).body["Description"]).toBe("Edited by Bob");
     // DAVE is not a user of the draft: he cannot change it, nor read it
@@ -89,7 +89,7 @@ describe("collaborative draft", () => {
     expect((await call("CAROL", "PATCH", travel(false), { BookingFee: 42 })).status).toBe(200);
     // BOB activates the draft of the three users
     const activated = await call("BOB", "POST", `${travel(false)}/${NS}.Activate`, {});
-    expect(activated.status, JSON.stringify(activated.body)).toBe(200);
+    expect(activated.status, JSON.stringify(activated.body)).toBe(201);
     expect((await call("DAVE", "GET", travel(true))).body).toMatchObject({ Description: "Edited by Bob", BookingFee: 42, HasDraftEntity: false });
     const left = await db.selectFrom("rapt_draft_user" as never).selectAll().execute();
     expect(left).toEqual([]);

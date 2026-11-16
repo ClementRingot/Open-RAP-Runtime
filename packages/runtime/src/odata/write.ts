@@ -103,6 +103,8 @@ export interface Outcome {
   messages: ODataMessage[];
   options: QueryOptions;
   minimal: boolean;
+  /** `Prefer: handling=strict` (D88): echoed in Preference-Applied, as SAP does. */
+  strict?: boolean;
 }
 
 export class RapWriteHandler implements WriteHandler {
@@ -270,6 +272,11 @@ export class RapWriteHandler implements WriteHandler {
   // requests
 
   private async execute(tx: Transaction, request: ODataRequest, target: Target, ctx: HandlerContext): Promise<Outcome> {
+    const result = await this.executeRequest(tx, request, target, ctx);
+    return /handling=strict/i.test(request.headers["prefer"] ?? "") ? { ...result, strict: true } : result;
+  }
+
+  private async executeRequest(tx: Transaction, request: ODataRequest, target: Target, ctx: HandlerContext): Promise<Outcome> {
     const { segments, options } = target;
     const last = segments[segments.length - 1];
     const minimal = /return=minimal/i.test(request.headers["prefer"] ?? "");
@@ -771,6 +778,12 @@ export class RapWriteHandler implements WriteHandler {
 
   private async render(outcome: Outcome, ctx: HandlerContext): Promise<ODataResponse> {
     const headers: Record<string, string> = { ...sapMessagesHeader(outcome.messages) };
+    // D88: the preferences applied, as SAP answers them (return=minimal for a 204 instead of the
+    // entity, handling=strict echoed)
+    const applied = [...(outcome.minimal && outcome.status === 204 && outcome.entity !== undefined ? ["return=minimal"] : []), ...(outcome.strict === true ? ["handling=strict"] : [])];
+    if (applied.length > 0) {
+      headers["Preference-Applied"] = applied.join(",");
+    }
     if (outcome.location !== undefined) {
       headers["Location"] = `${this.servicePath}${outcome.location}`;
       headers["OData-EntityId"] = headers["Location"];
@@ -791,8 +804,14 @@ export class RapWriteHandler implements WriteHandler {
       const set = outcome.entities[0]?.set;
       return jsonResponse(200, { "@odata.context": set === undefined ? "$metadata" : this.json.contextUrl(set.info, outcome.options, false), value: rows }, ctx.ieee754, headers);
     }
-    if (outcome.entity === undefined || outcome.status === 204) {
+    if (outcome.entity === undefined) {
       return { status: 204, headers: { "OData-Version": "4.0", ...headers } };
+    }
+    if (outcome.status === 204) {
+      // return=minimal: no entity, its ETag still (D88)
+      const row = await this.read.readOne(outcome.entity.set.info, outcome.entity.key, {});
+      const etag = row === undefined ? undefined : etagOf(outcome.entity.set.info, row);
+      return { status: 204, headers: { "OData-Version": "4.0", ...headers, ...(etag === undefined ? {} : { ETag: etag }) } };
     }
     const { set, key } = outcome.entity;
     const row = await this.read.readOne(set.info, key, outcome.options);

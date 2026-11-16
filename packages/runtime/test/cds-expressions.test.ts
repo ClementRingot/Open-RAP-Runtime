@@ -62,13 +62,13 @@ describe("calculated elements (D67)", () => {
 
   it("ignores them in the request bodies and computes them from the draft values", async () => {
     const edit = await call("POST", `${travel(T1, true)}/com.sap.gateway.srvd.zrt_ui_travel.v0001.Edit`, { PreserveChanges: true });
-    expect(edit.status, JSON.stringify(edit.body)).toBe(200);
+    expect(edit.status, JSON.stringify(edit.body)).toBe(201);
     const patched = await call("PATCH", travel(T1, false), { Description: "Lyon", EndDate: "2026-06-03", TotalWithFee: 1, DescriptionUpper: "X" });
     expect(patched.status, JSON.stringify(patched.body)).toBe(200);
     const draft = await call("GET", `${travel(T1, false)}?${SELECT}`);
     expect(draft.body).toMatchObject({ Description: "Lyon", DescriptionUpper: "LYON", Duration: 2, TotalWithFee: 1540.5, StatusText: "Open" });
     const activated = await call("POST", `${travel(T1, false)}/com.sap.gateway.srvd.zrt_ui_travel.v0001.Activate`, {});
-    expect(activated.status, JSON.stringify(activated.body)).toBe(200);
+    expect(activated.status, JSON.stringify(activated.body)).toBe(201);
     expect((await call("GET", `${travel(T1, true)}?${SELECT}`)).body).toMatchObject({ DescriptionUpper: "LYON", Duration: 2, TotalWithFee: 1540.5 });
   });
 });
