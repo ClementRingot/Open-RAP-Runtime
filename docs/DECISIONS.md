@@ -2155,3 +2155,32 @@ _The issues moved to the repository itself once public: see D74._
   `Preference-Applied`, the `ETag` of a `204`, no preference applied without `Prefer`, Prepare
   `204`); `fe-protocol.test.ts` (the recorded scenarios); the status of `Edit` and `Activate` in
   `draft-collaborative.test.ts` and `cds-expressions.test.ts`.
+
+## D89 — The controls of the instances as on SAP BTP: creation by association, `Edit`, advertised actions
+
+- **Context**: after D88 the recorded scenarios `create`, `child`, `validation-error`,
+  `side-effects` and `value-help` (D84) still differed from SAP BTP: SAP reads
+  `$select=__CreateByAssociationControl/_Booking` before it offers the creation of bookings, and
+  answers the creation of a draft with the actions advertised, `#<namespace>.acceptTravel: {}`
+  and so on. Its `$metadata` (2611) has a property `__CreateByAssociationControl` of the complex
+  type `<Entity>CbAControl` (one boolean per composition), the `InsertRestrictions` of the
+  navigation on `__CreateByAssociationControl/_Booking`, and `Edit` in `__OperationControl` with
+  `Core.OperationAvailable`. Open RAP Runtime put the compositions in `__OperationControl` and
+  had no `Edit` there.
+- **Decision**:
+  - The compositions whose creation is under instance feature control or authorization (D36)
+    go to `__CreateByAssociationControl` (`ODataEntityType.createByAssociationControl`), no
+    longer to `__OperationControl`; in a draft they are `true`.
+  - `Edit` of a draft root is under operation control when the update is (instance features or
+    authorization): `__OperationControl/Edit`, `Core.OperationAvailable`, computed as the update
+    of the active instance; `false` on a draft.
+  - A full representation (no `$select`) advertises each action under operation control,
+    `"#<namespace>.<action>": {}`, as SAP does (also `Edit` on a draft, as recorded).
+  - The case files name the namespace of an advertised action `#{{NS}}.<action>`
+    (`scripts/fe-har-to-cases.mjs`, the runner replaces the placeholder in the names).
+  - With D89 the nine scenarios recorded on the trial pass. `SAP__Messages` on the entity types
+    without draft (on SAP every entity type of a UI service has it) stays a gap (D81).
+- **Tests**: `draft.test.ts` (`Edit` and `_Booking` controlled, the actions advertised on a new
+  draft); `odata-write.test.ts` (`__CreateByAssociationControl`, advertised in a full
+  representation only); `rap-authorizations.test.ts`; `csdl.test.ts` (snapshot);
+  `fe-har.test.mjs` (`#{{NS}}.Edit`); `fe-protocol.test.ts` (the nine recorded scenarios).

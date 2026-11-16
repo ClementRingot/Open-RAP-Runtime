@@ -18,6 +18,8 @@ import {
   getArray,
   OPERATION_CONTROL,
   operationControlTypeName,
+  createByAssociationControlTypeName,
+  CREATE_BY_ASSOCIATION_CONTROL,
   projectedFieldName,
   same,
   SCHEMA_ALIAS,
@@ -175,6 +177,9 @@ class CsdlBuilder {
     for (const property of type.properties) {
       children.push(el("Property", { Name: property.name, ...edmAttributes(property.edm), Nullable: property.nullable ? undefined : "false" }));
     }
+    if (type.createByAssociationControl.length > 0) {
+      children.push(el("Property", { Name: CREATE_BY_ASSOCIATION_CONTROL, Type: this.qualified(createByAssociationControlTypeName(type)) }));
+    }
     if (type.entityControl !== undefined) {
       children.push(el("Property", { Name: ENTITY_CONTROL, Type: this.qualified("EntityControl") }));
     }
@@ -218,6 +223,9 @@ class CsdlBuilder {
       );
     }
     for (const type of this.service.entityTypes) {
+      if (type.createByAssociationControl.length > 0) {
+        result.push(el("ComplexType", { Name: createByAssociationControlTypeName(type) }, ...type.createByAssociationControl.map((n) => el("Property", { Name: n, Type: "Edm.Boolean", Nullable: "false" }))));
+      }
       if (type.operationControl.length > 0) {
         result.push(el("ComplexType", { Name: operationControlTypeName(type) }, ...type.operationControl.map((o) => el("Property", { Name: o, Type: "Edm.Boolean", Nullable: "false" }))));
       }
@@ -761,7 +769,7 @@ class CsdlBuilder {
                     pv(
                       "InsertRestrictions",
                       {},
-                      record("Capabilities.InsertRestrictionsType", pv("Insertable", n.insertableDynamic ? { Path: `${OPERATION_CONTROL}/${n.name}` } : { Bool: n.insertable })),
+                      record("Capabilities.InsertRestrictionsType", pv("Insertable", n.insertableDynamic ? { Path: `${CREATE_BY_ASSOCIATION_CONTROL}/${n.name}` } : { Bool: n.insertable })),
                     ),
                   ),
                 ),

@@ -1,6 +1,6 @@
 /** OData V4 JSON (odata.metadata=minimal): entities, collections, ETags, IEEE754Compatible. */
 
-import { ENTITY_CONTROL, FIELD_CONTROL, OPERATION_CONTROL, STATE_MESSAGES } from "@open-rap/model";
+import { CREATE_BY_ASSOCIATION_CONTROL, ENTITY_CONTROL, FIELD_CONTROL, OPERATION_CONTROL, STATE_MESSAGES } from "@open-rap/model";
 import { RawJsonNumber, toJson, type CanonicalValue, type JsonValue } from "../values.js";
 import type { ReadEngine, Row } from "./read.js";
 import type { ServiceRuntime, TypeInfo } from "./service.js";
@@ -56,11 +56,17 @@ export class JsonWriter {
     if (etag !== undefined) {
       result["@odata.etag"] = etag;
     }
+    // D89: the actions under operation control advertised in a full representation, as on SAP BTP
+    if (options.select === undefined && info.type.operationControl.length > 0) {
+      for (const name of info.type.operationControl) {
+        result[`#${this.service.odata.namespace}.${name}`] = {};
+      }
+    }
     for (const name of this.read.selectedProperties(info, options)) {
       const { property } = this.service.property(info, name);
       result[name] = toJson(property.edm, (row[name] ?? null) as CanonicalValue, ctx.ieee754);
     }
-    for (const control of [ENTITY_CONTROL, OPERATION_CONTROL, FIELD_CONTROL, STATE_MESSAGES]) {
+    for (const control of [CREATE_BY_ASSOCIATION_CONTROL, ENTITY_CONTROL, OPERATION_CONTROL, FIELD_CONTROL, STATE_MESSAGES]) {
       const value = row[control];
       if (value !== undefined && isSelected(options, control)) {
         result[control] = value as unknown as JsonValue;

@@ -78,10 +78,10 @@
             {
               "status": 201,
               "properties": [
-                "#com.sap.gateway.srvd.zrt_ui_travelcrg.v0001.acceptTravel",
-                "#com.sap.gateway.srvd.zrt_ui_travelcrg.v0001.copyTravel",
-                "#com.sap.gateway.srvd.zrt_ui_travelcrg.v0001.deductDiscount",
-                "#com.sap.gateway.srvd.zrt_ui_travelcrg.v0001.Edit",
+                "#{{NS}}.acceptTravel",
+                "#{{NS}}.copyTravel",
+                "#{{NS}}.deductDiscount",
+                "#{{NS}}.Edit",
                 "TravelUUID",
                 "TravelID",
                 "AgencyID",
@@ -524,8 +524,7 @@
             }
           ]
         }
-      ],
-      "fails": "D89"
+      ]
     }
   ]
 }

@@ -141,13 +141,25 @@ session was not saved, see `recording.md`); then, after D86:
 - Review: no host name, cookie, token or user name in `cases/*.json`; responses kept as their
   structure only; request bodies hold test data only. Every URL carries `sap-client=100`.
 
+## Replay in Open RAP Runtime
+
+The nine case files replay in `fe-protocol.test.ts`. Their differences with SAP BTP were fixed by:
+
+| Decision | Difference |
+|---|---|
+| D87 | `I_DraftAdministrativeData` (entity set, properties, `DraftIs…ByMe`), `DraftEntityCreationDateTime` and `DraftEntityLastChangeDateTime` |
+| D88 | `Preference-Applied`, the `ETag` of a `204`, `201` and `Location` of `Edit` and `Activate`, `204` of `Prepare` |
+| D89 | `__CreateByAssociationControl`, `Edit` under operation control, advertised actions |
+
+Since D89 the nine scenarios pass without difference.
+
 ## Other findings (environment)
 
 - `scripts/btp-roundtrip.mjs` fails on a Windows working copy with CRLF line endings
   (`variant draft: text not found in zrt_r_travel.bdef.asbdef …`): the files were checked out
-  again in LF; not fixed in the repository.
+  again in LF; fixed in D87 (CRLF read as LF).
 - A suffix of 4 characters truncates `ZRT_D_BOOKING` (16 characters for a table); 3 characters at
-  most keep every name.
+  most keep every name. Since D87 the script warns about a cut name.
 - Tests on Windows (unrelated to these changes): `rapt.test.ts` "resolves the CLI" (`/repo` →
   `C:\repo`), `e2e.test.ts` (`spawnSync npm ENOENT`), `dev.test.ts` flaky (file watching).
 

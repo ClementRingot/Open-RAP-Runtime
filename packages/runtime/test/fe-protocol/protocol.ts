@@ -339,7 +339,9 @@ export async function runCase(server: ProtocolServer, c: ProtocolCase): Promise<
           problems.push(`step ${i + 1}: no response ${j + 1} (got ${responses.length})`);
           return;
         }
-        for (const p of check(response, expected)) problems.push(`step ${i + 1}${expectations.length > 1 ? `.${j + 1}` : ""}: ${p}`);
+        // the names of the properties may hold placeholders: the advertised actions `#{{NS}}.Edit` (D89)
+        const named = expected.properties === undefined ? expected : { ...expected, properties: expected.properties.map((p) => substitute(p, values)) };
+        for (const p of check(response, named)) problems.push(`step ${i + 1}${expectations.length > 1 ? `.${j + 1}` : ""}: ${p}`);
         if (expected.match !== undefined && !matches(response.body, expected.match)) {
           problems.push(`step ${i + 1}: body ${JSON.stringify(response.body)?.slice(0, 400)} does not match ${JSON.stringify(substituteDeep(expected.match, values))}`);
         }

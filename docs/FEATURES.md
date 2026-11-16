@@ -205,7 +205,7 @@ dependent ETag, remote APIs.
 | POST, PATCH, PUT, DELETE, deep insert, creation through a navigation | ✅ | `Location`, `Prefer: return=minimal` and `handling=strict` answered in `Preference-Applied`, as SAP does (D88). |
 | Bound and static actions (POST), functions (GET) | ✅ | |
 | Multipart `$batch`: reads and change sets | ✅ | One change set = one LUW, `$<Content-ID>` references, deferred responses (D23). |
-| Instance feature control in the reads | ✅ | `__EntityControl`, `__OperationControl`, `__FieldControl` (D25). |
+| Instance feature control in the reads | ✅ | `__EntityControl`, `__OperationControl`, `__FieldControl` (D25); the creation by association in `__CreateByAssociationControl`, `Edit` of a draft root in `__OperationControl`, the actions under operation control advertised (`#<namespace>.<action>`) in a full representation, as on SAP BTP (D89). |
 | CSRF token (`X-CSRF-Token: Fetch`) | ✅ | Required for cookie sessions (M6). |
 | Errors in OData V4 format (`@Common.numericSeverity`, `details`, `target`) | ✅ | Status according to the cause of the failure (D22). |
 | `sap-*` parameters | ✅ | Ignored. |
@@ -215,7 +215,7 @@ dependent ETag, remote APIs.
 | `$apply`: `filter`, `groupby`, `aggregate` (`sum`, `min`, `max`, `average`, `countdistinct`, `$count`) | ✅ | With the DCL of the user; other transformations: 501 (D52). |
 | Enumeration types (`EnumType`): JSON by member name, literals `Ns.Type'M'` | ✅ | `enhanced` mode, CDS enumerated types (D55). |
 | JSON batch, `$value`, single properties | ❌ | Not in the MVP. |
-| SAP Fiori elements protocol cases (draft List Report and Object Page) | 🟡 | Requests of Fiori elements replayed without SAPUI5 (`fe-protocol.test.ts`): the 13 cases pass (D81); cases recorded on an SAP BTP trial by `scripts/fe-record-trial.mjs`, on a copy renamed by `rapt abapgit --suffix` (D83), or from a HAR with `scripts/fe-har-to-cases.mjs`; `rapt dev --fe-check` (D79). |
+| SAP Fiori elements protocol cases (draft List Report and Object Page) | 🟡 | Requests of Fiori elements replayed without SAPUI5 (`fe-protocol.test.ts`): the 13 cases pass (D81); the 9 scenarios recorded on the SAP BTP trial 2611 pass (D87 to D89); cases recorded on an SAP BTP trial by `scripts/fe-record-trial.mjs`, on a copy renamed by `rapt abapgit --suffix` (D83), or from a HAR with `scripts/fe-har-to-cases.mjs`; `rapt dev --fe-check` (D79). |
 
 ## Generated UI (OpenUI5)
 

@@ -100,6 +100,11 @@ describe("SAP Fiori elements protocol cases from a HAR (D79)", () => {
     expect(JSON.stringify(shape)).not.toContain("text");
   });
 
+  it("names the namespace of an advertised action by the placeholder {{NS}} (D89)", () => {
+    const shape = responseShape(201, {}, JSON.stringify({ "#com.sap.gateway.srvd.zrt_ui_travelxyz.v0001.Edit": {}, TravelID: "1" }));
+    expect(shape.properties).toEqual(["#{{NS}}.Edit", "TravelID"]);
+  });
+
   it("turns a HAR into a case file: the requests of the service, keys as placeholders, no secret", () => {
     const { file, warnings } = harToCases(HAR, { scenario: "draft-object-page", floorplan: "objectPage", release: "2611", map: { [ACTIVE]: "T1" } });
     expect(file).toMatchObject({ scenario: "draft-object-page", floorplan: "objectPage", fixture: "travel-draft", source: "har", release: "2611" });

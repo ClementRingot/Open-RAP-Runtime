@@ -49,6 +49,18 @@ const travel = (uuid: string, active: boolean): string => `Travel(TravelUUID=${u
 const values = (r: Response): Array<Record<string, unknown>> => r.body["value"] as Array<Record<string, unknown>>;
 
 describe("draft", () => {
+  it("controls Edit and the creation by association as SAP does (D89)", async () => {
+    expect(fixture.metadata).toContain('<Annotation Term="Core.OperationAvailable" Path="_it/__OperationControl/Edit"/>');
+    expect(fixture.metadata).toContain('<PropertyValue Property="Insertable" Path="__CreateByAssociationControl/_Booking"/>');
+    const select = "$select=TravelUUID,__OperationControl/Edit,__CreateByAssociationControl/_Booking";
+    expect((await call(alice, "GET", `${travel(T1, true)}?${select}`)).body).toMatchObject({ __OperationControl: { Edit: true }, __CreateByAssociationControl: { _Booking: true } });
+    // a new draft: Edit applies to an active instance only, the bookings are created in the draft
+    const created = await call(alice, "POST", "Travel", { TravelID: "00000190", AgencyID: "070001", CustomerID: "000100" });
+    expect(created.status).toBe(201);
+    expect(created.body).toMatchObject({ [`#${NS}.Edit`]: {}, [`#${NS}.acceptTravel`]: {}, __OperationControl: { Edit: false }, __CreateByAssociationControl: { _Booking: true } });
+    expect((await call(alice, "POST", `${travel(String(created.body["TravelUUID"]), false)}/${NS}.Discard`, {})).status).toBe(204);
+  });
+
   it("answers the preferences, the ETag and the Location as SAP does (D88)", async () => {
     const headers = (extra: Record<string, string>): Record<string, string> => ({ ...HEADERS, ...extra });
     // Edit: 201 Created, the Location of the draft, handling=strict echoed

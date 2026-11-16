@@ -40,6 +40,7 @@
         <Property Name="LastChangedBy" Type="Edm.String" MaxLength="12" Nullable="false"/>
         <Property Name="LastChangedAt" Type="Edm.DateTimeOffset" Precision="7"/>
         <Property Name="LocalLastChangedAt" Type="Edm.DateTimeOffset" Precision="7"/>
+        <Property Name="__CreateByAssociationControl" Type="SAP__self.TravelCbAControl"/>
         <Property Name="__EntityControl" Type="SAP__self.EntityControl"/>
         <Property Name="__OperationControl" Type="SAP__self.TravelOperationControl"/>
         <NavigationProperty Name="_Booking" Type="Collection(SAP__self.BookingType)" Partner="_Travel"/>
@@ -68,8 +69,10 @@
         <Property Name="Deletable" Type="Edm.Boolean" Nullable="false"/>
         <Property Name="Updatable" Type="Edm.Boolean" Nullable="false"/>
       </ComplexType>
-      <ComplexType Name="TravelOperationControl">
+      <ComplexType Name="TravelCbAControl">
         <Property Name="_Booking" Type="Edm.Boolean" Nullable="false"/>
+      </ComplexType>
+      <ComplexType Name="TravelOperationControl">
         <Property Name="acceptTravel" Type="Edm.Boolean" Nullable="false"/>
         <Property Name="deductDiscount" Type="Edm.Boolean" Nullable="false"/>
         <Property Name="copyTravel" Type="Edm.Boolean" Nullable="false"/>
@@ -363,7 +366,7 @@
                   <PropertyValue Property="NavigationProperty" NavigationPropertyPath="_Booking"/>
                   <PropertyValue Property="InsertRestrictions">
                     <Record Type="Capabilities.InsertRestrictionsType">
-                      <PropertyValue Property="Insertable" Path="__OperationControl/_Booking"/>
+                      <PropertyValue Property="Insertable" Path="__CreateByAssociationControl/_Booking"/>
                     </Record>
                   </PropertyValue>
                 </Record>

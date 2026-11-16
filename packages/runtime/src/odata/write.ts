@@ -17,6 +17,7 @@ import {
   FIELD_CONTROL,
   findEntity,
   OPERATION_CONTROL,
+  CREATE_BY_ASSOCIATION_CONTROL,
   same,
   STATE_MESSAGES,
   type ActionModel,
@@ -864,15 +865,17 @@ export class RapWriteHandler implements WriteHandler {
     }
     const wantEntity = type.entityControl !== undefined && selected(ENTITY_CONTROL);
     const wantOperations = type.operationControl.length > 0 && selected(OPERATION_CONTROL);
+    const wantCreates = type.createByAssociationControl.length > 0 && selected(CREATE_BY_ASSOCIATION_CONTROL);
     const wantFields = type.fieldControl.length > 0 && selected(FIELD_CONTROL);
-    if (!wantEntity && !wantOperations && !wantFields) {
+    if (!wantEntity && !wantOperations && !wantCreates && !wantFields) {
       return;
     }
     // drafts (D54): edited by their user, actions after the activation
     const drafts = rows.filter((row) => row["IsActiveEntity"] === false);
     for (const row of drafts) {
       if (wantEntity) row[ENTITY_CONTROL] = { Updatable: true, Deletable: true };
-      if (wantOperations) row[OPERATION_CONTROL] = Object.fromEntries(type.operationControl.map((name) => [name, info.navigations.has(name)]));
+      if (wantOperations) row[OPERATION_CONTROL] = Object.fromEntries(type.operationControl.map((name) => [name, false]));
+      if (wantCreates) row[CREATE_BY_ASSOCIATION_CONTROL] = Object.fromEntries(type.createByAssociationControl.map((name) => [name, true]));
       if (wantFields) row[FIELD_CONTROL] = Object.fromEntries(type.fieldControl.map((p) => [p, type.properties.find((x) => x.name === p)?.mandatory === true ? 7 : 3]));
     }
     rows = rows.filter((row) => row["IsActiveEntity"] !== false);
@@ -885,9 +888,10 @@ export class RapWriteHandler implements WriteHandler {
       ...(type.entityControl?.deletable === true ? [{ kind: "delete" as const }] : []),
       ...type.operationControl.map((name) => {
         const operation = this.service.odata.operations.find((o) => o.boundType === type.name && o.name === name);
-        if (operation !== undefined) {
-          return { kind: "action" as const, name: operation.action };
-        }
+        // Edit of a draft root (D89): the update of the instance
+        return operation?.draft === true ? { kind: "update" as const } : { kind: "action" as const, name: operation?.action ?? name };
+      }),
+      ...type.createByAssociationControl.map((name) => {
         const projected = info.entity.associations.find((a) => a.name === name);
         return { kind: "association" as const, name: projected?.baseAssociation ?? name };
       }),
@@ -903,12 +907,20 @@ export class RapWriteHandler implements WriteHandler {
           Deletable: type.entityControl?.deletable === true ? enabled({ kind: "delete" }) : true,
         };
       }
+      const first = (type.entityControl?.updatable === true ? 1 : 0) + (type.entityControl?.deletable === true ? 1 : 0);
       if (wantOperations) {
         const control: Record<string, boolean> = {};
         type.operationControl.forEach((name, j) => {
-          control[name] = enabled(operations[(type.entityControl?.updatable === true ? 1 : 0) + (type.entityControl?.deletable === true ? 1 : 0) + j] as (typeof operations)[number]);
+          control[name] = enabled(operations[first + j] as (typeof operations)[number]);
         });
         row[OPERATION_CONTROL] = control;
+      }
+      if (wantCreates) {
+        const control: Record<string, boolean> = {};
+        type.createByAssociationControl.forEach((name, j) => {
+          control[name] = enabled(operations[first + type.operationControl.length + j] as (typeof operations)[number]);
+        });
+        row[CREATE_BY_ASSOCIATION_CONTROL] = control;
       }
       if (wantFields) {
         const readonly = features.readonly.get(k);

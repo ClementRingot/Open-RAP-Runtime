@@ -113,14 +113,14 @@ describe("access controls (DCL) on the reads", () => {
 
 describe("authorizations in the controls of the instances (D36)", () => {
   it("disables the operations the user may not perform, per instance", async () => {
-    const select = `Travel?$select=TravelID,__EntityControl,__OperationControl&$filter=TravelID eq '00000001'`;
+    const select = `Travel?$select=TravelID,__EntityControl,__OperationControl,__CreateByAssociationControl&$filter=TravelID eq '00000001'`;
     const agent = await tokenOf("alice", ["travel_agent"], { agency: "070001" });
     const [own] = (await as(agent, "GET", select)).body["value"] as Array<Record<string, unknown>>;
     // the agent changes the travels of his agency, without deleting or copying them
     expect(own).toMatchObject({ __EntityControl: { Updatable: true, Deletable: false }, __OperationControl: { deductDiscount: true, copyTravel: false } });
     const viewer = await tokenOf("victor", ["travel_viewer"]);
     const [seen] = (await as(viewer, "GET", select)).body["value"] as Array<Record<string, unknown>>;
-    expect(seen).toMatchObject({ __EntityControl: { Updatable: false, Deletable: false }, __OperationControl: { acceptTravel: false, deductDiscount: false, copyTravel: false, _Booking: false } });
+    expect(seen).toMatchObject({ __EntityControl: { Updatable: false, Deletable: false }, __OperationControl: { acceptTravel: false, deductDiscount: false, copyTravel: false }, __CreateByAssociationControl: { _Booking: false } });
   });
 
   it("checks the creation of bookings by the update authorization of their travel (D85)", async () => {

@@ -122,7 +122,8 @@ export function responseShape(status, headers, bodyText) {
   if (body !== undefined && body !== null && typeof body === "object" && !Array.isArray(body)) {
     const entity = Array.isArray(body.value) ? (body.value[0] ?? undefined) : "error" in body ? undefined : body;
     if (entity !== undefined && entity !== null && typeof entity === "object") {
-      const properties = Object.keys(entity).filter((k) => !k.includes("@"));
+      // the advertised actions (`#<namespace>.Edit`) name the namespace: the placeholder {{NS}}
+      const properties = Object.keys(entity).filter((k) => !k.includes("@")).map((k) => k.replace(NAMESPACE, "{{NS}}"));
       if (properties.length > 0) expected.properties = properties;
     }
     const annotations = ANNOTATIONS.filter((a) => a in body);

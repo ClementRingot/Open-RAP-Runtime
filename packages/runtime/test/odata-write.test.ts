@@ -178,14 +178,20 @@ describe("OData writes on the managed runtime", () => {
   });
 
   it("returns the instance feature control with the rows read", async () => {
-    // the actions and the creation of bookings: instance features and authorizations (D36)
-    const list = await get(`Travel?$select=TravelUUID,OverallStatus,__OperationControl&$orderby=TravelID`);
-    const allowed = { _Booking: true, deductDiscount: true, copyTravel: true };
+    // the actions and the creation of bookings: instance features and authorizations (D36); the
+    // creation by association in __CreateByAssociationControl, as on SAP BTP (D89)
+    const list = await get(`Travel?$select=TravelUUID,OverallStatus,__OperationControl,__CreateByAssociationControl&$orderby=TravelID`);
+    const allowed = { deductDiscount: true, copyTravel: true };
+    const bookings = { __CreateByAssociationControl: { _Booking: true } };
     expect(list.body["value"]).toEqual([
-      expect.objectContaining({ TravelUUID: T1, __OperationControl: { ...allowed, acceptTravel: true } }),
-      expect.objectContaining({ TravelUUID: T2, __OperationControl: { ...allowed, acceptTravel: false } }),
-      expect.objectContaining({ TravelUUID: T3, __OperationControl: { ...allowed, acceptTravel: true } }),
+      expect.objectContaining({ TravelUUID: T1, __OperationControl: { ...allowed, acceptTravel: true }, ...bookings }),
+      expect.objectContaining({ TravelUUID: T2, __OperationControl: { ...allowed, acceptTravel: false }, ...bookings }),
+      expect.objectContaining({ TravelUUID: T3, __OperationControl: { ...allowed, acceptTravel: true }, ...bookings }),
     ]);
+    // a full representation advertises the actions under operation control (D89)
+    const full = await get(`Travel(${T1})`);
+    expect(Object.keys(full.body).filter((k) => k.startsWith("#"))).toEqual(["#com.sap.gateway.srvd.zrt_ui_travel.v0001.acceptTravel", "#com.sap.gateway.srvd.zrt_ui_travel.v0001.deductDiscount", "#com.sap.gateway.srvd.zrt_ui_travel.v0001.copyTravel"]);
+    expect(Object.keys((list.body["value"] as Array<Record<string, unknown>>)[0] ?? {}).some((k) => k.startsWith("#"))).toBe(false);
   });
 
   it("runs a change set as one LUW: Content-ID references and deferred responses", async () => {

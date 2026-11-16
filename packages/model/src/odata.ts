@@ -48,7 +48,7 @@ export interface ODataNavigation {
   on: Array<{ source: string; target: string }>;
   /** Compositions: the parent may create children through this navigation. */
   insertable: boolean;
-  /** Create by association under instance feature control (__OperationControl/<nav>). */
+  /** Create by association under instance feature control (__CreateByAssociationControl/<nav>, D89). */
   insertableDynamic: boolean;
   /** SiblingEntity (D81): the ON pairs are the keys, and IsActiveEntity is the opposite one. */
   sibling?: true;
@@ -72,8 +72,10 @@ export interface ODataEntityType {
   etagPath?: { navigations: string[]; property: string };
   /** Feature control of update/delete (instance or global): __EntityControl. */
   entityControl?: { updatable: boolean; deletable: boolean };
-  /** Actions and create-by-association navigations under instance feature control. */
+  /** Actions under instance feature control (`__OperationControl`), `Edit` of a draft root (D89). */
   operationControl: string[];
+  /** Compositions whose creation is under instance feature control (`__CreateByAssociationControl`, D89). */
+  createByAssociationControl: string[];
   /** Fields under instance feature control. */
   fieldControl: string[];
   /** The state messages of a draft (D81): the property SAP__Messages, annotated Common.Messages. */
@@ -350,6 +352,7 @@ export function buildODataService(model: Model): ODataService {
       properties,
       navigations: [],
       operationControl: [],
+      createByAssociationControl: [],
       // a Web API (D60) does not expose the feature control
       fieldControl: model.service.webApi === true ? [] : properties.filter((p) => p.dynamic).map((p) => p.name),
       // the state messages of a draft (D81), in a service with a UI
@@ -417,7 +420,7 @@ export function buildODataService(model: Model): ODataService {
       }
       entityType.navigations.push(navigation);
       if (navigation.insertableDynamic && model.service.webApi !== true) {
-        entityType.operationControl.push(navigation.name);
+        entityType.createByAssociationControl.push(navigation.name);
       }
     }
     for (const action of exposedActions(behavior)) {
@@ -478,8 +481,14 @@ export function buildODataService(model: Model): ODataService {
         draft: true,
         ...(returnType === undefined ? {} : { returnType }),
       });
+      // D89: Edit follows the update of the instance (feature control, authorization), as on SAP
+      const edit = draftOperation("Edit", self, [{ name: "PreserveChanges", edm: { type: "Edm.Boolean" }, nullable: true }]);
+      if (entityType.entityControl?.updatable === true) {
+        edit.dynamic = true;
+        entityType.operationControl.push("Edit");
+      }
       service.operations.push(
-        draftOperation("Edit", self, [{ name: "PreserveChanges", edm: { type: "Edm.Boolean" }, nullable: true }]),
+        edit,
         draftOperation("Activate", self),
         draftOperation("Prepare", self),
         draftOperation("Resume", self),
@@ -548,6 +557,10 @@ export function operationControlTypeName(entityType: ODataEntityType): string {
   return `${entityType.name.replace(/Type$/, "")}OperationControl`;
 }
 
+export function createByAssociationControlTypeName(entityType: ODataEntityType): string {
+  return `${entityType.name.replace(/Type$/, "")}CbAControl`;
+}
+
 export function fieldControlTypeName(entityType: ODataEntityType): string {
   return `${entityType.name.replace(/Type$/, "")}FieldControl`;
 }
@@ -558,4 +571,6 @@ export const ENTITY_CONTROL = "__EntityControl";
 export const STATE_MESSAGES = "SAP__Messages";
 export const STATE_MESSAGE_TYPE = "SAP__Message";
 export const OPERATION_CONTROL = "__OperationControl";
+/** The creation by association under instance feature control (D89), as on SAP BTP. */
+export const CREATE_BY_ASSOCIATION_CONTROL = "__CreateByAssociationControl";
 export const FIELD_CONTROL = "__FieldControl";
