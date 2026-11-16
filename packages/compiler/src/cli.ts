@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /** rapt: command line of the RAP → Node.js compiler. */
 
-import { copyFileSync, existsSync, mkdirSync, realpathSync, writeFileSync } from "node:fs";
+import { copyFileSync, existsSync, mkdirSync, readFileSync, realpathSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { generateAbapGitFiles, type AbapGitResult } from "./authoring/abapgit.js";
@@ -23,6 +23,7 @@ import { buildModel, type BuildOptions } from "./ir/builder.js";
 import { LaunchpadDevSession, type LaunchpadDevOptions } from "./launchpad/dev.js";
 import { registerApp, type RegisterResult } from "./launchpad/workspace.js";
 import { COMPILER_VERSION } from "./version.js";
+import { compareMetadata, comparisonReport } from "./conformance/metadata.js";
 
 const USAGE = `rapt ${COMPILER_VERSION}: compiles RAP sources (abapGit format) into a Node.js OData V4 application
 
@@ -54,6 +55,9 @@ Usage:
   rapt floorplan <src> [<EntitySet> <fp>]       the floorplan of the UI of each root entity set: listReport,
                                                  worklist, analyticalListPage or formEntry (rapt/config.json);
                                                  choosing one adds the application to the launchpad
+  rapt conformance compare <src> --sap <file>    compare the $metadata of the service with the one SAP BTP generated
+                                                 for the same sources (D90); --suffix XYZ: the suffix of the objects
+                                                 on SAP (rapt abapgit --suffix), --out <file>: the report (Markdown)
   rapt agent [<workspace>]                       MCP server (stdio) of rapt for AI coding agents: check,
                                                  create objects, floorplans, abapGit, documentation
 
@@ -133,6 +137,7 @@ export async function main(argv: string[]): Promise<number> {
         "no-launchpad": { type: "boolean" },
         "warnings-as-errors": { type: "boolean" },
         suffix: { type: "string" },
+        sap: { type: "string" },
         help: { type: "boolean", short: "h" },
       },
     });
@@ -183,6 +188,13 @@ export async function main(argv: string[]): Promise<number> {
       return renamedCopyCommand(source, parsed.values["suffix"], parsed.values["out"], parsed.values["json"] === true);
     }
     return abapGitCommand(source, parsed.values["check"] === true, parsed.values["json"] === true);
+  }
+  if (command === "conformance") {
+    if (source !== "compare") {
+      process.stderr.write(`unknown command conformance ${source}\n\n${USAGE}`);
+      return 2;
+    }
+    return conformanceCompareCommand(parsed.positionals[2], parsed.values, parsed.values["json"] === true);
   }
   if (command === "launchpad") {
     if (source === "add") {
@@ -264,6 +276,46 @@ export async function main(argv: string[]): Promise<number> {
       process.stderr.write(`unknown command ${command}\n\n${USAGE}`);
       return 2;
   }
+}
+
+/** `rapt conformance compare <src> --sap <file>` (D90): the $metadata of the service against the one of SAP BTP. */
+async function conformanceCompareCommand(source: string | undefined, values: Record<string, unknown>, json: boolean): Promise<number> {
+  const sap = values["sap"];
+  if (source === undefined || typeof sap !== "string") {
+    process.stderr.write(`rapt conformance compare needs <src> and --sap <metadata.xml>\n\n${USAGE}`);
+    return 2;
+  }
+  if (!existsSync(sap)) {
+    process.stderr.write(`${sap} does not exist\n`);
+    return 1;
+  }
+  const options: GenerateOptions = { scaffold: false };
+  if (typeof values["service"] === "string") options.service = values["service"];
+  if (typeof values["mode"] === "string") options.mode = values["mode"];
+  const project = loadProject(source);
+  const result = await generateApplication(project, options);
+  const metadata = result.files.find((f) => f.path === "odata/metadata.xml")?.content;
+  if (metadata === undefined) {
+    report(result.diagnostics);
+    return 1;
+  }
+  const comparison = compareMetadata(readFileSync(sap, "utf8"), metadata, typeof values["suffix"] === "string" ? { suffix: values["suffix"] } : {});
+  const out = values["out"];
+  const text = comparisonReport(comparison, `$metadata of ${path.basename(path.resolve(source))} and SAP BTP`);
+  if (typeof out === "string") {
+    mkdirSync(path.dirname(path.resolve(out)), { recursive: true });
+    writeFileSync(out, text);
+  }
+  if (json) {
+    process.stdout.write(`${JSON.stringify({ command: "conformance compare", ok: true, root: project.root, same: comparison.same, differences: comparison.differences, ...(typeof out === "string" ? { out: path.resolve(out) } : {}) })}\n`);
+    return 0;
+  }
+  if (typeof out === "string") {
+    process.stdout.write(`${comparison.same} facts the same, ${comparison.differences.length} different: ${path.resolve(out)}\n`);
+  } else {
+    process.stdout.write(text);
+  }
+  return 0;
 }
 
 /** `rapt abapgit <src> --suffix XYZ --out <dir>` (D83): the abapGit copy of the project, every object renamed with the suffix. */

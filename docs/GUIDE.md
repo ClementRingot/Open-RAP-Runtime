@@ -522,6 +522,7 @@ Dockerfile, docker-compose.yml, keycloak/, manifest.yml   container, PostgreSQL,
 | `rapt generate <src> <type> <name> [--from X] [--for Y] [--expose A,B] [--root]` | one object |
 | `rapt floorplan <src> [<EntitySet> <floorplan>]` | floorplan of a root entity set; the application is added to the launchpad |
 | `rapt abapgit <src> [--check]` | missing abapGit XML files; `--suffix XYZ --out <dir>`: a renamed copy for a shared SAP system (§7) |
+| `rapt conformance compare <src> --sap <metadata.xml> [--suffix XYZ] [--out f]` | differences between the `$metadata` of the service and the one SAP BTP generated for the same sources ([D90](DECISIONS.md)) |
 | `rapt mcp <src>` | MCP tools (`rapt/mcp.json`) |
 | `rapt launchpad <launchpad.json> --out <dir>` | launchpad, and the applications of their sources (`source`) |
 | `rapt launchpad dev <launchpad.json> [--port 8090]` | development loop of all the applications of the launchpad, behind it |

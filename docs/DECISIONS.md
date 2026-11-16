@@ -2184,3 +2184,38 @@ _The issues moved to the repository itself once public: see D74._
   draft); `odata-write.test.ts` (`__CreateByAssociationControl`, advertised in a full
   representation only); `rap-authorizations.test.ts`; `csdl.test.ts` (snapshot);
   `fe-har.test.mjs` (`#{{NS}}.Edit`); `fe-protocol.test.ts` (the nine recorded scenarios).
+
+## D90 — The `$metadata` compared with the one of SAP BTP
+
+- **Context**: the round trip (D84) brought back the `$metadata` SAP BTP generated for the draft
+  fixture (`conformance/btp/2611/metadata.xml`). Read by hand, it showed differences the
+  recorded scenarios of SAP Fiori elements do not exercise (qualifiers of the side effects, value
+  help service, `OnDelete`, labels of the data elements…). The plan (provisional D99, part b)
+  asks for `rapt conformance compare`, so that each difference is listed, and its fix measured.
+- **Decision**:
+  - `rapt conformance compare <src> --sap <metadata.xml> [--suffix XYZ] [--out file] [--json]`
+    generates the `$metadata` of the project and compares it with the one of SAP BTP. Both are
+    turned into facts: the key, properties (type, `Nullable`, `MaxLength`, `Precision`, `Scale`),
+    navigations (`Partner`, `OnDelete`, constraints), complex types, actions and functions
+    (binding, parameters, return type), entity sets and their bindings, and one fact per
+    annotation (target, term, qualifier: the canonical text of its value), inline or in an
+    `Annotations` block.
+  - Names are normalized: a vocabulary by its short name whatever its alias (`SAP__common` and
+    `Common` are `Common`), the schema of the service `self` (namespace or alias), the entity
+    container `self.Container`, and the suffix of a renamed copy (D83) removed from the names on
+    both sides (the project may be the fixture or the renamed copy). The type of a record that is
+    the type of its term (`Capabilities.InsertRestrictionsType`) is optional and SAP leaves it
+    out: it is ignored; a derived type (`UI.DataFieldForAction`) is kept. The order of the
+    property values of a record does not matter, the order of a collection does.
+  - The report (Markdown) counts the facts the same, only on SAP BTP, only in Open RAP Runtime,
+    and different, for the structure and the annotations, then lists the differences per target.
+    It is a measure: the command always succeeds.
+  - `conformance/btp/2611/metadata-diff.md` is the report of the draft fixture (variants `draft`
+    and `trial`) against the trial 2611, kept up to date by `conformance.test.ts`
+    (`toMatchFileSnapshot`): a change that removes a difference updates it with `vitest -u`.
+    First measure: 237 facts the same, 209 differences. Step 5 of the README of the round trip
+    runs the comparison.
+  - D90 changes no output of Open RAP Runtime: the differences are fixed by later decisions, in
+    the order of their effect on SAP Fiori elements.
+- **Tests**: `conformance.test.ts` (normalization: aliases, namespace, container, suffix, record
+  type; the report of the trial 2611; `rapt conformance compare --json`, refused without `--sap`).

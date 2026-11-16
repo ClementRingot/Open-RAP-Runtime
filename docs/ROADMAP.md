@@ -73,7 +73,7 @@ The sections below use the provisional numbers, unless they say "final".
 | — | D89 | `__CreateByAssociationControl`, `Edit` under operation control, advertised actions, as on SAP BTP | 0 |
 | — | D88 | `Prefer` and `Preference-Applied`, the `ETag` of a `204`, `201` and `Location` of `Edit` and `Activate`, `204` of `Prepare`, as on SAP BTP | 0 |
 | — | D87 | The administrative data of the drafts as on SAP BTP: `I_DraftAdministrativeData`, `DraftEntityCreationDateTime`, `DraftEntityLastChangeDateTime` | 0 |
-| D99 | D84 (part a) | Round-trip protocol to an SAP BTP ABAP trial (a: the repository for the trial, final D84) | 0 |
+| D99 | D84 (part a), D90 (part b) | Round-trip protocol to an SAP BTP ABAP trial (a: the repository for the trial, final D84; b: the comparison of the `$metadata`, final D90) | 0 |
 | D100 | — | Conformance metrics in the CI | 0 |
 | D101 | — | ATC-like quality checks and clean-up | 6 |
 | D102 | D80 | abaplint gaps fixed in our layers, without upstream issue | 0 |

@@ -57,7 +57,8 @@ its users. Expected: ${expected.expect}.
    (from the repository of Open RAP Runtime). Review them, then copy them to
    \`packages/runtime/test/fe-protocol/cases\` of Open RAP Runtime.
 5. Keep in \`results/\` the \`$metadata\` of the service
-   (\`${service?.path ?? "<service path>"}$metadata\`) for the comparison of D100.
+   (\`${service?.path ?? "<service path>"}$metadata\`), then compare it with Open RAP Runtime:
+   \`rapt conformance compare <this folder> --sap results/metadata.xml --suffix ${expected.suffix} --out results/metadata-diff.md\`
 
 The trial account lasts 30 days by default: repeat these steps on a new account or a new release.
 Objects of this repository${expected.objects.some((o) => !o.to.startsWith(o.from)) ? " (a name too long for its type is cut before the suffix: a shorter suffix keeps it whole)" : ""}:
