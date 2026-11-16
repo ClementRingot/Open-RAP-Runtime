@@ -710,7 +710,7 @@ export function parseResourcePath(path: string, isEntitySet: (name: string) => b
       segments.push({ kind: "value" });
       return;
     }
-    if (index === 0 && /^\$\d+$/.test(decoded)) {
+    if (index === 0 && /^\$[A-Za-z0-9_.~-]+$/.test(decoded) && !["$batch", "$metadata", "$count", "$value", "$all", "$crossjoin", "$entity", "$root"].includes(decoded)) {
       segments.push({ kind: "contentId", id: decoded.slice(1) });
       return;
     }

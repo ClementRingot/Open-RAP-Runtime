@@ -234,6 +234,42 @@ describe("OData writes on the managed runtime", () => {
     expect((await get(`Travel(${T1})`)).body["Description"]).toBe("Paris and Rome");
   });
 
+  it("runs a JSON batch: atomicity groups as LUWs, ids as Content-IDs (D95)", async () => {
+    const booking = { BookingID: "0001", CarrierID: "LH", ConnectionID: "0400", FlightDate: "2027-03-02", FlightPrice: "50.00", CurrencyCode: "EUR" };
+    const payload = {
+      requests: [
+        { id: "t", atomicityGroup: "g1", method: "post", url: "Travel", headers: { "content-type": "application/json" }, body: travel },
+        { id: "b", atomicityGroup: "g1", method: "post", url: "$t/_Booking", body: booking },
+        { id: "r", method: "get", url: `Travel(${T1})?$select=TravelID` },
+        { id: "bad", atomicityGroup: "g2", method: "patch", url: `Travel(${T3})`, headers: { "if-match": "*" }, body: { EndDate: "2026-01-01" } },
+      ],
+    };
+    const response = await t.app.inject({ method: "POST", url: `${SERVICE}$batch`, headers: { "content-type": "application/json", accept: "application/json" }, payload: JSON.stringify(payload) });
+    expect(response.statusCode).toBe(200);
+    expect(response.headers["content-type"]).toMatch(/^application\/json/);
+    const { responses } = JSON.parse(response.body) as { responses: Array<{ id: string; status: number; atomicityGroup?: string; body?: Record<string, unknown> }> };
+    expect(responses.map((r) => [r.id, r.status])).toEqual([["t", 201], ["b", 201], ["r", 200], ["bad", 400]]);
+    expect(responses[0]?.atomicityGroup).toBe(responses[1]?.atomicityGroup);
+    expect(responses[1]?.body).toMatchObject({ TravelUUID: responses[0]?.body?.["TravelUUID"], BookingID: "0001" });
+    expect(responses[2]?.body).toMatchObject({ TravelID: "00000001" });
+    expect(responses[3]?.body).toMatchObject({ error: { message: "End date must not be before begin date" } });
+    // the requests of an atomicity group are next to each other
+    const split = { requests: [{ id: "1", atomicityGroup: "g", method: "delete", url: `Travel(${T2})` }, { id: "2", method: "get", url: "Travel" }, { id: "3", atomicityGroup: "g", method: "delete", url: `Travel(${T3})` }] };
+    expect((await t.app.inject({ method: "POST", url: `${SERVICE}$batch`, headers: { "content-type": "application/json" }, payload: JSON.stringify(split) })).statusCode).toBe(400);
+  });
+
+  it("reads a property and its raw value (D95)", async () => {
+    expect((await get(`Travel(${T1})/Description`)).body).toEqual({ "@odata.context": `$metadata#Travel(${T1.replace(/^TravelUUID=/, "")})/Description`, value: "Paris and Rome" });
+    const raw = await t.app.inject({ method: "GET", url: `${SERVICE}Travel(${T1})/Description/$value` });
+    expect(raw.statusCode).toBe(200);
+    expect(raw.headers["content-type"]).toMatch(/^text\/plain/);
+    expect(raw.body).toBe("Paris and Rome");
+    expect((await t.app.inject({ method: "GET", url: `${SERVICE}Travel(${T1})/TotalPrice/$value` })).body).toBe("1520.50");
+    expect((await t.app.inject({ method: "GET", url: `${SERVICE}Travel(${T1})/_Booking(${B1})/BookingID/$value` })).body).toBe("0001");
+    expect((await t.app.inject({ method: "GET", url: `${SERVICE}Travel/$value` })).statusCode).toBe(400);
+    expect((await t.app.inject({ method: "GET", url: `${SERVICE}Travel(${T1})/Nothing` })).statusCode).toBeGreaterThanOrEqual(400);
+  });
+
   it("updates a booking through the navigation of its travel", async () => {
     const response = await send("PATCH", `Travel(${T1})/_Booking(${B1})`, { FlightPrice: "800.25" }, { "if-match": "*" });
     expect(response.status).toBe(200);

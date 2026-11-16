@@ -5,8 +5,8 @@ Runtime on normalized names (aliases of the vocabularies, namespace of the servi
 
 | | Structure | Annotations |
 |---|---|---|
-| Same | 312 | |
-| Only on SAP BTP | 1 | 77 |
+| Same | 314 | |
+| Only on SAP BTP | 1 | 75 |
 | Only in Open RAP Runtime | 16 | 29 |
 | Different | 4 | 2 |
 
@@ -189,8 +189,6 @@ Runtime on normalized names (aliases of the vocabularies, namespace of the servi
 | | SAP BTP | Open RAP Runtime |
 |---|---|---|
 | @Capabilities.AsynchronousRequestsSupported | `` | — |
-| @Capabilities.BatchSupport | `Record(SupportedFormats: Collection(String("application/json"), String("multipart/mixed")))` | — |
-| @Capabilities.FilterFunctions | `Collection(String("eq"), String("ne"), String("gt"), String("ge"), String("lt"), String("le"), String("and"), String("or"), String("contains"), String("startswith"), String("endswith"), String("any"), String("all"))` | — |
 | @Capabilities.KeyAsSegmentSupported | `` | — |
 | @Capabilities.SupportedFormats | `Collection(String("application/json"), String("application/pdf"))` | — |
 | @CodeList.CurrencyCodes | `Record(CollectionPath: String=Currencies, Url: String=../../../../default/iwbep/common/0001/$metadata)` | — |

@@ -155,6 +155,11 @@ class CsdlBuilder {
     for (const operation of this.service.operations) {
       this.operationAnnotations(operation);
     }
+    // D95: the batch formats (multipart and JSON) and the functions of $filter, as on SAP BTP
+    this.annotations(`${SCHEMA_ALIAS}.${CONTAINER_NAME}`, [
+      annotation("Capabilities.BatchSupport", {}, record("Capabilities.BatchSupportType", pv("SupportedFormats", {}, collection(el("String", undefined, "application/json"), el("String", undefined, "multipart/mixed"))))),
+      annotation("Capabilities.FilterFunctions", {}, collection(...["eq", "ne", "gt", "ge", "lt", "le", "and", "or", "contains", "startswith", "endswith", "any", "all"].map((f) => el("String", undefined, f)))),
+    ]);
     schemaChildren.push(...this.annotationBlocks);
     const edmx = el(
       "edmx:Edmx",

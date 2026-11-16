@@ -5,7 +5,7 @@
  */
 
 import type { User } from "../auth/user.js";
-import { parseBatch, serializeBatch, type BatchItem, type BatchRequestPart, type BatchResponseItem, type BatchResponsePart } from "./batch.js";
+import { isJsonBatch, parseBatch, parseJsonBatch, serializeBatch, serializeJsonBatch, type BatchItem, type BatchRequestPart, type BatchResponseItem, type BatchResponsePart } from "./batch.js";
 import { badRequest, methodNotAllowed, notFound, notImplemented, ODataError, type ODataMessage } from "./errors.js";
 import { etagOf, JsonWriter, stringify } from "./json.js";
 import type { ReadEngine } from "./read.js";
@@ -122,8 +122,8 @@ export class ODataHandler {
 
   public parse(request: ODataRequest, ctx: HandlerContext): Target {
     let path = request.path;
-    // $<Content-ID> references of a change set
-    const reference = /^\$(\d+)(\/.*)?$/.exec(path);
+    // $<Content-ID> references of a change set, or of a JSON batch (an id of letters and digits, D95)
+    const reference = /^\$([A-Za-z0-9_.~-]+)(\/.*)?$/.exec(path);
     if (reference !== null) {
       const url = ctx.contentIds?.get(reference[1] as string);
       if (url === undefined) {
@@ -233,7 +233,53 @@ export class ODataHandler {
     return result;
   }
 
+  /**
+   * A property of a single entity (`Travel(…)/Description`), or its raw value (`…/Description/$value`)
+   * (D95); undefined when the path is not one.
+   */
+  private async property(target: Target, ctx: HandlerContext): Promise<ODataResponse | undefined> {
+    let segments = target.segments;
+    const raw = segments[segments.length - 1]?.kind === "value";
+    if (raw) segments = segments.slice(0, -1);
+    const last = segments[segments.length - 1];
+    if (last?.kind !== "navigation" || last.key !== undefined || segments.length < 2) {
+      if (raw) throw badRequest("$value applies to a property of an entity (media entities are not supported)");
+      return undefined;
+    }
+    const owner = await this.resolve(segments.slice(0, -1));
+    if (!owner.single || owner.count || !owner.info.properties.has(last.name) || owner.info.navigations.has(last.name)) {
+      if (raw) throw badRequest(`$value: ${last.name} is not a property of a single entity`);
+      return undefined;
+    }
+    const options = { select: [[last.name]] };
+    const row =
+      owner.key !== undefined && owner.scope.length === 0
+        ? await this.read.readOne(owner.info, owner.key, options)
+        : (await this.read.readCollection(owner.info, { ...options, top: 1 }, owner.scope, false)).rows[0];
+    if (row === undefined) {
+      throw notFound(`${owner.info.set.name}${owner.key === undefined ? "" : this.service.keyPredicate(owner.info, owner.key)}`);
+    }
+    const edm = this.service.property(owner.info, last.name).property.edm;
+    const canonical = (row[last.name] ?? null) as CanonicalValue;
+    const value = toJson(edm, canonical, ctx.ieee754);
+    // a null value: 204 No Content, for the property and for its raw value
+    if (value === null) {
+      return { status: 204, headers: { "OData-Version": "4.0" }, body: "" };
+    }
+    if (raw) {
+      // the raw value: the text of a JSON string, the digits of a number (exact for a decimal)
+      const text = typeof value === "string" || typeof value === "number" || typeof value === "boolean" ? String(value) : String(toJson(edm, canonical, true));
+      return { status: 200, headers: { "Content-Type": "text/plain;charset=utf-8", "OData-Version": "4.0" }, body: text };
+    }
+    const context = `$metadata#${owner.info.set.name}${owner.key === undefined ? "" : this.service.keyPredicate(owner.info, owner.key)}/${last.name}`;
+    return jsonResponse(200, { "@odata.context": context, value }, ctx.ieee754);
+  }
+
   private async get(target: Target, ctx: HandlerContext): Promise<ODataResponse> {
+    const property = await this.property(target, ctx);
+    if (property !== undefined) {
+      return property;
+    }
     const { info, key, scope, single, count, toOne } = await this.resolve(target.segments);
     if (count) {
       const n = await this.read.count(info, target.options, scope);
@@ -327,11 +373,14 @@ export class ODataHandler {
 
   private async batch(request: ODataRequest, ctx: HandlerContext): Promise<ODataResponse> {
     let items: BatchItem[];
+    const json = isJsonBatch(request.headers["content-type"]);
     try {
-      items = parseBatch(request.body ?? "", request.headers["content-type"]);
+      items = json ? parseJsonBatch(request.body ?? "") : parseBatch(request.body ?? "", request.headers["content-type"]);
     } catch (error) {
       return errorResponse(error, ctx.ieee754);
     }
+    // D95: the ids of a JSON batch are Content-IDs for every later request, not only in a change set
+    if (json) ctx = { ...ctx, contentIds: ctx.contentIds ?? new Map() };
     const responses: BatchResponseItem[] = [];
     for (const item of items) {
       if (item.kind === "request") {
@@ -366,8 +415,8 @@ export class ODataHandler {
         responses.push({ kind: "response", response: toPart(result, undefined) });
       }
     }
-    const { contentType, body } = serializeBatch(responses);
-    return { status: 200, headers: { "Content-Type": contentType, "OData-Version": "4.0" }, body };
+    const { contentType, body } = json ? serializeJsonBatch(items.map((item, i) => ({ item, result: responses[i] as BatchResponseItem }))) : serializeBatch(responses);
+    return { status: 200, headers: { "Content-Type": contentType, "OData-Version": json ? "4.01" : "4.0" }, body };
   }
 }
 

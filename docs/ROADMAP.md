@@ -70,6 +70,7 @@ The sections below use the provisional numbers, unless they say "final".
 | — | D83 | Guided recording of the Fiori elements protocol on the SAP BTP trial, renamed copy for a shared system | 0 |
 | — | D85 | First pull and activation on the SAP BTP trial: abapGit XML of DDLX and SRVB, `total etag`, authorizations | 0 |
 | — | D86 | `use side effects`, value help and side effects of the draft fixture | 0 |
+| — | D95 | JSON batch, `$value` and single properties; batch formats and filter functions in the `$metadata` | 1 |
 | — | D94 | `SAP__Messages` on every entity type of a business object; the capabilities of SAP BTP in the `$metadata` | 0 |
 | — | D93 | The identifiers of the interfaces of SAP (`SAP__Messages`, `sap-messages`, `com.sap.vocabularies.*`…) are kept | 0 |
 | — | D92 | The `$metadata` closer to SAP BTP: `OnDelete`, nullability, `Prepare` and `Resume` without result, controls and draft fields hidden, side effects `SAP__Field_*`, actions with their binding, draft nodes, administrative fields | 0 |

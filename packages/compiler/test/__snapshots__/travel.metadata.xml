@@ -682,6 +682,35 @@
       <Annotations Target="SAP__self.copyTravel(SAP__self.TravelType)">
         <Annotation Term="Core.OperationAvailable" Path="_it/__OperationControl/copyTravel"/>
       </Annotations>
+      <Annotations Target="SAP__self.Container">
+        <Annotation Term="Capabilities.BatchSupport">
+          <Record Type="Capabilities.BatchSupportType">
+            <PropertyValue Property="SupportedFormats">
+              <Collection>
+                <String>application/json</String>
+                <String>multipart/mixed</String>
+              </Collection>
+            </PropertyValue>
+          </Record>
+        </Annotation>
+        <Annotation Term="Capabilities.FilterFunctions">
+          <Collection>
+            <String>eq</String>
+            <String>ne</String>
+            <String>gt</String>
+            <String>ge</String>
+            <String>lt</String>
+            <String>le</String>
+            <String>and</String>
+            <String>or</String>
+            <String>contains</String>
+            <String>startswith</String>
+            <String>endswith</String>
+            <String>any</String>
+            <String>all</String>
+          </Collection>
+        </Annotation>
+      </Annotations>
     </Schema>
   </edmx:DataServices>
 </edmx:Edmx>

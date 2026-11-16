@@ -172,3 +172,108 @@ export function serializeBatch(items: BatchResponseItem[]): { contentType: strin
   chunks.push(`--${boundary}--`, "");
   return { contentType: `multipart/mixed; boundary=${boundary}`, body: chunks.join("\r\n") };
 }
+
+// -------------------------------------------------------------------------------------------
+// JSON batch (OData 4.01, D95): { "requests": [...] } → { "responses": [...] }
+
+/** A request of a JSON batch: its id, and its atomicity group (a change set). */
+interface JsonBatchRequest {
+  id: string;
+  atomicityGroup?: string;
+  request: BatchRequestPart;
+}
+
+/** Whether the body of a $batch is a JSON batch (OData 4.01). */
+export function isJsonBatch(contentType: string | undefined): boolean {
+  return /^application\/json/i.test(contentType ?? "");
+}
+
+/**
+ * Parses a JSON batch: the requests of an atomicity group become a change set (they must be next
+ * to each other); the id of a request is its Content-ID, referenced as `$<id>` in a later URL.
+ */
+export function parseJsonBatch(body: string): BatchItem[] {
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(body);
+  } catch {
+    throw badRequest("The JSON $batch body is not valid JSON");
+  }
+  const list = typeof parsed === "object" && parsed !== null ? (parsed as Record<string, unknown>)["requests"] : undefined;
+  if (!Array.isArray(list)) {
+    throw badRequest("A JSON $batch has a member requests: an array of requests");
+  }
+  const requests: JsonBatchRequest[] = list.map((entry, index) => {
+    if (typeof entry !== "object" || entry === null) {
+      throw badRequest(`JSON $batch: request ${index + 1} is not an object`);
+    }
+    const r = entry as Record<string, unknown>;
+    const { id, method, url } = r;
+    if (typeof id !== "string" || id === "" || typeof method !== "string" || typeof url !== "string") {
+      throw badRequest(`JSON $batch: request ${index + 1} needs an id, a method and a url`);
+    }
+    const headers: Record<string, string> = {};
+    if (typeof r["headers"] === "object" && r["headers"] !== null) {
+      for (const [name, value] of Object.entries(r["headers"] as Record<string, unknown>)) headers[name.toLowerCase()] = String(value);
+    }
+    const bodyValue = r["body"];
+    if (bodyValue !== undefined && headers["content-type"] === undefined) headers["content-type"] = "application/json";
+    const request: BatchRequestPart = { method: method.toUpperCase(), url, headers, body: bodyValue === undefined ? "" : typeof bodyValue === "string" && !/json/i.test(headers["content-type"] ?? "") ? bodyValue : JSON.stringify(bodyValue), contentId: id };
+    return typeof r["atomicityGroup"] === "string" ? { id, atomicityGroup: r["atomicityGroup"], request } : { id, request };
+  });
+  const items: BatchItem[] = [];
+  const closed = new Set<string>();
+  let open: { group: string; requests: BatchRequestPart[] } | undefined;
+  for (const r of requests) {
+    if (open !== undefined && r.atomicityGroup !== open.group) {
+      items.push({ kind: "changeset", requests: open.requests });
+      closed.add(open.group);
+      open = undefined;
+    }
+    if (r.atomicityGroup === undefined) {
+      items.push({ kind: "request", request: r.request });
+      continue;
+    }
+    if (closed.has(r.atomicityGroup)) {
+      throw badRequest(`JSON $batch: the requests of the atomicity group ${r.atomicityGroup} are not next to each other`);
+    }
+    if (r.request.method === "GET") {
+      throw badRequest("A change set cannot contain GET requests");
+    }
+    open ??= { group: r.atomicityGroup, requests: [] };
+    open.requests.push(r.request);
+  }
+  if (open !== undefined) items.push({ kind: "changeset", requests: open.requests });
+  return items;
+}
+
+/** The responses of a JSON batch, in the order of the requests, with their id and atomicity group. */
+export function serializeJsonBatch(items: Array<{ item: BatchItem; result: BatchResponseItem }>): { contentType: string; body: string } {
+  const responses: unknown[] = [];
+  const jsonOf = (part: BatchResponsePart): Record<string, unknown> => {
+    const headers = Object.fromEntries(Object.entries(part.headers).map(([k, v]) => [k.toLowerCase(), v]));
+    const entry: Record<string, unknown> = { status: part.status, headers };
+    if (part.body !== undefined && part.body !== "") {
+      entry["body"] = /json/i.test(headers["content-type"] ?? "") ? (JSON.parse(part.body) as unknown) : part.body;
+    }
+    return entry;
+  };
+  for (const { item, result } of items) {
+    if (item.kind === "request") {
+      const part = result.kind === "response" ? result.response : result.responses[0];
+      if (part !== undefined) responses.push({ id: item.request.contentId, ...jsonOf(part) });
+      continue;
+    }
+    const group = `g${responses.length + 1}`;
+    if (result.kind === "changeset") {
+      item.requests.forEach((request, i) => {
+        const part = result.responses[i];
+        if (part !== undefined) responses.push({ id: request.contentId, atomicityGroup: group, ...jsonOf(part) });
+      });
+    } else {
+      // the atomicity group failed: its error answers each of its requests
+      for (const request of item.requests) responses.push({ id: request.contentId, atomicityGroup: group, ...jsonOf(result.response) });
+    }
+  }
+  return { contentType: "application/json", body: JSON.stringify({ responses }) };
+}

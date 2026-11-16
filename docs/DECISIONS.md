@@ -2330,3 +2330,27 @@ _The issues moved to the repository itself once public: see D74._
 - **Tests**: `conformance.test.ts` (the report of the trial 2611); `csdl.test.ts` (`SAP__Messages`
   on an entity without draft; snapshot); `odata-write.test.ts` (`SAP__Messages` empty without
   draft).
+
+## D95 — JSON batch, single properties and `$value`
+
+- **Context**: KNOWN_GAPS listed the JSON batch of OData 4.01 and `$value` as answered 400 or
+  501 (phase 1 of the roadmap, provisional D83). SAP BTP declares on its entity container that
+  it accepts both batch formats (`Capabilities.BatchSupport`) and the functions of `$filter`
+  (`Capabilities.FilterFunctions`).
+- **Decision**:
+  - `POST $batch` with `Content-Type: application/json` reads `{ "requests": [...] }`: each
+    request has an `id`, a `method`, a `url`, optional `headers` and `body`; the requests of an
+    `atomicityGroup` (next to each other, 400 otherwise) form a change set, one LUW (D23); the id
+    of a request is its Content-ID, referenced as `$<id>` (letters, digits, `_.~-`) by the later
+    requests, in a group or not. The answer is `{ "responses": [...] }` (`OData-Version: 4.01`):
+    `id`, `atomicityGroup`, `status`, `headers`, `body` (JSON when the content is JSON); a failed
+    group answers each of its requests with its error. `dependsOn` and `if` are not read: the
+    requests run in order.
+  - `GET Travel(…)/Description`: the value of a property, `{ "@odata.context": …, "value": … }`;
+    `…/Description/$value`: its raw value as `text/plain` (a decimal with its scale); `204` for a
+    null value. `$value` elsewhere: 400 (no media entity).
+  - The entity container carries `Capabilities.BatchSupport` (`application/json`,
+    `multipart/mixed`) and `Capabilities.FilterFunctions` (the list of SAP BTP, all supported).
+- **Tests**: `odata-write.test.ts` (JSON batch: atomicity group, `$id` reference, a read, a
+  failed group, a group split; a property, raw values of a string, a decimal, a navigation);
+  `conformance.test.ts`.
