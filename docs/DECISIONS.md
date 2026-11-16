@@ -2244,3 +2244,36 @@ _The issues moved to the repository itself once public: see D74._
     (`missing-handler`, `database-write-in-handler`), one accepted by Open RAP Runtime may be
     refused by SAP (`commit-in-handler`): the trial decides, and Open RAP Runtime follows SAP.
 - **Tests**: `negative.test.mjs` (each case and its diagnostic, the repository for the trial).
+
+## D92 — The `$metadata` closer to the one of SAP BTP
+
+- **Context**: the first comparison with the trial 2611 (D90) gave 237 facts the same and 209
+  differences. Many are cheap to remove and follow what SAP BTP generates for the same sources.
+- **Decision**, each as in the `$metadata` of SAP BTP:
+  - Structure: a composition navigation has `<OnDelete Action="Cascade"/>`; a UUID property is
+    not nullable (`Nullable="false"`, its initial value), except `DraftUUID` of an active
+    instance; `PreserveChanges` of `Edit` is not nullable; `Prepare` and `Resume` have no return
+    type (`Resume` now answers `204`, as `Prepare` since D88).
+  - The controls of the instances (`__EntityControl`, `__OperationControl`,
+    `__CreateByAssociationControl`): `Core.Computed`, `UI.HiddenFilter`, `UI.Hidden`. A
+    composition navigation: `Common.Composition`.
+  - The draft fields `IsActiveEntity`, `HasActiveEntity`, `HasDraftEntity`,
+    `DraftEntityCreationDateTime`, `DraftEntityLastChangeDateTime`: `UI.HiddenFilter` (from
+    `@Consumption.filter.hidden`, now read for every field); labels `Is active`, `Has active`.
+  - A draft node: `Common.DraftNode` without record and `Common.DraftActivationVia` the entity set
+    of its root (instead of a `PreparationAction`).
+  - The side effects of a field: qualified `SAP__Field_<field>`, one per source field (the
+    targets of several side effects of the same field merged), instead of `<field><n>`.
+  - `UI.DataFieldForAction`: the action named with its binding parameter
+    (`<namespace>.acceptTravel(<namespace>.TravelType)`) and `InvocationGrouping` `Isolated`
+    unless the source says otherwise. `UI.PresentationVariant` no longer adds `Visualizations`.
+  - `Common.CreatedBy`, `CreatedAt`, `ChangedBy`, `ChangedAt` on the entity type, from
+    `@Semantics.user.*` and `@Semantics.systemDateTime.*` of its fields (or of its base).
+  - `I_DraftAdministrativeData`: labels of SAP (`Draft Administration Data`, `Draft Entity ID`,
+    `Draft (Technical ID)`), every element hidden but the users and the dates, the users with
+    `Common.Text` to their descriptions.
+  - After D92: 298 facts the same, 145 different (`conformance/btp/2611/metadata-diff.md`); the
+    remaining differences are listed in KNOWN_GAPS.md.
+- **Tests**: `conformance.test.ts` (the report of the trial 2611); `csdl.test.ts` (the entity
+  annotations, the action with its binding, no `Visualizations`, `SAP__Field_BookingFee`;
+  snapshot); `rap-variant-features.test.ts`.

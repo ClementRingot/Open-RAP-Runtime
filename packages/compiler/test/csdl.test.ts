@@ -98,11 +98,19 @@ describe("CSDL ($metadata)", () => {
       "UI.FieldGroup#Prices",
       "UI.Facets",
       "UI.PresentationVariant",
+      // D92: the administrative fields, from @Semantics of the base view
+      "Common.CreatedBy",
+      "Common.CreatedAt",
+      "Common.ChangedBy",
+      "Common.ChangedAt",
       "Common.Label",
     ]);
     const selection = annotationsOf("SAP__self.TravelType").find((a) => a["@Term"] === "UI.SelectionFields") as Node;
     expect((selection["Collection"] as Node)["PropertyPath"]).toEqual(["TravelID", "AgencyID", "CustomerID", "OverallStatus"]);
-    expect(xml).toContain('<PropertyValue Property="Action" String="com.sap.gateway.srvd.zrt_ui_travel.v0001.acceptTravel"/>');
+    // D92: as on SAP BTP, the action with its binding parameter, Isolated
+    expect(xml).toContain('<PropertyValue Property="Action" String="com.sap.gateway.srvd.zrt_ui_travel.v0001.acceptTravel(com.sap.gateway.srvd.zrt_ui_travel.v0001.TravelType)"/>');
+    expect(xml).toContain('<PropertyValue Property="InvocationGrouping" EnumMember="UI.OperationGroupingType/Isolated"/>');
+    expect(xml).not.toContain('Property="Visualizations"');
     expect(xml).toContain('<PropertyValue Property="Target" AnnotationPath="_Booking/@UI.LineItem"/>');
   });
 
@@ -144,6 +152,6 @@ describe("side effects of the base BDEF through the projection (D86)", () => {
     expect(without.xml).not.toContain("Common.SideEffects");
     const used = build({ [BASE]: withSideEffects, [PROJECTION]: (c) => c.replace("strict ( 2 );", "strict ( 2 );\nuse side effects;") });
     expect(used.warnings).toEqual([]);
-    expect(used.xml).toMatch(/<Annotation Term="Common\.SideEffects" Qualifier="BookingFee">[\s\S]*?<String>TotalPrice<\/String>/);
+    expect(used.xml).toMatch(/<Annotation Term="Common\.SideEffects" Qualifier="SAP__Field_BookingFee">[\s\S]*?<String>TotalPrice<\/String>/);
   });
 });

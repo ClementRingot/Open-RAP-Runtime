@@ -43,14 +43,16 @@
         <Property Name="__CreateByAssociationControl" Type="SAP__self.TravelCbAControl"/>
         <Property Name="__EntityControl" Type="SAP__self.EntityControl"/>
         <Property Name="__OperationControl" Type="SAP__self.TravelOperationControl"/>
-        <NavigationProperty Name="_Booking" Type="Collection(SAP__self.BookingType)" Partner="_Travel"/>
+        <NavigationProperty Name="_Booking" Type="Collection(SAP__self.BookingType)" Partner="_Travel">
+          <OnDelete Action="Cascade"/>
+        </NavigationProperty>
       </EntityType>
       <EntityType Name="BookingType">
         <Key>
           <PropertyRef Name="BookingUUID"/>
         </Key>
         <Property Name="BookingUUID" Type="Edm.Guid" Nullable="false"/>
-        <Property Name="TravelUUID" Type="Edm.Guid"/>
+        <Property Name="TravelUUID" Type="Edm.Guid" Nullable="false"/>
         <Property Name="BookingID" Type="Edm.String" MaxLength="4" Nullable="false"/>
         <Property Name="BookingDate" Type="Edm.Date"/>
         <Property Name="CarrierID" Type="Edm.String" MaxLength="3" Nullable="false"/>
@@ -215,12 +217,14 @@
               <Annotation Term="UI.Importance" EnumMember="UI.ImportanceType/High"/>
             </Record>
             <Record Type="UI.DataFieldForAction">
-              <PropertyValue Property="Action" String="com.sap.gateway.srvd.zrt_ui_travel.v0001.acceptTravel"/>
+              <PropertyValue Property="Action" String="com.sap.gateway.srvd.zrt_ui_travel.v0001.acceptTravel(com.sap.gateway.srvd.zrt_ui_travel.v0001.TravelType)"/>
               <PropertyValue Property="Label" String="Accept Travel"/>
+              <PropertyValue Property="InvocationGrouping" EnumMember="UI.OperationGroupingType/Isolated"/>
             </Record>
             <Record Type="UI.DataFieldForAction">
-              <PropertyValue Property="Action" String="com.sap.gateway.srvd.zrt_ui_travel.v0001.copyTravel"/>
+              <PropertyValue Property="Action" String="com.sap.gateway.srvd.zrt_ui_travel.v0001.copyTravel(com.sap.gateway.srvd.zrt_ui_travel.v0001.TravelType)"/>
               <PropertyValue Property="Label" String="Copy Travel"/>
+              <PropertyValue Property="InvocationGrouping" EnumMember="UI.OperationGroupingType/Isolated"/>
             </Record>
           </Collection>
         </Annotation>
@@ -242,16 +246,19 @@
               <PropertyValue Property="Value" Path="OverallStatus"/>
             </Record>
             <Record Type="UI.DataFieldForAction">
-              <PropertyValue Property="Action" String="com.sap.gateway.srvd.zrt_ui_travel.v0001.acceptTravel"/>
+              <PropertyValue Property="Action" String="com.sap.gateway.srvd.zrt_ui_travel.v0001.acceptTravel(com.sap.gateway.srvd.zrt_ui_travel.v0001.TravelType)"/>
               <PropertyValue Property="Label" String="Accept Travel"/>
+              <PropertyValue Property="InvocationGrouping" EnumMember="UI.OperationGroupingType/Isolated"/>
             </Record>
             <Record Type="UI.DataFieldForAction">
-              <PropertyValue Property="Action" String="com.sap.gateway.srvd.zrt_ui_travel.v0001.deductDiscount"/>
+              <PropertyValue Property="Action" String="com.sap.gateway.srvd.zrt_ui_travel.v0001.deductDiscount(com.sap.gateway.srvd.zrt_ui_travel.v0001.TravelType)"/>
               <PropertyValue Property="Label" String="Deduct Discount"/>
+              <PropertyValue Property="InvocationGrouping" EnumMember="UI.OperationGroupingType/Isolated"/>
             </Record>
             <Record Type="UI.DataFieldForAction">
-              <PropertyValue Property="Action" String="com.sap.gateway.srvd.zrt_ui_travel.v0001.copyTravel"/>
+              <PropertyValue Property="Action" String="com.sap.gateway.srvd.zrt_ui_travel.v0001.copyTravel(com.sap.gateway.srvd.zrt_ui_travel.v0001.TravelType)"/>
               <PropertyValue Property="Label" String="Copy Travel"/>
+              <PropertyValue Property="InvocationGrouping" EnumMember="UI.OperationGroupingType/Isolated"/>
             </Record>
           </Collection>
         </Annotation>
@@ -328,14 +335,31 @@
                 </Record>
               </Collection>
             </PropertyValue>
-            <PropertyValue Property="Visualizations">
-              <Collection>
-                <AnnotationPath>@UI.LineItem</AnnotationPath>
-              </Collection>
-            </PropertyValue>
           </Record>
         </Annotation>
+        <Annotation Term="Common.CreatedBy" Path="CreatedBy"/>
+        <Annotation Term="Common.CreatedAt" Path="CreatedAt"/>
+        <Annotation Term="Common.ChangedBy" Path="LastChangedBy"/>
+        <Annotation Term="Common.ChangedAt" Path="LastChangedAt"/>
         <Annotation Term="Common.Label" String="Travel"/>
+      </Annotations>
+      <Annotations Target="SAP__self.TravelType/__CreateByAssociationControl">
+        <Annotation Term="Core.Computed"/>
+        <Annotation Term="UI.HiddenFilter"/>
+        <Annotation Term="UI.Hidden"/>
+      </Annotations>
+      <Annotations Target="SAP__self.TravelType/__EntityControl">
+        <Annotation Term="Core.Computed"/>
+        <Annotation Term="UI.HiddenFilter"/>
+        <Annotation Term="UI.Hidden"/>
+      </Annotations>
+      <Annotations Target="SAP__self.TravelType/__OperationControl">
+        <Annotation Term="Core.Computed"/>
+        <Annotation Term="UI.HiddenFilter"/>
+        <Annotation Term="UI.Hidden"/>
+      </Annotations>
+      <Annotations Target="SAP__self.TravelType/_Booking">
+        <Annotation Term="Common.Composition"/>
       </Annotations>
       <Annotations Target="SAP__self.Container/Travel">
         <Annotation Term="Capabilities.InsertRestrictions">
@@ -508,6 +532,11 @@
           </Collection>
         </Annotation>
         <Annotation Term="Common.Label" String="Booking"/>
+      </Annotations>
+      <Annotations Target="SAP__self.BookingType/__EntityControl">
+        <Annotation Term="Core.Computed"/>
+        <Annotation Term="UI.HiddenFilter"/>
+        <Annotation Term="UI.Hidden"/>
       </Annotations>
       <Annotations Target="SAP__self.Container/Booking">
         <Annotation Term="Capabilities.InsertRestrictions">

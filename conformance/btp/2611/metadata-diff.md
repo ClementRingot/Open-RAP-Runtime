@@ -5,10 +5,10 @@ Runtime on normalized names (aliases of the vocabularies, namespace of the servi
 
 | | Structure | Annotations |
 |---|---|---|
-| Same | 237 | |
-| Only on SAP BTP | 2 | 132 |
-| Only in Open RAP Runtime | 18 | 32 |
-| Different | 8 | 17 |
+| Same | 298 | |
+| Only on SAP BTP | 1 | 86 |
+| Only in Open RAP Runtime | 16 | 30 |
+| Different | 4 | 7 |
 
 ## Structure
 
@@ -30,12 +30,6 @@ Runtime on normalized names (aliases of the vocabularies, namespace of the servi
 |---|---|---|
 | Property | `Type=Edm.Decimal Nullable=false Precision=16 Scale=variable` | `Type=Edm.Decimal Nullable=false Precision=16 Scale=2` |
 
-### `self.BookingType/TravelUUID`
-
-| | SAP BTP | Open RAP Runtime |
-|---|---|---|
-| Property | `Type=Edm.Guid Nullable=false` | `Type=Edm.Guid` |
-
 ### `self.Container/I_Currency`
 
 | | SAP BTP | Open RAP Runtime |
@@ -54,12 +48,6 @@ Runtime on normalized names (aliases of the vocabularies, namespace of the servi
 | | SAP BTP | Open RAP Runtime |
 |---|---|---|
 | Parameter | `Type=Edm.Boolean Nullable=false` | — |
-
-### `self.Edit(self.TravelType)/PreserveChanges`
-
-| | SAP BTP | Open RAP Runtime |
-|---|---|---|
-| Parameter | `Type=Edm.Boolean Nullable=false` | `Type=Edm.Boolean` |
 
 ### `self.I_CurrencyTextType`
 
@@ -127,26 +115,6 @@ Runtime on normalized names (aliases of the vocabularies, namespace of the servi
 |---|---|---|
 | Property | — | `Type=Edm.Byte Nullable=false` |
 
-### `self.Prepare(self.TravelType)`
-
-| | SAP BTP | Open RAP Runtime |
-|---|---|---|
-| Action | `IsBound=true` | `IsBound=true EntitySetPath=_it` |
-| ReturnType | — | `Type=self.TravelType Nullable=false` |
-
-### `self.Resume(self.TravelType)`
-
-| | SAP BTP | Open RAP Runtime |
-|---|---|---|
-| Action | `IsBound=true` | `IsBound=true EntitySetPath=_it` |
-| ReturnType | — | `Type=self.TravelType Nullable=false` |
-
-### `self.TravelType/_Booking`
-
-| | SAP BTP | Open RAP Runtime |
-|---|---|---|
-| OnDelete | `Cascade` | — |
-
 ### `self.TravelType/BookingFee`
 
 | | SAP BTP | Open RAP Runtime |
@@ -167,32 +135,12 @@ Runtime on normalized names (aliases of the vocabularies, namespace of the servi
 
 ## Annotations
 
-### `self.BookingType/__EntityControl`
-
-| | SAP BTP | Open RAP Runtime |
-|---|---|---|
-| @Core.Computed | `` | — |
-| @UI.Hidden | `` | — |
-| @UI.HiddenFilter | `` | — |
-
 ### `self.BookingType/BookingUUID`
 
 | | SAP BTP | Open RAP Runtime |
 |---|---|---|
 | @Common.Heading | `String=UUID` | — |
 | @Common.QuickInfo | `String=16 Byte UUID in 16 Bytes (Raw Format)` | — |
-
-### `self.BookingType/DraftEntityCreationDateTime`
-
-| | SAP BTP | Open RAP Runtime |
-|---|---|---|
-| @UI.HiddenFilter | `` | — |
-
-### `self.BookingType/DraftEntityLastChangeDateTime`
-
-| | SAP BTP | Open RAP Runtime |
-|---|---|---|
-| @UI.HiddenFilter | `` | — |
 
 ### `self.BookingType/DraftUUID`
 
@@ -206,24 +154,19 @@ Runtime on normalized names (aliases of the vocabularies, namespace of the servi
 
 | | SAP BTP | Open RAP Runtime |
 |---|---|---|
-| @Common.Label | `String=Has active` | `String=Has Active` |
 | @Common.QuickInfo | `String=Draft - Indicator - Has active document` | — |
-| @UI.HiddenFilter | `` | — |
 
 ### `self.BookingType/HasDraftEntity`
 
 | | SAP BTP | Open RAP Runtime |
 |---|---|---|
 | @Common.QuickInfo | `String=Draft - Indicator - Has draft document` | — |
-| @UI.HiddenFilter | `` | — |
 
 ### `self.BookingType/IsActiveEntity`
 
 | | SAP BTP | Open RAP Runtime |
 |---|---|---|
-| @Common.Label | `String=Is active` | `String=Is Active` |
 | @Common.QuickInfo | `String=Draft - Indicator - Is active document` | — |
-| @UI.HiddenFilter | `` | — |
 
 ### `self.BookingType/LocalLastChangedAt`
 
@@ -264,8 +207,6 @@ Runtime on normalized names (aliases of the vocabularies, namespace of the servi
 | @Capabilities.NavigationRestrictions | `Record(RestrictedProperties: Collection(Record(DeepUpdateSupport: Record(Supported: Bool=false), NavigationProperty: NavigationPropertyPath=SiblingEntity), Record(DeepUpdateSupport: Record(Supported: Bool=false), InsertRestrictions: Record(Insertable: Bool=false), NavigationProperty: NavigationPropertyPath=_Travel)))` | — |
 | @Capabilities.SortRestrictions | `Record(NonSortableProperties: Collection(PropertyPath("__EntityControl")))` | — |
 | @Capabilities.UpdateRestrictions | `Record(DeltaUpdateSupported: Bool=true, NonUpdatableNavigationProperties: Collection(PropertyPath("DraftAdministrativeData"), PropertyPath("SiblingEntity"), PropertyPath("_Travel")), QueryOptions: Record(SelectSupported: Bool=true), Updatable: Path=__EntityControl/Updatable)` | `Record(Updatable: Path=__EntityControl/Updatable)` |
-| @Common.DraftActivationVia | `Collection(String("self.Container/Travel"))` | — |
-| @Common.DraftNode | `` | `Record(PreparationAction: String=self.Prepare)` |
 
 ### `self.Container/I_Currency`
 
@@ -401,111 +342,37 @@ Runtime on normalized names (aliases of the vocabularies, namespace of the servi
 |---|---|---|
 | @Common.Label | — | `String=Decimals` |
 
-### `self.I_DraftAdministrativeDataType`
-
-| | SAP BTP | Open RAP Runtime |
-|---|---|---|
-| @Common.Label | `String=Draft Administration Data` | `String=Draft Administrative Data` |
-
 ### `self.I_DraftAdministrativeDataType/CreatedByUser`
 
 | | SAP BTP | Open RAP Runtime |
 |---|---|---|
 | @Common.IsUpperCase | `` | — |
-| @Common.Text | `Path=CreatedByUserDescription` | — |
 | @Common.ValueListReferences | `Collection(String("../../../../srvd_f4/sap/i_draftadministrativeuservh/0001;ps='srvd-zrt_ui_travel-0001';va='self.et-i_draftadministrativedata.createdbyuser'/$metadata"))` | — |
-
-### `self.I_DraftAdministrativeDataType/CreatedByUserDescription`
-
-| | SAP BTP | Open RAP Runtime |
-|---|---|---|
-| @UI.Hidden | `` | — |
 
 ### `self.I_DraftAdministrativeDataType/DraftAccessType`
 
 | | SAP BTP | Open RAP Runtime |
 |---|---|---|
 | @Common.IsUpperCase | `` | — |
-| @UI.Hidden | `` | — |
 
 ### `self.I_DraftAdministrativeDataType/DraftEntityType`
 
 | | SAP BTP | Open RAP Runtime |
 |---|---|---|
 | @Common.IsUpperCase | `` | — |
-| @Common.Label | `String=Draft Entity ID` | `String=Draft Entity Type` |
-| @UI.Hidden | `` | — |
-
-### `self.I_DraftAdministrativeDataType/DraftIsCreatedByMe`
-
-| | SAP BTP | Open RAP Runtime |
-|---|---|---|
-| @UI.Hidden | `` | — |
-
-### `self.I_DraftAdministrativeDataType/DraftIsKeptByUser`
-
-| | SAP BTP | Open RAP Runtime |
-|---|---|---|
-| @UI.Hidden | `` | — |
-
-### `self.I_DraftAdministrativeDataType/DraftIsLastChangedByMe`
-
-| | SAP BTP | Open RAP Runtime |
-|---|---|---|
-| @UI.Hidden | `` | — |
-
-### `self.I_DraftAdministrativeDataType/DraftIsProcessedByMe`
-
-| | SAP BTP | Open RAP Runtime |
-|---|---|---|
-| @UI.Hidden | `` | — |
-
-### `self.I_DraftAdministrativeDataType/DraftUUID`
-
-| | SAP BTP | Open RAP Runtime |
-|---|---|---|
-| @Common.Label | `String=Draft (Technical ID)` | `String=Draft` |
-| @UI.Hidden | `` | — |
-
-### `self.I_DraftAdministrativeDataType/EnqueueStartDateTime`
-
-| | SAP BTP | Open RAP Runtime |
-|---|---|---|
-| @UI.Hidden | `` | — |
 
 ### `self.I_DraftAdministrativeDataType/InProcessByUser`
 
 | | SAP BTP | Open RAP Runtime |
 |---|---|---|
 | @Common.IsUpperCase | `` | — |
-| @Common.Text | `Path=InProcessByUserDescription` | — |
-| @UI.Hidden | `` | — |
-
-### `self.I_DraftAdministrativeDataType/InProcessByUserDescription`
-
-| | SAP BTP | Open RAP Runtime |
-|---|---|---|
-| @UI.Hidden | `` | — |
 
 ### `self.I_DraftAdministrativeDataType/LastChangedByUser`
 
 | | SAP BTP | Open RAP Runtime |
 |---|---|---|
 | @Common.IsUpperCase | `` | — |
-| @Common.Text | `Path=LastChangedByUserDescription` | — |
 | @Common.ValueListReferences | `Collection(String("../../../../srvd_f4/sap/i_draftadministrativeuservh/0001;ps='srvd-zrt_ui_travel-0001';va='self.et-i_draftadministrativedata.lastchangedbyuser'/$metadata"))` | — |
-
-### `self.I_DraftAdministrativeDataType/LastChangedByUserDescription`
-
-| | SAP BTP | Open RAP Runtime |
-|---|---|---|
-| @UI.Hidden | `` | — |
-
-### `self.I_DraftAdministrativeDataType/ProcessingStartDateTime`
-
-| | SAP BTP | Open RAP Runtime |
-|---|---|---|
-| @UI.Hidden | `` | — |
 
 ### `self.TravelCbAControl/_Booking`
 
@@ -551,47 +418,7 @@ Runtime on normalized names (aliases of the vocabularies, namespace of the servi
 
 | | SAP BTP | Open RAP Runtime |
 |---|---|---|
-| @Common.ChangedAt | `Path=LastChangedAt` | — |
-| @Common.ChangedBy | `Path=LastChangedBy` | — |
-| @Common.CreatedAt | `Path=CreatedAt` | — |
-| @Common.CreatedBy | `Path=CreatedBy` | — |
-| @Common.SideEffects#BookingFee | — | `Record(SourceProperties: Collection(PropertyPath("BookingFee")), TargetProperties: Collection(String("TotalPrice")))` |
-| @Common.SideEffects#CurrencyCode2 | — | `Record(SourceProperties: Collection(PropertyPath("CurrencyCode")), TargetProperties: Collection(String("TotalPrice")))` |
-| @Common.SideEffects#SAP__Field_BookingFee | `Record(SourceProperties: Collection(PropertyPath("BookingFee")), TargetProperties: Collection(String("TotalPrice")))` | — |
-| @Common.SideEffects#SAP__Field_CurrencyCode | `Record(SourceProperties: Collection(PropertyPath("CurrencyCode")), TargetProperties: Collection(String("TotalPrice")))` | — |
-| @UI.Identification | `Collection(Record(Type=UI.DataField, Value: Path=TravelID), Record(Type=UI.DataField, Value: Path=AgencyID), Record(Type=UI.DataField, Value: Path=CustomerID), Record(Type=UI.DataField, Value: Path=Description), Record(Type=UI.DataField, Value: Path=OverallStatus), Record(Action: String=self.copyTravel(self.TravelType), InvocationGrouping: EnumMember=UI.OperationGroupingType/Isolated, Label: String=Copy Travel, Type=UI.DataFieldForAction), Record(Action: String=self.deductDiscount(self.TravelType), InvocationGrouping: EnumMember=UI.OperationGroupingType/Isolated, Label: String=Deduct Discount, Type=UI.DataFieldForAction), Record(Action: String=self.acceptTravel(self.TravelType), InvocationGrouping: EnumMember=UI.OperationGroupingType/Isolated, Label: String=Accept Travel, Type=UI.DataFieldForAction))` | `Collection(Record(Type=UI.DataField, Value: Path=TravelID), Record(Type=UI.DataField, Value: Path=AgencyID), Record(Type=UI.DataField, Value: Path=CustomerID), Record(Type=UI.DataField, Value: Path=Description), Record(Type=UI.DataField, Value: Path=OverallStatus), Record(Action: String=self.acceptTravel, Label: String=Accept Travel, Type=UI.DataFieldForAction), Record(Action: String=self.deductDiscount, Label: String=Deduct Discount, Type=UI.DataFieldForAction), Record(Action: String=self.copyTravel, Label: String=Copy Travel, Type=UI.DataFieldForAction))` |
-| @UI.LineItem | `Collection(Record(Type=UI.DataField, Value: Path=TravelID), Record(Type=UI.DataField, Value: Path=AgencyID), Record(Type=UI.DataField, Value: Path=CustomerID), Record(Type=UI.DataField, Value: Path=BeginDate), Record(Type=UI.DataField, Value: Path=EndDate), Record(Type=UI.DataField, Value: Path=TotalPrice), Record(Type=UI.DataField, Value: Path=OverallStatus), Record(Action: String=self.acceptTravel(self.TravelType), InvocationGrouping: EnumMember=UI.OperationGroupingType/Isolated, Label: String=Accept Travel, Type=UI.DataFieldForAction), Record(Action: String=self.copyTravel(self.TravelType), InvocationGrouping: EnumMember=UI.OperationGroupingType/Isolated, Label: String=Copy Travel, Type=UI.DataFieldForAction))` | `Collection(Record(Type=UI.DataField, Value: Path=TravelID), Record(Type=UI.DataField, Value: Path=AgencyID), Record(Type=UI.DataField, Value: Path=CustomerID), Record(Type=UI.DataField, Value: Path=BeginDate), Record(Type=UI.DataField, Value: Path=EndDate), Record(Type=UI.DataField, Value: Path=TotalPrice), Record(Type=UI.DataField, Value: Path=OverallStatus), Record(Action: String=self.acceptTravel, Label: String=Accept Travel, Type=UI.DataFieldForAction), Record(Action: String=self.copyTravel, Label: String=Copy Travel, Type=UI.DataFieldForAction))` |
-| @UI.PresentationVariant | `Record(SortOrder: Collection(Record(Descending: Bool=true, Property: PropertyPath=TravelID)))` | `Record(SortOrder: Collection(Record(Descending: Bool=true, Property: PropertyPath=TravelID)), Visualizations: Collection(AnnotationPath("@UI.LineItem")))` |
-
-### `self.TravelType/__CreateByAssociationControl`
-
-| | SAP BTP | Open RAP Runtime |
-|---|---|---|
-| @Core.Computed | `` | — |
-| @UI.Hidden | `` | — |
-| @UI.HiddenFilter | `` | — |
-
-### `self.TravelType/__EntityControl`
-
-| | SAP BTP | Open RAP Runtime |
-|---|---|---|
-| @Core.Computed | `` | — |
-| @UI.Hidden | `` | — |
-| @UI.HiddenFilter | `` | — |
-
-### `self.TravelType/__OperationControl`
-
-| | SAP BTP | Open RAP Runtime |
-|---|---|---|
-| @Core.Computed | `` | — |
-| @UI.Hidden | `` | — |
-| @UI.HiddenFilter | `` | — |
-
-### `self.TravelType/_Booking`
-
-| | SAP BTP | Open RAP Runtime |
-|---|---|---|
-| @Common.Composition | `` | — |
+| @UI.Identification | `Collection(Record(Type=UI.DataField, Value: Path=TravelID), Record(Type=UI.DataField, Value: Path=AgencyID), Record(Type=UI.DataField, Value: Path=CustomerID), Record(Type=UI.DataField, Value: Path=Description), Record(Type=UI.DataField, Value: Path=OverallStatus), Record(Action: String=self.copyTravel(self.TravelType), InvocationGrouping: EnumMember=UI.OperationGroupingType/Isolated, Label: String=Copy Travel, Type=UI.DataFieldForAction), Record(Action: String=self.deductDiscount(self.TravelType), InvocationGrouping: EnumMember=UI.OperationGroupingType/Isolated, Label: String=Deduct Discount, Type=UI.DataFieldForAction), Record(Action: String=self.acceptTravel(self.TravelType), InvocationGrouping: EnumMember=UI.OperationGroupingType/Isolated, Label: String=Accept Travel, Type=UI.DataFieldForAction))` | `Collection(Record(Type=UI.DataField, Value: Path=TravelID), Record(Type=UI.DataField, Value: Path=AgencyID), Record(Type=UI.DataField, Value: Path=CustomerID), Record(Type=UI.DataField, Value: Path=Description), Record(Type=UI.DataField, Value: Path=OverallStatus), Record(Action: String=self.acceptTravel(self.TravelType), InvocationGrouping: EnumMember=UI.OperationGroupingType/Isolated, Label: String=Accept Travel, Type=UI.DataFieldForAction), Record(Action: String=self.deductDiscount(self.TravelType), InvocationGrouping: EnumMember=UI.OperationGroupingType/Isolated, Label: String=Deduct Discount, Type=UI.DataFieldForAction), Record(Action: String=self.copyTravel(self.TravelType), InvocationGrouping: EnumMember=UI.OperationGroupingType/Isolated, Label: String=Copy Travel, Type=UI.DataFieldForAction))` |
 
 ### `self.TravelType/CreatedAt`
 
@@ -617,18 +444,6 @@ Runtime on normalized names (aliases of the vocabularies, namespace of the servi
 | @Common.ValueList | — | `Record(CollectionPath: String=I_Currency, Label: String=Currency, Parameters: Collection(Record(LocalDataProperty: PropertyPath=CurrencyCode, Type=Common.ValueListParameterInOut, ValueListProperty: String=Currency), Record(Type=Common.ValueListParameterDisplayOnly, ValueListProperty: String=Decimals), Record(Type=Common.ValueListParameterDisplayOnly, ValueListProperty: String=CurrencyISOCode), Record(Type=Common.ValueListParameterDisplayOnly, ValueListProperty: String=AlternativeCurrencyKey)), SearchSupported: Bool=true)` |
 | @Common.ValueListReferences | `Collection(String("../../../../srvd_f4/sap/i_currency/0001;ps='srvd-zrt_ui_travel-0001';va='self.et-zrt_c_travel.currencycode'/$metadata"))` | — |
 
-### `self.TravelType/DraftEntityCreationDateTime`
-
-| | SAP BTP | Open RAP Runtime |
-|---|---|---|
-| @UI.HiddenFilter | `` | — |
-
-### `self.TravelType/DraftEntityLastChangeDateTime`
-
-| | SAP BTP | Open RAP Runtime |
-|---|---|---|
-| @UI.HiddenFilter | `` | — |
-
 ### `self.TravelType/DraftUUID`
 
 | | SAP BTP | Open RAP Runtime |
@@ -641,24 +456,19 @@ Runtime on normalized names (aliases of the vocabularies, namespace of the servi
 
 | | SAP BTP | Open RAP Runtime |
 |---|---|---|
-| @Common.Label | `String=Has active` | `String=Has Active` |
 | @Common.QuickInfo | `String=Draft - Indicator - Has active document` | — |
-| @UI.HiddenFilter | `` | — |
 
 ### `self.TravelType/HasDraftEntity`
 
 | | SAP BTP | Open RAP Runtime |
 |---|---|---|
 | @Common.QuickInfo | `String=Draft - Indicator - Has draft document` | — |
-| @UI.HiddenFilter | `` | — |
 
 ### `self.TravelType/IsActiveEntity`
 
 | | SAP BTP | Open RAP Runtime |
 |---|---|---|
-| @Common.Label | `String=Is active` | `String=Is Active` |
 | @Common.QuickInfo | `String=Draft - Indicator - Is active document` | — |
-| @UI.HiddenFilter | `` | — |
 
 ### `self.TravelType/LastChangedAt`
 

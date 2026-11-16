@@ -82,7 +82,7 @@ describe("features beyond the reference fixture", () => {
 
   it("describes the side effects and the global feature control in the metadata", async () => {
     const metadata = (await t.app.inject({ method: "GET", url: `${SERVICE}$metadata` })).body;
-    expect(metadata).toMatch(/<Annotation Term="Common\.SideEffects" Qualifier="BookingFee">[\s\S]*?<PropertyPath>BookingFee<\/PropertyPath>[\s\S]*?<String>TotalPrice<\/String>/);
+    expect(metadata).toMatch(/<Annotation Term="Common\.SideEffects" Qualifier="SAP__Field_BookingFee">[\s\S]*?<PropertyPath>BookingFee<\/PropertyPath>[\s\S]*?<String>TotalPrice<\/String>/);
     expect(metadata).toMatch(/<Annotation Term="Capabilities\.DeleteRestrictions">[\s\S]*?<PropertyValue Property="Deletable" Path="__EntityControl\/Deletable"\/>/);
     expect(metadata).toContain('<Annotation Term="Core.OperationAvailable" Path="_it/__OperationControl/copyTravel"/>');
   });

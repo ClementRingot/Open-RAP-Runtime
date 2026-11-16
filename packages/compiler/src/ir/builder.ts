@@ -408,14 +408,16 @@ function applyDraft(model: Model, diagnostics: Diagnostics): void {
     const base = baseEntityOf(model, entity);
     const info = drafted.get(base.name.toUpperCase()) as { table: string; root: boolean; collaborative: boolean };
     const hidden = { ui: { hidden: true } };
+    // D92: as on SAP BTP, the draft fields are not offered in the filter bar
+    const unfiltered = { ...hidden, consumption: { filter: { hidden: true } } };
     entity.fields.push(
-      { name: "IsActiveEntity", type: bool, key: true, annotations: { endusertext: { label: "Is Active" }, ...hidden }, draft: true },
-      { name: "HasActiveEntity", type: bool, key: false, annotations: { endusertext: { label: "Has Active" }, ...hidden }, draft: true },
-      { name: "HasDraftEntity", type: bool, key: false, annotations: { endusertext: { label: "Has Draft" }, ...hidden }, draft: true },
+      { name: "IsActiveEntity", type: bool, key: true, annotations: { endusertext: { label: "Is active" }, ...unfiltered }, draft: true },
+      { name: "HasActiveEntity", type: bool, key: false, annotations: { endusertext: { label: "Has active" }, ...unfiltered }, draft: true },
+      { name: "HasDraftEntity", type: bool, key: false, annotations: { endusertext: { label: "Has Draft" }, ...unfiltered }, draft: true },
       { name: "DraftUUID", type: { kind: "raw", length: 16 }, key: false, annotations: { endusertext: { label: "Draft" }, ...hidden }, draft: true },
       // D87: as on SAP, the creation and last change of the draft instance (none for an active one)
-      { name: "DraftEntityCreationDateTime", type: { kind: "timestampl" }, key: false, annotations: { endusertext: { label: "Draft Created On" }, ...hidden }, draft: true },
-      { name: "DraftEntityLastChangeDateTime", type: { kind: "timestampl" }, key: false, annotations: { endusertext: { label: "Draft Last Changed On" }, ...hidden }, draft: true },
+      { name: "DraftEntityCreationDateTime", type: { kind: "timestampl" }, key: false, annotations: { endusertext: { label: "Draft Created On" }, ...unfiltered }, draft: true },
+      { name: "DraftEntityLastChangeDateTime", type: { kind: "timestampl" }, key: false, annotations: { endusertext: { label: "Draft Last Changed On" }, ...unfiltered }, draft: true },
     );
     for (const association of entity.associations) {
       const target = exposed.find((e) => same(e.name, association.target));
@@ -432,33 +434,36 @@ function applyDraft(model: Model, diagnostics: Diagnostics): void {
   const text = (length: number): FieldModel["type"] => ({ kind: "char", length });
   const stamp: FieldModel["type"] = { kind: "timestampl" };
   const label = (l: string): FieldModel["annotations"] => ({ endusertext: { label: l } });
+  const hiddenLabel = (l: string): FieldModel["annotations"] => ({ endusertext: { label: l }, ui: { hidden: true } });
+  const textOf = (annotations: FieldModel["annotations"], element: string): FieldModel["annotations"] => ({ ...annotations, objectmodel: { text: { element: [element] } } });
   model.entities.push({
     name: DRAFT_ADMIN_ENTITY,
     kind: "view",
     root: false,
     sqlView: DRAFT_ADMIN_VIEW,
+    // D92: as on SAP BTP, only the users and the dates are shown, the users with their names
     // D87: the elements of I_DraftAdministrativeData on SAP BTP
     fields: [
-      { name: "DraftUUID", type: { kind: "raw", length: 16 }, key: true, annotations: label("Draft") },
-      { name: "DraftEntityType", type: text(30), key: true, annotations: label("Draft Entity Type") },
+      { name: "DraftUUID", type: { kind: "raw", length: 16 }, key: true, annotations: hiddenLabel("Draft (Technical ID)") },
+      { name: "DraftEntityType", type: text(30), key: true, annotations: hiddenLabel("Draft Entity ID") },
       { name: "CreationDateTime", type: stamp, key: false, annotations: label("Draft Created On") },
-      { name: "CreatedByUser", type: text(12), key: false, annotations: label("Draft Created By") },
+      { name: "CreatedByUser", type: text(12), key: false, annotations: textOf(label("Draft Created By"), "CreatedByUserDescription") },
       { name: "LastChangeDateTime", type: stamp, key: false, annotations: label("Draft Last Changed On") },
-      { name: "LastChangedByUser", type: text(12), key: false, annotations: label("Draft Last Changed By") },
-      { name: "DraftAccessType", type: text(1), key: false, annotations: label("Draft Access Type") },
-      { name: "ProcessingStartDateTime", type: stamp, key: false, annotations: label("Draft In Process Since") },
-      { name: "InProcessByUser", type: text(12), key: false, annotations: label("Draft In Process By") },
-      { name: "DraftIsKeptByUser", type: { kind: "bool" }, key: false, annotations: label("Draft Is Kept By User") },
-      { name: "EnqueueStartDateTime", type: stamp, key: false, annotations: label("Draft Locked Since") },
-      { name: "DraftIsCreatedByMe", type: { kind: "bool" }, key: false, annotations: label("Draft Created By Me"), currentUserIn: "CreatedByUser" },
-      { name: "DraftIsLastChangedByMe", type: { kind: "bool" }, key: false, annotations: label("Draft Last Changed By Me"), currentUserIn: "LastChangedByUser" },
-      { name: "DraftIsProcessedByMe", type: { kind: "bool" }, key: false, annotations: label("Draft In Process By Me"), currentUserIn: "InProcessByUser" },
-      { name: "CreatedByUserDescription", type: text(80), key: false, annotations: label("Draft Created By (Description)") },
-      { name: "LastChangedByUserDescription", type: text(80), key: false, annotations: label("Draft Last Changed By (Description)") },
-      { name: "InProcessByUserDescription", type: text(80), key: false, annotations: label("Draft In Process By (Description)") },
+      { name: "LastChangedByUser", type: text(12), key: false, annotations: textOf(label("Draft Last Changed By"), "LastChangedByUserDescription") },
+      { name: "DraftAccessType", type: text(1), key: false, annotations: hiddenLabel("Draft Access Type") },
+      { name: "ProcessingStartDateTime", type: stamp, key: false, annotations: hiddenLabel("Draft In Process Since") },
+      { name: "InProcessByUser", type: text(12), key: false, annotations: textOf(hiddenLabel("Draft In Process By"), "InProcessByUserDescription") },
+      { name: "DraftIsKeptByUser", type: { kind: "bool" }, key: false, annotations: hiddenLabel("Draft Is Kept By User") },
+      { name: "EnqueueStartDateTime", type: stamp, key: false, annotations: hiddenLabel("Draft Locked Since") },
+      { name: "DraftIsCreatedByMe", type: { kind: "bool" }, key: false, annotations: hiddenLabel("Draft Created By Me"), currentUserIn: "CreatedByUser" },
+      { name: "DraftIsLastChangedByMe", type: { kind: "bool" }, key: false, annotations: hiddenLabel("Draft Last Changed By Me"), currentUserIn: "LastChangedByUser" },
+      { name: "DraftIsProcessedByMe", type: { kind: "bool" }, key: false, annotations: hiddenLabel("Draft In Process By Me"), currentUserIn: "InProcessByUser" },
+      { name: "CreatedByUserDescription", type: text(80), key: false, annotations: hiddenLabel("Draft Created By (Description)") },
+      { name: "LastChangedByUserDescription", type: text(80), key: false, annotations: hiddenLabel("Draft Last Changed By (Description)") },
+      { name: "InProcessByUserDescription", type: text(80), key: false, annotations: hiddenLabel("Draft In Process By (Description)") },
     ],
     associations: [],
-    annotations: label("Draft Administrative Data"),
+    annotations: label("Draft Administration Data"),
     draft: { admin: true },
   });
   model.service.entitySets.push({ name: DRAFT_ADMIN_ENTITY, entity: DRAFT_ADMIN_ENTITY, draftAdministrativeData: true });

@@ -69,6 +69,9 @@ describe("draft", () => {
     expect(edit.headers["location"]).toBe(`${SERVICE}${travel(T2, false)}`);
     expect(edit.headers["preference-applied"]).toBe("handling=strict");
     expect(edit.headers["etag"]).toMatch(/^W\/"/);
+    // D92: Resume returns nothing, as on SAP BTP
+    expect((await bob.inject({ method: "POST", url: `${SERVICE}${travel(T2, false)}/${NS}.Resume`, headers: HEADERS, payload: "{}" })).statusCode).toBe(204);
+    expect(fixture.metadata).toMatch(/<Action Name="Resume" IsBound="true">\s*<Parameter Name="_it" Type="[^"]+" Nullable="false"\/>\s*<\/Action>/);
     // PATCH with return=minimal: 204, the preference applied, the new ETag
     const patch = await bob.inject({ method: "PATCH", url: `${SERVICE}${travel(T2, false)}`, headers: headers({ prefer: "return=minimal" }), payload: JSON.stringify({ Description: "minimal" }) });
     expect(patch.statusCode).toBe(204);

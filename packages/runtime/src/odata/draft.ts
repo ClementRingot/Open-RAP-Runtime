@@ -751,7 +751,8 @@ export class DraftRuntime {
         throw new ODataError(409, "DRAFT_LOCKED", `The draft is in process by ${admin.InProcessByUser}`);
       }
       await sql`UPDATE "rapt_draft_admin" SET "InProcessByUser" = ${user}, "LastChangeDateTime" = now() WHERE "DraftUUID" = ${row.DraftUUID}`.execute(db);
-      return { ...outcome(200), entity: { set, key: draftKey(key) } };
+      // D92: Resume returns nothing, as on SAP BTP
+      return outcome(204);
     }
     await this.owned(db, set, row, user);
     if (name === "Share") {

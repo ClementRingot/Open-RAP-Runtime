@@ -335,7 +335,8 @@ export function buildODataService(model: Model): ODataService {
         name: field.name,
         field: field.name,
         edm,
-        nullable: field.key ? false : isNullableType(edm),
+        // D92: a UUID is not nullable on SAP BTP (its initial value), the draft UUID of an active instance is
+        nullable: field.key ? false : edm.type === "Edm.Guid" ? field.draft === true : isNullableType(edm),
         key: field.key,
         computed: field.draft === true || characteristics.includes("readonly") || characteristics.includes("numberingManaged"),
         immutable: characteristics.includes("readonlyUpdate"),
@@ -482,7 +483,7 @@ export function buildODataService(model: Model): ODataService {
         ...(returnType === undefined ? {} : { returnType }),
       });
       // D89: Edit follows the update of the instance (feature control, authorization), as on SAP
-      const edit = draftOperation("Edit", self, [{ name: "PreserveChanges", edm: { type: "Edm.Boolean" }, nullable: true }]);
+      const edit = draftOperation("Edit", self, [{ name: "PreserveChanges", edm: { type: "Edm.Boolean" }, nullable: false }]);
       if (entityType.entityControl?.updatable === true) {
         edit.dynamic = true;
         entityType.operationControl.push("Edit");
@@ -490,8 +491,9 @@ export function buildODataService(model: Model): ODataService {
       service.operations.push(
         edit,
         draftOperation("Activate", self),
-        draftOperation("Prepare", self),
-        draftOperation("Resume", self),
+        // D92: as on SAP BTP, Prepare and Resume return nothing (204)
+        draftOperation("Prepare", undefined),
+        draftOperation("Resume", undefined),
         draftOperation("Discard", undefined),
       );
       if (draft.collaborative === true) {

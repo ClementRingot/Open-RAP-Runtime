@@ -204,6 +204,8 @@ class CsdlBuilder {
             Partner: navigation.partner,
           },
           ...navigation.constraints.map((c) => el("ReferentialConstraint", { Property: c.property, ReferencedProperty: c.referencedProperty })),
+          // D92: the children of a composition go with their parent, as on SAP BTP
+          navigation.kind === "composition" ? el("OnDelete", { Action: "Cascade" }) : undefined,
         ),
       );
     }
@@ -347,6 +349,7 @@ class CsdlBuilder {
       if (field.currencyCode !== undefined) children.push(annotation("Measures.ISOCurrency", { Path: field.currencyCode }));
       if (field.unitOfMeasure !== undefined) children.push(annotation("Measures.Unit", { Path: field.unitOfMeasure }));
       if (getAnnotation(a, "UI.hidden") === true) children.push(annotation("UI.Hidden"));
+      if (getAnnotation(a, "Consumption.filter.hidden") === true) children.push(annotation("UI.HiddenFilter"));
       const help = valueHelpOf(this.model, field);
       if (help !== undefined) {
         children.push(
@@ -440,13 +443,15 @@ class CsdlBuilder {
         if (action === undefined) {
           continue;
         }
-        const grouping = str(entry["invocationgrouping"]);
+        // D92: as on SAP BTP, the action with its binding parameter, Isolated unless said otherwise
+        const grouping = str(entry["invocationgrouping"]) ?? "#ISOLATED";
+        const operation = this.service.operations.find((o) => o.name === action && this.service.entityTypes.find((t) => t.name === o.boundType)?.entity === entity.name);
         result.push(
           record(
             "UI.DataFieldForAction",
-            pv("Action", { String: `${this.service.namespace}.${action}` }),
+            pv("Action", { String: operation === undefined ? `${this.service.namespace}.${action}` : `${this.service.namespace}.${action}(${operation.collectionBound ? `Collection(${this.service.namespace}.${operation.boundType})` : `${this.service.namespace}.${operation.boundType}`})` }),
             label === undefined ? undefined : pv("Label", { String: label }),
-            grouping === undefined ? undefined : pv("InvocationGrouping", { EnumMember: `UI.OperationGroupingType/${enumName(grouping)}` }),
+            pv("InvocationGrouping", { EnumMember: `UI.OperationGroupingType/${enumName(grouping)}` }),
             entry["inline"] === true ? pv("Inline", { Bool: true }) : undefined,
             importanceAnnotation,
             hidden,
@@ -547,7 +552,6 @@ class CsdlBuilder {
                     ),
                   ),
                 ),
-            pv("Visualizations", {}, collection(el("AnnotationPath", undefined, "@UI.LineItem"))),
           ),
         ),
       );
@@ -557,10 +561,36 @@ class CsdlBuilder {
       children.push(annotation("Common.SemanticKey", {}, collection(...semanticKey.map(propertyPath))));
     }
     children.push(...this.sideEffects(type, entity));
+    // D92: the administrative fields of the entity, from @Semantics of the fields (of its base)
+    const base = exposedBehavior(this.model, entity).baseEntity;
+    const semantics: Array<[string, string]> = [
+      ["Semantics.user.createdBy", "Common.CreatedBy"],
+      ["Semantics.systemDateTime.createdAt", "Common.CreatedAt"],
+      ["Semantics.user.lastChangedBy", "Common.ChangedBy"],
+      ["Semantics.systemDateTime.lastChangedAt", "Common.ChangedAt"],
+    ];
+    for (const [key, term] of semantics) {
+      const own = entity.fields.find((f) => getAnnotation(f.annotations, key) === true)?.name;
+      const inherited = base.fields.find((f) => getAnnotation(f.annotations, key) === true)?.name;
+      const name = own ?? (inherited === undefined ? undefined : projectedFieldName(this.model, entity, inherited));
+      if (name !== undefined && type.properties.some((p) => p.name === name)) children.push(annotation(term, { Path: name }));
+    }
     const label = str(getAnnotation(a, "EndUserText.label"));
     if (label !== undefined) children.push(annotation("Common.Label", { String: label }));
     if (type.stateMessages === true) children.push(annotation("Common.Messages", { Path: STATE_MESSAGES }));
     this.annotations(this.qualified(type.name), children);
+    // D92: the controls of the instances are computed, hidden, not filterable (as on SAP BTP)
+    const controls = [
+      ...(type.createByAssociationControl.length > 0 ? [CREATE_BY_ASSOCIATION_CONTROL] : []),
+      ...(type.entityControl !== undefined ? [ENTITY_CONTROL] : []),
+      ...(type.operationControl.length > 0 ? [OPERATION_CONTROL] : []),
+    ];
+    for (const control of controls) {
+      this.annotations(`${this.qualified(type.name)}/${control}`, [annotation("Core.Computed"), annotation("UI.HiddenFilter"), annotation("UI.Hidden")]);
+    }
+    for (const navigation of type.navigations.filter((n) => n.kind === "composition")) {
+      this.annotations(`${this.qualified(type.name)}/${navigation.name}`, [annotation("Common.Composition")]);
+    }
   }
 
   private facets(entity: EntityModel): XmlElement[] {
@@ -639,7 +669,8 @@ class CsdlBuilder {
   /** BDEF side effects of the base entity, renamed through the projection. */
   private sideEffects(type: ODataEntityType, entity: EntityModel): XmlElement[] {
     const result: XmlElement[] = [];
-    let index = 0;
+    // D92: one side effect per source field, qualified SAP__Field_<field> as on SAP BTP
+    const bySource = new Map<string, { properties: string[]; entities: string[] }>();
     for (const effect of this.exposedSideEffects(entity)) {
       if (effect.trigger.kind !== "field") {
         continue;
@@ -648,15 +679,20 @@ class CsdlBuilder {
       if (source === undefined) {
         continue;
       }
-      const targets = this.sideEffectTargets(type, entity, effect.targets, "");
+      const found = this.sideEffectTargets(type, entity, effect.targets, "");
+      const merged = bySource.get(source) ?? { properties: [], entities: [] };
+      merged.properties.push(...found.properties.filter((p) => !merged.properties.includes(p)));
+      merged.entities.push(...found.entities.filter((p) => !merged.entities.includes(p)));
+      bySource.set(source, merged);
+    }
+    for (const [source, targets] of bySource) {
       if (targets.properties.length + targets.entities.length === 0) {
         continue;
       }
-      index++;
       result.push(
         annotation(
           "Common.SideEffects",
-          { Qualifier: `${source}${index > 1 ? index : ""}` },
+          { Qualifier: `SAP__Field_${source}` },
           record(
             "Common.SideEffectsType",
             pv("SourceProperties", {}, collection(propertyPath(source))),
@@ -722,6 +758,18 @@ class CsdlBuilder {
             ),
       ),
     );
+  }
+
+  /** The entity set of the draft root of a draft node, up its associations to the parent. */
+  private draftRootSet(type: ODataEntityType): string | undefined {
+    let current: ODataEntityType | undefined = type;
+    for (let depth = 0; current !== undefined && depth < 20; depth++) {
+      const set = this.service.entitySets.find((s) => s.entityType === current?.name);
+      if (set?.draft?.root === true) return set.name;
+      const parent: ODataEntityType["navigations"][number] | undefined = current.navigations.find((n) => n.kind === "toParent");
+      current = parent === undefined ? undefined : this.service.entityTypes.find((t) => t.name === parent.targetType);
+    }
+    return undefined;
   }
 
   private setAnnotations(type: ODataEntityType): void {
@@ -796,7 +844,10 @@ class CsdlBuilder {
         ),
       );
     } else if (set.draft !== undefined) {
-      children.push(annotation("Common.DraftNode", {}, record("Common.DraftNodeType", pv("PreparationAction", { String: `${this.service.namespace}.Prepare` }))));
+      // D92: as on SAP BTP, the node names the entity set of its root
+      const root = this.draftRootSet(type);
+      children.push(annotation("Common.DraftNode"));
+      if (root !== undefined) children.push(annotation("Common.DraftActivationVia", {}, collection(el("String", undefined, `${SCHEMA_ALIAS}.${CONTAINER_NAME}/${root}`))));
     }
     this.annotations(`${SCHEMA_ALIAS}.${CONTAINER_NAME}/${set.name}`, children);
   }
