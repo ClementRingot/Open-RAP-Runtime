@@ -65,7 +65,7 @@ try {
   const binding = renamed.find((r) => r.types.includes("SRVB"));
   const definition = renamed.find((r) => r.types.includes("SRVD"));
   const expected = {
-    fixture: path.relative(root, fixture),
+    fixture: path.relative(root, fixture).split(path.sep).join("/"),
     variants,
     suffix: values.suffix.toUpperCase(),
     expect: "every object activates without error",
@@ -74,6 +74,9 @@ try {
   };
   writeFileSync(path.join(out, "expected.json"), `${JSON.stringify(expected, null, 2)}\n`);
   writeFileSync(path.join(out, "README.md"), roundTripReadme(expected));
+  for (const o of renamed.filter((r) => !r.to.startsWith(r.from))) {
+    process.stdout.write(`warning: ${o.from} is cut to ${o.to} (${o.types.join(", ")}): a shorter suffix keeps it whole\n`);
+  }
   process.stdout.write(`${out}: ${result.files} files, ${renamed.length} objects renamed with ${expected.suffix}\n`);
   process.stdout.write(`next: follow ${path.join(out, "README.md")}\n`);
 } finally {

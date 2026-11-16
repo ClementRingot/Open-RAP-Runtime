@@ -6,7 +6,8 @@ import path from "node:path";
 
 /**
  * Applies variants of fixtures/variants.json to the sources of a copy: each file gets its exact
- * replacements in order (each must be found once), `null` removes the file.
+ * replacements in order (each must be found once), `null` removes the file. A working copy with
+ * CRLF line endings (an older checkout with core.autocrlf) is read as LF, as the repository holds it.
  */
 export function applyVariants(srcDir, definitions, names) {
   for (const name of names) {
@@ -23,7 +24,7 @@ export function applyVariants(srcDir, definitions, names) {
       if (!existsSync(target)) {
         throw new Error(`variant ${name}: ${file} does not exist`);
       }
-      let content = readFileSync(target, "utf8");
+      let content = readFileSync(target, "utf8").replace(/\r\n/g, "\n");
       for (const [from, to] of replacements) {
         if (!content.includes(from)) {
           throw new Error(`variant ${name}: text not found in ${file}: ${from.slice(0, 80)}`);
@@ -51,14 +52,15 @@ its users. Expected: ${expected.expect}.
    error in \`results/activation.md\`.
 3. Open the service binding \`${service?.binding ?? "(the binding)"}\`, press *Publish*, select the root entity and
    open the *Preview* of Fiori elements; copy its URL.
-4. Record the scenarios of SAP Fiori elements:
-   \`node scripts/fe-record-trial.mjs --url <preview URL> --release <release of the trial>\`
-   (from the repository of Open RAP Runtime).
+4. Record the scenarios of SAP Fiori elements, the cases going to \`results/cases\`:
+   \`node scripts/fe-record-trial.mjs --url <preview URL> --release <release of the trial> --out <this folder>/results/cases\`
+   (from the repository of Open RAP Runtime). Review them, then copy them to
+   \`packages/runtime/test/fe-protocol/cases\` of Open RAP Runtime.
 5. Keep in \`results/\` the \`$metadata\` of the service
    (\`${service?.path ?? "<service path>"}$metadata\`) for the comparison of D100.
 
 The trial account lasts 30 days by default: repeat these steps on a new account or a new release.
-Objects of this repository:
+Objects of this repository${expected.objects.some((o) => !o.to.startsWith(o.from)) ? " (a name too long for its type is cut before the suffix: a shorter suffix keeps it whole)" : ""}:
 
 ${expected.objects.map((o) => `- ${o.from} → ${o.to} (${o.types.join(", ")})`).join("\n")}
 `;

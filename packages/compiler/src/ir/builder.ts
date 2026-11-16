@@ -361,9 +361,12 @@ function checkExposedTypes(model: Model, diagnostics: Diagnostics): void {
   }
 }
 
-/** The entity of the administrative data of the drafts (D54), a table of the runtime. */
-export const DRAFT_ADMIN_ENTITY = "DraftAdministrativeData";
-export const DRAFT_ADMIN_TABLE = "rapt_draft_admin";
+/** The navigation of a draft entity to its administrative data (D54). */
+export const DRAFT_ADMIN_NAVIGATION = "DraftAdministrativeData";
+/** The entity of the administrative data, named as on SAP BTP (D87). */
+export const DRAFT_ADMIN_ENTITY = "I_DraftAdministrativeData";
+/** Its view: the table of the runtime in the shape of SAP (D87). */
+export const DRAFT_ADMIN_VIEW = "rapt_draft_admin_v";
 /** The navigation of a draft entity to its sibling (D81). */
 export const SIBLING_ENTITY = "SiblingEntity";
 /** The users of the collaborative drafts (D59). */
@@ -410,6 +413,9 @@ function applyDraft(model: Model, diagnostics: Diagnostics): void {
       { name: "HasActiveEntity", type: bool, key: false, annotations: { endusertext: { label: "Has Active" }, ...hidden }, draft: true },
       { name: "HasDraftEntity", type: bool, key: false, annotations: { endusertext: { label: "Has Draft" }, ...hidden }, draft: true },
       { name: "DraftUUID", type: { kind: "raw", length: 16 }, key: false, annotations: { endusertext: { label: "Draft" }, ...hidden }, draft: true },
+      // D87: as on SAP, the creation and last change of the draft instance (none for an active one)
+      { name: "DraftEntityCreationDateTime", type: { kind: "timestampl" }, key: false, annotations: { endusertext: { label: "Draft Created On" }, ...hidden }, draft: true },
+      { name: "DraftEntityLastChangeDateTime", type: { kind: "timestampl" }, key: false, annotations: { endusertext: { label: "Draft Last Changed On" }, ...hidden }, draft: true },
     );
     for (const association of entity.associations) {
       const target = exposed.find((e) => same(e.name, association.target));
@@ -417,7 +423,7 @@ function applyDraft(model: Model, diagnostics: Diagnostics): void {
         association.on.push({ source: "IsActiveEntity", target: "IsActiveEntity" });
       }
     }
-    entity.associations.push({ name: DRAFT_ADMIN_ENTITY, target: DRAFT_ADMIN_ENTITY, kind: "association", cardinality: { min: 0, max: 1 }, on: [{ source: "DraftUUID", target: "DraftUUID" }] });
+    entity.associations.push({ name: DRAFT_ADMIN_NAVIGATION, target: DRAFT_ADMIN_ENTITY, kind: "association", cardinality: { min: 0, max: 1 }, on: [{ source: "DraftUUID", target: "DraftUUID" }] });
     // SiblingEntity (D81): the draft of an active instance, or the active instance of a draft
     const keys = entity.fields.filter((f) => f.key && f.draft !== true).map((f) => ({ source: f.name, target: f.name }));
     entity.associations.push({ name: SIBLING_ENTITY, target: entity.name, kind: "association", cardinality: { min: 0, max: 1 }, on: keys, sibling: true });
@@ -430,14 +436,26 @@ function applyDraft(model: Model, diagnostics: Diagnostics): void {
     name: DRAFT_ADMIN_ENTITY,
     kind: "view",
     root: false,
-    sqlView: DRAFT_ADMIN_TABLE,
+    sqlView: DRAFT_ADMIN_VIEW,
+    // D87: the elements of I_DraftAdministrativeData on SAP BTP
     fields: [
       { name: "DraftUUID", type: { kind: "raw", length: 16 }, key: true, annotations: label("Draft") },
+      { name: "DraftEntityType", type: text(30), key: true, annotations: label("Draft Entity Type") },
       { name: "CreationDateTime", type: stamp, key: false, annotations: label("Draft Created On") },
       { name: "CreatedByUser", type: text(12), key: false, annotations: label("Draft Created By") },
       { name: "LastChangeDateTime", type: stamp, key: false, annotations: label("Draft Last Changed On") },
       { name: "LastChangedByUser", type: text(12), key: false, annotations: label("Draft Last Changed By") },
+      { name: "DraftAccessType", type: text(1), key: false, annotations: label("Draft Access Type") },
+      { name: "ProcessingStartDateTime", type: stamp, key: false, annotations: label("Draft In Process Since") },
       { name: "InProcessByUser", type: text(12), key: false, annotations: label("Draft In Process By") },
+      { name: "DraftIsKeptByUser", type: { kind: "bool" }, key: false, annotations: label("Draft Is Kept By User") },
+      { name: "EnqueueStartDateTime", type: stamp, key: false, annotations: label("Draft Locked Since") },
+      { name: "DraftIsCreatedByMe", type: { kind: "bool" }, key: false, annotations: label("Draft Created By Me"), currentUserIn: "CreatedByUser" },
+      { name: "DraftIsLastChangedByMe", type: { kind: "bool" }, key: false, annotations: label("Draft Last Changed By Me"), currentUserIn: "LastChangedByUser" },
+      { name: "DraftIsProcessedByMe", type: { kind: "bool" }, key: false, annotations: label("Draft In Process By Me"), currentUserIn: "InProcessByUser" },
+      { name: "CreatedByUserDescription", type: text(80), key: false, annotations: label("Draft Created By (Description)") },
+      { name: "LastChangedByUserDescription", type: text(80), key: false, annotations: label("Draft Last Changed By (Description)") },
+      { name: "InProcessByUserDescription", type: text(80), key: false, annotations: label("Draft In Process By (Description)") },
     ],
     associations: [],
     annotations: label("Draft Administrative Data"),

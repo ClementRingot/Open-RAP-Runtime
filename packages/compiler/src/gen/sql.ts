@@ -514,11 +514,29 @@ function draftViews(model: Model): string[] {
     statements.push(`CREATE VIEW ${quoteIdentifier(draft.view)} AS
 SELECT ${fields.map((f) => `a.${quoteIdentifier(f.name)}`).join(", ")}, TRUE AS "IsActiveEntity", FALSE AS "HasActiveEntity",
   EXISTS (SELECT 1 FROM ${quoteIdentifier(draft.table)} d WHERE ${exists}) AS "HasDraftEntity",
-  (SELECT d."DraftUUID" FROM ${quoteIdentifier(draft.table)} d WHERE ${exists} LIMIT 1) AS "DraftUUID"
+  (SELECT d."DraftUUID" FROM ${quoteIdentifier(draft.table)} d WHERE ${exists} LIMIT 1) AS "DraftUUID",
+  NULL::timestamptz(6) AS "DraftEntityCreationDateTime", NULL::timestamptz(6) AS "DraftEntityLastChangeDateTime"
 FROM ${quoteIdentifier(entity.sqlView ?? "")} a
 UNION ALL
-SELECT ${fields.map((f) => `${draftFieldSql(model, entity, f)} AS ${quoteIdentifier(f.name)}`).join(", ")}, FALSE, d."HasActiveEntity", FALSE, d."DraftUUID"
+SELECT ${fields.map((f) => `${draftFieldSql(model, entity, f)} AS ${quoteIdentifier(f.name)}`).join(", ")}, FALSE, d."HasActiveEntity", FALSE, d."DraftUUID",
+  d."DraftEntityCreationDateTime", d."DraftEntityLastChangeDateTime"
 FROM ${quoteIdentifier(draft.table)} d;
+`);
+  }
+  if (statements.length > 0) {
+    // D87: the administrative data in the shape of I_DraftAdministrativeData of SAP BTP; the
+    // DraftIs…ByMe booleans are computed per request (they depend on the user)
+    const users = model.tables.some((t) => t.name === "rapt_bususer");
+    const description = (column: string): string =>
+      users ? `COALESCE((SELECT u.fullname FROM "rapt_bususer" u WHERE u.userid = a.${quoteIdentifier(column)}), '')::varchar(80)` : `''::varchar(80)`;
+    statements.push(`DROP VIEW IF EXISTS "rapt_draft_admin_v";
+CREATE VIEW "rapt_draft_admin_v" AS
+SELECT a."DraftUUID", upper(a."RootEntity")::varchar(30) AS "DraftEntityType", a."CreationDateTime", a."CreatedByUser",
+  a."LastChangeDateTime", a."LastChangedByUser", ''::varchar(1) AS "DraftAccessType", a."CreationDateTime" AS "ProcessingStartDateTime",
+  a."InProcessByUser", FALSE AS "DraftIsKeptByUser", a."LastChangeDateTime" AS "EnqueueStartDateTime",
+  ${description("CreatedByUser")} AS "CreatedByUserDescription", ${description("LastChangedByUser")} AS "LastChangedByUserDescription",
+  ${description("InProcessByUser")} AS "InProcessByUserDescription"
+FROM "rapt_draft_admin" a;
 `);
   }
   return statements.length === 0 ? [] : ["-- active instances and drafts of the exposed entities (D54)", ...statements];

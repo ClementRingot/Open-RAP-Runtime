@@ -250,7 +250,7 @@ projections (`use …`), side effects. Details and exceptions: [FEATURES.md](FEA
 otherwise), `total etag`, `draft action Edit; draft action Activate optimized; draft action
 Discard; draft action Resume; draft determine action Prepare;`. The draft table does not have to
 exist: it is generated. The service has the `IsActiveEntity` key, `HasDraftEntity`,
-`DraftAdministrativeData` and the actions of SAP; determinations and validations run on
+`DraftAdministrativeData` (to the entity set `I_DraftAdministrativeData`, as on SAP BTP, [D87](DECISIONS.md)) and the actions of SAP; determinations and validations run on
 activation. The UI follows Fiori Elements: *Editing Status* filter, *Locked by X*,
 "Draft updated", *Keep Draft* when leaving the page ([D58](DECISIONS.md)).
 

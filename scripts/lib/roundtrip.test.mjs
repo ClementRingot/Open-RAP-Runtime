@@ -22,6 +22,10 @@ describe("variants of the fixtures (D99)", () => {
       expect(existsSync(path.join(dir, "b.txt"))).toBe(false);
       expect(() => applyVariants(dir, definitions, ["w"])).toThrow(/unknown variant w: v/);
       expect(() => applyVariants(dir, { v: { files: { "a.txt": [["three", "3"]] } } }, ["v"])).toThrow(/text not found in a.txt: three/);
+      // a working copy with CRLF line endings is read as the repository holds it
+      writeFileSync(path.join(dir, "c.txt"), "line one\r\nline two\r\n");
+      applyVariants(dir, { v: { files: { "c.txt": [["one\nline two", "1\nline 2"]] } } }, ["v"]);
+      expect(readFileSync(path.join(dir, "c.txt"), "utf8")).toBe("line 1\nline 2\n");
     } finally {
       rmSync(dir, { recursive: true, force: true });
     }
@@ -77,7 +81,10 @@ describe("repository for the SAP BTP trial (D99)", () => {
       expect(readFileSync(path.join(out, "src", "zbp_rt_r_travelxyz.clas.locals_imp.abap"), "utf8")).not.toContain("AUTHORITY-CHECK");
       const expected = JSON.parse(readFileSync(path.join(out, "expected.json"), "utf8"));
       expect(expected).toMatchObject({ variants: ["draft", "trial"], suffix: "XYZ", service: { binding: "ZRT_UI_TRAVEL_O4XYZ", path: "/sap/opu/odata4/sap/zrt_ui_travel_o4xyz/srvd/sap/zrt_ui_travelxyz/0001/" } });
-      expect(readFileSync(path.join(out, "README.md"), "utf8")).toContain("ZRT_UI_TRAVEL_O4XYZ");
+      expect(expected.fixture).toBe("fixtures/travel");
+      const readme = readFileSync(path.join(out, "README.md"), "utf8");
+      expect(readme).toContain("ZRT_UI_TRAVEL_O4XYZ");
+      expect(readme).toContain("--out <this folder>/results/cases");
       // a folder that exists is not overwritten
       expect(() => execFileSync("node", ["scripts/btp-roundtrip.mjs", "--suffix", "xyz", "--out", out], { cwd: ROOT, stdio: "pipe" })).toThrow(/exists/);
     } finally {
@@ -89,5 +96,7 @@ describe("repository for the SAP BTP trial (D99)", () => {
     const text = roundTripReadme({ fixture: "fixtures/travel", variants: [], suffix: "A1", expect: "x", objects: [{ from: "ZA", to: "ZAA1", types: ["TABL"] }] });
     expect(text).toContain("- ZA → ZAA1 (TABL)");
     expect(text).toContain("variants none");
+    expect(text).not.toContain("is cut before the suffix");
+    expect(roundTripReadme({ fixture: "f", variants: [], suffix: "CRG1", expect: "x", objects: [{ from: "ZRT_D_BOOKING", to: "ZRT_D_BOOKINCRG1", types: ["TABL"] }] })).toContain("is cut before the suffix");
   });
 });

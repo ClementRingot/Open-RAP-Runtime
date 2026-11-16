@@ -146,7 +146,7 @@ export class ReadEngine {
     if (path.length === 1) {
       const name = path[0] as string;
       const { property, field } = this.service.property(info, name);
-      return { sql: sql.ref(`${alias}.${property.name}`), abap: field.type, edm: property.edm };
+      return { sql: this.propertySql(info, alias, property.name), abap: field.type, edm: property.edm };
     }
     if (path.length === 2) {
       // a to-one navigation: scalar sub-query on the target view
@@ -167,7 +167,7 @@ export class ReadEngine {
         conditions.push(access);
       }
       return {
-        sql: sql`(SELECT ${sql.ref(`${inner}.${property.name}`)} FROM ${sql.table(target.view)} AS ${sql.id(inner)} WHERE ${sql.join(conditions, sql` AND `)} LIMIT 1)`,
+        sql: sql`(SELECT ${this.propertySql(target, inner, property.name)} FROM ${sql.table(target.view)} AS ${sql.id(inner)} WHERE ${sql.join(conditions, sql` AND `)} LIMIT 1)`,
         abap: field.type,
         edm: property.edm,
       };
@@ -566,8 +566,17 @@ export class ReadEngine {
   }
 
   /** The columns of a query: the properties, and the ETag of an `etag dependent` entity. */
+  /** A property of a row: its column, or (D87) a boolean computed for the user of the request. */
+  private propertySql(info: TypeInfo, alias: string, name: string): RawBuilder<unknown> {
+    const column = info.properties.get(name)?.field.currentUserIn;
+    if (column !== undefined) {
+      return sql`(${sql.ref(`${alias}.${column}`)} = ${currentReader()?.abapName ?? ""})`;
+    }
+    return sql.ref(`${alias}.${name}`) as RawBuilder<unknown>;
+  }
+
   private columns(info: TypeInfo, alias: string, properties: string[]): RawBuilder<unknown> {
-    const columns = properties.map((p) => sql.ref(`${alias}.${p}`) as RawBuilder<unknown>);
+    const columns = properties.map((p) => (info.properties.get(p)?.field.currentUserIn === undefined ? (sql.ref(`${alias}.${p}`) as RawBuilder<unknown>) : sql`${this.propertySql(info, alias, p)} AS ${sql.id(p)}`));
     const etag = this.dependentEtag(info, alias);
     if (etag !== undefined) {
       columns.push(sql`${etag.sql} AS ${sql.id(DEPENDENT_ETAG)}`);

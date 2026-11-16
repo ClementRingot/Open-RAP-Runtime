@@ -237,6 +237,11 @@ export interface FieldModel {
   semantics?: AdminSemantics;
   /** Draft (D54): IsActiveEntity, HasActiveEntity, HasDraftEntity, DraftUUID — no column of the base. */
   draft?: true;
+  /**
+   * D87: a boolean computed for the user of the request: whether this column holds the user
+   * (`DraftIsCreatedByMe`: `CreatedByUser`).
+   */
+  currentUserIn?: string;
   /** Name of the currency code element (`@Semantics.amount.currencyCode`). */
   currencyCode?: string;
   /** Name of the unit element (`@Semantics.quantity.unitOfMeasure`). */

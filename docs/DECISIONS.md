@@ -2087,3 +2087,42 @@ _The issues moved to the repository itself once public: see D74._
 - **Tests**: `csdl.test.ts` (no side effect without `use side effects`, the side effect with it,
   no warning); `roundtrip.test.mjs` (the draft variant); `rap-variant-features.test.ts` (its
   variant says `use side effects`).
+
+## D87 — The administrative data of the drafts as on SAP BTP
+
+- **Context**: the scenarios recorded on the SAP BTP trial (D84, release 2611) replay in
+  `fe-protocol.test.ts`; the first difference of most of them is the administrative data of the
+  drafts. On SAP the navigation `DraftAdministrativeData` of a draft entity leads to the entity set
+  `I_DraftAdministrativeData` (type `I_DraftAdministrativeDataType`, keys `DraftUUID` and
+  `DraftEntityType`, 17 properties: the users, the dates, `DraftAccessType`,
+  `DraftIsKeptByUser`, `DraftIsCreatedByMe`, `DraftIsLastChangedByMe`, `DraftIsProcessedByMe`, the
+  descriptions of the users), and every draft entity has `DraftEntityCreationDateTime` and
+  `DraftEntityLastChangeDateTime`. Fiori elements selects them (the List Report reads
+  `DraftAdministrativeData($select=DraftUUID,InProcessByUser,…,DraftIsCreatedByMe,…)`). Open RAP
+  Runtime had an entity set `DraftAdministrativeData` with 6 properties, the table
+  `rapt_draft_admin` itself.
+- **Decision**:
+  - The entity set is `I_DraftAdministrativeData`, its properties those of SAP, on the view
+    `rapt_draft_admin_v` of the table (unchanged): `DraftEntityType` the root entity in upper case,
+    `DraftAccessType` empty, `DraftIsKeptByUser` false, `ProcessingStartDateTime` the creation of
+    the draft, `EnqueueStartDateTime` its last change, the descriptions the full names of
+    `rapt_bususer` when the project has the table (D63), empty otherwise.
+  - `DraftIsCreatedByMe`, `DraftIsLastChangedByMe` and `DraftIsProcessedByMe` depend on the user
+    of the request: a field of the model may be `currentUserIn` a column, read as
+    `column = <user>` in `$select`, `$expand`, `$filter` and `$orderby` (not stored).
+  - The draft entities have `DraftEntityCreationDateTime` and `DraftEntityLastChangeDateTime`
+    (`timestampl`, the columns of the draft table that the runtime already kept; `null` for an active instance
+    in the `_all` view), hidden in the UI.
+  - The navigation keeps its name `DraftAdministrativeData`; the UI and `SiblingEntity` (D81)
+    are unchanged.
+  - With D87 the recorded scenario `list-report` passes; the others are marked `"fails": "D88"`
+    (`Prefer`, `Preference-Applied`, `Location`, 201 for `Edit`) or `"D89"` (advertised actions,
+    `__CreateByAssociationControl`).
+  - The round trip (D84) reads a working copy with CRLF line endings as LF (an older checkout with
+    `core.autocrlf`), writes the fixture as a POSIX path in `expected.json`, warns when a name is
+    cut before the suffix (16 characters for a table: `ZRT_D_BOOKING` with `CRG1`), and its
+    step 4 records the cases to `results/cases` of the repository for the trial.
+- **Tests**: `draft.test.ts` (the entity set, its properties, the `…ByMe` booleans for two users,
+  in `$expand` and `$filter`, the dates on a draft and `null` on an active instance);
+  `fe-protocol.test.ts` (`trial-list-report-har.json` passes); `roundtrip.test.mjs` (CRLF, the
+  POSIX path, `--out` in step 4, a cut name).

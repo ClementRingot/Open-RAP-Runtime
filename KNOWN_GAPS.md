@@ -185,6 +185,7 @@ What the project deliberately leaves out; the planned work is in
 | `draft query view`, `with draft` on a BO with unmanaged save | Not supported. |
 | Collaborative draft (D59) | No real time (WebSocket): the Object Page reads the draft again every 5 s; no field lock; `ShareAll` ignored; joining a draft only checks the Edit authorization; two-segment navigation `DraftAdministrativeData/DraftAdministrativeUser`: read `DraftAdministrativeUser?$filter=DraftUUID eq …`. |
 | State messages (D81) | Stored by `Prepare` and read in `SAP__Messages` of the draft entity types only (on SAP, every entity type of a UI service has the property); the messages of a refused activation are returned, not stored (the LUW is rolled back). |
+| Administrative data (D87) | `I_DraftAdministrativeData` has the elements of SAP BTP; `DraftEntityType` is the root entity of the BO in upper case (on SAP the name of the draft entity, to confirm on the trial); `DraftAccessType` empty, `DraftIsKeptByUser` false, `ProcessingStartDateTime` and `EnqueueStartDateTime` are the creation and the last change of the draft; the descriptions of the users come from `rapt_bususer` when the project has it, empty otherwise; no value help on the users (`I_DraftAdministrativeUserVH` on SAP). |
 | Exclusive lock | Taken over by another user after 15 minutes without a change, as on SAP; no adjustable duration. |
 
 ## Floorplans (D53)

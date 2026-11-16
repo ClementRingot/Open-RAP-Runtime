@@ -182,6 +182,13 @@ describe("draft", () => {
     expect(edit.status, JSON.stringify(edit.body)).toBe(200);
     const read = await call(bob, "GET", `${travel(T1, false)}?$expand=DraftAdministrativeData`);
     expect(read.body["DraftAdministrativeData"]).toMatchObject({ CreatedByUser: "BOB", InProcessByUser: "BOB" });
+    // D87: I_DraftAdministrativeData as on SAP BTP, the …ByMe booleans for the user of the request
+    expect(fixture.metadata).toContain('<EntitySet Name="I_DraftAdministrativeData" EntityType="');
+    expect(read.body["DraftAdministrativeData"]).toMatchObject({ DraftEntityType: "ZRT_R_TRAVEL", DraftAccessType: "", DraftIsKeptByUser: false, DraftIsCreatedByMe: true, DraftIsProcessedByMe: true, InProcessByUserDescription: "" });
+    expect(read.body).toMatchObject({ DraftEntityCreationDateTime: expect.any(String), DraftEntityLastChangeDateTime: expect.any(String) });
+    const seen = await call(alice, "GET", `${travel(T1, true)}?$select=DraftEntityCreationDateTime&$expand=DraftAdministrativeData($select=DraftEntityType,InProcessByUser,DraftIsProcessedByMe)`);
+    expect(seen.body).toMatchObject({ DraftEntityCreationDateTime: null, DraftAdministrativeData: { DraftEntityType: "ZRT_R_TRAVEL", InProcessByUser: "BOB", DraftIsProcessedByMe: false } });
+    expect(values(await call(alice, "GET", `Travel?$filter=IsActiveEntity eq true and DraftAdministrativeData/DraftIsProcessedByMe eq false&$select=TravelID`)).map((r) => r["TravelID"])).toEqual(["00000001"]);
     expect((await call(bob, "POST", `${travel(T1, false)}/${NS}.Discard`, {})).status).toBe(204);
     expect((await call(alice, "GET", travel(T1, true))).body).toMatchObject({ HasDraftEntity: false });
   });
