@@ -130,3 +130,11 @@ dependency.
 Static HTML and CSS written for the project (MIT of the repository); the documentation pages are
 rendered from `docs/` by the Markdown renderer of the compiler (`scripts/build-site.mjs`). No
 external dependency, no font or script loaded from a third party.
+
+## Identifiers of the interfaces of SAP
+
+The generated services use names defined by SAP so that clients written for SAP BTP work as is:
+`SAP__Messages`, `SAP__Field_<field>`, the header `sap-messages`, the paths `/sap/opu/odata4/…`,
+the namespaces `com.sap.vocabularies.*` (vocabularies published by SAP under Apache-2.0). They
+are identifiers of interfaces, not software of SAP: no code of SAP is taken (D93).
+

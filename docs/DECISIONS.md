@@ -2277,3 +2277,26 @@ _The issues moved to the repository itself once public: see D74._
 - **Tests**: `conformance.test.ts` (the report of the trial 2611); `csdl.test.ts` (the entity
   annotations, the action with its binding, no `Visualizations`, `SAP__Field_BookingFee`;
   snapshot); `rap-variant-features.test.ts`.
+
+## D93 — The identifiers of the interfaces of SAP are kept
+
+- **Context**: to behave as SAP BTP, the generated services use names that start with `SAP` or
+  `sap`: the property `SAP__Messages` (D81), the qualifiers `SAP__Field_<field>` of the side
+  effects (D92), the aliases `SAP__self`, the header `sap-messages`, the parameter `sap-client`,
+  the paths `/sap/opu/odata4/…`, the namespaces `com.sap.vocabularies.*` and
+  `com.sap.gateway.srvd.*`. The question was whether neutral names should replace them, since
+  the project takes nothing proprietary from SAP (AGENTS.md, rule 2).
+- **Decision**: they are kept.
+  - They are identifiers of interfaces, not software of SAP: rule 2 and LICENSES.md are about
+    the libraries the project uses (SAPUI5, `sap.fe`, CAP…), none of which is taken.
+  - The vocabularies of SAP (`Common`, `UI`, `Communication`…, with `Common.Messages` and
+    `Common.SideEffects`) are published by SAP under the Apache-2.0 license; the OData
+    vocabularies of OASIS too.
+  - Several cannot change without breaking the clients: OpenUI5 reads the header
+    `sap-messages`; SAP Fiori elements understands only the namespaces `com.sap.vocabularies.*`;
+    the requests SAP Fiori elements sends to SAP BTP (the cases recorded on the trial, D83)
+    select `SAP__Messages` by name. Renaming only the others (a qualifier, an alias) would not
+    change the picture and would add differences with SAP BTP.
+  - The name SAP appears only to designate the system the services are compatible with; the
+    project does not present itself as a product of SAP.
+- **Tests**: none (no change of behavior).
