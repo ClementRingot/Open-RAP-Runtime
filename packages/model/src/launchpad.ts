@@ -34,6 +34,8 @@ export interface LaunchpadTile {
   external: boolean;
   /** Path of the launchpad answering the number of the tile (the `$count` of an entity set of an application). */
   count?: string;
+  /** D98: seconds between two reads of the count (at least 10); none: on load and when the launchpad is shown again. */
+  refresh?: number;
   /** Roles of the identity provider the tile is assigned to; none: every user. */
   roles: string[];
 }

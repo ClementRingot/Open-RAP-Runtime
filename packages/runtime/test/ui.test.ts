@@ -75,6 +75,16 @@ describe.skipIf(browserType === undefined)("generated UI (OpenUI5)", () => {
     await page.locator(ROWS).first().click();
     await page.getByText("Ski holidays").first().waitFor({ timeout: 30_000 });
     await page.locator(id("TravelObject", "edit")).click();
+    // D98: a mandatory field left empty is marked at once
+    const agency = page.locator(`${id("TravelObject", "field_Travel_AgencyID")}-inner`);
+    const before = String(await page.evaluate(`sap.ui.require("sap/ui/core/Element").getElementById("${id("TravelObject", "field_Travel_AgencyID").slice(1)}").getValue()`));
+    await agency.fill("");
+    await agency.press("Tab");
+    const state = `sap.ui.require("sap/ui/core/Element").getElementById("${id("TravelObject", "field_Travel_AgencyID").slice(1)}").getValueState()`;
+    await page.waitForFunction(`${state} === "Error"`, undefined, { timeout: 10_000 });
+    await agency.fill(before);
+    await agency.press("Tab");
+    await page.waitForFunction(`${state} === "None"`, undefined, { timeout: 10_000 });
     const description = page.locator(`${id("TravelObject", "field_Travel_Description")}-inner`);
     await description.fill("Ski holidays in the Alps");
     await description.press("Tab");

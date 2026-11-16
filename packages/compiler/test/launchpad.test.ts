@@ -58,7 +58,7 @@ describe("launchpad.json", () => {
           title: "Travels",
           tiles: [
             { app: "travel", intent: "Travel-manage", icon: "sap-icon://flight", count: "Travel", roles: ["travel_viewer", "travel_manager"] },
-            { title: "Open", app: "travel", count: { entitySet: "Travel", filter: "OverallStatus eq 'O'" } },
+            { title: "Open", app: "travel", count: { entitySet: "Travel", filter: "OverallStatus eq 'O'" }, refresh: 60 },
             { title: "Help", url: "https://example.org/help" },
             { title: "Help", url: "/apps/travel/ui/index.html#/Travel/new" },
           ],
@@ -73,6 +73,9 @@ describe("launchpad.json", () => {
     expect(manage).toEqual({ id: "travel-manage", title: "Travels", target: "/apps/travel/ui/index.html", external: false, roles: ["travel_viewer", "travel_manager"], icon: "sap-icon://flight", intent: "Travel-manage", app: "travel", count: `${SERVICE}Travel/$count` });
     expect(open?.count).toBe(`${SERVICE}Travel/$count?$filter=OverallStatus%20eq%20'O'`);
     expect(open?.roles).toEqual([]);
+    // D98: the count read again every 60 s
+    expect(open?.refresh).toBe(60);
+    expect(manage?.refresh).toBeUndefined();
     expect(help).toMatchObject({ id: "help", target: "https://example.org/help", external: true });
     expect(internal).toMatchObject({ id: "help-2", external: false });
     // the claims and the roles of rapt/authorizations.json of the application
@@ -119,6 +122,8 @@ describe("launchpad.json", () => {
             { title: "Bad intent", app: "travel", intent: "manage" },
             { title: "Bad count", app: "travel", count: "Flights" },
             { title: "Count without app", url: "https://example.org", count: "Travel" },
+            { title: "Refresh too short", app: "travel", count: "Travel", refresh: 5 },
+            { title: "Refresh without count", app: "travel", refresh: 60 },
             { title: "Unknown role", app: "travel", roles: ["travel_admin"] },
           ],
         },
@@ -137,6 +142,8 @@ describe("launchpad.json", () => {
       "error LPD004", // bad intent
       "error LPD006", // unknown entity set
       "error LPD006", // count without app
+      "error LPD006", // refresh too short (D98)
+      "error LPD006", // refresh without count
       "warning LPD007", // unknown role
       "error LPD001", // group without title
     ]);

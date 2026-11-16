@@ -164,6 +164,21 @@ export const LAUNCHPAD_CONTROLLER = `sap.ui.define([
           }
           that._render();
           that._loadCounts();
+          // D98: the counts read again when the launchpad is shown again, and every refresh seconds
+          document.addEventListener("visibilitychange", function () {
+            if (document.visibilityState === "visible") {
+              that._loadCounts();
+            }
+          });
+          that._tiles().filter(function (t) {
+            return !!t.count && t.refresh >= 10;
+          }).forEach(function (oTile) {
+            setInterval(function () {
+              if (document.visibilityState === "visible") {
+                that._loadCount(oTile);
+              }
+            }, oTile.refresh * 1000);
+          });
           oModel.setProperty("/loaded", true);
         })
         .catch(function (oError) {
@@ -293,21 +308,26 @@ export const LAUNCHPAD_CONTROLLER = `sap.ui.define([
 
     /** The dynamic tiles: the $count of an entity set of an application, with the access controls of the user. */
     _loadCounts: function () {
-      var oModel = this._model();
+      var that = this;
       this._tiles().filter(function (t) {
         return !!t.count;
       }).forEach(function (oTile) {
-        fetch(oTile.count, { credentials: "same-origin", headers: { accept: "text/plain" } })
-          .then(function (oResponse) {
-            return oResponse.ok ? oResponse.text() : "";
-          })
-          .then(function (sCount) {
-            oModel.setProperty("/counts/" + oTile.id, sCount.trim());
-          })
-          .catch(function () {
-            oModel.setProperty("/counts/" + oTile.id, "");
-          });
+        that._loadCount(oTile);
       });
+    },
+
+    _loadCount: function (oTile) {
+      var oModel = this._model();
+      fetch(oTile.count, { credentials: "same-origin", headers: { accept: "text/plain" } })
+        .then(function (oResponse) {
+          return oResponse.ok ? oResponse.text() : "";
+        })
+        .then(function (sCount) {
+          oModel.setProperty("/counts/" + oTile.id, sCount.trim());
+        })
+        .catch(function () {
+          oModel.setProperty("/counts/" + oTile.id, "");
+        });
     },
 
     _open: function (oTile) {

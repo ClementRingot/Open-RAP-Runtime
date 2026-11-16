@@ -133,7 +133,7 @@ What the project deliberately leaves out; the planned work is in
 | Application loaded full page, not in a container of the shell | Accepted: one application per page; the shell bar is shown by the application. |
 | Personalization (groups and tiles of the user), notifications, enterprise search | Not planned. Spaces and pages are supported (D48). |
 | Pages of a space: drop-down list above the sections | Accepted: SAP shows them in the menu of the tab of the space. |
-| Tile counters read on load only | Gap: no refresh interval. |
+| Tile counters | Read on load, when the launchpad is shown again, and every `refresh` seconds of the tile (D98); no refresh while the launchpad is hidden. |
 | Shared session: same `SESSION_SECRET` for the launchpad and its applications, no revocation before expiry | Accepted: one level of trust, like the sessions (D28). |
 | Applications behind the launchpad in `AUTH_MODE=none`: their development user, independent of the one of the launchpad | Development only. |
 | OpenUI5 resources served by each application (`/apps/<id>/resources/`) | Accepted: no cache shared between the applications. |
@@ -212,7 +212,7 @@ What the project deliberately leaves out; the planned work is in
 
 | Gap | Status |
 |---|---|
-| Check of the mandatory fields | On save only (not while typing); fields under dynamic feature control (instance `fc-mandatory`) not checked. |
+| Check of the mandatory fields | By the service on save; the UI marks a mandatory field left empty when it is left (D98, both modes); fields under dynamic feature control (instance `fc-mandatory`) not checked. |
 
 ## MCP (D47)
 

@@ -60,6 +60,8 @@ interface TileSource {
   app?: unknown;
   url?: unknown;
   count?: unknown;
+  /** D98: refresh interval of the count, in seconds. */
+  refresh?: unknown;
   roles?: unknown;
 }
 
@@ -313,6 +315,14 @@ export function resolveLaunchpad(file: string, diagnostics: Diagnostics, options
       if (app !== undefined) resolved.app = app.id;
       const count = countPath(tile, app, name, at, diagnostics);
       if (count !== undefined) resolved.count = count;
+      if (tile.refresh !== undefined) {
+        // D98: the count read again every n seconds (at least 10), as the dynamic tiles of SAP
+        if (typeof tile.refresh !== "number" || !Number.isInteger(tile.refresh) || tile.refresh < 10 || count === undefined) {
+          diagnostics.error("LPD006", `tile ${name}: refresh is a number of seconds of at least 10, for a tile with a count`, at);
+        } else {
+          resolved.refresh = tile.refresh;
+        }
+      }
       tiles.push(resolved);
     }
     return { title, tiles };

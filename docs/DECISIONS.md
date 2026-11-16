@@ -2380,3 +2380,19 @@ _The issues moved to the repository itself once public: see D74._
     `enhanced` mode (D45) keeps creating it from 1, a convenience of development.
 - **Tests**: `utilities.test.ts` (the self-test checks `minchar`; `cx_nr_object_not_found` without
   configuration).
+
+## D98 — Counts of the tiles read again; mandatory fields marked while editing
+
+- **Context**: two gaps of KNOWN_GAPS: the counts of the dynamic tiles of the launchpad were read
+  on load only (D37), and a mandatory field left empty was only reported by the save (D45).
+- **Decision**:
+  - A tile with a `count` may have `refresh`, in seconds (at least 10, LPD006 otherwise or
+    without a count): the count is read again at that interval while the launchpad is visible,
+    as the refresh interval of the dynamic tiles of SAP. Every count is also read again when the
+    launchpad is shown again (`visibilitychange`).
+  - In edit mode, the Object Page marks a mandatory field (`required`, from `field ( mandatory )`
+    or `Common.FieldControl`) left empty when it is left: value state `Error`, "Fill in this
+    field"; the mark goes when a value is entered. The service still checks on save (enhanced
+    mode, D45).
+- **Tests**: `launchpad.test.ts` (`refresh`, LPD006); `launchpad-ui.test.ts` (counts read again
+  when the launchpad is shown again); `ui.test.ts` (a mandatory field emptied, then filled).

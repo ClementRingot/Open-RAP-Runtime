@@ -57,6 +57,10 @@ afterAll(async () => {
 describe.skipIf(browserType === undefined)("the launchpad in a browser", () => {
   it("shows the tiles of the viewer with the number of travels, and filters them", async () => {
     const page = await browser.newPage({ viewport: { width: 1280, height: 800 } });
+    let counts = 0;
+    page.on("request", (request) => {
+      if ((request as { url(): string }).url().includes("/$count")) counts++;
+    });
     await page.goto(`${base}/`);
     await page.locator(tile("travel-manage")).waitFor({ timeout: 60_000 });
     // the manager's tile is not assigned to the viewer
@@ -65,6 +69,10 @@ describe.skipIf(browserType === undefined)("the launchpad in a browser", () => {
     // the $count of the application, with the access controls of the viewer (agencies 07…)
     await page.waitForFunction(`/\\b3\\b/.test(document.querySelector('${tile("travel-manage")} .sapMNCValue')?.textContent ?? '')`, undefined, { timeout: 30_000 });
     expect(await page.locator(tile("travel-manage")).textContent()).toContain("Travels and bookings");
+    // D98: the counts are read again when the launchpad is shown again
+    const before = counts;
+    await page.evaluate(`document.dispatchEvent(new Event("visibilitychange"))`);
+    await expect.poll(() => counts, { timeout: 10_000 }).toBeGreaterThan(before);
     // the search of the shell bar
     await page.evaluate(`(function () {
       var oSearch = sap.ui.require("sap/ui/core/Element").getElementById("container-launchpad---home--search");

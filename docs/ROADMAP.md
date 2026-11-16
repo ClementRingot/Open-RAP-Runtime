@@ -70,6 +70,7 @@ The sections below use the provisional numbers, unless they say "final".
 | — | D83 | Guided recording of the Fiori elements protocol on the SAP BTP trial, renamed copy for a shared system | 0 |
 | — | D85 | First pull and activation on the SAP BTP trial: abapGit XML of DDLX and SRVB, `total etag`, authorizations | 0 |
 | — | D86 | `use side effects`, value help and side effects of the draft fixture | 0 |
+| — | D98 | Counts of the tiles read again (interval, launchpad shown again); mandatory fields left empty marked in the UI | 7 |
 | — | D97 | `cl_abap_char_utilities=>minchar`; a number range interval that is not configured raises `cx_nr_object_not_found` in standard mode | 4 |
 | — | D96 | Value help of the users of the drafts (`I_DraftAdministrativeUserVH`) | 1 |
 | — | D95 | JSON batch, `$value` and single properties; batch formats and filter functions in the `$metadata` | 1 |

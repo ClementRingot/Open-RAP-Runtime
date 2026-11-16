@@ -2423,6 +2423,35 @@ export const OBJECT_CONTROLLER = `sap.ui.define([
       this._ui().setProperty("/editMode", bEdit);
       this._ui().setProperty("/createMode", bCreate);
       this._ui().setProperty("/childSelected", false);
+      if (bEdit) {
+        this._watchMandatory();
+      }
+    },
+
+    /** D98: a mandatory field left empty is marked at once, before the save. */
+    _watchMandatory: function () {
+      var that = this;
+      this.getView().findAggregatedObjects(true, function (o) {
+        return typeof o.getRequired === "function" && typeof o.attachChange === "function" && o.getRequired() && !o.data("raptMandatory");
+      }).forEach(function (oControl) {
+        oControl.data("raptMandatory", "watched");
+        oControl.attachChange(function () {
+          that._checkMandatory(oControl);
+        });
+      });
+    },
+
+    _checkMandatory: function (oControl) {
+      var sKey = typeof oControl.getSelectedKey === "function" ? oControl.getSelectedKey() : "";
+      var sValue = typeof oControl.getValue === "function" ? oControl.getValue() : "";
+      var bEmpty = String(sKey || "").trim() === "" && String(sValue || "").trim() === "";
+      if (bEmpty) {
+        oControl.setValueState("Error");
+        oControl.setValueStateText("Fill in this field");
+      } else if (oControl.getValueStateText() === "Fill in this field") {
+        oControl.setValueState("None");
+        oControl.setValueStateText("");
+      }
     },
 
     /** Collaborative draft (D59): the users of the draft, the changes of the others (polling). */
