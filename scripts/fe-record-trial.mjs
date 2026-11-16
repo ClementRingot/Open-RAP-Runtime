@@ -122,12 +122,12 @@ try {
     const har = path.join(work, `${scenario.id}.har`);
     const context = await browser.newContext({ storageState: statePath, recordHar: { path: har, content: "embed", urlFilter: SERVICE_TRAFFIC } });
     const page = await context.newPage();
-    process.stdout.write(`\n[${n + 1}/${scenarios.length}] ${scenario.title}\n${scenario.steps.map((s) => `  - ${s}`).join("\n")}\n`);
+    process.stdout.write(`\n[${n + 1}/${scenarios.length}] ${scenario.title}${scenario.variants === undefined ? "" : ` (needs the variants ${scenario.variants.join(", ")} on the trial)`}\n${scenario.steps.map((s) => `  - ${s}`).join("\n")}\n`);
     await page.goto(values.url);
     await pause("Press Enter when the scenario is done: ");
     await context.close(); // writes the HAR
     try {
-      const { file, warnings } = harToCases(JSON.parse(readFileSync(har, "utf8")), { scenario: `trial-${scenario.id}`, floorplan: scenario.floorplan, release: values.release, title: scenario.title, map });
+      const { file, warnings } = harToCases(JSON.parse(readFileSync(har, "utf8")), { scenario: `trial-${scenario.id}`, floorplan: scenario.floorplan, release: values.release, title: scenario.title, map, observe: scenario.observe ?? [] });
       const target = path.join(out, `trial-${scenario.id}-har.json`);
       writeFileSync(target, `${JSON.stringify(file, null, 2)}\n`);
       process.stdout.write(`${target}: ${file.cases[0].steps.length} steps\n`);

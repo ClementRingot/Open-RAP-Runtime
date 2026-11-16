@@ -12,6 +12,8 @@ The sources SAP must refuse are in `fixtures/negative/cases.json` (D91): `node
 scripts/btp-roundtrip.mjs --negative --suffix XYZ --out <dir>` writes them for the trial, and the
 outcome of SAP goes back to the `sap` member of each case.
 
+The next session on the trial and what it must settle: [btp/round-2.md](btp/round-2.md).
+
 To compare a project of your own with the `$metadata` SAP BTP generated for it:
 
 ```

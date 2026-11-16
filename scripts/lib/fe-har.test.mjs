@@ -105,6 +105,16 @@ describe("SAP Fiori elements protocol cases from a HAR (D79)", () => {
     expect(shape.properties).toEqual(["#{{NS}}.Edit", "TravelID"]);
   });
 
+  it("keeps the values observed for the trial, without the users nor the keys (D99, round 2)", () => {
+    const body = { "#com.sap.gateway.srvd.zrt_ui_travelxyz.v0001.Edit": {}, TravelID: "1", OverallStatus: "O", DraftAdministrativeData: { DraftEntityType: "ZRT_C_TRAVELXYZ", InProcessByUser: "CB0000001", DraftUUID: "3f2504e0-4f89-11d3-9a0c-0305e82c3301" } };
+    const shape = responseShape(201, {}, JSON.stringify(body), ["#*", "DraftAdministrativeData"]);
+    expect(shape.observed).toEqual({ "#{{NS}}.Edit": {}, DraftAdministrativeData: { DraftEntityType: "ZRT_C_TRAVELXYZ", InProcessByUser: "{{user}}", DraftUUID: "{{uuid}}" } });
+    expect(JSON.stringify(shape)).not.toContain("CB0000001");
+    const failed = responseShape(412, { "sap-messages": JSON.stringify([{ message: "Travel 1 accepted", numericSeverity: 3 }]) }, JSON.stringify({ error: { code: "ZRT/002", message: "Travel 1 accepted" } }), ["error", "sap-messages"]);
+    expect(failed.observed).toEqual({ error: { code: "ZRT/002", message: "Travel 1 accepted" }, "sap-messages": [{ message: "Travel 1 accepted", numericSeverity: 3 }] });
+    expect(responseShape(200, {}, JSON.stringify(body)).observed).toBeUndefined();
+  });
+
   it("turns a HAR into a case file: the requests of the service, keys as placeholders, no secret", () => {
     const { file, warnings } = harToCases(HAR, { scenario: "draft-object-page", floorplan: "objectPage", release: "2611", map: { [ACTIVE]: "T1" } });
     expect(file).toMatchObject({ scenario: "draft-object-page", floorplan: "objectPage", fixture: "travel-draft", source: "har", release: "2611" });

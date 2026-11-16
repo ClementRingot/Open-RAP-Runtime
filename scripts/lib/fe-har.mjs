@@ -115,8 +115,13 @@ function contentText(content) {
   return content.encoding === "base64" ? Buffer.from(content.text, "base64").toString("utf8") : content.text;
 }
 
-/** The structure of a response: status, property names, annotations, headers, messages. */
-export function responseShape(status, headers, bodyText) {
+/**
+ * The structure of a response: status, property names, annotations, headers, messages. With
+ * `observe` (names of properties, `Name*` for a prefix, `error`, `sap-messages`), the values of
+ * those properties too, in `observed`: what a recording on the trial must settle (D99), read by
+ * people, not compared by the runner.
+ */
+export function responseShape(status, headers, bodyText, observe = []) {
   const expected = { status };
   const body = parseJson(bodyText);
   if (body !== undefined && body !== null && typeof body === "object" && !Array.isArray(body)) {
@@ -128,10 +133,25 @@ export function responseShape(status, headers, bodyText) {
     }
     const annotations = ANNOTATIONS.filter((a) => a in body);
     if (annotations.length > 0) expected.annotations = annotations;
+    if (observe.length > 0) {
+      const observed = {};
+      const wanted = (name) => observe.some((o) => (o.endsWith("*") ? name.startsWith(o.slice(0, -1)) : name === o));
+      if (entity !== undefined && entity !== null && typeof entity === "object") {
+        for (const [name, value] of Object.entries(entity)) {
+          const key = name.replace(NAMESPACE, "{{NS}}");
+          if (wanted(key)) observed[key] = neutral(value);
+        }
+      }
+      if (observe.includes("error") && body.error !== undefined) observed.error = neutral(body.error);
+      if (Object.keys(observed).length > 0) expected.observed = observed;
+    }
   }
   const present = RESPONSE_HEADERS.filter((h) => headers[h] !== undefined);
   if (present.length > 0) expected.headers = present;
   const messages = parseJson(headers["sap-messages"]);
+  if (observe.includes("sap-messages") && Array.isArray(messages) && messages.length > 0) {
+    expected.observed = { ...(expected.observed ?? {}), "sap-messages": neutral(messages) };
+  }
   if (Array.isArray(messages) && messages.length > 0) {
     expected.messages = messages.map((m) => {
       const shape = {};
@@ -141,6 +161,15 @@ export function responseShape(status, headers, bodyText) {
     });
   }
   return expected;
+}
+
+/**
+ * An observed value: the namespace of the service as {{NS}}, the UUIDs as {{uuid}}, the users and
+ * their names (`…User`, `…UserDescription`) as {{user}}: no personal data in the repository.
+ */
+function neutral(value) {
+  const text = JSON.stringify(value ?? null, (key, v) => (/User(Description)?$/.test(key) && typeof v === "string" && v !== "" ? "{{user}}" : v));
+  return JSON.parse(text.replace(NAMESPACE, "{{NS}}").replace(/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/gi, "{{uuid}}"));
 }
 
 /** Keeps the protocol headers of a request; the value of If-Match becomes `*`. */
@@ -273,7 +302,7 @@ export function harToCases(har, options) {
         };
         batch.push(part.kind === "changeset" ? { changeset: part.parts.map(toRequest) } : toRequest(part));
       }
-      const expect = flatResponses.map((p) => responseShape(statusOf(p.start), p.headers, p.body));
+      const expect = flatResponses.map((p) => responseShape(statusOf(p.start), p.headers, p.body, options.observe ?? []));
       const step = { batch };
       if (expect.length > 0) step.expect = expect;
       else warnings.push(`$batch #${steps.length + 1}: status ${entry.response?.status}, no part to compare`);
@@ -287,7 +316,7 @@ export function harToCases(har, options) {
       continue;
     }
     const step = { request: requestOf(entry.request.method ?? "GET", relative, requestHeadersMap, requestText, keys, false) };
-    step.expect = responseShape(entry.response?.status ?? 0, responseHeadersMap, responseText);
+    step.expect = responseShape(entry.response?.status ?? 0, responseHeadersMap, responseText, options.observe ?? []);
     const capture = keys.capture(parseJson(responseText));
     if (Object.keys(capture).length > 0) step.capture = capture;
     steps.push(step);

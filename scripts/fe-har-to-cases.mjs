@@ -17,8 +17,9 @@ import { parseArgs } from "node:util";
 import { harToCases } from "./lib/fe-har.mjs";
 
 const USAGE = `Usage: node scripts/fe-har-to-cases.mjs <file.har> --scenario <name> --floorplan <floorplan> --release <SAP BTP release>
-  [--fixture travel|travel-draft] [--case <id>] [--title <text>] [--map <guid>=<T1|T2|T3|B1…>]... [--out <file>]
+  [--fixture travel|travel-draft] [--case <id>] [--title <text>] [--map <guid>=<T1|T2|T3|B1…>]... [--observe a,b] [--out <file>]
 
+  --observe    properties whose values are kept in "observed" (Name* for a prefix, error, sap-messages)
   --floorplan  listReport, objectPage, worklist, analyticalListPage, overviewPage or formEntry
   --map        a key of an instance of the SAP system → a seeded key of the fixture (T1, T2, T3, B1…B4)
   --out        default: packages/runtime/test/fe-protocol/cases/<scenario>-har.json
@@ -38,6 +39,7 @@ try {
       case: { type: "string" },
       title: { type: "string" },
       map: { type: "string", multiple: true },
+      observe: { type: "string" },
       out: { type: "string" },
       help: { type: "boolean", short: "h" },
     },
@@ -88,7 +90,7 @@ try {
 }
 let result;
 try {
-  result = harToCases(har, { scenario: values.scenario, floorplan: values.floorplan, release: values.release, fixture: values.fixture, caseId: values.case, title: values.title, map });
+  result = harToCases(har, { scenario: values.scenario, floorplan: values.floorplan, release: values.release, fixture: values.fixture, caseId: values.case, title: values.title, map, observe: (values.observe ?? "").split(",").map((o) => o.trim()).filter((o) => o !== "") });
 } catch (error) {
   process.stderr.write(`${harFile}: ${error.message}\n`);
   process.exit(1);

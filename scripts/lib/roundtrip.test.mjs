@@ -54,6 +54,9 @@ describe("variants of the fixtures (D99)", () => {
       // ABAP for Cloud Development only reads sy-subrc (D85)
       expect(pool).not.toMatch(/^\s*sy-subrc\s*=/im);
       expect(pool).not.toContain("%assoc-_Booking");
+      // round 2: acceptTravel reports a warning (strict handling)
+      applyVariants(path.join(dir, "src"), definitions, ["strict"]);
+      expect(readFileSync(path.join(dir, "src", "zbp_rt_r_travel.clas.locals_imp.abap"), "utf8")).toContain("severity = if_abap_behv_message=>severity-warning");
     } finally {
       rmSync(dir, { recursive: true, force: true });
     }

@@ -102,5 +102,16 @@
    ],
    "zao_travl.suso.xml": null
   }
+ },
+ "strict": {
+  "$comment": "D99, round 2: acceptTravel reports a warning instead of a success, to see what SAP BTP answers to Prefer: handling=strict (412 Precondition Failed and the confirmation popup of SAP Fiori elements, or not).",
+  "files": {
+   "zbp_rt_r_travel.clas.locals_imp.abap": [
+    [
+     "                                                     number   = '002'\n                                                     severity = if_abap_behv_message=>severity-success",
+     "                                                     number   = '002'\n                                                     severity = if_abap_behv_message=>severity-warning"
+    ]
+   ]
+  }
  }
 }

@@ -182,7 +182,7 @@ What the project deliberately leaves out; the planned work is in
 | Gap | Status |
 |---|---|
 | Logic of the BO on a draft (D81) | Runs in a transaction of its own whose buffer holds the draft, on each request: what the handlers write elsewhere (another instance through EML, the database) is dropped; ABAP SQL in a handler reads the active instances, not the draft (as on SAP). |
-| Actions of the application on a draft | Instance actions run (D81); static and factory actions: 501, activate first. |
+| Actions of the application on a draft | Instance actions run (D81); static and factory actions on a draft instance: 501, activate first. A factory action that creates a draft (`ResultIsActiveEntity`, `%is_draft` in EML) needs the draft indicator in the derived types: planned with the complete EML (phase 4). |
 | `draft query view`, `with draft` on a BO with unmanaged save | Not supported. |
 | Collaborative draft (D59) | No real time (WebSocket): the Object Page reads the draft again every 5 s; no field lock; `ShareAll` ignored; joining a draft only checks the Edit authorization; two-segment navigation `DraftAdministrativeData/DraftAdministrativeUser`: read `DraftAdministrativeUser?$filter=DraftUUID eq …`. |
 | State messages (D81, D94) | `SAP__Messages` on every entity type of a business object in a service with a UI (D94); stored by `Prepare` for the drafts only (empty without draft); the messages of a refused activation are returned, not stored (the LUW is rolled back). The property on the entities without draft is to confirm on a service without draft on the trial. |

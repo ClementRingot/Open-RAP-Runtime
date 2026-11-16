@@ -35,6 +35,10 @@ describe("the scenarios of the trial recording (D83)", () => {
     for (const s of SCENARIOS) expect(s.steps.length).toBeGreaterThan(0);
     expect(scenariosOf("create,edit").map((s) => s.id)).toEqual(["create", "edit"]);
     expect(() => scenariosOf("nope")).toThrow(/unknown scenario nope/);
+    // the variants a scenario needs exist (round 2: strict handling)
+    const variants = JSON.parse(readFileSync(new URL("../../fixtures/variants.json", import.meta.url), "utf8"));
+    for (const s of SCENARIOS) for (const v of s.variants ?? []) expect(variants[v]).toBeDefined();
+    expect(scenariosOf("strict-handling")[0]?.observe).toContain("error");
   });
 });
 

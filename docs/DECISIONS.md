@@ -2396,3 +2396,30 @@ _The issues moved to the repository itself once public: see D74._
     mode, D45).
 - **Tests**: `launchpad.test.ts` (`refresh`, LPD006); `launchpad-ui.test.ts` (counts read again
   when the launchpad is shown again); `ui.test.ts` (a mandatory field emptied, then filled).
+
+## D99 — Round 2 on the SAP BTP trial: observed values, the `strict` variant
+
+- **Context**: several behaviors of SAP BTP cannot be guessed from the documentation nor from the
+  first round (D84 to D86): what an action with a warning answers to `Prefer: handling=strict`,
+  the value of `DraftEntityType`, whether a disabled action is advertised, `SAP__Messages` on the
+  entities of a service without draft, and three negative cases (D91). The case files of the
+  recordings keep the structure of the responses only (D79, D83), so they cannot answer the
+  questions about values.
+- **Decision**:
+  - `responseShape` of `scripts/lib/fe-har.mjs` keeps, when asked (`observe`: property names,
+    `Name*` for a prefix, `error`, `sap-messages`), the values of those properties in an
+    `observed` member of the expectation, read by people and not compared by the runner. The
+    users and their names (`…User`, `…UserDescription`) become `{{user}}`, the UUIDs `{{uuid}}`,
+    the namespace `{{NS}}`. `scripts/fe-har-to-cases.mjs --observe a,b`.
+  - The scenarios of `scripts/lib/fe-scenarios.mjs` name what they observe (`list-report`: the
+    administrative data; `create` and `action`: the advertised actions and the controls) and the
+    variants they need; a new scenario `strict-handling` plays an action that reports a warning.
+  - `fixtures/variants.json`: variant `strict`, `acceptTravel` reports its message as a warning.
+  - `conformance/btp/round-2.md`: the questions, what Open RAP Runtime does today, and the steps
+    of the session (draft service with `strict`, recordings, `$metadata` of the draft service and
+    of a service without draft, negative cases).
+  - Static and factory actions on a draft instance stay answered 501: a factory action that
+    creates a draft needs `%is_draft` in the derived types of EML (complete EML, phase 4).
+- **Tests**: `fe-har.test.mjs` (observed values without user nor key, `error`, `sap-messages`);
+  `fe-record.test.mjs` (the variants of the scenarios exist); `roundtrip.test.mjs` (the `strict`
+  variant applies).
