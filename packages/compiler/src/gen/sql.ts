@@ -202,6 +202,12 @@ function orderedViews(model: Model): EntityModel[] {
     for (const target of pathTargets(model, entity, source)) {
       visit(target, stack);
     }
+    // D106: and the sources of the branches of a UNION
+    for (const { branch } of entity.union ?? []) {
+      const branchSource = sourceEntityOf(model, branch);
+      if (branchSource !== undefined) visit(branchSource, stack);
+      for (const target of pathTargets(model, branch, branchSource)) visit(target, stack);
+    }
     result.push(entity);
   };
   for (const entity of model.entities) {
@@ -261,6 +267,14 @@ function joinedRelation(model: Model, source: { table?: string; entity?: string 
 }
 
 function createView(model: Model, entity: EntityModel): string {
+  // D106: the other branches of a UNION, their columns cast to the types of the first SELECT
+  const first = entity.fields.filter((f) => f.draft !== true);
+  const branches = (entity.union ?? []).map((u) => `\nUNION${u.all ? " ALL" : ""}\n${selectSql(model, u.branch, first)}`).join("");
+  return `CREATE VIEW ${quoteIdentifier(entity.sqlView ?? "")} AS ${selectSql(model, entity)}${branches};\n`;
+}
+
+/** The SELECT of a view entity; `castTo`: the fields of the first branch of a UNION (D106). */
+function selectSql(model: Model, entity: EntityModel, castTo?: FieldModel[]): string {
   const source = entity.source ?? "";
   const sourceEntity = sourceEntityOf(model, entity);
   const from = sourceEntity?.sqlView ?? source.toLowerCase();
@@ -279,7 +293,12 @@ function createView(model: Model, entity: EntityModel): string {
   };
   const fieldSql = (field: FieldModel): string =>
     field.expression === undefined ? plainColumn(field) : calculatedColumn(field.expression, field.type, sqlType, refs);
-  const columns = entity.fields.filter((field) => field.draft !== true).map((field) => `  ${fieldSql(field)} AS ${quoteIdentifier(field.name)}`);
+  const columns = entity.fields
+    .filter((field) => field.draft !== true)
+    .map((field, i) => {
+      const target = castTo?.[i];
+      return target === undefined ? `  ${fieldSql(field)} AS ${quoteIdentifier(field.name)}` : `  CAST(${fieldSql(field)} AS ${sqlType(target.type)}) AS ${quoteIdentifier(target.name)}`;
+    });
   // D101: the WHERE condition of the view entity, on the columns of its source
   const where = entity.where === undefined ? "" : `\nWHERE ${renderCondition(entity.where, sqlType, refs)}`;
   // D104: the joined data sources
@@ -292,7 +311,7 @@ function createView(model: Model, entity: EntityModel): string {
   // D105: GROUP BY and HAVING of a view entity with aggregates
   const groupBy = entity.groupBy === undefined ? "" : `\nGROUP BY ${entity.groupBy.map((g) => renderExpression(g, sqlType, refs)).join(", ")}`;
   const having = entity.having === undefined ? "" : `\nHAVING ${renderCondition(entity.having, sqlType, refs)}`;
-  return `CREATE VIEW ${quoteIdentifier(entity.sqlView ?? "")} AS SELECT\n${columns.join(",\n")}\nFROM ${quoteIdentifier(from)}${joins}${where}${groupBy}${having};\n`;
+  return `SELECT\n${columns.join(",\n")}\nFROM ${quoteIdentifier(from)}${joins}${where}${groupBy}${having}`;
 }
 
 /**

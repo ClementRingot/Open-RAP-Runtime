@@ -63,6 +63,8 @@ export interface CdsEntityAst {
   hasWhere: boolean;
   /** D104: the joins of the data source, in order. */
   joins?: CdsJoinAst[];
+  /** D106: the other branches of a UNION [ALL], in order. */
+  unions?: Array<{ all: boolean; branch: CdsEntityAst }>;
   /** D105: the GROUP BY paths and the HAVING condition (or the construct it could not parse). */
   groupBy?: string[][];
   having?: CdsCondAst;
@@ -198,34 +200,22 @@ class AdapterContext {
     if (kind === "view") {
       const select = tree.findDirectExpression(E.CDSSelect);
       if (select !== undefined) {
-        const source = select.findDirectExpression(E.CDSSource);
-        if (source !== undefined) {
-          const prefixed = source.findDirectExpression(E.CDSPrefixedName);
-          entity.source = (prefixed ?? source).concatTokens().replace(/\s+/g, "");
-          const as = source.findDirectExpression(E.CDSAs);
-          if (as !== undefined) {
-            entity.sourceAlias = as.findDirectExpression(E.CDSName)?.concatTokens() ?? "";
-          }
+        this.select(entity, select);
+        // D106: the branches of UNION [ALL], each a nested SELECT
+        let current: abaplint.Nodes.ExpressionNode | undefined = select;
+        for (let depth = 0; current !== undefined && depth < 50; depth++) {
+          const words = current
+            .getChildren()
+            .filter((c) => c instanceof abaplint.Nodes.TokenNode)
+            .map((c) => c.getFirstToken().getStr().toLowerCase());
+          const next = current.findDirectExpression(E.CDSSelect);
+          if (next === undefined || !words.includes("union")) break;
+          const branch: CdsEntityAst = { ...entity, annotations: {}, elements: [], associations: [], hasJoin: false, hasWhere: false, loc: this.loc(next) };
+          for (const key of ["source", "sourceAlias", "joins", "where", "whereError", "whereLoc", "groupBy", "having", "havingError", "unions"] as const) delete branch[key];
+          this.select(branch, next);
+          (entity.unions ??= []).push({ all: words.includes("all"), branch });
+          current = next;
         }
-        entity.hasJoin = select.findDirectExpressions(E.CDSJoin).length > 0;
-        entity.joins = select.findDirectExpressions(E.CDSJoin).map((j) => this.join(j));
-        this.where(entity, select.findDirectExpression(E.CDSWhere));
-        // D105: GROUP BY and HAVING
-        const groupBy = select.findDirectExpression(E.CDSGroupBy);
-        if (groupBy !== undefined) {
-          entity.groupBy = groupBy.findDirectExpressions(E.CDSPrefixedName).map((p) => p.findAllExpressions(E.CDSName).map((n) => n.concatTokens()));
-        }
-        const having = select.findDirectExpression(E.CDSHaving);
-        if (having !== undefined) {
-          try {
-            entity.having = parseCdsCondition(having);
-          } catch (error) {
-            if (!(error instanceof CdsExpressionError)) throw error;
-            entity.havingError = error.message;
-          }
-        }
-        entity.associations = this.associations(select);
-        entity.elements = select.findDirectExpressions(E.CDSElement).map((e) => this.element(e));
       }
       return entity;
     }
@@ -267,6 +257,38 @@ class AdapterContext {
       on: this.onCondition(child.findDirectExpression(E.CDSCondition)),
       loc: this.loc(child),
     };
+  }
+
+  /** The data source, joins, conditions, grouping, associations and elements of a SELECT. */
+  private select(entity: CdsEntityAst, select: abaplint.Nodes.ExpressionNode): void {
+    const source = select.findDirectExpression(E.CDSSource);
+    if (source !== undefined) {
+      const prefixed = source.findDirectExpression(E.CDSPrefixedName);
+      entity.source = (prefixed ?? source).concatTokens().replace(/\s+/g, "");
+      const as = source.findDirectExpression(E.CDSAs);
+      if (as !== undefined) {
+        entity.sourceAlias = as.findDirectExpression(E.CDSName)?.concatTokens() ?? "";
+      }
+    }
+    entity.hasJoin = select.findDirectExpressions(E.CDSJoin).length > 0;
+    entity.joins = select.findDirectExpressions(E.CDSJoin).map((j) => this.join(j));
+    this.where(entity, select.findDirectExpression(E.CDSWhere));
+    // D105: GROUP BY and HAVING
+    const groupBy = select.findDirectExpression(E.CDSGroupBy);
+    if (groupBy !== undefined) {
+      entity.groupBy = groupBy.findDirectExpressions(E.CDSPrefixedName).map((p) => p.findAllExpressions(E.CDSName).map((n) => n.concatTokens()));
+    }
+    const having = select.findDirectExpression(E.CDSHaving);
+    if (having !== undefined) {
+      try {
+        entity.having = parseCdsCondition(having);
+      } catch (error) {
+        if (!(error instanceof CdsExpressionError)) throw error;
+        entity.havingError = error.message;
+      }
+    }
+    entity.associations = this.associations(select);
+    entity.elements = select.findDirectExpressions(E.CDSElement).map((e) => this.element(e));
   }
 
   /** D104: a join of the data source. */

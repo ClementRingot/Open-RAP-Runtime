@@ -127,6 +127,9 @@ export class EntityResolver {
     switch (parsed.ast.kind) {
       case "view":
         entity = this.view(parsed);
+        if (entity !== undefined && parsed.ast.unions !== undefined) {
+          this.union(parsed, entity);
+        }
         break;
       case "projection":
         entity = this.projection(parsed);
@@ -557,6 +560,47 @@ export class EntityResolver {
       }
     }
     return { groupBy, ...(having === undefined ? {} : { having }) };
+  }
+
+  /**
+   * D106: the branches of a UNION [ALL] (the entity is the first one), checked as SAP does: the
+   * annotation Metadata.ignorePropagatedAnnotations, the same element names and keys in each
+   * branch, element annotations in the first branch only, compatible types, no string without ALL.
+   */
+  private union(parsed: ParsedEntity, entity: EntityModel): void {
+    const { ast, file } = parsed;
+    const where = this.loc(file, ast.loc);
+    const error = (message: string): void => this.diagnostics.error("CDS022", `${ast.name}: UNION: ${message}`, where);
+    if (getAnnotation(ast.annotations, "Metadata.ignorePropagatedAnnotations") !== true) {
+      error("a union view needs the annotation @Metadata.ignorePropagatedAnnotations: true");
+    }
+    if (entity.associations.length > 0 || (ast.unions ?? []).some((u) => u.branch.associations.length > 0)) {
+      this.diagnostics.error("CDS002", `${ast.name}: associations in a union view are not supported yet`, where);
+    }
+    const first = entity.fields.filter((f) => f.draft !== true);
+    const union: NonNullable<EntityModel["union"]> = [];
+    for (const [index, { all, branch }] of (ast.unions ?? []).entries()) {
+      const label = `branch ${index + 2}`;
+      for (const element of branch.elements) {
+        if (Object.keys(element.annotations).length > 0) error(`${label}: element annotations are allowed in the first SELECT only (${element.name})`);
+      }
+      const model = this.view({ ...parsed, ast: { ...branch, name: ast.name, root: false } });
+      if (model === undefined) continue;
+      const fields = model.fields.filter((f) => f.draft !== true);
+      if (fields.length !== first.length) {
+        error(`${label} has ${fields.length} elements, the first SELECT ${first.length}`);
+        continue;
+      }
+      fields.forEach((field, i) => {
+        const head = first[i] as FieldModel;
+        if (!same(field.name, head.name)) error(`${label}: element ${i + 1} is ${field.name}, ${head.name} in the first SELECT`);
+        if (field.key !== head.key) error(`${label}: the key elements differ from the first SELECT (${field.name})`);
+        if (!unionCompatible(head.type, field.type)) error(`${label}: ${field.name} (${field.type.kind}) cannot be merged with ${head.type.kind}`);
+        if (!all && (head.type.kind === "string" || head.type.kind === "rawstring")) error(`${head.name}: STRING and RAWSTRING need UNION ALL`);
+      });
+      union.push({ all, branch: model });
+    }
+    entity.union = union;
   }
 
   /** The labels of the elements reached by the paths (D100), by path in upper case. */
@@ -1000,3 +1044,14 @@ function columnsOf(e: unknown, outside: boolean): string[] {
   if (node.kind === "column") return [`${node.source ?? ""}.${(node.name ?? "").toLowerCase()}`];
   return Object.values(e).flatMap((v) => (Array.isArray(v) ? v.flatMap((x) => columnsOf(x, outside)) : columnsOf(v, outside)));
 }
+
+/** D106: the types a UNION can merge (the matrix of SAP, its warnings accepted). */
+function unionCompatible(first: AbapType, other: AbapType): boolean {
+  const numeric = ["int1", "int2", "int4", "int8", "dec", "decfloat16", "decfloat34", "quan", "fltp"];
+  const characters = ["char", "sstring", "numc", "dats", "tims", "lang", "accp"];
+  if (first.kind === "curr" || other.kind === "curr") return first.kind === other.kind && (first.decimals ?? 0) === (other.decimals ?? 0);
+  if (numeric.includes(first.kind)) return numeric.includes(other.kind);
+  if (characters.includes(first.kind)) return characters.includes(other.kind);
+  return first.kind === other.kind;
+}
+

@@ -289,6 +289,24 @@ describe("calculated elements (D67)", () => {
     expect(stats("  count( carrier_id ) as Carriers")).toEqual(["CDS022 ZRT_I_Stats.Carriers: COUNT counts COUNT(*) rows or COUNT( DISTINCT … ) values"]);
   });
 
+  it("checks the branches of a UNION as SAP (D106)", () => {
+    const union = (second: string, annotation = "@Metadata.ignorePropagatedAnnotations: true\n", kind = "union all") =>
+      build({
+        "zrt_i_union.ddls.asddls": `${annotation}define view entity ZRT_I_Union as select from zrt_travel {\n  key travel_uuid as Id,\n  travel_id as Number\n}\n${kind} select from zrt_booking {\n${second}\n}\n`,
+        "zrt_ui_travel.srvd.srvdsrv": (c: string) => lf(c).replace("  expose ZRT_C_Booking as Booking;", "  expose ZRT_C_Booking as Booking;\n  expose ZRT_I_Union as Unioned;"),
+      });
+    const errors = (r: ReturnType<typeof union>) => r.diagnostics.filter((d) => d.severity === "error").map((d) => `${d.code} ${d.message}`);
+    const ok = union("  key booking_uuid as Id,\n  booking_id as Number");
+    expect(errors(ok)).toEqual([]);
+    expect(findEntity(ok.model, "ZRT_I_Union")?.union).toMatchObject([{ all: true, branch: { fields: [{ name: "Id", key: true }, { name: "Number" }] } }]);
+    expect(errors(union("  key booking_uuid as Id,\n  booking_id as Number", ""))).toEqual(["CDS022 ZRT_I_Union: UNION: a union view needs the annotation @Metadata.ignorePropagatedAnnotations: true"]);
+    expect(errors(union("  key booking_uuid as Id,\n  booking_id as Other"))).toEqual(["CDS022 ZRT_I_Union: UNION: branch 2: element 2 is Other, Number in the first SELECT"]);
+    expect(errors(union("  booking_uuid as Id,\n  key booking_id as Number"))).toContain("CDS022 ZRT_I_Union: UNION: branch 2: the key elements differ from the first SELECT (Id)");
+    expect(errors(union("  key booking_uuid as Id"))).toEqual(["CDS022 ZRT_I_Union: UNION: branch 2 has 1 elements, the first SELECT 2"]);
+    expect(errors(union("  key booking_uuid as Id,\n  @EndUserText.label: 'X'\n  booking_id as Number"))).toEqual(["CDS022 ZRT_I_Union: UNION: branch 2: element annotations are allowed in the first SELECT only (Number)"]);
+    expect(errors(union("  key booking_uuid as Id,\n  flight_price as Number"))).toEqual(["CDS022 ZRT_I_Union: UNION: branch 2: Number (curr) cannot be merged with numc"]);
+  });
+
   it("reports invalid expressions with CDS022", () => {
     const message = (line: string): string[] =>
       build(withElement(line))

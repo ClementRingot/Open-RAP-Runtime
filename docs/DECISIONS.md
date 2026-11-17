@@ -2550,3 +2550,23 @@ _The issues moved to the repository itself once public: see D74._
   - Aggregates may appear inside another expression (a CASE, a CAST, a function), as SAP allows.
 - **Tests**: `ir.test.ts` (the rules, with the messages); `cds-aggregates.test.ts` (COUNT(*),
   COUNT(DISTINCT), SUM, AVG, MAX per travel and currency, HAVING, Edm types, `Core.Computed`).
+
+## D106 — UNION and UNION ALL of view entities
+
+- **Context**: a view entity with a union was compiled as its first SELECT only (the other
+  branches were not read). The ABAP keyword documentation of ABAP Cloud (`UNION` of CDS view
+  entities) gives the rules: the same number of elements, the same element names and key
+  elements in each branch, element annotations in the first branch only, the types of the first
+  SELECT and a matrix of compatible types, no STRING or RAWSTRING without `ALL`, and the
+  annotation `@Metadata.ignorePropagatedAnnotations: true` mandatory.
+- **Decision**:
+  - The CDS parser reads each branch (a nested SELECT after `UNION [ALL]`) like the first one
+    (source, joins, WHERE, GROUP BY, elements); the IR builds each branch as a view entity and
+    keeps them in `EntityModel.union`, the entity being the first branch.
+  - The rules above are CDS022 errors; the type matrix is simplified to families (numbers,
+    character-like types, the same type otherwise, CURR only with CURR of the same decimals) and
+    its warnings are not reported. Associations in a union view: CDS002.
+  - The PostgreSQL view is `SELECT … UNION [ALL] SELECT …`, the columns of the other branches
+    cast to the types of the first SELECT; the sources of every branch are created first.
+- **Tests**: `ir.test.ts` (the rules, with their messages); `cds-unions.test.ts` (UNION ALL of
+  travels and bookings, a filter on it, UNION removing duplicates).

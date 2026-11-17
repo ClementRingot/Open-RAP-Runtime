@@ -70,6 +70,7 @@ The sections below use the provisional numbers, unless they say "final".
 | — | D83 | Guided recording of the Fiori elements protocol on the SAP BTP trial, renamed copy for a shared system | 0 |
 | — | D85 | First pull and activation on the SAP BTP trial: abapGit XML of DDLX and SRVB, `total etag`, authorizations | 0 |
 | — | D86 | `use side effects`, value help and side effects of the draft fixture | 0 |
+| D86 | D106 (part) | CDS: UNION and UNION ALL | 4 |
 | D86 | D105 (part) | CDS: aggregate expressions, GROUP BY, HAVING | 4 |
 | D86 | D104 (part) | CDS: inner and left outer joins of view entities | 4 |
 | D86 | D103 (part) | CDS: `$session.user`, `system_language`, `client` | 4 |
@@ -165,7 +166,7 @@ The sections below use the provisional numbers, unless they say "final".
 
 - **CDS (D86)**, one pull request per item: `$session.user`, `system_language`, `client` (final D103); to-one
   association paths (final D100); WHERE (final D101) and explicit joins (final D104); aggregates and `GROUP BY` (non-transactional
-  view, final D105); unions; parameters; hierarchies. Everything stays compiled to PostgreSQL views.
+  view, final D105); unions (final D106); parameters; hierarchies. Everything stays compiled to PostgreSQL views.
 - **Currencies and conversion exits (D92).** Conversion exits allowed in ABAP Cloud (`ALPHA`,
   `ISOLA`, `CUNIT`), applied in the OData layer and `/ui2/cl_json`; shift of the currency
   decimals in OData (as with TCURX); `CURRENCY_CONVERSION` in CDS on the exchange rates.

@@ -344,6 +344,8 @@ export interface EntityModel {
   sqlView?: string;
   /** D101: the WHERE condition of a view entity, on the columns of its source and its elements. */
   where?: CdsCondition;
+  /** D106: the other SELECT branches of a UNION [ALL]; the entity itself is the first one. */
+  union?: Array<{ all: boolean; branch: EntityModel }>;
   /** D105: the GROUP BY of a view entity with aggregates, and its HAVING condition. */
   groupBy?: CdsExpression[];
   having?: CdsCondition;
