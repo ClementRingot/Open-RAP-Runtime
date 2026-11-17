@@ -9,7 +9,8 @@ import type { Database } from "../db/database.js";
 import { fromSql, literalToCanonical, toSql, type CanonicalValue, type UrlLiteral } from "../values.js";
 import { badRequest, notImplemented, ODataError } from "./errors.js";
 import type { Cond, CustomQueries } from "./custom.js";
-import { currentReader, type AccessControls } from "./access.js";
+import { abapLanguage } from "../abap/bridge.js";
+import { currentLanguage, currentReader, type AccessControls } from "./access.js";
 import { DEPENDENT_ETAG } from "./json.js";
 
 /** The deepest nesting of $expand (D82). */
@@ -39,12 +40,37 @@ export class ReadEngine {
   /** Scopes on custom entities: the SQL placeholder stands for a condition given to the query class. */
   private readonly customScopes = new WeakMap<RawBuilder<unknown>, Cond>();
 
+  /** D103: views use the user or the language of the request ($session.user, system_language). */
+  private readonly session: boolean;
+
   public constructor(
     private readonly service: ServiceRuntime,
     private readonly db: () => Database,
     /** The access controls (DCL) of the entities, for the user of the request (D35). */
     private readonly access?: AccessControls,
-  ) {}
+  ) {
+    this.session = /"kind":"session","variable":"(user|system_language)"/.test(JSON.stringify(service.model.entities));
+  }
+
+  /**
+   * Runs a query of a read: when views read $session.user or system_language (D103), in a
+   * transaction where rapt.user and rapt.language are those of the request.
+   */
+  private async run<R>(query: (db: Database) => Promise<R>): Promise<R> {
+    const db = this.db();
+    if (!this.session) {
+      return query(db);
+    }
+    const settings = sql`SELECT set_config('rapt.user', ${currentReader()?.abapName ?? ""}, true), set_config('rapt.language', ${abapLanguage(currentLanguage() ?? "en")}, true)`;
+    if (db.isTransaction) {
+      await settings.execute(db);
+      return query(db);
+    }
+    return db.transaction().execute(async (trx) => {
+      await settings.execute(trx);
+      return query(trx);
+    });
+  }
 
   // -------------------------------------------------------------------------------------------
   // custom entities (D43)
@@ -611,7 +637,7 @@ export class ReadEngine {
     const where = this.where(info, alias, options, scope);
     const limit = Math.min(options.top ?? MAX_PAGE_SIZE, MAX_PAGE_SIZE);
     const query = sql<Record<string, unknown>>`SELECT ${columns} FROM ${sql.table(info.view)} AS ${sql.id(alias)} ${where} ${this.orderBy(info, alias, options.orderby)} LIMIT ${limit} OFFSET ${options.skip ?? 0}`;
-    const { rows } = await query.execute(this.db());
+    const { rows } = await this.run((db) => query.execute(db));
     const result: ReadResult = { rows: rows.map((r) => this.rowFrom(info, r, properties)) };
     if (withCount) {
       result.count = await this.count(info, options, scope);
@@ -683,7 +709,7 @@ export class ReadEngine {
     const orderBy = order.length === 0 ? sql`` : sql`ORDER BY ${sql.join(order)}`;
     const inner = sql`SELECT ${sql.join(columns)} FROM ${sql.table(info.view)} AS ${sql.id(alias)} ${where} ${groupBy}`;
     const limit = Math.min(options.top ?? MAX_PAGE_SIZE, MAX_PAGE_SIZE);
-    const { rows } = await sql<Record<string, unknown>>`SELECT * FROM (${inner}) AS "g" ${orderBy} LIMIT ${limit} OFFSET ${options.skip ?? 0}`.execute(this.db());
+    const { rows } = await this.run((db) => sql<Record<string, unknown>>`SELECT * FROM (${inner}) AS "g" ${orderBy} LIMIT ${limit} OFFSET ${options.skip ?? 0}`.execute(db));
     const result: { rows: Array<Record<string, CanonicalValue | number>>; count?: number; properties: string[]; aliases: string[] } = {
       rows: rows.map((raw) => {
         const row: Record<string, CanonicalValue | number> = {};
@@ -700,7 +726,7 @@ export class ReadEngine {
       aliases,
     };
     if (options.count === true) {
-      const counted = await sql<{ n: string | number }>`SELECT count(*) AS n FROM (${inner}) AS "g"`.execute(this.db());
+      const counted = await this.run((db) => sql<{ n: string | number }>`SELECT count(*) AS n FROM (${inner}) AS "g"`.execute(db));
       result.count = Number(counted.rows[0]?.n ?? 0);
     }
     return result;
@@ -715,7 +741,7 @@ export class ReadEngine {
     }
     const alias = "t0";
     const where = this.where(info, alias, { ...(options.filter === undefined ? {} : { filter: options.filter }), ...(options.search === undefined ? {} : { search: options.search }) }, scope);
-    const { rows } = await sql<{ n: string | number }>`SELECT count(*) AS n FROM ${sql.table(info.view)} AS ${sql.id(alias)} ${where}`.execute(this.db());
+    const { rows } = await this.run((db) => sql<{ n: string | number }>`SELECT count(*) AS n FROM ${sql.table(info.view)} AS ${sql.id(alias)} ${where}`.execute(db));
     return Number(rows[0]?.n ?? 0);
   }
 
@@ -819,13 +845,13 @@ export class ReadEngine {
       } else {
         query = sql`SELECT ${columns} FROM ${sql.table(target.view)} AS ${sql.id(alias)} ${where} ${this.orderBy(target, alias, item.options.orderby)}`;
       }
-      const { rows: raw } = await query.execute(this.db());
+      const { rows: raw } = await this.run((db) => query.execute(db));
       const matches = raw.map((r) => this.rowFrom(target, r, properties));
       await this.expand(target, matches, nested, depth + 1);
       attach(matches);
       if (navigation.collection && item.options.count === true) {
         const countWhere = this.where(target, alias, { ...(item.options.filter === undefined ? {} : { filter: item.options.filter }) }, [inCondition]);
-        const grouped = await sql<Record<string, unknown>>`SELECT ${sql.join(targetFields.map((f) => sql.ref(`${alias}.${f}`)))}, count(*) AS "__n" FROM ${sql.table(target.view)} AS ${sql.id(alias)} ${countWhere} GROUP BY ${sql.join(targetFields.map((f) => sql.ref(`${alias}.${f}`)))}`.execute(this.db());
+        const grouped = await this.run((db) => sql<Record<string, unknown>>`SELECT ${sql.join(targetFields.map((f) => sql.ref(`${alias}.${f}`)))}, count(*) AS "__n" FROM ${sql.table(target.view)} AS ${sql.id(alias)} ${countWhere} GROUP BY ${sql.join(targetFields.map((f) => sql.ref(`${alias}.${f}`)))}`.execute(db));
         const counts = grouped.rows.map((g) => ({ key: targetFields.map((f) => fromSql(this.service.property(target, f).field.type, g[f])), n: Number(g["__n"]) }));
         for (const row of rows) {
           const found = counts.find((c) => navigation.on.every((p, i) => c.key[i] === row[p.source]));

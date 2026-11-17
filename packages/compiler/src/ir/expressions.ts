@@ -157,7 +157,17 @@ class Resolver {
       if (variable === "system_date" && rest.length === 2) {
         return { kind: "session", variable: "system_date", type: { kind: "dats", length: 8 } };
       }
-      throw new ExpressionIssue("CDS002", `session variable ${text} is not supported (the SQL views have no session of the request; only $session.system_date)`);
+      // D103: the user, the language and the client of the request
+      if (variable === "user" && rest.length === 2) {
+        return { kind: "session", variable: "user", type: { kind: "char", length: 12 } };
+      }
+      if (variable === "system_language" && rest.length === 2) {
+        return { kind: "session", variable: "system_language", type: { kind: "lang", length: 1 } };
+      }
+      if (variable === "client" && rest.length === 2) {
+        return { kind: "session", variable: "client", type: { kind: "clnt", length: 3 } };
+      }
+      throw new ExpressionIssue("CDS002", `session variable ${text} is not supported (only $session.user, client, system_language and system_date)`);
     }
     if (head.startsWith("$")) {
       throw new ExpressionIssue("CDS002", `${text} is not supported in expressions`);

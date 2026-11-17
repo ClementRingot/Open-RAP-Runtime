@@ -199,7 +199,7 @@ export async function createApp(options: AppOptions): Promise<FastifyInstance> {
         throw error;
       }
     }
-    const response = await withReader(user, () => handler.handle(odataRequest, ctx));
+    const response = await withReader(user, () => handler.handle(odataRequest, ctx), ctx.language);
     response.headers = { ...response.headers, ...extra };
     return send(reply, response);
   };

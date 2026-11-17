@@ -260,7 +260,8 @@ export type CdsExpression =
   | { kind: "literal"; value: string | number | null; type: AbapType }
   | { kind: "column"; name: string; type: AbapType }
   | { kind: "element"; name: string; type: AbapType }
-  | { kind: "session"; variable: "system_date"; type: AbapType }
+  /** `$session.…` (D103): the date, and the user, the language and the client of the request. */
+  | { kind: "session"; variable: "system_date" | "user" | "system_language" | "client"; type: AbapType }
   | { kind: "arithmetic"; operator: "+" | "-" | "*" | "/"; left: CdsExpression; right: CdsExpression; type: AbapType }
   | { kind: "negate"; operand: CdsExpression; type: AbapType }
   | { kind: "case"; operand?: CdsExpression; branches: Array<{ when: CdsExpression | CdsCondition; then: CdsExpression }>; else?: CdsExpression; type: AbapType }

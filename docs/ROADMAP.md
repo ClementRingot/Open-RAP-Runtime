@@ -70,6 +70,7 @@ The sections below use the provisional numbers, unless they say "final".
 | — | D83 | Guided recording of the Fiori elements protocol on the SAP BTP trial, renamed copy for a shared system | 0 |
 | — | D85 | First pull and activation on the SAP BTP trial: abapGit XML of DDLX and SRVB, `total etag`, authorizations | 0 |
 | — | D86 | `use side effects`, value help and side effects of the draft fixture | 0 |
+| D86 | D103 (part) | CDS: `$session.user`, `system_language`, `client` | 4 |
 | D86 | D102 (part) | CDS: `BETWEEN`, `IS INITIAL`, the WHERE of projections | 4 |
 | D86 | D101 (part) | CDS: the WHERE condition of view entities | 4 |
 | D86 | D100 (part) | CDS: to-one association paths in the select list | 4 |
@@ -160,7 +161,7 @@ The sections below use the provisional numbers, unless they say "final".
 
 ## Phase 4: CDS and RAP fidelity
 
-- **CDS (D86)**, one pull request per item: `$session.user`, `system_language`, `client`; to-one
+- **CDS (D86)**, one pull request per item: `$session.user`, `system_language`, `client` (final D103); to-one
   association paths (final D100); WHERE (final D101) and explicit joins; aggregates and `GROUP BY` (non-transactional
   view); unions; parameters; hierarchies. Everything stays compiled to PostgreSQL views.
 - **Currencies and conversion exits (D92).** Conversion exits allowed in ABAP Cloud (`ALPHA`,

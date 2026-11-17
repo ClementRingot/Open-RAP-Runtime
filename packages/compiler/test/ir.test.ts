@@ -220,8 +220,10 @@ describe("calculated elements (D67)", () => {
       build(withElement(line))
         .diagnostics.filter((d) => d.severity === "error")
         .map((d) => `${d.code} ${d.message}`);
-    expect(message("$session.user as CurrentUser")).toEqual([
-      "CDS002 ZRT_R_Travel.CurrentUser: session variable $session.user is not supported (the SQL views have no session of the request; only $session.system_date)",
+    // D103: user, client, system_language and system_date are supported
+    expect(message("$session.user as CurrentUser")).toEqual([]);
+    expect(message("$session.bs_instance_id as Instance")).toEqual([
+      "CDS002 ZRT_R_Travel.Instance: session variable $session.bs_instance_id is not supported (only $session.user, client, system_language and system_date)",
     ]);
     // D100: a path through a to-many association has no single value
     expect(message("concat( _Booking.BookingID, 'x' ) as FirstBooking")).toEqual(["CDS002 ZRT_R_Travel.FirstBooking: _Booking.BookingID: _Booking is a to-many association: a path in the select list needs one value per instance"]);

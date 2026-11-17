@@ -37,7 +37,18 @@ export function renderExpression(e: CdsExpression, sqlType: (t: AbapType) => str
     case "path":
       return refs.path === undefined ? `NULL::${sqlType(e.type)}` : refs.path(e);
     case "session":
-      return "current_date";
+      // D103: the user and the language of the request, set by the runtime on the transaction of
+      // each read and each LUW (rapt.user, rapt.language); one client (D9)
+      switch (e.variable) {
+        case "user":
+          return `coalesce(current_setting('rapt.user', true), '')`;
+        case "system_language":
+          return `coalesce(nullif(current_setting('rapt.language', true), ''), 'E')`;
+        case "client":
+          return `'100'`;
+        default:
+          return "current_date";
+      }
     case "negate":
       return `(-${render(e.operand)})`;
     case "arithmetic":

@@ -17,7 +17,12 @@ export async function loadAbap(abapDir: string, entry = "init.mjs"): Promise<voi
   abapGlobal();
 }
 
-const LANGUAGES: Record<string, string> = { en: "E", de: "D", fr: "F", es: "S", it: "I", pt: "P", nl: "N", ja: "J", zh: "1", ru: "R", pl: "L", cs: "C", da: "K", fi: "U", sv: "V", tr: "T", ko: "3" };
+export const LANGUAGES: Record<string, string> = { en: "E", de: "D", fr: "F", es: "S", it: "I", pt: "P", nl: "N", ja: "J", zh: "1", ru: "R", pl: "L", cs: "C", da: "K", fi: "U", sv: "V", tr: "T", ko: "3" };
+
+/** The one-character ABAP language of a language tag (`en` → `E`, D103). */
+export function abapLanguage(language: string): string {
+  return LANGUAGES[language.slice(0, 2).toLowerCase()] ?? "E";
+}
 
 /** Sets the system fields the ABAP code reads (sy-uname, sy-datum, sy-uzeit, sy-langu). */
 export function setSystemFields(user: User, language: string, now = new Date()): void {

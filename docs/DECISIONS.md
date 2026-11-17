@@ -2483,3 +2483,22 @@ _The issues moved to the repository itself once public: see D74._
   - `IN ( … )` stays refused (CDS001, the source cannot be parsed), as on SAP.
 - **Tests**: `ir.test.ts` (BETWEEN, IS INITIAL, IN refused); `cds-where.test.ts` (a projection
   with BETWEEN and IS NOT INITIAL on top of a filtered view entity).
+
+## D103 — `$session.user`, `system_language` and `client`
+
+- **Context**: the PostgreSQL views of the CDS entities are shared by every request, so only
+  `$session.system_date` was supported (D67); `$session.user` is common in RAP views (the
+  instances of the user, a "created by me" flag).
+- **Decision**:
+  - `$session.user` (`char(12)`), `$session.system_language` (`lang`) and `$session.client`
+    (`clnt`) are expressions of the select list and of the WHERE conditions (D101).
+  - The views read `current_setting('rapt.user', true)` and `current_setting('rapt.language',
+    true)`; the client is `'100'` (one client, D9).
+  - Every LUW sets `rapt.user` (the ABAP name of the user) and `rapt.language` (the one-letter
+    ABAP language of `Accept-Language`, as `sy-langu`) on its transaction, so that the ABAP SQL of
+    the behavior pools reads them. The reads of the OData layer run in a transaction that sets
+    them, only when a view of the model reads `$session.user` or `system_language`; otherwise
+    nothing changes.
+- **Tests**: `ir.test.ts` (`$session.user` accepted, another session variable refused);
+  `cds-session.test.ts` (the user, the language of `Accept-Language`, the client, a flag computed
+  with the user and filtered).

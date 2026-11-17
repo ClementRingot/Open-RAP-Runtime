@@ -8,9 +8,9 @@
  */
 
 import { AsyncLocalStorage } from "node:async_hooks";
-import type { Kysely } from "kysely";
+import { sql, type Kysely } from "kysely";
 import { ABAP_SQL_SCHEMA, type Model } from "@open-rap/model";
-import { AbapBridge, loadAbap, setSystemFields } from "../abap/bridge.js";
+import { AbapBridge, abapLanguage, loadAbap, setSystemFields } from "../abap/bridge.js";
 import { abapGlobal } from "../abap/convert.js";
 import { AbapSqlClient } from "../abap/sql.js";
 import { Authorizations } from "../auth/authorizations.js";
@@ -128,6 +128,8 @@ export class RapRuntime {
         if (this.customRead !== undefined) {
           services.customRead = this.customRead;
         }
+        // D103: the user and the language of the LUW for the views that read $session
+        await sql`SELECT set_config('rapt.user', ${user.abapName}, true), set_config('rapt.language', ${abapLanguage(language)}, true)`.execute(trx);
         const tx = new Transaction(services, trx as unknown as Kysely<unknown>, user);
         if (options.background !== undefined && !options.background.controlled) {
           // a transactionally uncontrolled operation may write the database at any time

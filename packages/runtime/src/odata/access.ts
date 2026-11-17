@@ -13,16 +13,21 @@ import { valueMatches, type Authorizations } from "../auth/authorizations.js";
 import type { User } from "../auth/user.js";
 import { toSql, type CanonicalValue } from "../values.js";
 
-const reader = new AsyncLocalStorage<User>();
+const reader = new AsyncLocalStorage<{ user: User; language: string }>();
 
 /** The user of the running read, if any. */
 export function currentReader(): User | undefined {
-  return reader.getStore();
+  return reader.getStore()?.user;
 }
 
-/** Runs `fn` with the user whose access controls apply to the reads. */
-export function withReader<T>(user: User, fn: () => Promise<T>): Promise<T> {
-  return reader.run(user, fn);
+/** The language of the running read (`en`, `de`…), for `$session.system_language` (D103). */
+export function currentLanguage(): string | undefined {
+  return reader.getStore()?.language;
+}
+
+/** Runs `fn` with the user whose access controls apply to the reads, and its language. */
+export function withReader<T>(user: User, fn: () => Promise<T>, language = "en"): Promise<T> {
+  return reader.run({ user, language }, fn);
 }
 
 /** A literal of a DCL condition (ABAP format: dates YYYYMMDD, booleans X) as a canonical value. */
@@ -68,7 +73,7 @@ export class AccessControls {
     if (controls === undefined || controls.length === 0) {
       return undefined;
     }
-    const user = reader.getStore();
+    const user = reader.getStore()?.user;
     if (user === undefined) {
       // a read outside of a request: nothing is granted
       return sql`FALSE`;
