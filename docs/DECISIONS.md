@@ -2674,3 +2674,28 @@ _The issues moved to the repository itself once public: see D74._
   `adjust_numbers`); `rap-late-numbering.test.ts` (a deep create numbered by `adjust_numbers`, the
   `Location`, a new item of an existing order, a changeset with content IDs).
 
+## D110 — The draft indicator `%is_draft` in EML
+
+- **Context**: the derived types of a draft BO had no `%is_draft`: ABAP code of SAP using it (`%tky`
+  with the indicator, `%is_draft = if_abap_behv=>mk-on` in a creation, `%is_draft = key-%is_draft`
+  in a copy) did not compile, and a factory action on a draft answered 501.
+- **Decision**:
+  - The derived types of the entities of a draft BO have `%is_draft` (ABP_BEHV_FLAG) in `%tky` and
+    in the rows of the creations.
+  - The rows the runtime gives the handlers carry the indicator of their instance: on in the
+    transaction of a draft (D81), off in a transaction on the active instances. EML reads it back,
+    as SAP: a key without it (off) names the active instance.
+  - A read of the other image goes to it: the draft table from an active transaction, the active
+    table from the transaction of a draft. Changing the other image is a runtime error (not yet).
+  - A creation with `%is_draft` on in a transaction on the active instances creates a new draft
+    (administrative data of the user, the draft tables; the children created by association with
+    it are drafts of it), written by the save; `mapped` carries `%is_draft`.
+  - OData: a factory action answers the draft its handler created (`IsActiveEntity` false). A
+    factory action on a draft instance runs in the transaction of the draft; a root it creates is a
+    draft of its own (its DraftUUID), apart from the draft it was called on. Static actions stay on
+    the collection (G1d).
+  - Not yet: changing the other image in EML; the determinations on modify of a draft created by
+    EML in an active transaction (they run on its first change).
+- **Tests**: `eml-draft.test.ts` (a factory action creating a draft from an active instance and
+  from a draft, its administrative data); the draft and variant tests run with the indicator.
+

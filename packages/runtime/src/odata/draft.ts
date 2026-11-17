@@ -509,7 +509,7 @@ export class DraftRuntime {
    * change there, the determinations on modify follow, and the buffer is written back to the draft
    * tables. What the handlers did in the database is rolled back: only the draft tables change.
    */
-  private async withLogic(tx: Transaction, root: { bo: BoEntity; row: Row & { DraftUUID: string; HasActiveEntity: boolean } }, run: (shadow: Transaction) => Promise<Responses>, options: { writeOnFailure?: boolean } = {}): Promise<Responses> {
+  private async withLogic(tx: Transaction, root: { bo: BoEntity; row: Row & { DraftUUID: string; HasActiveEntity: boolean } }, run: (shadow: Transaction) => Promise<Responses>, options: { writeOnFailure?: boolean; user?: string } = {}): Promise<Responses> {
     const db = tx.db;
     const seeded = new Map<string, BoEntity>();
     let image: ReturnType<Transaction["draftInstances"]> = [];
@@ -529,14 +529,33 @@ export class DraftRuntime {
       await sql`RELEASE SAVEPOINT rapt_draft_logic`.execute(db);
     }
     if (!responses.hasFailed || options.writeOnFailure === true) {
-      await this.writeBack(db, image, seeded, root.row.DraftUUID);
+      await this.writeBack(db, image, seeded, root.row.DraftUUID, options.user ?? tx.user.abapName);
     }
     return responses;
   }
 
   /** Writes the buffer of a draft transaction to the draft tables. */
-  private async writeBack(db: Kysely<unknown>, image: ReturnType<Transaction["draftInstances"]>, seeded: Map<string, BoEntity>, draftUuid: string): Promise<void> {
+  private async writeBack(db: Kysely<unknown>, image: ReturnType<Transaction["draftInstances"]>, seeded: Map<string, BoEntity>, draftUuid: string, user: string): Promise<void> {
     const present = new Set<string>();
+    // D110: a root instance created by the logic (a factory action on the draft) is a draft of its
+    // own; the instances created under it belong to it
+    const uuids = new Map<unknown, string>();
+    const uuidOf = (instance: (typeof image)[number]): string => {
+      const known = uuids.get(instance);
+      if (known !== undefined) return known;
+      const parent = instance.bo.parent;
+      const owner = parent === undefined ? undefined : image.find((o) => o.bo === parent.target && o.created && parent.on.every((p) => JSON.stringify(o.row[p.target] ?? null) === JSON.stringify(instance.row[p.source] ?? null)));
+      const uuid = owner === undefined ? draftUuid : uuidOf(owner);
+      uuids.set(instance, uuid);
+      return uuid;
+    };
+    for (const instance of image) {
+      if (instance.created && !instance.deleted && instance.bo.parent === undefined && !seeded.has(`${instance.bo.entity.name}|${keyString(instance.bo, instance.row)}`)) {
+        const uuid = randomUUID();
+        uuids.set(instance, uuid);
+        await this.newDraft(db, instance.bo, uuid, user);
+      }
+    }
     for (const instance of image) {
       const bo = instance.bo;
       const id = `${bo.entity.name}|${keyString(bo, instance.row)}`;
@@ -552,7 +571,7 @@ export class DraftRuntime {
         continue;
       }
       if (existing === undefined) {
-        await this.insert(db, bo, instance.row, draftUuid, !instance.created);
+        await this.insert(db, bo, instance.row, instance.created ? uuidOf(instance) : draftUuid, !instance.created);
         continue;
       }
       const stored = bo.fields.filter((f) => f.expression === undefined && !bo.keys.some((k) => k.name === f.name));
@@ -580,7 +599,7 @@ export class DraftRuntime {
     const name = qualifiedName.replace(/^.*\./, "");
     const operation = this.writes.service.operation(set.info, name, false);
     const action = set.bo.behavior.actions.find((a) => same(a.name, operation.action));
-    if (action === undefined || operation.kind !== "action" || action.static || action.factory) {
+    if (action === undefined || operation.kind !== "action" || action.static) {
       throw notImplemented(`${name} on a draft: activate the draft first`);
     }
     if (request.method !== "POST") {
@@ -593,11 +612,18 @@ export class DraftRuntime {
     }
     await this.owned(tx.db, set, row, user);
     let results: ActionResult[] = [];
-    const responses = await this.withLogic(tx, await this.rootOf(tx.db, set.bo, row.DraftUUID), async (shadow) => {
-      const executed = await shadow.execute(set.bo, action, [{ key: keyOf(set.bo, row), param }], ODATA_MODE);
-      results = executed.results;
-      return executed.responses;
-    });
+    // D110: a factory action on a draft creates a draft, with the %cid of the call
+    const cid = "%ODATA-ACTION";
+    const responses = await this.withLogic(
+      tx,
+      await this.rootOf(tx.db, set.bo, row.DraftUUID),
+      async (shadow) => {
+        const executed = await shadow.execute(set.bo, action, [{ key: keyOf(set.bo, row), param, ...(action.factory ? { cid } : {}) }], ODATA_MODE);
+        results = executed.results;
+        return executed.responses;
+      },
+      { user },
+    );
     if (responses.hasFailed) {
       throw this.writes.error(responses, { set, key });
     }
@@ -605,6 +631,13 @@ export class DraftRuntime {
     const base: Outcome = { ...outcome(200), messages: this.writes.messages(responses.reported, { set, key }) };
     if (operation.returnType === undefined) {
       return { ...base, status: 204 };
+    }
+    if (action.factory) {
+      const created = responses.mapped.find((m) => m.cid === cid);
+      if (created === undefined) {
+        throw new ODataError(500, "INTERNAL_ERROR", `the factory action ${name} did not map its %cid`);
+      }
+      return { ...base, entity: { set, key: { ...this.writes.projectedKey(set, created.key), IsActiveEntity: false } } };
     }
     const result = this.writes.actionResult(base, set, action.result?.entity ?? "$self", operation, results);
     // the result of the draft instance is the draft

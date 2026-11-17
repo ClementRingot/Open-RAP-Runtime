@@ -630,7 +630,8 @@ export class RapWriteHandler implements WriteHandler {
       if (created === undefined || targetSet === undefined) {
         throw new ODataError(500, "INTERNAL_ERROR", `the factory action ${name} did not map its %cid`);
       }
-      return { ...base, entity: { set: targetSet, key: this.projectedKey(targetSet, created.key) } };
+      // D110: the instance created by the factory action is a draft when its handler set %is_draft
+      return { ...base, entity: { set: targetSet, key: this.projectedKey(targetSet, { ...created.key, ...(created.key["%is_draft"] === true ? { IsActiveEntity: false } : {}) }) } };
     }
     return this.actionResult(base, set, action.result?.entity ?? "$self", operation, results);
   }

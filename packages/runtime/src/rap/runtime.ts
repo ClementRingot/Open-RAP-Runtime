@@ -66,6 +66,8 @@ export class RapRuntime {
   private constructor(public readonly model: Model) {
     this.bo = new BoModel(model);
     this.bridge = new AbapBridge(this.bo, model.messageClasses);
+    // D110: %is_draft of the rows given to the handlers, by the kind of the running transaction
+    this.bridge.draftMode = () => this.storage.getStore()?.tx.draft === true;
     this.authorizations = new Authorizations(model.authorizations);
   }
 
@@ -162,6 +164,7 @@ export class RapRuntime {
       services.customRead = this.customRead;
     }
     const tx = new Transaction(services, db, user);
+    tx.draft = true;
     return this.storage.run({ ...current, tx }, () => fn(tx));
   }
 

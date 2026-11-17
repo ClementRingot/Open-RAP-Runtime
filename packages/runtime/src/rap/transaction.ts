@@ -110,6 +110,10 @@ export class Transaction {
   private saved = false;
   /** ETag masters whose ETag field changes with their `etag dependent` instances (D32). */
   private readonly etagTouched = new Set<Instance>();
+  /** D110: a transaction on the drafts (D81: its buffer holds a draft), whose instances have %is_draft on. */
+  public draft = false;
+  /** D110: the drafts created by EML (%is_draft on) in a transaction on the active instances, written by the save. */
+  private readonly newDrafts: Array<{ bo: BoEntity; row: Row; uuid: string }> = [];
   /** D109: the final keys given by adjust_numbers, by the buffer id of the preliminary key. */
   private readonly renumbered = new Map<string, Row>();
   private pidCounter = 0;
@@ -618,7 +622,7 @@ export class Transaction {
     return true;
   }
 
-  public async create(bo: BoEntity, requests: CreateRequest[], mode: AccessMode, parent?: { association: BoAssociation; key: Row; numbered?: Map<string, Row> }): Promise<Responses> {
+  public async create(bo: BoEntity, requests: CreateRequest[], mode: AccessMode, parent?: { association: BoAssociation; key: Row; numbered?: Map<string, Row>; draftUuid?: string }): Promise<Responses> {
     const responses = new Responses();
     const operation: FailedOperation = { kind: "create" };
     if (parent === undefined && !mode.local && mode.external && bo.behavior.operations.find((o) => o.kind === "create")?.internal === true) {
@@ -704,6 +708,21 @@ export class Transaction {
         }
       }
       const key = keyOf(bo, row);
+      // D110: %is_draft on in a transaction on the active instances: a new draft
+      if (!this.draft && bo.bdef.draft === true && (request.values["%is_draft"] === true || parent?.draftUuid !== undefined)) {
+        if (parent === undefined && ((await this.instance(bo, key)) !== undefined || (await this.draftRow(bo, key)) !== undefined)) {
+          this.failure(responses, bo, { cause: "conflict", key, ...(request.cid === undefined ? {} : { cid: request.cid }) }, operation);
+          continue;
+        }
+        this.setAdminFields(bo, row, true, changed);
+        this.newDrafts.push({ bo, row, uuid: parent?.draftUuid ?? randomUUID() });
+        const draftKey = { ...key, "%is_draft": true };
+        if (request.cid !== undefined && request.cid !== "") {
+          this.cids.set(request.cid, { bo, key: draftKey });
+          responses.mapped.push({ entity: bo.entity.name, cid: request.cid, key: draftKey });
+        }
+        continue;
+      }
       if ((await this.instance(bo, key)) !== undefined) {
         this.failure(responses, bo, { cause: "conflict", key, ...(request.cid === undefined ? {} : { cid: request.cid }) }, operation);
         continue;
@@ -725,6 +744,35 @@ export class Transaction {
       this.record(bo, key, "create", new Set(changed));
     }
     return responses;
+  }
+
+  /** D110: an instance of the draft table of the entity, undefined when there is none. */
+  private async draftRow(bo: BoEntity, key: Row): Promise<Row | undefined> {
+    const table = bo.behavior.draftTable;
+    if (table === undefined) return undefined;
+    const where = sql.join(bo.keys.map((k) => sql`${sql.id(k.name)} = ${toSql(k.type, key[k.name] ?? null)}`), sql` AND `);
+    const { rows } = await sql<Record<string, unknown>>`SELECT * FROM ${sql.table(table)} WHERE ${where}`.execute(this.db);
+    const raw = rows[0];
+    if (raw === undefined) return undefined;
+    return Object.fromEntries(bo.fields.map((f) => [f.name, f.expression !== undefined ? initialValue(f.type) : fromSql(f.type, raw[f.name])])) as Row;
+  }
+
+  /** D110: the drafts created by EML in this transaction: their administrative data and their rows. */
+  private async writeNewDrafts(): Promise<void> {
+    const user = this.user.abapName;
+    for (const uuid of new Set(this.newDrafts.map((d) => d.uuid))) {
+      const root = this.newDrafts.find((d) => d.uuid === uuid && d.bo.parent === undefined) ?? this.newDrafts.find((d) => d.uuid === uuid);
+      await sql`INSERT INTO "rapt_draft_admin" ("DraftUUID", "CreatedByUser", "LastChangedByUser", "InProcessByUser", "RootEntity") VALUES (${uuid}, ${user}, ${user}, ${user}, ${root?.bo.entity.name ?? ""})`.execute(this.db);
+      if (root?.bo.bdef.collaborativeDraft === true) {
+        await sql`INSERT INTO "rapt_draft_user" ("DraftUUID", "UserID", "UserDescription", "UserAccessRole") VALUES (${uuid}, ${user}, ${user}, 'O') ON CONFLICT ("DraftUUID", "UserID") DO NOTHING`.execute(this.db);
+      }
+    }
+    for (const { bo, row, uuid } of this.newDrafts) {
+      const stored = bo.fields.filter((f) => f.expression === undefined);
+      const columns = [...stored.map((f) => sql.id(f.name)), sql.id("DraftUUID"), sql.id("HasActiveEntity")];
+      const values = [...stored.map((f) => sql`${toSql(f.type, row[f.name] ?? initialValue(f.type))}`), sql`${uuid}`, sql`${false}`];
+      await sql`INSERT INTO ${sql.table(bo.behavior.draftTable ?? "")} (${sql.join(columns)}) VALUES (${sql.join(values)})`.execute(this.db);
+    }
   }
 
   /**
@@ -1046,6 +1094,14 @@ export class Transaction {
     const targets: Array<{ request: CreateByAssociationRequest; key: Row; instance: Instance }> = [];
     for (const request of requests) {
       const key = this.resolveKey(bo, request.key, request.cidRef);
+      // D110: the children of a draft created by EML in this transaction are drafts too
+      const pending = key === undefined ? undefined : this.newDrafts.find((d) => d.bo === bo && keyString(bo, d.row) === keyString(bo, key));
+      if (pending !== undefined && !this.draft) {
+        const parentKey: Row = {};
+        for (const pair of association.on) parentKey[pair.source] = pending.row[pair.source] ?? null;
+        responses.add(await this.create(association.target, request.targets, mode, { association, key: parentKey, draftUuid: pending.uuid }));
+        continue;
+      }
       const instance = key === undefined ? undefined : await this.instance(bo, key);
       if (key === undefined || instance === undefined) {
         this.failure(responses, bo, { cause: "not_found", ...(key === undefined ? {} : { key }) }, operation);
@@ -1121,6 +1177,17 @@ export class Transaction {
     const rows: Array<Row | undefined> = [];
     for (const { key: given, cidRef } of keys) {
       const key = this.resolveKey(bo, given, cidRef);
+      // D110: the other image (%is_draft): the draft of an active transaction, the active instance of a draft one
+      const wanted = given["%is_draft"] ?? key?.["%is_draft"];
+      if (typeof wanted === "boolean" && wanted !== this.draft && bo.bdef.draft === true && key !== undefined) {
+        const plain = keyOf(bo, key);
+        const other = wanted ? (this.newDrafts.find((d) => d.bo === bo && keyString(bo, d.row) === keyString(bo, plain))?.row ?? (await this.draftRow(bo, plain))) : await this.load(bo, plain);
+        if (other === undefined) {
+          this.failure(responses, bo, { cause: "not_found", key: plain });
+        }
+        rows.push(other === undefined ? undefined : { ...other, "%is_draft": wanted });
+        continue;
+      }
       const instance = key === undefined ? undefined : await this.instance(bo, key);
       if (instance === undefined) {
         this.failure(responses, bo, { cause: "not_found", ...(key === undefined ? {} : { key }) });
@@ -1389,6 +1456,7 @@ export class Transaction {
     responses.add(await this.adjustNumbers());
     await this.refreshEtagMasters();
     await this.write();
+    await this.writeNewDrafts();
     // additional and unmanaged save: save_modified, whose failed (cl_abap_behavior_saver_failed)
     // makes the caller roll the LUW back
     responses.add(await this.saveModified());

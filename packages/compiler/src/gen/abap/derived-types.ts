@@ -189,7 +189,9 @@ export function generateDerivedTypes(model: Model, behavior: BehaviorModel): Der
     w.line(`" ---- ${entity.alias} (${entity.entity}): entity ${e}`);
     w.structure(derivedType.key(e), keys.map((f) => component(f.name, abapTypeText(f.type))));
     w.structure(derivedType.pky(e), [{ component: "%pid", type: "pid" }, { include: derivedType.key(e), as: "%key" }]);
-    w.structure(derivedType.tky(e), [{ include: derivedType.pky(e), as: "%pky" }]);
+    // D110: the draft indicator of a draft BO (ABP_BEHV_FLAG), in %tky and in the creations
+    const isDraft = behavior.draft === true ? [{ component: "%is_draft", type: "flag" }] : [];
+    w.structure(derivedType.tky(e), [{ include: derivedType.pky(e), as: "%pky" }, ...isDraft]);
     if (hasData) {
       w.structure(derivedType.data(e), data.map((f) => component(f.name, abapTypeText(f.type))));
     }
@@ -223,7 +225,7 @@ export function generateDerivedTypes(model: Model, behavior: BehaviorModel): Der
     // operations
     w.structure(
       derivedType.createRow(e),
-      [{ component: "%cid", type: "cid" }, { include: `ts_e${e}_full`, as: "%data" }, { component: "%control", type: derivedType.control(e) }],
+      [{ component: "%cid", type: "cid" }, ...isDraft, { include: `ts_e${e}_full`, as: "%data" }, { component: "%control", type: derivedType.control(e) }],
       derivedType.create(e),
     );
     w.structure(

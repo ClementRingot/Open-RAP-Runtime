@@ -110,6 +110,7 @@ dependent ETag, remote APIs.
 | `MODIFY … CREATE BY \_assoc` | ✅ | |
 | `IN LOCAL MODE`, `PRIVILEGED` | ✅ | Local mode: neither authorization nor feature control, read-only fields changeable. |
 | `COMMIT ENTITIES`, `ROLLBACK ENTITIES` in a handler | ✅ | Forbidden, as in RAP (runtime error). |
+| `%is_draft` in `%tky` and in the creations of a draft BO | 🟡 | The indicator of the instance (D110): a creation with it on makes a new draft, a read of the other image works. Not yet: changing the other image. |
 | `GET PERMISSIONS`, `SET LOCKS`, `MODIFY … OPERATIONS`, `RELATING TO`, `AUGMENTING`, `RAISE ENTITY EVENT` | ❌ | Diagnostic ABP005/ABP007. |
 
 ## ABAP SQL in the ABP

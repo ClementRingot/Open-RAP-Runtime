@@ -67,6 +67,9 @@ export class AbapBridge {
     private readonly texts: MessageTexts,
   ) {}
 
+  /** D110: whether the running transaction is on the drafts (the default %is_draft of the rows). */
+  public draftMode: () => boolean = () => false;
+
   public iface(bo: BoEntity): AbapData {
     const iface = abapGlobal().Classes[bo.iface];
     if (iface === undefined) {
@@ -97,6 +100,12 @@ export class AbapBridge {
         setAbapValue(data, field.type, row[field.name]);
       }
     }
+    // D110: the draft indicator of a draft BO: the instance's own, else the kind of the transaction
+    const isDraft = component(target, "%is_draft");
+    if (isDraft !== undefined) {
+      const own = row["%is_draft"];
+      isDraft.set((typeof own === "boolean" ? own : this.draftMode()) ? "01" : "00");
+    }
   }
 
   public fillKey(target: AbapData, bo: BoEntity, key: Row): void {
@@ -110,6 +119,11 @@ export class AbapBridge {
 
   public readRow(source: AbapData, bo: BoEntity, fields?: Iterable<string>): Row {
     const row: Row = {};
+    // D110: the draft indicator given by the handler (%is_draft, or in %tky)
+    const isDraft = component(source, "%is_draft");
+    if (isDraft !== undefined) {
+      row["%is_draft"] = isFlagOn(isDraft);
+    }
     const list: FieldModel[] = fields === undefined ? bo.fields : [...fields].map((n) => this.bo.field(bo, n)).filter((f): f is FieldModel => f !== undefined);
     for (const field of list) {
       const data = component(source, field.name);

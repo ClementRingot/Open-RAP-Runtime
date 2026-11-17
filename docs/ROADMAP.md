@@ -56,7 +56,7 @@ The sections below use the provisional numbers, unless they say "final".
 | D85 | — | OData V2 at the Gateway URL | 7 |
 | D86 | — | CDS: joins, WHERE, paths, parameters, unions, hierarchies, `$session`, aggregates | 4 |
 | D87 | D109 (part) | Late numbering (without draft) | 4 |
-| D88 | — | Complete EML | 4 |
+| D88 | D110 (part) | Complete EML (`%is_draft` done) | 4 |
 | D89 | — | Business events, change documents, extensions, attachments | 4 |
 | D90 | — | Exact decimal numbers and `TIMESTAMPL` | 4 |
 | D91 | — | Catchable SQL errors in ABAP | 3 |
