@@ -276,7 +276,42 @@ export type CdsExpression =
   /** D107: an input parameter of the entity, read from the setting of the transaction. */
   | { kind: "parameter"; name: string; setting: string; type: AbapType }
   /** D105: an aggregate expression; COUNT(*) has no operand. */
-  | { kind: "aggregate"; fn: "max" | "min" | "sum" | "avg" | "count"; distinct: boolean; operand?: CdsExpression; type: AbapType };
+  | { kind: "aggregate"; fn: "max" | "min" | "sum" | "avg" | "count"; distinct: boolean; operand?: CdsExpression; type: AbapType }
+  /** D108: `$node.…` of a CDS hierarchy: a hierarchy attribute of the node. */
+  | { kind: "node"; attribute: HierarchyAttribute; type: AbapType };
+
+/** D108: the hierarchy attributes of SAP (`$node.…` in the element list of a CDS hierarchy). */
+export type HierarchyAttribute =
+  | "hierarchy_rank"
+  | "hierarchy_tree_size"
+  | "hierarchy_parent_rank"
+  | "hierarchy_level"
+  | "hierarchy_is_cycle"
+  | "hierarchy_is_orphan"
+  | "node_id"
+  | "parent_id";
+
+/**
+ * D108: a CDS hierarchy (`define hierarchy … as parent child hierarchy( … )`), read by a recursive
+ * view on its source, a view entity. The elements of the conditions are those of the source.
+ */
+export interface HierarchyModel {
+  /** The child-to-parent association of the source: a self association. */
+  association: string;
+  /** Its ON condition: the element of a node holding the parent (`child`) equals the element of the parent (`node`). */
+  parent: Array<{ child: string; node: string }>;
+  /** START WHERE, explicit or implicit (the parent is initial when it is numeric). */
+  start: CdsCondition;
+  /** SIBLINGS ORDER BY. */
+  siblings: Array<{ element: string; descending: boolean }>;
+  /** DEPTH: a literal or a parameter. */
+  depth?: CdsExpression;
+  /** DIRECTORY … FILTER BY: the condition on the source. */
+  directory?: CdsCondition;
+  multipleParents: "notAllowed" | "leavesOnly" | "allowed";
+  orphans: "ignore" | "error" | "root";
+  cycles: "error" | "breakup";
+}
 
 export type CdsFunctionName =
   | "concat"
@@ -355,6 +390,8 @@ export interface EntityModel {
   sourceParameters?: Array<{ name: string; value: CdsExpression }>;
   /** D106: the other SELECT branches of a UNION [ALL]; the entity itself is the first one. */
   union?: Array<{ all: boolean; branch: EntityModel }>;
+  /** D108: a CDS hierarchy; `source` is its source view entity. */
+  hierarchy?: HierarchyModel;
   /** D105: the GROUP BY of a view entity with aggregates, and its HAVING condition. */
   groupBy?: CdsExpression[];
   having?: CdsCondition;

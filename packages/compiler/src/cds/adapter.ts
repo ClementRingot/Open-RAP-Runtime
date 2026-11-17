@@ -47,7 +47,25 @@ export interface CdsAssociationAst {
   loc: CdsLoc;
 }
 
-export type CdsEntityKind = "view" | "projection" | "abstract" | "custom" | "table" | "other";
+export type CdsEntityKind = "view" | "projection" | "abstract" | "custom" | "table" | "hierarchy" | "other";
+
+/** D108: `as parent child hierarchy( … )` of a CDS hierarchy. */
+export interface CdsHierarchyAst {
+  source: string;
+  association: string;
+  directory?: { association: string; filter?: CdsCondAst; error?: string };
+  start?: CdsCondAst;
+  startError?: string;
+  siblings: Array<{ path: string[]; descending: boolean }>;
+  /** DEPTH: an integer literal or a parameter (`:p`, `$parameters.p`). */
+  depth?: { value?: number; parameter?: string };
+  multipleParents?: "notAllowed" | "leavesOnly" | "allowed";
+  orphans?: "ignore" | "error" | "root";
+  cycles?: "error" | "breakup";
+  /** Additions not supported yet: PERIOD, GENERATE SPANTREE. */
+  unsupported: string[];
+  loc: CdsLoc;
+}
 
 export interface CdsEntityAst {
   kind: CdsEntityKind;
@@ -67,6 +85,8 @@ export interface CdsEntityAst {
   parameters?: Array<{ name: string; type: string; systemField?: string; annotations: Annotations; loc: CdsLoc }>;
   /** D107: the actual parameters passed to the data source (`select from X( p: … )`). */
   sourceParameters?: Array<{ name: string; value?: CdsExprAst; error?: string }>;
+  /** D108: a CDS hierarchy. */
+  hierarchy?: CdsHierarchyAst;
   /** D106: the other branches of a UNION [ALL], in order. */
   unions?: Array<{ all: boolean; branch: CdsEntityAst }>;
   /** D105: the GROUP BY paths and the HAVING condition (or the construct it could not parse). */
@@ -153,7 +173,9 @@ class AdapterContext {
               ? "custom"
               : statement instanceof E.CDSDefineTableEntity
                 ? "table"
-                : "other";
+                : statement instanceof E.CDSDefineHierarchy
+                  ? "hierarchy"
+                  : "other";
     const topTokens = tree.getChildren().filter(isToken).map((t) => tokenText(t).toUpperCase());
     const names = tree.findDirectExpressions(E.CDSName);
     const nameNode = names[0];
@@ -227,11 +249,132 @@ class AdapterContext {
       return entity;
     }
 
+    if (kind === "hierarchy") {
+      const withParameters = tree.findDirectExpression(E.CDSWithParameters);
+      if (withParameters !== undefined) entity.parameters = this.parameterList(withParameters);
+      this.hierarchy(entity, tree);
+      return entity;
+    }
+
     // abstract, custom and table entities: `[key] name : type [null];`, `_Assoc : association … ;`
     const typed = this.typedElements(tree);
     entity.elements = typed.elements;
     entity.associations = typed.associations;
     return entity;
+  }
+
+  /**
+   * D108: the definition of a CDS hierarchy: the additions in parentheses, read in order, and the
+   * element list (`[key] path [as alias]`, `$node.attribute as alias`, associations).
+   */
+  private hierarchy(entity: CdsEntityAst, tree: abaplint.Nodes.ExpressionNode): void {
+    const children = tree.getChildren();
+    const open = children.findIndex((c) => isToken(c) && tokenText(c) === "(");
+    const brace = children.findIndex((c) => isToken(c) && tokenText(c) === "{");
+    const additions = children.slice(open + 1, brace);
+    const word = (i: number): string => {
+      const c = additions[i];
+      return c !== undefined && isToken(c) ? tokenText(c).toLowerCase() : "";
+    };
+    const hierarchy: CdsHierarchyAst = { source: "", association: "", siblings: [], unsupported: [], loc: this.loc(tree) };
+    const condition = (node: Node | undefined): { cond?: CdsCondAst; error?: string } => {
+      if (node === undefined || !isExpression(node)) return { error: "a missing condition" };
+      try {
+        return { cond: parseCdsCondition(node) };
+      } catch (error) {
+        if (!(error instanceof CdsExpressionError)) throw error;
+        return { error: error.message };
+      }
+    };
+    for (let i = 0; i < additions.length; i++) {
+      const w = word(i);
+      const next = additions[i + 1];
+      if (w === "source" && next !== undefined && isExpression(next)) {
+        hierarchy.source = next.concatTokens().replace(/\s+/g, "");
+        i++;
+      } else if (w === "association" && next !== undefined && isExpression(next)) {
+        hierarchy.association = next.concatTokens();
+        i++;
+      } else if (w === "directory" && next !== undefined && isExpression(next)) {
+        // DIRECTORY _assoc FILTER BY cond
+        const result = condition(additions[i + 4]);
+        hierarchy.directory = { association: next.concatTokens(), ...(result.cond === undefined ? {} : { filter: result.cond }), ...(result.error === undefined ? {} : { error: result.error }) };
+        i += 4;
+      } else if (w === "start" && word(i + 1) === "where") {
+        const result = condition(additions[i + 2]);
+        if (result.cond !== undefined) hierarchy.start = result.cond;
+        if (result.error !== undefined) hierarchy.startError = result.error;
+        i += 2;
+      } else if (w === "siblings" && word(i + 1) === "order" && word(i + 2) === "by") {
+        let j = i + 3;
+        for (; j < additions.length; j++) {
+          const item = additions[j];
+          if (item !== undefined && isExpression(item) && item.get() instanceof E.CDSPrefixedName) {
+            const descending = word(j + 1) === "descending";
+            hierarchy.siblings.push({ path: this.path(item), descending });
+            if (word(j + 1) === "ascending" || descending) j++;
+            if (word(j + 1) !== ",") break;
+            j++;
+          } else {
+            break;
+          }
+        }
+        i = j;
+      } else if (w === "depth" && next !== undefined) {
+        const text = next.concatTokens().replace(/\s+/g, "");
+        if (/^-?\d+$/.test(text)) hierarchy.depth = { value: Number.parseInt(text, 10) };
+        else hierarchy.depth = { parameter: text.replace(/^:/, "").replace(/^\$parameters\./i, "") };
+        i++;
+      } else if (w === "multiple" && word(i + 1) === "parents") {
+        if (word(i + 2) === "not") {
+          hierarchy.multipleParents = "notAllowed";
+          i += 3;
+        } else if (word(i + 2) === "leaves") {
+          hierarchy.multipleParents = "leavesOnly";
+          i += word(i + 3) === "only" ? 3 : 2;
+        } else {
+          hierarchy.multipleParents = "allowed";
+          i += 2;
+        }
+      } else if (w === "orphans") {
+        const value = word(i + 1);
+        hierarchy.orphans = value === "root" ? "root" : value === "error" ? "error" : "ignore";
+        i++;
+      } else if (w === "cycles") {
+        hierarchy.cycles = word(i + 1) === "breakup" ? "breakup" : "error";
+        i++;
+      } else if (w === "period") {
+        hierarchy.unsupported.push("PERIOD");
+      } else if (w === "generate") {
+        hierarchy.unsupported.push("GENERATE SPANTREE");
+      }
+      // LOAD, CACHE and NODETYPE only tune the database or inform analytical engines
+    }
+    entity.source = hierarchy.source;
+    entity.hierarchy = hierarchy;
+    // the element list
+    let annotations: abaplint.Nodes.ExpressionNode[] = [];
+    let key = false;
+    for (let i = brace + 1; i < children.length; i++) {
+      const child = children[i];
+      if (child === undefined) continue;
+      if (isToken(child)) {
+        if (tokenText(child).toLowerCase() === "key") key = true;
+        continue;
+      }
+      if (child.get() instanceof E.CDSAnnotation) {
+        annotations.push(child);
+        continue;
+      }
+      if (child.get() instanceof E.CDSPrefixedName) {
+        const path = this.path(child);
+        const as = children[i + 1];
+        const alias = as !== undefined && isExpression(as) && as.get() instanceof E.CDSAs ? as.findDirectExpression(E.CDSName)?.concatTokens() : undefined;
+        entity.elements.push({ name: alias ?? path[path.length - 1] ?? "", key, path, annotations: this.annotations(annotations), loc: this.loc(child) });
+        annotations = [];
+        key = false;
+      }
+    }
   }
 
   private associations(parent: abaplint.Nodes.ExpressionNode): CdsAssociationAst[] {
