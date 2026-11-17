@@ -1,8 +1,11 @@
 // Round trip to an SAP BTP ABAP trial (D99): pure helpers of scripts/btp-roundtrip.mjs, tested by
 // scripts/lib/roundtrip.test.mjs.
 
-import { existsSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { cpSync, existsSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import path from "node:path";
+import { fileURLToPath } from "node:url";
+
+const ROOT = fileURLToPath(new URL("../..", import.meta.url));
 
 /**
  * Applies variants of fixtures/variants.json to the sources of a copy: each file gets its exact
@@ -14,6 +17,10 @@ export function applyVariants(srcDir, definitions, names) {
     const variant = definitions[name];
     if (variant === undefined || name.startsWith("$")) {
       throw new Error(`unknown variant ${name}: ${Object.keys(definitions).filter((k) => !k.startsWith("$")).join(", ")}`);
+    }
+    // D111: the files of a folder of the repository, added before the replacements
+    if (variant.add !== undefined) {
+      cpSync(path.join(ROOT, variant.add), srcDir, { recursive: true });
     }
     for (const [file, replacements] of Object.entries(variant.files)) {
       const target = path.join(srcDir, file);

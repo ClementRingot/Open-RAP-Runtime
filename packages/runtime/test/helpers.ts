@@ -336,20 +336,29 @@ export function testLaunchpad(appDir: string, appUrl: string): { config: Launchp
 }
 
 /** The variants of the Travel fixture (D99), shared with scripts/btp-roundtrip.mjs. */
-const VARIANTS = JSON.parse(readFileSync(new URL("../../../fixtures/variants.json", import.meta.url), "utf8")) as Record<string, { files: Record<string, Array<[string, string]> | null> }>;
+const VARIANTS = JSON.parse(readFileSync(new URL("../../../fixtures/variants.json", import.meta.url), "utf8")) as Record<string, { add?: string; files: Record<string, Array<[string, string]> | null> }>;
 
 /** The changes of a variant of fixtures/variants.json, for generatedVariant. */
-export function variantChanges(name: string): Record<string, (content: string) => string> {
+export function variantChanges(name: string): Record<string, string | ((content: string) => string)> {
   const variant = VARIANTS[name];
   if (variant === undefined) {
     throw new Error(`unknown variant ${name}`);
   }
-  return Object.fromEntries(
-    Object.entries(variant.files)
-      .filter((entry): entry is [string, Array<[string, string]>] => entry[1] !== null)
-      .map(([file, replacements]) => [file, (content: string) => edit(content, replacements)]),
-  );
+  // D111: the files of a folder of the repository (`add`), then the replacements
+  const added: Record<string, string> = {};
+  if (variant.add !== undefined) {
+    const folder = fileURLToPath(new URL(`../../../${variant.add}`, import.meta.url));
+    for (const file of readdirSync(folder)) added[file] = readFileSync(path.join(folder, file), "utf8");
+  }
+  return {
+    ...added,
+    ...Object.fromEntries(
+      Object.entries(variant.files)
+        .filter((entry): entry is [string, Array<[string, string]>] => entry[1] !== null)
+        .map(([file, replacements]) => [file, (content: string) => edit(content, replacements)]),
+    ),
+  };
 }
 
 /** The Travel fixture as a draft BO (D54): `with draft`, draft tables, draft actions. */
-export const DRAFT_CHANGES: Record<string, (content: string) => string> = variantChanges("draft");
+export const DRAFT_CHANGES: Record<string, (content: string) => string> = variantChanges("draft") as Record<string, (content: string) => string>;

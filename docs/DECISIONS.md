@@ -2699,3 +2699,29 @@ _The issues moved to the repository itself once public: see D74._
 - **Tests**: `eml-draft.test.ts` (a factory action creating a draft from an active instance and
   from a draft, its administrative data); the draft and variant tests run with the indicator.
 
+## D111 — Round 2 on the trial: the CDS of D100 to D110
+
+- **Context**: the CDS features of D100 to D108 follow the documentation of SAP; their `$metadata`
+  and their answers (the recursive hierarchy above all) are to confirm on SAP BTP, like the
+  protocol of D99.
+- **Decision**:
+  - `fixtures/cds` holds views on the tables of the Travel fixture: a join, a path, `$session`,
+    BETWEEN and IS NOT INITIAL (`ZRT_I_CdsBooking`); COUNT, SUM, MAX with GROUP BY and HAVING
+    (`ZRT_I_CdsBookingStats`); UNION ALL (`ZRT_I_CdsDates`); a parameter (`ZRT_I_CdsTravelByStatus`);
+    a table entity, a view with `@OData.hierarchy.recursiveHierarchy` and its hierarchy
+    (`ZRT_CDSNODE`, `ZRT_I_CdsNode`, `ZRT_I_CdsNodeHier`); a class that fills the nodes on the
+    trial (`ZRT_CL_CDS_FILL`). The variant `cds` adds them (`add`, a new member of the variants)
+    and exposes them in the service.
+  - `scripts/btp-read-trial.mjs` reads, with the session of the browser of the recordings, the
+    `$metadata` and the reads of `scripts/lib/cds-reads.mjs` on the trial, and writes the answers
+    without user name, key, namespace or suffix.
+  - `cds-round2.test.ts` builds the variant, reads each view, and replays the reads of the
+    hierarchy: when the answers of the trial are in `conformance/btp/<release>/cds/`, Open RAP
+    Runtime must give the same rows and count.
+  - `fixtures/negative` gets two CDS cases: COUNT(*) without GROUP BY (CDS022) and
+    `$session.bs_system_id` (CDS002, which SAP documents: to settle).
+  - Late numbering (D109) and `%is_draft` (D110) are not in round 2 yet (no draft BO with late
+    numbering on SAP, and the factory action of the fixture creates an active copy).
+- **Tests**: `cds-round2.test.ts`, `roundtrip.test.mjs` (the variant `cds`), `cds-reads.test.mjs`
+  (the URLs, the neutral answers), `negative.test.mjs` (the two cases).
+

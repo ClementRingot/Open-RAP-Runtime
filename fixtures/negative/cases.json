@@ -92,6 +92,23 @@
       "expect": { "code": null },
       "sap": null,
       "confirm": "Open RAP Runtime accepts it today; SAP may refuse it at activation (strict mode) or at runtime only."
+    },
+    {
+      "id": "cds-aggregate-without-group-by",
+      "prefix": "ZRNL",
+      "description": "COUNT(*) in the select list of a view entity without GROUP BY (D105, D111).",
+      "changes": { "_r_item.ddls.asddls": [["      status                as Status,\n", "      status                as Status,\n      count(*)              as Total,\n"]] },
+      "expect": { "code": "CDS022" },
+      "sap": null
+    },
+    {
+      "id": "cds-session-bs-system-id",
+      "prefix": "ZRNM",
+      "description": "The session variable $session.bs_system_id in a view entity (D103, D111).",
+      "changes": { "_r_item.ddls.asddls": [["      status                as Status,\n", "      status                as Status,\n      $session.bs_system_id as SystemId,\n"]] },
+      "expect": { "code": "CDS002" },
+      "sap": null,
+      "confirm": "SAP documents $session.bs_system_id, bs_instance_id and bs_zone_id for view entities: if it activates, Open RAP Runtime supports them (the system, the instance, the zone of the server)."
     }
   ]
 }

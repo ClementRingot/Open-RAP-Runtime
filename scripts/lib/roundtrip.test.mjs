@@ -57,6 +57,10 @@ describe("variants of the fixtures (D99)", () => {
       // round 2: acceptTravel reports a warning (strict handling)
       applyVariants(path.join(dir, "src"), definitions, ["strict"]);
       expect(readFileSync(path.join(dir, "src", "zbp_rt_r_travel.clas.locals_imp.abap"), "utf8")).toContain("severity = if_abap_behv_message=>severity-warning");
+      // round 2 (D111): the CDS of fixtures/cds added and exposed
+      applyVariants(path.join(dir, "src"), definitions, ["cds"]);
+      expect(readdirSync(path.join(dir, "src"))).toEqual(expect.arrayContaining(["zrt_i_cdsnodehier.ddls.asddls", "zrt_cdsnode.ddls.xml", "zrt_cl_cds_fill.clas.abap"]));
+      expect(readFileSync(path.join(dir, "src", "zrt_ui_travel.srvd.srvdsrv"), "utf8")).toContain("  expose ZRT_I_CdsNode as CdsNode;");
     } finally {
       rmSync(dir, { recursive: true, force: true });
     }

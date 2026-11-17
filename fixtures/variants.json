@@ -1,5 +1,5 @@
 {
- "$comment": "Variants of fixtures/travel (D99), shared by the tests (packages/runtime/test/helpers.ts) and scripts/btp-roundtrip.mjs. Each file: exact replacements [from, to], applied in order, once each; null removes the file.",
+ "$comment": "Variants of fixtures/travel (D99), shared by the tests (packages/runtime/test/helpers.ts) and scripts/btp-roundtrip.mjs. Each file: exact replacements [from, to], applied in order, once each; null removes the file. `add` (D111): a folder of the repository whose files are added first.",
  "draft": {
   "description": "The Travel fixture as a draft BO (D54): with draft, draft tables, draft actions.",
   "files": {
@@ -110,6 +110,18 @@
     [
      "                                                     number   = '002'\n                                                     severity = if_abap_behv_message=>severity-success",
      "                                                     number   = '002'\n                                                     severity = if_abap_behv_message=>severity-warning"
+    ]
+   ]
+  }
+ },
+ "cds": {
+  "description": "Round 2 (D111): the CDS of D100 to D108 next to the BO (paths, WHERE, BETWEEN, IS INITIAL, $session, joins, aggregates, UNION ALL, parameters, a table entity and a hierarchy), exposed in the service, to compare their $metadata and their values with SAP BTP. `add` copies the files of fixtures/cds/src.",
+  "add": "fixtures/cds/src",
+  "files": {
+   "zrt_ui_travel.srvd.srvdsrv": [
+    [
+     "  expose ZRT_C_Booking as Booking;",
+     "  expose ZRT_C_Booking as Booking;\n  expose ZRT_I_CdsBooking as CdsBooking;\n  expose ZRT_I_CdsBookingStats as CdsBookingStats;\n  expose ZRT_I_CdsDates as CdsDates;\n  expose ZRT_I_CdsTravelByStatus as CdsTravelByStatus;\n  expose ZRT_I_CdsNode as CdsNode;"
     ]
    ]
   }

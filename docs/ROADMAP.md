@@ -70,6 +70,7 @@ The sections below use the provisional numbers, unless they say "final".
 | — | D83 | Guided recording of the Fiori elements protocol on the SAP BTP trial, renamed copy for a shared system | 0 |
 | — | D85 | First pull and activation on the SAP BTP trial: abapGit XML of DDLX and SRVB, `total etag`, authorizations | 0 |
 | — | D86 | `use side effects`, value help and side effects of the draft fixture | 0 |
+| — | D111 | Round 2 on the trial: the CDS of D100 to D108 (variant `cds`, reads of the views, negative CDS cases) | 0 |
 | D86 | D108 (part) | CDS: hierarchies and the OData recursive hierarchy | 4 |
 | D86 | D107 (part) | CDS: parameters of view entities | 4 |
 | D86 | D106 (part) | CDS: UNION and UNION ALL | 4 |
