@@ -32,7 +32,15 @@ export function setSystemFields(user: User, language: string, now = new Date()):
   sy.datum.set(iso.slice(0, 10).replace(/-/g, ""));
   sy.uzeit.set(iso.slice(11, 19).replace(/:/g, ""));
   sy.langu.set(LANGUAGES[language.slice(0, 2).toLowerCase()] ?? "E");
+  // D103: one client, the one of $session.client; the user time zone is UTC (D40)
+  sy.mandt.set(SESSION_CLIENT);
+  sy.zonlo.set("UTC");
+  sy.datlo.set(iso.slice(0, 10).replace(/-/g, ""));
+  sy.timlo.set(iso.slice(11, 19).replace(/:/g, ""));
 }
+
+/** The client of the application (D9, D103): sy-mandt and $session.client. */
+export const SESSION_CLIENT = "100";
 
 export function setSubrc(value: number): void {
   abapGlobal().builtin.sy.get().subrc.set(value);

@@ -21,11 +21,12 @@ beforeAll(async () => {
             "      case when created_by = $session.user then 'X' else '' end as CreatedByMe,",
             "      $session.system_language as Language,",
             "      $session.client as Client,",
+            "      $session.user_timezone as TimeZone,",
             "      _Booking",
             "",
           ].join("\n"),
         ),
-      "zrt_c_travel.ddls.asddls": (c) => lf(c).replace("      _Booking : redirected", "      CurrentUser,\n      CreatedByMe,\n      Language,\n      Client,\n      _Booking : redirected"),
+      "zrt_c_travel.ddls.asddls": (c) => lf(c).replace("      _Booking : redirected", "      CurrentUser,\n      CreatedByMe,\n      Language,\n      Client,\n      TimeZone,\n      _Booking : redirected"),
     }),
     { auth: { mode: "none", user: "ALICE" } },
   );
@@ -43,9 +44,9 @@ async function get(path: string, headers: Record<string, string> = {}): Promise<
 
 describe("session variables of CDS (D103)", () => {
   it("gives the user, the language and the client of the request", async () => {
-    const select = `Travel(${T1})?$select=CreatedBy,CurrentUser,CreatedByMe,Language,Client`;
+    const select = `Travel(${T1})?$select=CreatedBy,CurrentUser,CreatedByMe,Language,Client,TimeZone`;
     const read = await get(select, { "accept-language": "de-DE,de;q=0.9" });
-    expect(read).toMatchObject({ CurrentUser: "ALICE", Language: "D", Client: "100" });
+    expect(read).toMatchObject({ CurrentUser: "ALICE", Language: "D", Client: "100", TimeZone: "UTC" });
     expect(read).toMatchObject({ CreatedBy: "ALICE", CreatedByMe: "X" });
     expect(await get(select)).toMatchObject({ Language: "E" });
   });

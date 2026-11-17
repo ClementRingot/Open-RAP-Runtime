@@ -222,8 +222,9 @@ describe("calculated elements (D67)", () => {
         .map((d) => `${d.code} ${d.message}`);
     // D103: user, client, system_language and system_date are supported
     expect(message("$session.user as CurrentUser")).toEqual([]);
+    expect(message("$session.user_date as UserDate")).toEqual([]);
     expect(message("$session.bs_instance_id as Instance")).toEqual([
-      "CDS002 ZRT_R_Travel.Instance: session variable $session.bs_instance_id is not supported (only $session.user, client, system_language and system_date)",
+      "CDS002 ZRT_R_Travel.Instance: session variable $session.bs_instance_id is not supported (the built-in ones of CDS view entities only: user, client, system_language, system_date, user_timezone, user_date)",
     ]);
     // D100: a path through a to-many association has no single value
     expect(message("concat( _Booking.BookingID, 'x' ) as FirstBooking")).toEqual(["CDS002 ZRT_R_Travel.FirstBooking: _Booking.BookingID: _Booking is a to-many association: a path in the select list needs one value per instance"]);

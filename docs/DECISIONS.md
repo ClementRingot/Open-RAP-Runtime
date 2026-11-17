@@ -2493,7 +2493,14 @@ _The issues moved to the repository itself once public: see D74._
   - `$session.user` (`char(12)`), `$session.system_language` (`lang`) and `$session.client`
     (`clnt`) are expressions of the select list and of the WHERE conditions (D101).
   - The views read `current_setting('rapt.user', true)` and `current_setting('rapt.language',
-    true)`; the client is `'100'` (one client, D9).
+    true)`; the client is `'100'` (one client, D9). In a CDS view entity the client handling is
+    implicit (SAP filters with `$session.client`): no client field is exposed (D9), but
+    `$session.client` stays an operand. `sy-mandt` of the ABAP code is `100` too (the runtime of
+    abaplint set `123`), so that both agree.
+  - The other built-in session variables of CDS view entities: `user_timezone` is `UTC` (the user
+    time zone of Open RAP Runtime, D40, also `sy-zonlo`), `user_date` the system date (`sy-datlo`,
+    `sy-timlo` set like `sy-datum`, `sy-uzeit`). The application session variables
+    (`$session.bs_…`) stay CDS002.
   - Every LUW sets `rapt.user` (the ABAP name of the user) and `rapt.language` (the one-letter
     ABAP language of `Accept-Language`, as `sy-langu`) on its transaction, so that the ABAP SQL of
     the behavior pools reads them. The reads of the OData layer run in a transaction that sets

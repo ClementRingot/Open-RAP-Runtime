@@ -77,8 +77,8 @@ What the project deliberately leaves out; the planned work is in
 
 | Gap | Status |
 |---|---|
-| Expressions in the select list (D67): aggregates, SQL functions outside the list of D67, session variables other than `user`, `client`, `system_language`, `system_date` (D103) | Diagnostic CDS002 |
-| `$session.client` | Always `100`: one client (D9). `$session.user` and `system_language` are those of the OData request or of the LUW; a read outside a request (background, e-mail) has an empty user. |
+| Expressions in the select list (D67): aggregates, SQL functions outside the list of D67, application session variables (`$session.bs_…`), only the built-in ones are supported (D103) | Diagnostic CDS002 |
+| `$session.client`, `user_timezone` | Always `100` (one client, D9; also `sy-mandt`) and `UTC` (D40); `user_date` is the system date. `$session.user` and `system_language` are those of the OData request or of the LUW; a read outside a request (background, e-mail) has an empty user. |
 | Calculated elements read with EML in the behavior pool (D67) | Value of the active view (last save), not recomputed on the changes of the transaction; initial value for a draft instance. |
 | Association paths in the select list (`_Agency.Name`) | To-one associations, also in an expression and in a projection (D100): read-only, from the active instances of the targets (also for a draft instance); a to-many association or a filter in the path (`_X[…]`): CDS002. |
 | Joins | Diagnostic CDS002 |

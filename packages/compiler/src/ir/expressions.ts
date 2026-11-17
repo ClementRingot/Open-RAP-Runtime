@@ -167,7 +167,14 @@ class Resolver {
       if (variable === "client" && rest.length === 2) {
         return { kind: "session", variable: "client", type: { kind: "clnt", length: 3 } };
       }
-      throw new ExpressionIssue("CDS002", `session variable ${text} is not supported (only $session.user, client, system_language and system_date)`);
+      // the user time zone is UTC (D40): user_date is the system date
+      if (variable === "user_timezone" && rest.length === 2) {
+        return { kind: "session", variable: "user_timezone", type: { kind: "char", length: 6 } };
+      }
+      if (variable === "user_date" && rest.length === 2) {
+        return { kind: "session", variable: "user_date", type: { kind: "dats", length: 8 } };
+      }
+      throw new ExpressionIssue("CDS002", `session variable ${text} is not supported (the built-in ones of CDS view entities only: user, client, system_language, system_date, user_timezone, user_date)`);
     }
     if (head.startsWith("$")) {
       throw new ExpressionIssue("CDS002", `${text} is not supported in expressions`);

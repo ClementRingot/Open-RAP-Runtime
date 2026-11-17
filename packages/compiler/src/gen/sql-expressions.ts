@@ -46,6 +46,8 @@ export function renderExpression(e: CdsExpression, sqlType: (t: AbapType) => str
           return `coalesce(nullif(current_setting('rapt.language', true), ''), 'E')`;
         case "client":
           return `'100'`;
+        case "user_timezone":
+          return `'UTC'`;
         default:
           return "current_date";
       }
