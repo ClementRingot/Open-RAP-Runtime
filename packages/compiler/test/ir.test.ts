@@ -247,6 +247,9 @@ describe("calculated elements (D67)", () => {
     const ok = where("overall_status <> 'X' and $projection.BookingFee >= 0");
     expect(ok.diagnostics.filter((d) => d.severity !== "info")).toEqual([]);
     expect(findEntity(ok.model, "ZRT_R_Travel")?.where).toMatchObject({ kind: "and", left: { kind: "compare", operator: "<>", left: { kind: "column", name: "overall_status" } }, right: { left: { kind: "element", name: "BookingFee" } } });
+    // D102: BETWEEN and IS INITIAL; no IN list in CDS view entities (as SAP)
+    expect(findEntity(where("booking_fee between 1 and 2 or description is initial").model, "ZRT_R_Travel")?.where).toMatchObject({ kind: "or", left: { kind: "and" }, right: { kind: "isInitial", negated: false } });
+    expect(where("overall_status in ( 'A' )").diagnostics.filter((d) => d.severity === "error").map((d) => d.code)).toContain("CDS001");
     expect(where("nothing = 'X'").diagnostics.filter((d) => d.severity === "error").map((d) => `${d.code} ${d.message}`)).toEqual(["CDS004 ZRT_R_Travel: WHERE: zrt_travel has no element nothing"]);
   });
 

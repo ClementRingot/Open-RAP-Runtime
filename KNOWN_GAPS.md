@@ -81,7 +81,7 @@ What the project deliberately leaves out; the planned work is in
 | Calculated elements read with EML in the behavior pool (D67) | Value of the active view (last save), not recomputed on the changes of the transaction; initial value for a draft instance. |
 | Association paths in the select list (`_Agency.Name`) | To-one associations, also in an expression and in a projection (D100): read-only, from the active instances of the targets (also for a draft instance); a to-many association or a filter in the path (`_X[…]`): CDS002. |
 | Joins | Diagnostic CDS002 |
-| WHERE clause (D101) | View entities: comparisons, `IS [NOT] NULL`, `AND`/`OR`/`NOT` on the columns, `$projection` elements and to-one association paths; also applied to the draft instances. Not yet: `BETWEEN`, `IN`, a WHERE in a projection (CDS002). |
+| WHERE clause (D101, D102) | View entities and projections: comparisons, `[NOT] BETWEEN`, `LIKE`, `IS [NOT] NULL`, `IS [NOT] INITIAL`, `AND`/`OR`/`NOT` on the columns, the elements and to-one association paths; also applied to the draft instances. As on SAP, no `IN` list (CDS001). |
 | Views with parameters, unions, hierarchies | Diagnostic CDS002 |
 | Custom entities (D43): parameters, aggregation (`get_aggregation`), nested `$expand`; DCL not applied (the query class filters itself) | Not handled |
 | Custom entities: a `$filter` outside ranges (OR between elements, functions other than `contains`/`startswith`/`endswith`, comparison between elements) | `get_as_ranges` raises `cx_rap_query_filter_no_range`, as in SAP; `get_as_sql_string` stays available. Functions and expressions that cannot be translated: 501. |

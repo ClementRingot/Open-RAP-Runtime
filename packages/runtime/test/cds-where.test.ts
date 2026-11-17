@@ -16,6 +16,8 @@ beforeAll(async () => {
       // the travels other than the ski holidays, and their bookings of a flight price under 1000
       "zrt_r_travel.ddls.asddls": (c) => lf(c).replace(/\n}\s*$/, "\n}\nwhere description <> 'Ski holidays'\n"),
       "zrt_r_booking.ddls.asddls": (c) => lf(c).replace(/\n}\s*$/, "\n}\nwhere $projection.FlightPrice < 1000 and _Travel.OverallStatus <> 'X'\n"),
+      // D102: a projection with BETWEEN and IS NOT INITIAL
+      "zrt_c_booking.ddls.asddls": (c) => lf(c).replace(/\n}\s*$/, "\n}\nwhere FlightPrice between 100 and 900 and CarrierID is not initial\n"),
     }),
   );
 }, 180_000);
@@ -39,8 +41,9 @@ describe("WHERE of a view entity (D101)", () => {
   });
 
   it("filters on an element and through an association", async () => {
-    const bookings = (await get("Booking?$select=BookingID,FlightPrice")).body["value"] as Array<Record<string, unknown>>;
+    const bookings = (await get("Booking?$select=BookingID,FlightPrice,CarrierID")).body["value"] as Array<Record<string, unknown>>;
     expect(bookings.length).toBeGreaterThan(0);
-    expect(bookings.every((b) => Number(b["FlightPrice"]) < 1000)).toBe(true);
+    // the condition of the view entity and the one of the projection (D102)
+    expect(bookings.every((b) => Number(b["FlightPrice"]) >= 100 && Number(b["FlightPrice"]) <= 900 && b["CarrierID"] !== "")).toBe(true);
   });
 });

@@ -299,6 +299,8 @@ export type CdsFunctionName =
 export type CdsCondition =
   | { kind: "compare"; operator: "=" | "<>" | "<" | ">" | "<=" | ">=" | "like"; left: CdsExpression; right: CdsExpression }
   | { kind: "isNull"; operand: CdsExpression; negated: boolean }
+  /** D102: `IS [NOT] INITIAL`, the initial value of the type of the operand. */
+  | { kind: "isInitial"; operand: CdsExpression; negated: boolean }
   | { kind: "and" | "or"; left: CdsCondition; right: CdsCondition }
   | { kind: "not"; operand: CdsCondition };
 

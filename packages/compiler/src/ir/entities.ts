@@ -556,9 +556,8 @@ export class EntityResolver {
 
   private projection(parsed: ParsedEntity): EntityModel | undefined {
     const { ast, file } = parsed;
-    if (ast.hasWhere) {
-      // D101: the rows of the projection would differ from SAP
-      this.diagnostics.error("CDS002", `${ast.name}: a WHERE condition in a projection is not supported yet`, this.loc(file, ast.whereLoc ?? ast.loc));
+    if (ast.hasWhere && ast.where === undefined) {
+      this.diagnostics.error("CDS002", `${ast.name}: ${ast.whereError ?? "this WHERE condition"} is not supported yet`, this.loc(file, ast.whereLoc ?? ast.loc));
     }
     const base = ast.source === undefined ? undefined : this.resolve(ast.source);
     if (base === undefined) {
@@ -630,8 +629,7 @@ export class EntityResolver {
       }
       slots.push(field);
     }
-    fields.push(
-      ...this.withCalculatedFields(parsed, slots, {
+    const scope: Omit<ExpressionScope, "element" | "dictionary"> = {
         sourceName: base.name,
         sourcePrefixes: [base.name, ...(ast.sourceAlias === undefined ? [] : [ast.sourceAlias])],
         associations: new Set(base.associations.map((a) => a.name.toUpperCase())),
@@ -640,8 +638,25 @@ export class EntityResolver {
           const baseField = base.fields.find((f) => f.name.toUpperCase() === name.toUpperCase() && f.draft !== true);
           return baseField === undefined ? undefined : { name: baseField.name, type: baseField.type };
         },
-      }),
-    );
+      };
+    fields.push(...this.withCalculatedFields(parsed, slots, scope));
+    // D102: the WHERE condition of a projection, on the elements of the projected entity
+    let where: CdsCondition | undefined;
+    if (ast.where !== undefined) {
+      try {
+        where = resolveCondition(ast.where, {
+          ...scope,
+          dictionary: this.dictionary,
+          element: (name) => {
+            const field = fields.find((f) => same(f.name, name));
+            return field === undefined ? undefined : { name: field.name, type: field.type };
+          },
+        });
+      } catch (error) {
+        if (!(error instanceof ExpressionIssue)) throw error;
+        this.diagnostics.error(error.code, `${ast.name}: WHERE: ${error.message}`, this.loc(file, ast.whereLoc ?? ast.loc));
+      }
+    }
     // ON conditions: the pairs of the base association, renamed through both projections
     const entity: EntityModel = {
       name: ast.name,
@@ -653,6 +668,7 @@ export class EntityResolver {
       associations,
       annotations: this.entityAnnotations(parsed),
       src: this.loc(file, ast.loc),
+      ...(where === undefined ? {} : { where }),
     };
     if (ast.providerContract !== undefined) {
       entity.providerContract = ast.providerContract;

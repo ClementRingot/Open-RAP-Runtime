@@ -22,11 +22,12 @@ export type CdsExprAst =
 export type CdsCondAst =
   | { kind: "compare"; operator: "=" | "<>" | "<" | ">" | "<=" | ">=" | "like"; left: CdsExprAst; right: CdsExprAst }
   | { kind: "isNull"; operand: CdsExprAst; negated: boolean }
+  | { kind: "isInitial"; operand: CdsExprAst; negated: boolean }
   | { kind: "and" | "or"; left: CdsCondAst; right: CdsCondAst }
   | { kind: "not"; operand: CdsCondAst };
 
 export const isCondition = (x: CdsExprAst | CdsCondAst): x is CdsCondAst =>
-  x.kind === "compare" || x.kind === "isNull" || x.kind === "and" || x.kind === "or" || x.kind === "not";
+  x.kind === "compare" || x.kind === "isNull" || x.kind === "isInitial" || x.kind === "and" || x.kind === "or" || x.kind === "not";
 
 /** An unsupported construct: its message names it. */
 export class CdsExpressionError extends Error {}
@@ -336,6 +337,10 @@ class ItemParser {
     const left = this.arithmetic();
     if (this.accept("is")) {
       const negated = this.accept("not");
+      // D102: IS [NOT] INITIAL, the initial value of the type of the operand
+      if (this.accept("initial")) {
+        return { kind: "isInitial", operand: left, negated };
+      }
       this.expect("null");
       return { kind: "isNull", operand: left, negated };
     }
@@ -346,9 +351,17 @@ class ItemParser {
     if (this.accept("like")) {
       return { kind: "compare", operator: "like", left, right: this.arithmetic() };
     }
-    if (this.peek() === "between") {
-      throw new CdsExpressionError(`BETWEEN (${this.source})`);
+    // D102: [NOT] BETWEEN a AND b, as two comparisons (CDS view entities have no IN list)
+    const negated = this.peek() === "not" && this.peek(1) === "between";
+    if (negated) this.index++;
+    if (this.accept("between")) {
+      const low = this.arithmetic();
+      this.expect("and");
+      const high = this.arithmetic();
+      const between: CdsCondAst = { kind: "and", left: { kind: "compare", operator: ">=", left, right: low }, right: { kind: "compare", operator: "<=", left, right: high } };
+      return negated ? { kind: "not", operand: between } : between;
     }
+
     let operator: "=" | "<>" | "<" | ">" | "<=" | ">=";
     if (this.accept("=")) {
       operator = "=";

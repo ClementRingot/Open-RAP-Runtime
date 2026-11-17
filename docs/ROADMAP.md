@@ -70,6 +70,7 @@ The sections below use the provisional numbers, unless they say "final".
 | — | D83 | Guided recording of the Fiori elements protocol on the SAP BTP trial, renamed copy for a shared system | 0 |
 | — | D85 | First pull and activation on the SAP BTP trial: abapGit XML of DDLX and SRVB, `total etag`, authorizations | 0 |
 | — | D86 | `use side effects`, value help and side effects of the draft fixture | 0 |
+| D86 | D102 (part) | CDS: `BETWEEN`, `IS INITIAL`, the WHERE of projections | 4 |
 | D86 | D101 (part) | CDS: the WHERE condition of view entities | 4 |
 | D86 | D100 (part) | CDS: to-one association paths in the select list | 4 |
 | — | D99 | Round 2 on the trial: observed values in the recordings, `strict` variant, the checklist of what the trial must settle | 0 |

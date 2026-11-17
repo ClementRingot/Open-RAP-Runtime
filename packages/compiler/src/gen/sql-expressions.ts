@@ -139,6 +139,21 @@ export function renderCondition(c: CdsCondition, sqlType: (t: AbapType) => strin
     }
     case "isNull":
       return `(${render(c.operand)} IS ${c.negated ? "NOT " : ""}NULL)`;
+    case "isInitial": {
+      // D102: the initial value of the ABAP type; dates, times, time stamps and UUIDs are stored NULL
+      const value = render(c.operand);
+      const t = c.operand.type;
+      const initial = t.kind === "numc"
+        ? `coalesce(ltrim(${value}, '0'), '') = ''`
+        : isCharacterLike(t)
+        ? `coalesce(${value}, '') = ''`
+        : isNumeric(t)
+          ? `coalesce(${value}, 0) = 0`
+          : t.kind === "bool"
+            ? `coalesce(${value}, FALSE) = FALSE`
+            : `${value} IS NULL`;
+      return c.negated ? `(NOT (${initial}))` : `(${initial})`;
+    }
     case "and":
     case "or":
       return `(${renderCondition(c.left, sqlType, refs)} ${c.kind.toUpperCase()} ${renderCondition(c.right, sqlType, refs)})`;

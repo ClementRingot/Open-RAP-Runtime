@@ -230,6 +230,8 @@ class Resolver {
         return { kind: "compare", operator: ast.operator, left: this.expression(ast.left), right: this.expression(ast.right) };
       case "isNull":
         return { kind: "isNull", operand: this.expression(ast.operand), negated: ast.negated };
+      case "isInitial":
+        return { kind: "isInitial", operand: this.expression(ast.operand), negated: ast.negated };
       case "and":
       case "or":
         return { kind: ast.kind, left: this.condition(ast.left), right: this.condition(ast.right) };

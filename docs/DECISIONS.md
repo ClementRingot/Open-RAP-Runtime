@@ -2463,3 +2463,23 @@ _The issues moved to the repository itself once public: see D74._
     CDS002, an error (no longer a warning: the rows would differ from SAP).
 - **Tests**: `ir.test.ts` (the condition resolved; CDS004 on an unknown name); `cds-where.test.ts`
   (a travel excluded, read by key: 404; bookings filtered on an element and through `_Travel`).
+
+## D102 — `BETWEEN`, `IS INITIAL` and the WHERE of projections
+
+- **Context**: D101 left `BETWEEN` and the WHERE of projections out. The ABAP keyword
+  documentation of ABAP Cloud (`cds_cond` of CDS view entities) lists the relational expressions
+  of a condition: comparisons, `BETWEEN`, `LIKE`, `IS NULL`, `IS INITIAL`; there is no `IN` list
+  (abaplint does not parse it either). A projection view may have a WHERE condition on the
+  elements of its projected entity.
+- **Decision**:
+  - `x [NOT] BETWEEN a AND b` is parsed as `x >= a AND x <= b` (negated with NOT), in a WHERE
+    condition and in `CASE WHEN`.
+  - `x IS [NOT] INITIAL` compares with the initial value of the type of `x`: `''` for the
+    character types, `0` for the numbers, `'0…0'` for NUMC, `FALSE` for booleans, `NULL` for the
+    types stored NULL when initial (dates, times, time stamps, UUIDs, D8).
+  - The WHERE of a projection is parsed and resolved on the elements of the projected entity and
+    its to-one associations; the view of the projection and the draft part of the `_all` view
+    apply it (D101). Before, it was silently ignored.
+  - `IN ( … )` stays refused (CDS001, the source cannot be parsed), as on SAP.
+- **Tests**: `ir.test.ts` (BETWEEN, IS INITIAL, IN refused); `cds-where.test.ts` (a projection
+  with BETWEEN and IS NOT INITIAL on top of a filtered view entity).

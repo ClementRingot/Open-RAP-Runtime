@@ -173,6 +173,8 @@ class AdapterContext {
       }
       entity.elements = tree.findDirectExpressions(E.CDSElement).map((e) => this.element(e));
       entity.associations = this.associations(tree);
+      // D102: the WHERE condition of a projection
+      this.where(entity, tree.findDirectExpression(E.CDSWhere));
       return entity;
     }
 
@@ -189,17 +191,7 @@ class AdapterContext {
           }
         }
         entity.hasJoin = select.findDirectExpressions(E.CDSJoin).length > 0;
-        const where = select.findDirectExpression(E.CDSWhere);
-        entity.hasWhere = where !== undefined;
-        if (where !== undefined) {
-          entity.whereLoc = this.loc(where);
-          try {
-            entity.where = parseCdsCondition(where);
-          } catch (error) {
-            if (!(error instanceof CdsExpressionError)) throw error;
-            entity.whereError = error.message;
-          }
-        }
+        this.where(entity, select.findDirectExpression(E.CDSWhere));
         entity.associations = this.associations(select);
         entity.elements = select.findDirectExpressions(E.CDSElement).map((e) => this.element(e));
       }
@@ -243,6 +235,19 @@ class AdapterContext {
       on: this.onCondition(child.findDirectExpression(E.CDSCondition)),
       loc: this.loc(child),
     };
+  }
+
+  /** D101: the WHERE condition of a view entity or a projection, or the construct it cannot parse. */
+  private where(entity: CdsEntityAst, where: abaplint.Nodes.ExpressionNode | undefined): void {
+    entity.hasWhere = where !== undefined;
+    if (where === undefined) return;
+    entity.whereLoc = this.loc(where);
+    try {
+      entity.where = parseCdsCondition(where);
+    } catch (error) {
+      if (!(error instanceof CdsExpressionError)) throw error;
+      entity.whereError = error.message;
+    }
   }
 
   private cardinality(node: abaplint.Nodes.ExpressionNode, kind: CdsAssociationAst["kind"]): { min: number; max: number | "*" } {
