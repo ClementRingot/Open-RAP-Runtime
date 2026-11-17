@@ -63,6 +63,10 @@ export interface CdsEntityAst {
   hasWhere: boolean;
   /** D104: the joins of the data source, in order. */
   joins?: CdsJoinAst[];
+  /** D105: the GROUP BY paths and the HAVING condition (or the construct it could not parse). */
+  groupBy?: string[][];
+  having?: CdsCondAst;
+  havingError?: string;
   /** D101: the condition of the WHERE clause, or the construct it could not parse. */
   where?: CdsCondAst;
   whereError?: string;
@@ -206,6 +210,20 @@ class AdapterContext {
         entity.hasJoin = select.findDirectExpressions(E.CDSJoin).length > 0;
         entity.joins = select.findDirectExpressions(E.CDSJoin).map((j) => this.join(j));
         this.where(entity, select.findDirectExpression(E.CDSWhere));
+        // D105: GROUP BY and HAVING
+        const groupBy = select.findDirectExpression(E.CDSGroupBy);
+        if (groupBy !== undefined) {
+          entity.groupBy = groupBy.findDirectExpressions(E.CDSPrefixedName).map((p) => p.findAllExpressions(E.CDSName).map((n) => n.concatTokens()));
+        }
+        const having = select.findDirectExpression(E.CDSHaving);
+        if (having !== undefined) {
+          try {
+            entity.having = parseCdsCondition(having);
+          } catch (error) {
+            if (!(error instanceof CdsExpressionError)) throw error;
+            entity.havingError = error.message;
+          }
+        }
         entity.associations = this.associations(select);
         entity.elements = select.findDirectExpressions(E.CDSElement).map((e) => this.element(e));
       }

@@ -178,7 +178,7 @@ describe("CDS adapter over abaplint", () => {
       else: { kind: "literal", value: 0 },
     });
     expect(byName.get("Today")?.expr).toEqual({ kind: "path", path: ["$session", "system_date"] });
-    expect(byName.get("Bad")?.expr).toBeUndefined();
-    expect(byName.get("Bad")?.expressionError).toContain("aggregate");
+    // D105: an aggregate expression is parsed (its rules are checked by the IR)
+    expect(byName.get("Bad")?.expr).toEqual({ kind: "aggregate", fn: "count", distinct: false });
   });
 });

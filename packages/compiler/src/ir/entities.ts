@@ -12,6 +12,7 @@ import {
   type Annotations,
   type AssociationModel,
   type CdsCondition,
+  type CdsExpression,
   type ColumnModel,
   type EntityModel,
   type FieldModel,
@@ -494,6 +495,7 @@ export class EntityResolver {
       src: this.loc(file, ast.loc),
       ...(where === undefined ? {} : { where }),
       ...(joins === undefined ? {} : { joins }),
+      ...this.grouping(parsed, fields, scope),
     };
     entity.associations = this.associationsOf(parsed, entity);
     if (fields.filter((f) => f.key).length === 0) {
@@ -501,6 +503,60 @@ export class EntityResolver {
     }
     this.checkExtensionElements(parsed, entity);
     return entity;
+  }
+
+  /**
+   * D105: the GROUP BY and HAVING of a view entity with aggregate expressions, checked as SAP does:
+   * the aggregates need a GROUP BY, which lists every field the select list does not aggregate.
+   */
+  private grouping(parsed: ParsedEntity, fields: FieldModel[], scope: Omit<ExpressionScope, "element" | "dictionary">): Pick<EntityModel, "groupBy" | "having"> {
+    const { ast, file } = parsed;
+    const where = this.loc(file, ast.loc);
+    const full: ExpressionScope = {
+      ...scope,
+      dictionary: this.dictionary,
+      element: (name) => {
+        const field = fields.find((f) => same(f.name, name));
+        return field === undefined ? undefined : { name: field.name, type: field.type };
+      },
+    };
+    const aggregated = fields.some((f) => f.expression !== undefined && containsAggregate(f.expression));
+    if (ast.havingError !== undefined) {
+      this.diagnostics.error("CDS002", `${ast.name}: HAVING: ${ast.havingError} is not supported yet`, where);
+    }
+    if (ast.groupBy === undefined) {
+      if (aggregated) this.diagnostics.error("CDS022", `${ast.name}: aggregate expressions need a GROUP BY clause listing the other elements`, where);
+      if (ast.having !== undefined) this.diagnostics.error("CDS022", `${ast.name}: HAVING needs a GROUP BY clause`, where);
+      return {};
+    }
+    const groupBy: CdsExpression[] = [];
+    for (const path of ast.groupBy) {
+      try {
+        groupBy.push(resolveExpression({ kind: "path", path }, full));
+      } catch (error) {
+        if (!(error instanceof ExpressionIssue)) throw error;
+        this.diagnostics.error(error.code, `${ast.name}: GROUP BY: ${error.message}`, where);
+      }
+    }
+    // every column outside the aggregates is grouped
+    const grouped = new Set(groupBy.flatMap((g) => columnsOf(g, false)));
+    for (const field of fields.filter((f) => f.draft !== true)) {
+      const columns = field.expression === undefined ? [`.${(field.column ?? field.baseField ?? field.name).toLowerCase()}`] : columnsOf(field.expression, true);
+      const missing = columns.filter((c) => !grouped.has(c));
+      if (missing.length > 0) {
+        this.diagnostics.error("CDS022", `${ast.name}.${field.name}: not aggregated, so listed in GROUP BY (${missing.map((c) => c.replace(/^\./, "")).join(", ")})`, where);
+      }
+    }
+    let having: CdsCondition | undefined;
+    if (ast.having !== undefined) {
+      try {
+        having = resolveCondition(ast.having, full);
+      } catch (error) {
+        if (!(error instanceof ExpressionIssue)) throw error;
+        this.diagnostics.error(error.code, `${ast.name}: HAVING: ${error.message}`, where);
+      }
+    }
+    return { groupBy, ...(having === undefined ? {} : { having }) };
   }
 
   /** The labels of the elements reached by the paths (D100), by path in upper case. */
@@ -927,4 +983,20 @@ function projectedName(ast: CdsEntityAst, baseName: string): string {
 function asPathElement(element: CdsElementAst, path: string[]): CdsElementAst {
   const { path: _path, ...rest } = element;
   return { ...rest, expr: { kind: "path", path } };
+}
+
+/** D105: whether an expression contains an aggregate. */
+function containsAggregate(e: unknown): boolean {
+  if (typeof e !== "object" || e === null) return false;
+  if ((e as { kind?: string }).kind === "aggregate") return true;
+  return Object.values(e).some((v) => (Array.isArray(v) ? v.some(containsAggregate) : containsAggregate(v)));
+}
+
+/** D105: the columns an expression reads (`source.name`), outside its aggregates when `outside`. */
+function columnsOf(e: unknown, outside: boolean): string[] {
+  if (typeof e !== "object" || e === null) return [];
+  const node = e as { kind?: string; name?: string; source?: string };
+  if (node.kind === "aggregate" && outside) return [];
+  if (node.kind === "column") return [`${node.source ?? ""}.${(node.name ?? "").toLowerCase()}`];
+  return Object.values(e).flatMap((v) => (Array.isArray(v) ? v.flatMap((x) => columnsOf(x, outside)) : columnsOf(v, outside)));
 }

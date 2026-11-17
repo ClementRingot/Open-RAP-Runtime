@@ -17,7 +17,9 @@ export type CdsExprAst =
   | { kind: "case"; operand?: CdsExprAst; branches: Array<{ when: CdsExprAst | CdsCondAst; then: CdsExprAst }>; else?: CdsExprAst }
   /** `type`: the text of the target type, blanks removed (`abap.dec(10,2)`, a data element…). */
   | { kind: "cast"; operand: CdsExprAst; type: string }
-  | { kind: "function"; name: string; args: CdsExprAst[] };
+  | { kind: "function"; name: string; args: CdsExprAst[] }
+  /** D105: MAX, MIN, SUM, AVG( … AS type ), COUNT( DISTINCT … ), COUNT(*) (no operand). */
+  | { kind: "aggregate"; fn: "max" | "min" | "sum" | "avg" | "count"; distinct: boolean; operand?: CdsExprAst; type?: string };
 
 export type CdsCondAst =
   | { kind: "compare"; operator: "=" | "<>" | "<" | ">" | "<=" | ">=" | "like"; left: CdsExprAst; right: CdsExprAst }
@@ -98,7 +100,7 @@ function operand(node: abaplint.Nodes.ExpressionNode): CdsExprAst {
     return functionCall(node);
   }
   if (statement instanceof E.CDSAggregate) {
-    throw new CdsExpressionError(`aggregate functions (${compact(node)})`);
+    return aggregate(node);
   }
   throw new CdsExpressionError(`${statement.constructor.name.replace(/^CDS/, "")} (${compact(node)})`);
 }
@@ -166,6 +168,24 @@ function caseExpression(node: abaplint.Nodes.ExpressionNode): CdsExprAst {
   if (result.operand === undefined && result.branches.some((b) => !isCondition(b.when))) {
     throw new CdsExpressionError(`CASE WHEN without condition (${compact(node)})`);
   }
+  return result;
+}
+
+/** D105: an aggregate expression of a view entity. */
+function aggregate(node: abaplint.Nodes.ExpressionNode): CdsExprAst {
+  const words = node
+    .getChildren()
+    .filter(isToken)
+    .map((t) => text(t).toLowerCase());
+  const fn = words[0];
+  if (fn !== "max" && fn !== "min" && fn !== "sum" && fn !== "avg" && fn !== "count") {
+    throw new CdsExpressionError(`aggregate functions (${compact(node)})`);
+  }
+  const typeNode = node.findDirectExpression(E.CDSType);
+  const value = node.getChildren().find((c): c is abaplint.Nodes.ExpressionNode => isExpression(c) && !(c.get() instanceof E.CDSType));
+  const result: Extract<CdsExprAst, { kind: "aggregate" }> = { kind: "aggregate", fn, distinct: words.includes("distinct") };
+  if (value !== undefined) result.operand = operand(value);
+  if (typeNode !== undefined) result.type = typeNode.concatTokens().replace(/\s+/g, "");
   return result;
 }
 

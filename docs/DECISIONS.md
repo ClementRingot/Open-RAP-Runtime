@@ -2530,3 +2530,23 @@ _The issues moved to the repository itself once public: see D74._
   source, right outer join and unknown source refused); `cds-joins.test.ts` (inner join of two
   tables, left outer join of an entity with a condition on it, a filter on a joined column,
   `Core.Computed`).
+
+## D105 — Aggregate expressions, GROUP BY and HAVING
+
+- **Context**: aggregate expressions were CDS002. The ABAP keyword documentation of ABAP Cloud
+  (aggregate expressions of CDS view entities) fixes them: `MAX`, `MIN`, `SUM`,
+  `AVG( [DISTINCT] arg AS dtype )` (the type is mandatory: DEC, CURR, QUAN, D16N, D34N or FLTP),
+  `COUNT( DISTINCT arg )` and `COUNT(*)` (INT4); no STRING or RAWSTRING operand; an aggregate in
+  the select list needs a `GROUP BY` that lists every non-aggregated field; `HAVING` follows a
+  `GROUP BY`.
+- **Decision**:
+  - The CDS parser reads the aggregate expressions, `GROUP BY` and `HAVING`; the IR types them
+    as above (`MAX`, `MIN`, `SUM`: the type of the operand) and checks the rules with CDS022:
+    an aggregate without `GROUP BY`, a field outside the aggregates not listed in `GROUP BY`
+    (its columns, also inside a calculated element), `AVG` without type or with another type,
+    `COUNT` of a value without `DISTINCT`, an aggregate in an aggregate, a string operand.
+  - The PostgreSQL view groups and filters (`GROUP BY …`, `HAVING …`); `COUNT` is cast to
+    `integer` (INT4). The aggregated elements are read-only, like calculated elements.
+  - Aggregates may appear inside another expression (a CASE, a CAST, a function), as SAP allows.
+- **Tests**: `ir.test.ts` (the rules, with the messages); `cds-aggregates.test.ts` (COUNT(*),
+  COUNT(DISTINCT), SUM, AVG, MAX per travel and currency, HAVING, Edm types, `Core.Computed`).

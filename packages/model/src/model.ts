@@ -272,7 +272,9 @@ export type CdsExpression =
    * D100: an element reached through to-one associations (`_Agency.Name`): the associations of the
    * entity itself (`self`, a view entity) or of its source (`source`, a projection), then the element.
    */
-  | { kind: "path"; from: "self" | "source"; associations: string[]; element: string; type: AbapType };
+  | { kind: "path"; from: "self" | "source"; associations: string[]; element: string; type: AbapType }
+  /** D105: an aggregate expression; COUNT(*) has no operand. */
+  | { kind: "aggregate"; fn: "max" | "min" | "sum" | "avg" | "count"; distinct: boolean; operand?: CdsExpression; type: AbapType };
 
 export type CdsFunctionName =
   | "concat"
@@ -342,6 +344,9 @@ export interface EntityModel {
   sqlView?: string;
   /** D101: the WHERE condition of a view entity, on the columns of its source and its elements. */
   where?: CdsCondition;
+  /** D105: the GROUP BY of a view entity with aggregates, and its HAVING condition. */
+  groupBy?: CdsExpression[];
+  having?: CdsCondition;
   /**
    * D104: the joins of a view entity: the alias of the primary data source, and each joined
    * source (a table, lower case, or an entity) with its alias and ON condition.

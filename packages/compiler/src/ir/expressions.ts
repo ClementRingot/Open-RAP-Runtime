@@ -111,6 +111,49 @@ class Resolver {
         return { kind: "cast", operand: this.expression(ast.operand), type: this.castType(ast.type) };
       case "function":
         return this.function(ast.name, ast.args.map((a) => this.expression(a)));
+      case "aggregate":
+        return this.aggregate(ast);
+    }
+  }
+
+  /** D105: the aggregate expressions of a view entity and their result types, as SAP types them. */
+  private aggregate(ast: Extract<CdsExprAst, { kind: "aggregate" }>): CdsExpression {
+    const name = ast.fn.toUpperCase();
+    if (ast.operand === undefined) {
+      if (ast.fn !== "count") {
+        throw new ExpressionIssue("CDS022", `${name}(*): only COUNT(*) counts rows`);
+      }
+      return { kind: "aggregate", fn: "count", distinct: false, type: { kind: "int4" } };
+    }
+    const operand = this.expression(ast.operand);
+    if (operand.kind === "aggregate") {
+      throw new ExpressionIssue("CDS022", `${name}: an aggregate expression cannot contain another one`);
+    }
+    if (operand.type.kind === "string" || operand.type.kind === "rawstring") {
+      throw new ExpressionIssue("CDS022", `${name}: the operand cannot be a STRING or a RAWSTRING`);
+    }
+    switch (ast.fn) {
+      case "count":
+        if (!ast.distinct) {
+          throw new ExpressionIssue("CDS022", "COUNT counts COUNT(*) rows or COUNT( DISTINCT … ) values");
+        }
+        return { kind: "aggregate", fn: "count", distinct: true, operand, type: { kind: "int4" } };
+      case "avg": {
+        if (ast.type === undefined) {
+          throw new ExpressionIssue("CDS022", "AVG needs the type of its result: AVG( … AS abap.dec(…) )");
+        }
+        const type = this.castType(ast.type);
+        if (!["dec", "curr", "quan", "decfloat16", "decfloat34", "fltp"].includes(type.kind)) {
+          throw new ExpressionIssue("CDS022", `AVG ( … AS ${ast.type} ): the type of the result is DEC, CURR, QUAN, D16N, D34N or FLTP`);
+        }
+        this.numeric(operand, "AVG");
+        return { kind: "aggregate", fn: "avg", distinct: ast.distinct, operand, type };
+      }
+      case "sum":
+        this.numeric(operand, "SUM");
+        return { kind: "aggregate", fn: "sum", distinct: ast.distinct, operand, type: plain(operand.type) };
+      default:
+        return { kind: "aggregate", fn: ast.fn, distinct: ast.distinct, operand, type: plain(operand.type) };
     }
   }
 

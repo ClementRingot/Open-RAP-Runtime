@@ -229,7 +229,8 @@ describe("calculated elements (D67)", () => {
     // D100: a path through a to-many association has no single value
     expect(message("concat( _Booking.BookingID, 'x' ) as FirstBooking")).toEqual(["CDS002 ZRT_R_Travel.FirstBooking: _Booking.BookingID: _Booking is a to-many association: a path in the select list needs one value per instance"]);
     expect(message("_Booking.BookingID as FirstBooking")).toEqual(["CDS002 ZRT_R_Travel.FirstBooking: _Booking.BookingID: _Booking is a to-many association: a path in the select list needs one value per instance"]);
-    expect(message("count( * ) as Bookings")).toEqual(["CDS002 ZRT_R_Travel.Bookings: aggregate functions (count ( * )) is not supported yet"]);
+    // D105: an aggregate needs a GROUP BY listing the other elements
+    expect(message("count( * ) as Bookings")).toEqual(["CDS022 ZRT_R_Travel: aggregate expressions need a GROUP BY clause listing the other elements"]);
     expect(message("instr( description, 'a' ) as Position")).toEqual(["CDS002 ZRT_R_Travel.Position: the SQL function INSTR is not supported yet"]);
   });
 
@@ -271,6 +272,21 @@ describe("calculated elements (D67)", () => {
     expect(entity?.fields.find((f) => f.name === "BookingUUID")).toMatchObject({ key: true });
     expect(joinView("right outer join zrt_booking as b on b.parent_uuid = t.travel_uuid").diagnostics.filter((d) => d.severity === "error").map((d) => d.code)).toContain("CDS002");
     expect(joinView("inner join zrt_nothing as b on b.x = t.travel_uuid").diagnostics.filter((d) => d.severity === "error").map((d) => d.code)).toContain("CDS003");
+  });
+
+  it("checks the aggregate expressions and their GROUP BY as SAP (D105)", () => {
+    const stats = (elements: string, groupBy = "group by b.parent_uuid") =>
+      build({
+        "zrt_i_stats.ddls.asddls": `define view entity ZRT_I_Stats as select from zrt_booking as b {\n  key b.parent_uuid as TravelUUID,\n${elements}\n}\n${groupBy}\n`,
+        "zrt_ui_travel.srvd.srvdsrv": (c: string) => lf(c).replace("  expose ZRT_C_Booking as Booking;", "  expose ZRT_C_Booking as Booking;\n  expose ZRT_I_Stats as Stats;"),
+      })
+        .diagnostics.filter((d) => d.severity === "error")
+        .map((d) => `${d.code} ${d.message}`);
+    expect(stats("  count(*) as Bookings, max( flight_date ) as LastFlight")).toEqual([]);
+    expect(stats("  count(*) as Bookings", "")).toEqual(["CDS022 ZRT_I_Stats: aggregate expressions need a GROUP BY clause listing the other elements"]);
+    expect(stats("  booking_id as BookingID,\n  count(*) as Bookings")).toEqual(["CDS022 ZRT_I_Stats.BookingID: not aggregated, so listed in GROUP BY (booking_id)"]);
+    expect(stats("  avg( flight_price ) as Average")).toEqual(["CDS022 ZRT_I_Stats.Average: AVG needs the type of its result: AVG( … AS abap.dec(…) )"]);
+    expect(stats("  count( carrier_id ) as Carriers")).toEqual(["CDS022 ZRT_I_Stats.Carriers: COUNT counts COUNT(*) rows or COUNT( DISTINCT … ) values"]);
   });
 
   it("reports invalid expressions with CDS022", () => {

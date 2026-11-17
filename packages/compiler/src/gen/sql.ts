@@ -22,7 +22,7 @@ import {
   type TableModel,
 } from "@open-rap/model";
 import { standardRows, standardSql } from "../standard/index.js";
-import { calculatedColumn, renderCondition, type SqlRefs } from "./sql-expressions.js";
+import { calculatedColumn, renderCondition, renderExpression, type SqlRefs } from "./sql-expressions.js";
 
 export function quoteIdentifier(name: string): string {
   return `"${name.replace(/"/g, '""')}"`;
@@ -289,7 +289,10 @@ function createView(model: Model, entity: EntityModel): string {
       : ` AS ${quoteIdentifier(entity.joins.alias.toLowerCase())}${entity.joins.sources
           .map((j) => `\n${j.kind === "left" ? "LEFT OUTER JOIN" : "INNER JOIN"} ${quoteIdentifier(joinedRelation(model, j))} AS ${quoteIdentifier(j.alias.toLowerCase())} ON ${j.on === undefined ? "TRUE" : renderCondition(j.on, sqlType, refs)}`)
           .join("")}`;
-  return `CREATE VIEW ${quoteIdentifier(entity.sqlView ?? "")} AS SELECT\n${columns.join(",\n")}\nFROM ${quoteIdentifier(from)}${joins}${where};\n`;
+  // D105: GROUP BY and HAVING of a view entity with aggregates
+  const groupBy = entity.groupBy === undefined ? "" : `\nGROUP BY ${entity.groupBy.map((g) => renderExpression(g, sqlType, refs)).join(", ")}`;
+  const having = entity.having === undefined ? "" : `\nHAVING ${renderCondition(entity.having, sqlType, refs)}`;
+  return `CREATE VIEW ${quoteIdentifier(entity.sqlView ?? "")} AS SELECT\n${columns.join(",\n")}\nFROM ${quoteIdentifier(from)}${joins}${where}${groupBy}${having};\n`;
 }
 
 /**

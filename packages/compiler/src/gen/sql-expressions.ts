@@ -36,6 +36,12 @@ export function renderExpression(e: CdsExpression, sqlType: (t: AbapType) => str
       return refs.element(e.name, e.type);
     case "path":
       return refs.path === undefined ? `NULL::${sqlType(e.type)}` : refs.path(e);
+    case "aggregate":
+      // D105: computed by the GROUP BY of the view; COUNT is an INT4 (bigint in PostgreSQL)
+      if (e.operand === undefined) {
+        return "count(*)::integer";
+      }
+      return e.fn === "count" ? `count(DISTINCT ${render(e.operand)})::integer` : `${e.fn}(${e.distinct ? "DISTINCT " : ""}${render(e.operand)})`;
     case "session":
       // D103: the user and the language of the request, set by the runtime on the transaction of
       // each read and each LUW (rapt.user, rapt.language); one client (D9)
