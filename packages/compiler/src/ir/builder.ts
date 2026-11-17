@@ -13,6 +13,8 @@ import {
   getArray,
   type FieldModel,
   type Model,
+  recursiveHierarchyName,
+  recursiveHierarchyOf,
   type ServiceModel,
   type UiConfigModel,
   type TableModel,
@@ -150,6 +152,14 @@ export function buildModel(project: Project, options: BuildOptions = {}): BuildR
     if (entity.kind === "projection" && entity.source !== undefined) {
       queue.push(entity.source);
     }
+    // D108: the CDS hierarchy of an OData recursive hierarchy, and the source of a hierarchy
+    const hierarchy = recursiveHierarchyName(entity);
+    if (hierarchy !== undefined) {
+      queue.push(hierarchy);
+    }
+    if (entity.hierarchy !== undefined && entity.source !== undefined) {
+      queue.push(entity.source);
+    }
     for (const association of entity.associations) {
       // compositions and parents belong to the BO; other associations only matter when exposed
       if (association.kind !== "association" || exposed.has(association.target.toUpperCase())) {
@@ -216,7 +226,32 @@ export function buildModel(project: Project, options: BuildOptions = {}): BuildR
     }
   }
 
+  // D108: the CDS hierarchies of the project, read by the ABAP SQL of the behavior pools too,
+  // with their sources
+  for (const name of entities.hierarchyNames()) {
+    if (required.has(name.toUpperCase())) {
+      continue;
+    }
+    const quiet = new Diagnostics();
+    const entity = entities.resolveInto(name, quiet);
+    diagnostics.addAll(quiet);
+    const source = entity?.source === undefined ? undefined : entities.resolve(entity.source);
+    if (entity !== undefined && source !== undefined && !quiet.hasErrors()) {
+      required.set(name.toUpperCase(), entity);
+      required.set(source.name.toUpperCase(), source);
+    }
+  }
+
   checkBusinessObjects([...required.values()], behaviors, diagnostics);
+  // D108: the recursive hierarchies of the exposed entities
+  for (const set of service.entitySets) {
+    const entity = required.get(set.entity.toUpperCase());
+    if (entity === undefined || service.webApi === true) continue;
+    const recursive = recursiveHierarchyOf({ entities: [...required.values()] } as unknown as Model, entity);
+    if (recursive !== undefined && "error" in recursive) {
+      diagnostics.error(recursive.code, `${entity.name}: ${recursive.error}`, entity.src);
+    }
+  }
 
   // ------------------------------------------------------- authorization objects and roles (D34)
   const authorizations = loadAuthorizations(project, diagnostics);

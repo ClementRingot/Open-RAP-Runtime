@@ -230,7 +230,7 @@ describe("errors (OData V4 JSON format)", () => {
     [`Nothing`, 400, "Unknown entity set Nothing"],
     [`Travel(00000000-0000-0000-0000-000000000000)`, 404, "Travel(00000000-0000-0000-0000-000000000000) not found"],
     [`Travel(${T3})/_Booking(${B1})`, 404, `Booking(${B1}) not found`],
-    [`Travel?$apply=topcount(2,TotalPrice)`, 501, "$apply: topcount is not supported (filter, groupby, aggregate are)"],
+    [`Travel?$apply=topcount(2,TotalPrice)`, 501, "$apply: topcount is not supported (filter, groupby, aggregate, and the transformations of a recursive hierarchy are)"],
   ])("GET %s → %i", async (url, status, message) => {
     const r = await get(url);
     expect(r.status).toBe(status);

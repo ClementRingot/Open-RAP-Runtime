@@ -4,7 +4,7 @@
  */
 
 import { sql, type RawBuilder } from "kysely";
-import { STATE_MESSAGES, type AbapType, type EdmType, type FieldModel, type ODataNavigation } from "@open-rap/model";
+import { HIERARCHY_PROPERTIES, STATE_MESSAGES, type AbapType, type EdmType, type FieldModel, type ODataNavigation } from "@open-rap/model";
 import type { Database } from "../db/database.js";
 import { fromSql, literalToCanonical, toSql, type CanonicalValue, type UrlLiteral } from "../values.js";
 import { badRequest, notImplemented, ODataError } from "./errors.js";
@@ -12,6 +12,7 @@ import type { Cond, CustomQueries } from "./custom.js";
 import { abapLanguage } from "../abap/bridge.js";
 import { currentLanguage, currentParameters, currentReader, type AccessControls } from "./access.js";
 import { DEPENDENT_ETAG } from "./json.js";
+import { allLevels, ancestors, buildForest, descendants, orderSiblings, topLevels, type Forest, type HierarchyNode, type Occurrence } from "./hierarchy.js";
 
 /** The deepest nesting of $expand (D82). */
 export const MAX_EXPAND_DEPTH = 5;
@@ -528,7 +529,7 @@ export class ReadEngine {
       selected = [];
       for (const path of options.select) {
         const name = path[0] as string;
-        if (name.startsWith("__") || name === STATE_MESSAGES) {
+        if (name.startsWith("__") || name === STATE_MESSAGES || (info.type.recursiveHierarchy !== undefined && HIERARCHY_PROPERTIES.some((p) => p.name === name))) {
           continue; // instance feature control (also its members: __OperationControl/accept) and state messages (D81), computed by the RAP runtime
         }
         if (path.length > 1 || name.includes(".")) {
@@ -661,7 +662,7 @@ export class ReadEngine {
     const steps = options.apply ?? [];
     const alias = "t0";
     const filters = steps.filter((s): s is Extract<ApplyStep, { kind: "filter" }> => s.kind === "filter").map((s) => this.condition(info, alias, s.filter));
-    const grouping = steps.find((s) => s.kind !== "filter") as Exclude<ApplyStep, { kind: "filter" }> | undefined;
+    const grouping = steps.find((s): s is Extract<ApplyStep, { kind: "groupby" | "aggregate" }> => s.kind === "groupby" || s.kind === "aggregate");
     const dimensions = grouping?.kind === "groupby" ? grouping.properties : [];
     const items = grouping === undefined ? [] : grouping.aggregate;
     for (const d of dimensions) {
@@ -731,6 +732,118 @@ export class ReadEngine {
     if (options.count === true) {
       const counted = await this.run((db) => sql<{ n: string | number }>`SELECT count(*) AS n FROM (${inner}) AS "g"`.execute(db));
       result.count = Number(counted.rows[0]?.n ?? 0);
+    }
+    return result;
+  }
+
+  /**
+   * D108: a request on the recursive hierarchy of the entity set: the transformations of `$apply`
+   * (ancestors, descendants, orderby, TopLevels, as OpenUI5 sends them) computed on the nodes of the
+   * CDS hierarchy that the user may read, then `$skip`, `$top`, `$count` on the result in preorder;
+   * each row with its hierarchy properties.
+   */
+  public async readHierarchy(info: TypeInfo, options: QueryOptions, scope: RawBuilder<unknown>[] = []): Promise<ReadResult> {
+    const recursive = info.type.recursiveHierarchy;
+    if (recursive === undefined) {
+      throw badRequest(`$apply: ${info.set.name} has no recursive hierarchy`);
+    }
+    const steps = options.apply ?? [];
+    for (const step of steps) {
+      if ((step.kind === "ancestors" || step.kind === "descendants" || step.kind === "topLevels") && (step.qualifier !== recursive.qualifier || step.property !== recursive.nodeProperty)) {
+        throw badRequest(`$apply: ${step.kind === "topLevels" ? "TopLevels" : step.kind}: the recursive hierarchy of ${info.set.name} is ${recursive.qualifier} on ${recursive.nodeProperty}`);
+      }
+    }
+    const alias = "t0";
+    const node = sql`(${sql.ref(`${alias}.${recursive.nodeProperty}`)})::text`;
+    // the properties of orderby, to sort the siblings
+    const ordering = steps.flatMap((s) => (s.kind === "orderby" ? s.orderby : []));
+    for (const o of ordering) {
+      if (o.path.length !== 1 || !info.properties.has(o.path[0] ?? "")) throw badRequest(`$apply: orderby: ${info.type.name} has no property ${o.path.join("/")}`);
+    }
+    const sortNames = [...new Set(ordering.map((o) => o.path[0] as string))];
+    const visibleRows = await this.run((db) =>
+      sql<Record<string, unknown>>`SELECT ${node} AS "$node"${sortNames.length === 0 ? sql`` : sql`, ${sql.join(sortNames.map((n) => sql`${sql.ref(`${alias}.${n}`)} AS ${sql.id(n)}`))}`} FROM ${sql.table(info.view)} AS ${sql.id(alias)} ${this.where(info, alias, options, scope)}`.execute(db),
+    );
+    const values = new Map<string, Record<string, unknown>>(visibleRows.rows.map((r) => [String(r["$node"]), r]));
+    const hierarchyRows = await this.run((db) => sql<{ node: string; path: Array<number | string> }>`SELECT "$node" AS node, "$path" AS path FROM ${sql.table(recursive.view)} ORDER BY "$path"`.execute(db));
+    let forest: Forest = buildForest(hierarchyRows.rows, (n) => values.has(n));
+    // the nodes matching the input of ancestors and descendants
+    const matching = async (input: ApplyStep[]): Promise<Set<string>> => {
+      const conditions = input.map((s) => {
+        if (s.kind === "filter") return this.condition(info, alias, s.filter);
+        if (s.kind === "search") return this.search(info, alias, s.search);
+        throw notImplemented(`$apply: ${s.kind} in the input of ancestors or descendants`);
+      });
+      const result = await this.run((db) => sql<{ node: string }>`SELECT ${node} AS node FROM ${sql.table(info.view)} AS ${sql.id(alias)} ${this.where(info, alias, {}, [...scope, ...conditions])}`.execute(db));
+      return new Set(result.rows.map((r) => String(r.node)));
+    };
+    let unlimited: Forest | undefined;
+    let nodes: HierarchyNode[] | undefined;
+    for (const step of steps) {
+      if (nodes !== undefined && step.kind !== "filter") {
+        throw notImplemented(`$apply: ${step.kind} after TopLevels`);
+      }
+      switch (step.kind) {
+        case "ancestors": {
+          const matched = await matching(step.input);
+          forest = ancestors(forest, (o) => matched.has(o.node), step.distance, step.keepStart);
+          unlimited = undefined;
+          break;
+        }
+        case "descendants": {
+          const matched = await matching(step.input);
+          unlimited = descendants(forest, (o) => matched.has(o.node), undefined, step.keepStart);
+          forest = descendants(forest, (o) => matched.has(o.node), step.distance, step.keepStart);
+          break;
+        }
+        case "orderby": {
+          const compare = (a: Occurrence, b: Occurrence): number => {
+            for (const o of step.orderby) {
+              const name = o.path[0] as string;
+              const x = values.get(a.node)?.[name];
+              const y = values.get(b.node)?.[name];
+              const order = x === y ? 0 : x === null || x === undefined ? -1 : y === null || y === undefined ? 1 : x < y ? -1 : 1;
+              if (order !== 0) return o.descending ? -order : order;
+            }
+            return 0;
+          };
+          forest = orderSiblings(forest, compare);
+          if (unlimited !== undefined) unlimited = orderSiblings(unlimited, compare);
+          break;
+        }
+        case "topLevels":
+          nodes = topLevels(forest, { ...(step.levels === undefined ? {} : { levels: step.levels }), ...(step.expandLevels === undefined ? {} : { expandLevels: step.expandLevels }), ...(step.show === undefined ? {} : { show: step.show }) });
+          break;
+        case "filter": {
+          // a filter after TopLevels keeps the matching nodes with the properties of the limited hierarchy
+          const matched = await matching([step]);
+          if (nodes !== undefined) nodes = nodes.filter((n) => matched.has(n.occurrence.node));
+          else throw notImplemented("$apply: filter before the transformations of a recursive hierarchy (use ancestors)");
+          break;
+        }
+        default:
+          throw notImplemented(`$apply: ${step.kind} with a recursive hierarchy`);
+      }
+    }
+    nodes ??= allLevels(forest, unlimited ?? forest);
+    const page = nodes.slice(options.skip ?? 0, (options.skip ?? 0) + Math.min(options.top ?? MAX_PAGE_SIZE, MAX_PAGE_SIZE));
+    const result: ReadResult = { rows: [] };
+    if (options.count === true) result.count = nodes.length;
+    if (page.length === 0) return result;
+    const keys = [...new Set(page.map((n) => n.occurrence.node))];
+    const { apply: _apply, skip: _skip, top: _top, count: _count, orderby: _orderby, filter: _filter, search: _search, ...rest } = options;
+    const read = await this.readCollection(info, { ...rest, top: keys.length, skip: 0 }, [...scope, sql`${node} IN (${sql.join(keys.map((k) => sql`${k}`))})`], false);
+    const byNode = new Map<string, Row>();
+    for (const row of read.rows) {
+      const value = row[recursive.nodeProperty];
+      byNode.set(String(value), row);
+    }
+    // the node read by its text in SQL and as a canonical value in the row: compare both forms
+    const rowOf = (key: string): Row | undefined => byNode.get(key) ?? [...byNode.entries()].find(([k]) => k.toLowerCase() === key.toLowerCase())?.[1];
+    for (const n of page) {
+      const row = rowOf(n.occurrence.node);
+      if (row === undefined) continue;
+      result.rows.push({ ...row, LimitedDescendantCount: n.LimitedDescendantCount, DistanceFromRoot: n.DistanceFromRoot, DrillState: n.DrillState, LimitedRank: n.LimitedRank });
     }
     return result;
   }

@@ -16,6 +16,7 @@ import {
   getAnnotation,
   valueHelpOf,
   getArray,
+  HIERARCHY_PROPERTIES,
   OPERATION_CONTROL,
   operationControlTypeName,
   createByAssociationControlTypeName,
@@ -42,6 +43,12 @@ const VOCABULARIES = [
   { uri: "https://sap.github.io/odata-vocabularies/vocabularies/Common.xml", namespace: "com.sap.vocabularies.Common.v1", alias: "Common" },
   { uri: "https://sap.github.io/odata-vocabularies/vocabularies/UI.xml", namespace: "com.sap.vocabularies.UI.v1", alias: "UI" },
   { uri: "https://sap.github.io/odata-vocabularies/vocabularies/Communication.xml", namespace: "com.sap.vocabularies.Communication.v1", alias: "Communication" },
+];
+
+/** D108: the vocabularies of the recursive hierarchies, referenced by a service that has one. */
+const HIERARCHY_VOCABULARIES = [
+  { uri: "https://oasis-tcs.github.io/odata-vocabularies/vocabularies/Org.OData.Aggregation.V1.xml", namespace: "Org.OData.Aggregation.V1", alias: "Aggregation" },
+  { uri: "https://sap.github.io/odata-vocabularies/vocabularies/Hierarchy.xml", namespace: "com.sap.vocabularies.Hierarchy.v1", alias: "Hierarchy" },
 ];
 
 const isObject = (v: AnnotationValue | undefined): v is AnnotationObject => typeof v === "object" && v !== null && !Array.isArray(v);
@@ -177,7 +184,9 @@ class CsdlBuilder {
     const edmx = el(
       "edmx:Edmx",
       { Version: "4.0", "xmlns:edmx": "http://docs.oasis-open.org/odata/ns/edmx" },
-      ...VOCABULARIES.map((v) => el("edmx:Reference", { Uri: v.uri }, el("edmx:Include", { Namespace: v.namespace, Alias: v.alias }))),
+      ...[...VOCABULARIES, ...(this.service.entityTypes.some((t) => t.recursiveHierarchy !== undefined) ? HIERARCHY_VOCABULARIES : [])].map((v) =>
+        el("edmx:Reference", { Uri: v.uri }, el("edmx:Include", { Namespace: v.namespace, Alias: v.alias })),
+      ),
       el(
         "edmx:DataServices",
         undefined,
@@ -209,6 +218,10 @@ class CsdlBuilder {
     }
     if (type.stateMessages === true) {
       children.push(el("Property", { Name: STATE_MESSAGES, Type: `Collection(${this.qualified(STATE_MESSAGE_TYPE)})`, Nullable: "false" }));
+    }
+    // D108: the properties of the recursive hierarchy, computed by each hierarchical request
+    if (type.recursiveHierarchy !== undefined) {
+      for (const property of HIERARCHY_PROPERTIES) children.push(el("Property", { Name: property.name, ...edmAttributes(property.edm) }));
     }
     // D107: the results of a parameterized view lead back to their parameters
     const parameterized = this.service.entitySets.find((s) => s.entityType === type.name && s.parameters !== undefined);
@@ -565,6 +578,9 @@ class CsdlBuilder {
           {},
           record(
             "UI.PresentationVariantType",
+            // D108: the tree of a recursive hierarchy, expanded to a level
+            str(variant["recursiveHierarchyQualifier"]) === undefined ? undefined : pv("RecursiveHierarchyQualifier", { String: (str(variant["recursiveHierarchyQualifier"]) ?? "").replace(/[^A-Za-z0-9_]/g, "_") }),
+            typeof variant["initialExpansionLevel"] === "number" ? pv("InitialExpansionLevel", { Int: variant["initialExpansionLevel"] }) : undefined,
             sortOrder.length === 0
               ? undefined
               : pv(
@@ -602,7 +618,22 @@ class CsdlBuilder {
     const label = str(getAnnotation(a, "EndUserText.label"));
     if (label !== undefined) children.push(annotation("Common.Label", { String: label }));
     if (type.stateMessages === true) children.push(annotation("Common.Messages", { Path: STATE_MESSAGES }));
+    // D108: the recursive hierarchy, both terms with the qualifier of the CDS hierarchy
+    const recursive = type.recursiveHierarchy;
+    if (recursive !== undefined) {
+      children.push(
+        annotation(
+          "Aggregation.RecursiveHierarchy",
+          { Qualifier: recursive.qualifier },
+          record(undefined, pv("NodeProperty", { PropertyPath: recursive.nodeProperty }), pv("ParentNavigationProperty", { NavigationPropertyPath: recursive.parentNavigation })),
+        ),
+        annotation("Hierarchy.RecursiveHierarchy", { Qualifier: recursive.qualifier }, record(undefined, ...HIERARCHY_PROPERTIES.map((p) => pv(p.name, { PropertyPath: p.name })))),
+      );
+    }
     this.annotations(this.qualified(type.name), children);
+    for (const property of recursive === undefined ? [] : HIERARCHY_PROPERTIES) {
+      this.annotations(`${this.qualified(type.name)}/${property.name}`, [annotation("Core.Computed"), annotation("UI.HiddenFilter"), annotation("UI.Hidden")]);
+    }
     // D92: the controls of the instances are computed, hidden, not filterable (as on SAP BTP)
     for (const control of this.controls(type)) {
       this.annotations(`${this.qualified(type.name)}/${control}`, [annotation("Core.Computed"), annotation("UI.HiddenFilter"), annotation("UI.Hidden")]);

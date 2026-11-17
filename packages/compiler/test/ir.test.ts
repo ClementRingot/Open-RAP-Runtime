@@ -307,6 +307,38 @@ describe("calculated elements (D67)", () => {
     expect(errors(union("  key booking_uuid as Id,\n  flight_price as Number"))).toEqual(["CDS022 ZRT_I_Union: UNION: branch 2: Number (curr) cannot be merged with numc"]);
   });
 
+  it("checks the CDS hierarchies as SAP (D108)", () => {
+    const SOURCE = `define view entity ZRT_I_Bk as select from zrt_booking
+  association of many to one ZRT_I_Bk as _Parent on $projection.ParentId = _Parent.Id
+{
+  key booking_uuid as Id,
+  parent_uuid as ParentId,
+  booking_id as Number,
+  _Parent
+}
+`;
+    const hierarchy = (additions: string, source = "ZRT_I_Bk", association = "_Parent") =>
+      build({
+        "zrt_i_bk.ddls.asddls": SOURCE,
+        "zrt_i_bkhier.ddls.asddls": `define hierarchy ZRT_I_BkHier as parent child hierarchy(\n  source ${source}\n  child to parent association ${association}\n${additions}\n)\n{\n  Id,\n  ParentId,\n  $node.hierarchy_level as HierLevel\n}\n`,
+      });
+    const errors = (r: ReturnType<typeof hierarchy>) => r.diagnostics.filter((d) => d.severity === "error").map((d) => `${d.code} ${d.message}`);
+    const ok = hierarchy("  start where ParentId is initial\n  siblings order by Number descending");
+    expect(errors(ok)).toEqual([]);
+    expect(findEntity(ok.model, "ZRT_I_BkHier")).toMatchObject({
+      source: "ZRT_I_Bk",
+      hierarchy: { association: "_Parent", parent: [{ child: "ParentId", node: "Id" }], siblings: [{ element: "Number", descending: true }], multipleParents: "notAllowed", orphans: "ignore", cycles: "error" },
+      fields: [{ name: "Id" }, { name: "ParentId" }, { name: "HierLevel", type: { kind: "int4" }, expression: { kind: "node", attribute: "hierarchy_level" } }],
+    });
+    // the parent is a UUID: no implicit START WHERE
+    expect(errors(hierarchy("  siblings order by Number"))).toEqual(["CDS022 ZRT_I_BkHier: START WHERE is needed: it is implicit only when the parent node is numeric"]);
+    expect(errors(hierarchy("  start where ParentId is initial"))).toEqual(["CDS022 ZRT_I_BkHier: SIBLINGS ORDER BY is mandatory in a CDS hierarchy"]);
+    expect(errors(hierarchy("  start where ParentId is initial\n  siblings order by Number", "zrt_booking"))).toEqual(["CDS022 ZRT_I_BkHier: the source of a hierarchy must be a CDS view entity, not zrt_booking"]);
+    expect(errors(hierarchy("  start where ParentId is initial\n  siblings order by Number", "ZRT_I_Bk", "_Other"))).toEqual(["CDS004 ZRT_I_BkHier: ZRT_I_Bk exposes no association _Other: the hierarchy association must be in its select list"]);
+    expect(errors(hierarchy("  start where ParentId is initial\n  siblings order by Number\n  cycles breakup"))).toEqual(["CDS022 ZRT_I_BkHier: CYCLES BREAKUP needs MULTIPLE PARENTS ALLOWED"]);
+    expect(errors(hierarchy("  start where ParentId is initial\n  siblings order by Number\n  generate spantree"))).toEqual(["CDS002 ZRT_I_BkHier: GENERATE SPANTREE is not supported yet"]);
+  });
+
   it("checks the parameters of view entities and their actual parameters (D107)", () => {
     const views = (byStatus: string, open: string) =>
       build({

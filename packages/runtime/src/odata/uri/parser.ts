@@ -6,7 +6,7 @@
 import { createToken, EmbeddedActionsParser, Lexer, type IToken, type TokenType } from "chevrotain";
 import type { UrlLiteral } from "../../values.js";
 import { badRequest, ODataError } from "../errors.js";
-import type { AggregateItem, ApplyStep, ExpandItem, Expr, KeyPredicate, OrderItem, QueryOptions, Segment } from "./ast.js";
+import type { AggregateItem, ApplyStep, ExpandItem, Expr, HierarchyStep, KeyPredicate, OrderItem, QueryOptions, Segment } from "./ast.js";
 
 const WhiteSpace = createToken({ name: "WhiteSpace", pattern: /\s+/, group: Lexer.SKIPPED });
 const StringLiteral = createToken({ name: "StringLiteral", pattern: /'(?:[^']|'')*'/ });
@@ -474,23 +474,32 @@ export const parseParameters = (text: string): Array<{ name: string; value: Expr
 // ---------------------------------------------------------------------------------------------
 // $apply (D52): filter(…), groupby((…),aggregate(…)), aggregate(…), separated by /
 
-/** Splits `text` at `separator` outside parentheses and string literals. */
+/** Splits `text` at `separator` outside parentheses, brackets, braces and string literals. */
 function splitTopLevel(text: string, separator: string): string[] {
   const parts: string[] = [];
   let depth = 0;
   let quoted = false;
+  let doubleQuoted = false;
   let start = 0;
   for (let i = 0; i < text.length; i++) {
     const c = text[i];
+    if (doubleQuoted) {
+      if (c === "\\") i++;
+      else if (c === '"') doubleQuoted = false;
+      continue;
+    }
     if (c === "'") {
       if (quoted && text[i + 1] === "'") {
         i++;
         continue;
       }
       quoted = !quoted;
-    } else if (!quoted && c === "(") {
+    } else if (!quoted && c === '"' && depth > 0) {
+      // D108: the JSON of ExpandLevels
+      doubleQuoted = true;
+    } else if (!quoted && (c === "(" || c === "[" || c === "{")) {
       depth++;
-    } else if (!quoted && c === ")") {
+    } else if (!quoted && (c === ")" || c === "]" || c === "}")) {
       depth--;
     } else if (!quoted && depth === 0 && c === separator) {
       parts.push(text.slice(start, i).trim());
@@ -503,7 +512,7 @@ function splitTopLevel(text: string, separator: string): string[] {
 
 /** `name(arguments)`: the name and the text between the outer parentheses. */
 function callOf(text: string): { name: string; inner: string } {
-  const match = /^([A-Za-z]+)\s*\(([\s\S]*)\)$/.exec(text.trim());
+  const match = /^([A-Za-z][A-Za-z0-9_.]*)\s*\(([\s\S]*)\)$/.exec(text.trim());
   if (match === null) {
     throw badRequest(`$apply: cannot read ${text}`);
   }
@@ -526,6 +535,76 @@ function aggregates(text: string): AggregateItem[] {
   });
 }
 
+/** D108: `$root/Set` of the hierarchy functions. */
+function rootSet(text: string | undefined): string {
+  const match = /^\$root\/([A-Za-z_][A-Za-z0-9_]*)$/.exec((text ?? "").trim());
+  if (match === null) throw badRequest(`$apply: the hierarchy nodes must be $root/<entity set>, not ${text ?? ""}`);
+  return match[1] ?? "";
+}
+
+/** D108: a string literal `'…'` of a function parameter, or a plain identifier. */
+function unquote(text: string | undefined): string {
+  const value = (text ?? "").trim();
+  return value.startsWith("'") && value.endsWith("'") ? value.slice(1, -1).replace(/''/g, "'") : value;
+}
+
+/** D108: ancestors(…) and descendants(…): set, qualifier, node property, input, [distance], [keep start]. */
+function hierarchyFunction(kind: "ancestors" | "descendants", inner: string): ApplyStep {
+  const [set, qualifier, property, input, ...rest] = splitTopLevel(inner, ",");
+  if (input === undefined) throw badRequest(`$apply: ${kind}(…) needs the hierarchy nodes, the qualifier, the node property and a transformation`);
+  const step: ApplyStep = { kind, set: rootSet(set), qualifier: unquote(qualifier), property: unquote(property), input: parseApply(input), keepStart: false };
+  for (const option of rest) {
+    if (/^keep\s+start$/i.test(option)) step.keepStart = true;
+    else if (/^\d+$/.test(option)) step.distance = Number.parseInt(option, 10);
+    else throw badRequest(`$apply: ${kind}(…): unknown parameter ${option}`);
+  }
+  return step;
+}
+
+/** D108: the ExpandLevels of TopLevels, JSON (OpenUI5) or with unquoted names. */
+function expandLevels(text: string): Array<{ nodeId: string; levels: number | null }> {
+  let value: unknown;
+  try {
+    value = JSON.parse(text);
+  } catch {
+    try {
+      value = JSON.parse(text.replace(/([{,]\s*)([A-Za-z_][A-Za-z0-9_]*)\s*:/g, '$1"$2":'));
+    } catch {
+      throw badRequest(`$apply: TopLevels: cannot read ExpandLevels ${text}`);
+    }
+  }
+  if (!Array.isArray(value)) throw badRequest("$apply: TopLevels: ExpandLevels is a list");
+  return value.map((item: unknown) => {
+    const record = (item ?? {}) as Record<string, unknown>;
+    const levels = record["Levels"];
+    return { nodeId: String(record["NodeID"] ?? ""), levels: typeof levels === "number" ? levels : null };
+  });
+}
+
+/** D108: com.sap.vocabularies.Hierarchy.v1.TopLevels(Name=value, …). */
+function topLevels(inner: string): ApplyStep {
+  const values = new Map<string, string>();
+  for (const item of splitTopLevel(inner, ",")) {
+    const index = item.indexOf("=");
+    if (index < 0) throw badRequest(`$apply: TopLevels: ${item} is not Name=value`);
+    values.set(item.slice(0, index).trim(), item.slice(index + 1).trim());
+  }
+  const step: ApplyStep = { kind: "topLevels", set: rootSet(values.get("HierarchyNodes")), qualifier: unquote(values.get("HierarchyQualifier")), property: unquote(values.get("NodeProperty")) };
+  const levels = values.get("Levels");
+  if (levels !== undefined && levels !== "null") {
+    if (!/^\d+$/.test(levels)) throw badRequest(`$apply: TopLevels: Levels=${levels} is not a number`);
+    step.levels = Number.parseInt(levels, 10);
+  }
+  const expand = values.get("ExpandLevels");
+  if (expand !== undefined) step.expandLevels = expandLevels(expand);
+  const show = values.get("Show");
+  if (show !== undefined) {
+    const list = JSON.parse(show.replace(/'/g, '"')) as unknown;
+    step.show = Array.isArray(list) ? list.map(String) : [];
+  }
+  return step;
+}
+
 export function parseApply(text: string): ApplyStep[] {
   const steps: ApplyStep[] = [];
   for (const part of splitTopLevel(text, "/")) {
@@ -533,6 +612,19 @@ export function parseApply(text: string): ApplyStep[] {
     switch (name) {
       case "filter":
         steps.push({ kind: "filter", filter: parseFilter(inner) });
+        break;
+      case "search":
+        steps.push({ kind: "search", search: unquote(inner) });
+        break;
+      case "orderby":
+        steps.push({ kind: "orderby", orderby: parseOrderby(inner) });
+        break;
+      case "ancestors":
+      case "descendants":
+        steps.push(hierarchyFunction(name, inner));
+        break;
+      case "com.sap.vocabularies.hierarchy.v1.toplevels":
+        steps.push(topLevels(inner));
         break;
       case "aggregate":
         steps.push({ kind: "aggregate", aggregate: aggregates(inner) });
@@ -560,15 +652,23 @@ export function parseApply(text: string): ApplyStep[] {
         throw notImplementedApply(name);
     }
   }
-  const grouping = steps.filter((s) => s.kind !== "filter");
-  if (grouping.length > 1 || steps.findIndex((s) => s.kind !== "filter") < steps.length - grouping.length) {
+  const grouping = steps.filter((s) => s.kind === "groupby" || s.kind === "aggregate");
+  if (grouping.length > 0 && steps.some((s) => s.kind === "search" || s.kind === "orderby" || isHierarchical(s))) {
+    throw notImplementedApply("groupby or aggregate with hierarchy transformations");
+  }
+  if (grouping.length > 1 || (grouping.length === 1 && steps.findIndex((s) => s.kind !== "filter") < steps.length - 1)) {
     throw notImplementedApply("transformations after groupby or aggregate");
   }
   return steps;
 }
 
+/** D108: a transformation of a recursive hierarchy. */
+export function isHierarchical(step: ApplyStep): step is HierarchyStep {
+  return step.kind === "ancestors" || step.kind === "descendants" || step.kind === "topLevels";
+}
+
 function notImplementedApply(what: string): ODataError {
-  return new ODataError(501, "NOT_IMPLEMENTED", `$apply: ${what} is not supported (filter, groupby, aggregate are)`);
+  return new ODataError(501, "NOT_IMPLEMENTED", `$apply: ${what} is not supported (filter, groupby, aggregate, and the transformations of a recursive hierarchy are)`);
 }
 
 // ---------------------------------------------------------------------------------------------

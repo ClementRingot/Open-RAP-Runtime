@@ -14,7 +14,7 @@ import type { ReadEngine } from "./read.js";
 import type { Key, ServiceRuntime, TypeInfo } from "./service.js";
 import type { QueryOptions, Segment } from "./uri/ast.js";
 import { toJson, type CanonicalValue } from "../values.js";
-import { parseQueryOptions, parseQueryString, parseResourcePath } from "./uri/parser.js";
+import { isHierarchical, parseQueryOptions, parseQueryString, parseResourcePath } from "./uri/parser.js";
 
 export interface ODataRequest {
   method: string;
@@ -323,6 +323,17 @@ export class ODataHandler {
       const body = { "@odata.context": this.json.contextUrl(info, target.options, true), ...this.json.entity(info, row, target.options, ctx) };
       const etag = etagOf(info, row);
       return jsonResponse(200, body, ctx.ieee754, etag === undefined ? {} : { ETag: etag });
+    }
+    if (target.options.apply?.some((s) => isHierarchical(s)) === true) {
+      // D108: the recursive hierarchy, entities with their hierarchy properties
+      const result = await this.read.readHierarchy(info, target.options, scope);
+      await this.writes?.enrich?.(info, result.rows, target.options, ctx);
+      const body: Record<string, unknown> = { "@odata.context": this.json.contextUrl(info, target.options, false) };
+      if (result.count !== undefined) {
+        body["@odata.count"] = result.count;
+      }
+      body["value"] = result.rows.map((row) => this.json.entity(info, row, target.options, ctx));
+      return jsonResponse(200, body, ctx.ieee754);
     }
     if (target.options.apply !== undefined) {
       // data aggregation (D52): groups, not entities

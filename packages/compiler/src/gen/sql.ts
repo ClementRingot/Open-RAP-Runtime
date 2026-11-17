@@ -267,6 +267,9 @@ function joinedRelation(model: Model, source: { table?: string; entity?: string 
 }
 
 function createView(model: Model, entity: EntityModel): string {
+  if (entity.hierarchy !== undefined) {
+    return `CREATE VIEW ${quoteIdentifier(entity.sqlView ?? "")} AS ${hierarchySql(model, entity)};\n`;
+  }
   // D106: the other branches of a UNION, their columns cast to the types of the first SELECT
   const first = entity.fields.filter((f) => f.draft !== true);
   const branches = (entity.union ?? []).map((u) => `\nUNION${u.all ? " ALL" : ""}\n${selectSql(model, u.branch, first)}`).join("");
@@ -312,6 +315,91 @@ function selectSql(model: Model, entity: EntityModel, castTo?: FieldModel[]): st
   const groupBy = entity.groupBy === undefined ? "" : `\nGROUP BY ${entity.groupBy.map((g) => renderExpression(g, sqlType, refs)).join(", ")}`;
   const having = entity.having === undefined ? "" : `\nHAVING ${renderCondition(entity.having, sqlType, refs)}`;
   return `SELECT\n${columns.join(",\n")}\nFROM ${quoteIdentifier(from)}${joins}${where}${groupBy}${having}`;
+}
+
+/** D108: raises the exceptions of a CDS hierarchy (cycles, multiple parents, orphans) from its view. */
+const HIERARCHY_ERROR = `CREATE OR REPLACE FUNCTION "rapt_hierarchy_error"(message text) RETURNS boolean LANGUAGE plpgsql AS $f$
+BEGIN
+  RAISE EXCEPTION '%', message;
+END
+$f$;
+`;
+
+/**
+ * D108: the view of a CDS hierarchy, a recursive query on its source view. The root nodes match
+ * START WHERE (and, with ORPHANS ROOT, the nodes whose parent is missing); each node's children
+ * join it through the hierarchy association, ordered by SIBLINGS ORDER BY. "$path" holds the
+ * sibling ranks from the root: the preorder of the nodes, hence the hierarchy attributes. The
+ * runtime reads "$path" and "$node" (the node key as text) for the OData recursive hierarchy.
+ */
+function hierarchySql(model: Model, entity: EntityModel): string {
+  const h = entity.hierarchy as NonNullable<EntityModel["hierarchy"]>;
+  const source = sourceEntityOf(model, entity);
+  const q = quoteIdentifier;
+  const col = (alias: string, name: string): string => `${q(alias)}.${q(name)}`;
+  const refs = (alias: string): SqlRefs => ({ column: (name) => col(alias, name), element: () => "NULL" });
+  const cond = (c: NonNullable<EntityModel["where"]>, alias: string): string => `coalesce((${renderCondition(c, sqlType, refs(alias))}), false)`;
+  const order = (alias: string): string => [...h.siblings.map((x) => `${col(alias, x.element)} ${x.descending ? "DESC" : "ASC"} NULLS FIRST`), ...h.parent.map((p) => col(alias, p.node))].join(", ");
+  const key = (alias: string, side: "node" | "child"): string =>
+    h.parent.length === 1 ? `(${col(alias, (h.parent[0] as { node: string; child: string })[side])})::text` : `concat_ws(chr(1), ${h.parent.map((p) => `(${col(alias, p[side])})::text`).join(", ")})`;
+  const depth = h.depth === undefined ? undefined : renderExpression(h.depth, sqlType, refs("n"));
+  const start = cond(h.start, "r");
+  // a true orphan: its parent is given, but no node of the source is that parent
+  const orphan = (alias: string): string =>
+    `(NOT ${cond(h.start, alias)} AND ${h.parent.map((p) => `${col(alias, p.child)} IS NOT NULL`).join(" AND ")} AND NOT EXISTS (SELECT 1 FROM "src" AS "o" WHERE ${h.parent.map((p) => `${col("o", p.node)} = ${col(alias, p.child)}`).join(" AND ")}))`;
+  const roots = h.orphans === "root" ? `(${start} OR ${orphan("r")})` : start;
+  const lines = [
+    "WITH RECURSIVE",
+    `"src" AS (SELECT "s".*, row_number() OVER (PARTITION BY ${h.parent.map((p) => col("s", p.child)).join(", ")} ORDER BY ${order("s")}) AS "$sibling" FROM ${q(source?.sqlView ?? "")} AS "s"${h.directory === undefined ? "" : ` WHERE ${cond(h.directory, "s")}`}),`,
+    `"nodes" AS (`,
+    `  SELECT "r".*, 1 AS "$level", ARRAY[row_number() OVER (ORDER BY ${order("r")})]::bigint[] AS "$path", ARRAY[${key("r", "node")}] AS "$ids", 0 AS "$cycle", CASE WHEN ${start} THEN 0 ELSE 1 END AS "$orphan"`,
+    `  FROM "src" AS "r" WHERE ${roots}${depth === undefined ? "" : ` AND ${depth.replace(/"n"\./g, '"r".')} >= 0`}`,
+    "  UNION ALL",
+    `  SELECT "c".*, "n"."$level" + 1, "n"."$path" || "c"."$sibling", "n"."$ids" || ${key("c", "node")}, CASE WHEN ${key("c", "node")} = ANY("n"."$ids") THEN 1 ELSE 0 END, "n"."$orphan"`,
+    `  FROM "src" AS "c" JOIN "nodes" AS "n" ON ${h.parent.map((p) => `${col("c", p.child)} = ${col("n", p.node)}`).join(" AND ")}`,
+    `  WHERE "n"."$cycle" = 0${depth === undefined ? "" : ` AND "n"."$level" <= ${depth}`}`,
+    "),",
+    `"ranked" AS (SELECT "n".*, row_number() OVER (ORDER BY "n"."$path") AS "$rank", count(*) OVER (PARTITION BY ${key("n", "node")}) AS "$occurrences" FROM "nodes" AS "n")`,
+  ];
+  const treeSize = `(SELECT count(*) FROM "ranked" AS "d" WHERE "d"."$path"[1:array_length("h"."$path", 1)] = "h"."$path")`;
+  const nodeRefs: SqlRefs = {
+    column: (name) => col("h", name),
+    element: () => "NULL",
+    node: (e) => {
+      switch (e.attribute) {
+        case "hierarchy_rank":
+          return `"h"."$rank"`;
+        case "hierarchy_level":
+          return `"h"."$level"`;
+        case "hierarchy_tree_size":
+          return treeSize;
+        case "hierarchy_parent_rank":
+          return `coalesce((SELECT "p"."$rank" FROM "ranked" AS "p" WHERE "p"."$path" = "h"."$path"[1:array_length("h"."$path", 1) - 1]), 0)`;
+        case "hierarchy_is_cycle":
+          return `"h"."$cycle"`;
+        case "hierarchy_is_orphan":
+          return `"h"."$orphan"`;
+        case "node_id":
+          return h.parent.length === 1 ? col("h", (h.parent[0] as { node: string }).node) : key("h", "node");
+        case "parent_id":
+          return `CASE WHEN "h"."$level" = 1 AND "h"."$orphan" = 0 THEN NULL ELSE ${h.parent.length === 1 ? col("h", (h.parent[0] as { child: string }).child) : key("h", "child")} END`;
+      }
+    },
+  };
+  const columns = entity.fields
+    .filter((f) => f.draft !== true)
+    .map((f) => `  ${f.expression === undefined ? col("h", f.baseField ?? f.name) : calculatedColumn(f.expression, f.type, sqlType, nodeRefs)} AS ${q(f.name)}`);
+  columns.push(`  "h"."$path" AS "$path"`, `  ${key("h", "node")} AS "$node"`);
+  // the exceptions SAP raises: a cycle (CYCLES ERROR), several parents (MULTIPLE PARENTS), an orphan (ORPHANS ERROR)
+  const checks: string[] = [];
+  // checked on the whole hierarchy, in this order, whatever row the database reads first
+  const leaves = treeSize.replace(/"h"/g, '"e"').replace(/"d"/g, '"f"');
+  if (h.cycles === "error") checks.push(`WHEN EXISTS (SELECT 1 FROM "ranked" AS "e" WHERE "e"."$cycle" = 1) THEN "rapt_hierarchy_error"('${entity.name}: node cycle')`);
+  if (h.multipleParents === "notAllowed") checks.push(`WHEN EXISTS (SELECT 1 FROM "ranked" AS "e" WHERE "e"."$occurrences" > 1) THEN "rapt_hierarchy_error"('${entity.name}: node with multiple parents')`);
+  if (h.multipleParents === "leavesOnly") checks.push(`WHEN EXISTS (SELECT 1 FROM "ranked" AS "e" WHERE "e"."$occurrences" > 1 AND ${leaves} > 1) THEN "rapt_hierarchy_error"('${entity.name}: inner node with multiple parents')`);
+  if (h.orphans === "error") checks.push(`WHEN EXISTS (SELECT 1 FROM "src" AS "x" WHERE ${orphan("x")}) THEN "rapt_hierarchy_error"('${entity.name}: orphan node')`);
+  const where = checks.length === 0 ? "" : `\nWHERE CASE ${checks.join(" ")} ELSE true END`;
+  return `${lines.join("\n")}\nSELECT\n${columns.join(",\n")}\nFROM "ranked" AS "h"${where}`;
 }
 
 /**
@@ -511,7 +599,7 @@ export function generateSql(model: Model): SqlOutput {
   const tables = model.tables.map(createTable);
   const views = orderedViews(model);
   const drop = views.length === 0 ? "" : `DROP VIEW IF EXISTS ${[...views].reverse().map((v) => quoteIdentifier(v.sqlView ?? "")).join(", ")} CASCADE;\n`;
-  const viewStatements = views.map((v) => createView(model, v));
+  const viewStatements = [...(views.some((v) => v.hierarchy !== undefined) ? [HIERARCHY_ERROR] : []), ...views.map((v) => createView(model, v))];
   const abapSql = abapSqlSchema(model, views);
   const schema = [header, "-- tables", ...tables, ...standardData(model), "-- compositions", ...foreignKeys(model), ...[frameworkTables(model)].filter((t) => t !== ""), ...draftTables(model), "-- CDS views", drop, ...viewStatements, ...draftViews(model), "-- ABAP SQL of the behavior pools (values in ABAP form)", ...abapSql].join("\n");
   return { schema, tables: model.tables.map((t) => t.name), views: views.map((v) => v.sqlView ?? "") };

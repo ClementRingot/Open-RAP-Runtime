@@ -2596,3 +2596,52 @@ _The issues moved to the repository itself once public: see D74._
 - **Tests**: `ir.test.ts` (the parameters, `$parameters`, missing and unknown actual parameters,
   an unknown type); `cds-parameters.test.ts` (`View(p=…)/Set`, a system field from the session or
   given, 400 without parameters, a view passing a literal, the `$metadata`).
+
+## D108 — CDS hierarchies and the OData recursive hierarchy
+
+- **Context**: `define hierarchy` was CDS002, and a tree table of SAP Fiori elements (RAP
+  treeview, read-only) needs the recursive hierarchy of OData V4 (`Aggregation.RecursiveHierarchy`,
+  `Hierarchy.RecursiveHierarchy`, the transformations of `$apply`).
+- **Decision**:
+  - The CDS parser reads `define hierarchy … [with parameters] as parent child hierarchy( source …
+    child to parent association … [directory … filter by …] [start where …] siblings order by …
+    [depth …] [multiple parents …] [orphans …] [cycles …] )` and its element list (elements of the
+    source, `$node.<attribute> as Alias`, associations of the source).
+  - The IR checks it as SAP does: the source is a view entity exposing the hierarchy association,
+    a self association compared with `=` only (CDS022, CDS004); START WHERE is implicit (the parent
+    is initial) only when the parent node is numeric; SIBLINGS ORDER BY is mandatory and on no
+    string; DEPTH (a literal or an integer parameter) only with ORPHANS IGNORE; CYCLES BREAKUP only
+    with MULTIPLE PARENTS ALLOWED. `$node.hierarchy_rank`, `hierarchy_tree_size`,
+    `hierarchy_parent_rank`, `hierarchy_level`, `hierarchy_is_cycle`, `hierarchy_is_orphan`,
+    `node_id`, `parent_id` are typed as SAP documents them. PERIOD and GENERATE SPANTREE: CDS002;
+    LOAD, CACHE and NODETYPE only tune the database or inform analytical engines: ignored.
+  - SQL: the view of a hierarchy is a recursive query on its source view: the root nodes (START
+    WHERE; with ORPHANS ROOT, the nodes whose parent is missing, flagged), then the children
+    through the ON condition, each with the sibling ranks from its root (`$path`): their order is
+    the preorder, which gives the hierarchy attributes. DIRECTORY … FILTER BY filters the source.
+    The exceptions SAP raises — a cycle (CYCLES ERROR, the default), a node with several parents
+    (MULTIPLE PARENTS NOT ALLOWED, the default; LEAVES ONLY for an inner node), an orphan (ORPHANS
+    ERROR) — are raised by the view (`rapt_hierarchy_error`), cycles first. Every hierarchy of the
+    project is in the model with its source, for the ABAP SQL of the behavior pools.
+  - OData: an exposed entity annotated `@OData.hierarchy.recursiveHierarchy: [{ entity.name: … }]`
+    has both annotations of the qualifier of the hierarchy (its name), NodeProperty the node
+    element, ParentNavigationProperty its to-one self association, and the properties
+    LimitedDescendantCount, DistanceFromRoot, DrillState, LimitedRank (computed, hidden), with the
+    vocabularies Aggregation and Hierarchy. `@UI.presentationVariant` gives RecursiveHierarchyQualifier
+    and InitialExpansionLevel. A hierarchy with parameters, or whose association compares several
+    elements: CDS002; a missing node element or parent association: CDS022.
+  - The runtime serves the requests of the OData V4 model of OpenUI5 for a tree table:
+    `ancestors(…, filter(…)/search(…), [n,] keep start)`, `descendants(…, filter(…), n)`,
+    `orderby(…)` (the siblings), `Hierarchy.TopLevels(…, Levels=n, ExpandLevels=[…], Show=[…])`,
+    then `$skip`, `$top`, `$count`, `$select`, `$expand`. It reads the nodes the user may read
+    (access controls, drafts), the preorder of the hierarchy view, and computes the result in
+    preorder; a node whose parent cannot be read is left out with its descendants. DrillState and
+    DistanceFromRoot follow the unlimited hierarchy of the Hierarchy vocabulary (the sub-hierarchy of
+    `descendants`).
+  - To confirm on SAP BTP (round 2, D111): the qualifier, the names of the four properties, the
+    distance of a node read by `descendants`.
+- **Tests**: `ir.test.ts` (the checks of SAP); `cds-hierarchies.test.ts` (preorder and attributes,
+  DEPTH by parameter, siblings descending, CYCLES BREAKUP and ERROR, ORPHANS ROOT and ERROR,
+  multiple parents; `$metadata`, TopLevels with Levels, ExpandLevels, orderby, paging, descendants,
+  ancestors with filter and search, another qualifier).
+

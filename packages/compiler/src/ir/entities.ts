@@ -16,7 +16,10 @@ import {
   type ColumnModel,
   type EntityModel,
   type FieldModel,
+  type HierarchyAttribute,
+  type HierarchyModel,
   type TableModel,
+  isNumeric,
 } from "@open-rap/model";
 import { parseCds, type CdsElementAst, type CdsEntityAst, type CdsMetadataExtensionAst } from "../cds/adapter.js";
 import { parseBuiltInType } from "../ddic/catalog.js";
@@ -88,6 +91,11 @@ export class EntityResolver {
     return [...this.parsed.values()].filter((p) => p.ast.kind === "abstract").map((p) => p.ast.name);
   }
 
+  /** Names of the CDS hierarchies of the project (D108). */
+  public hierarchyNames(): string[] {
+    return [...this.parsed.values()].filter((p) => p.ast.kind === "hierarchy").map((p) => p.ast.name);
+  }
+
   /** Names of the table entities of the project (D55). */
   public tableEntityNames(): string[] {
     return [...this.parsed.values()].filter((p) => p.ast.kind === "table").map((p) => p.ast.name);
@@ -142,6 +150,9 @@ export class EntityResolver {
         break;
       case "table":
         entity = this.tableEntity(parsed);
+        break;
+      case "hierarchy":
+        entity = this.hierarchy(parsed);
         break;
       default:
         this.diagnostics.error("CDS002", `${parsed.ast.name}: ${parsed.ast.statement} is not supported`, { file: parsed.file.path, ...parsed.ast.loc });
@@ -618,6 +629,211 @@ export class EntityResolver {
       union.push({ all, branch: model });
     }
     entity.union = union;
+  }
+
+  // -------------------------------------------------------------------------------------------
+  // CDS hierarchies (D108)
+
+  /**
+   * A CDS hierarchy, checked as SAP does: its source is a view entity exposing the hierarchy
+   * association, a self association; START WHERE is implicit only for a numeric parent; SIBLINGS
+   * ORDER BY is mandatory. Its elements are elements of the source, `$node.…` hierarchy attributes
+   * and associations of the source.
+   */
+  private hierarchy(parsed: ParsedEntity): EntityModel | undefined {
+    const { ast, file } = parsed;
+    const h = ast.hierarchy;
+    if (h === undefined) return undefined;
+    const at = this.loc(file, h.loc);
+    const error = (code: "CDS002" | "CDS003" | "CDS004" | "CDS022", message: string): undefined => {
+      this.diagnostics.error(code, `${ast.name}: ${message}`, at);
+      return undefined;
+    };
+    for (const addition of h.unsupported) error("CDS002", `${addition} is not supported yet`);
+    const sourceAst = this.parsed.get(h.source.toUpperCase())?.ast;
+    if (sourceAst === undefined && this.dictionary.table(h.source) === undefined) {
+      return error("CDS003", `unknown hierarchy source ${h.source} (no DDLS in the sources)`);
+    }
+    if (sourceAst?.kind !== "view") {
+      return error("CDS022", `the source of a hierarchy must be a CDS view entity, not ${h.source}`);
+    }
+    const source = this.resolve(h.source);
+    if (source === undefined) return undefined;
+    if ((source.parameters?.length ?? 0) > 0) {
+      return error("CDS002", `a hierarchy source with parameters (${source.name}) is not supported yet`);
+    }
+    const association = source.associations.find((a) => same(a.name, h.association));
+    if (association === undefined) {
+      return error("CDS004", `${source.name} exposes no association ${h.association || "?"}: the hierarchy association must be in its select list`);
+    }
+    if (!same(association.target, source.name)) {
+      return error("CDS022", `the hierarchy association ${association.name} must be a self association of ${source.name}, not to ${association.target}`);
+    }
+    if (association.on.length === 0) {
+      return error("CDS022", `the ON condition of ${association.name} must compare elements with = only`);
+    }
+    const sourceField = (name: string): FieldModel | undefined => source.fields.find((f) => same(f.name, name) && f.draft !== true);
+    const parent = association.on.map((p) => ({ child: sourceField(p.source)?.name ?? p.source, node: sourceField(p.target)?.name ?? p.target }));
+    const parameters = this.parameters(parsed);
+    const single = parent.length === 1 ? parent[0] : undefined;
+    const attributeType = (name: string): { attribute: HierarchyAttribute; type: AbapType } | undefined => {
+      const attribute = name.toLowerCase() as HierarchyAttribute;
+      switch (attribute) {
+        case "hierarchy_rank":
+        case "hierarchy_tree_size":
+        case "hierarchy_parent_rank":
+          return { attribute, type: { kind: "int8" } };
+        case "hierarchy_level":
+          return { attribute, type: { kind: "int4" } };
+        case "hierarchy_is_cycle":
+        case "hierarchy_is_orphan":
+          return { attribute, type: { kind: "int1" } };
+        case "node_id":
+        case "parent_id": {
+          const field = single === undefined ? undefined : sourceField(attribute === "node_id" ? single.node : single.child);
+          return { attribute, type: field === undefined ? { kind: "sstring", length: 1333 } : { ...field.type } };
+        }
+        default:
+          return undefined;
+      }
+    };
+    const scope: ExpressionScope = {
+      sourceName: source.name,
+      sourcePrefixes: [source.name],
+      associations: new Set(),
+      column: (name) => {
+        const field = sourceField(name);
+        return field === undefined ? undefined : { name: field.name, type: field.type };
+      },
+      element: () => undefined,
+      parameter: (name) => {
+        const p = parameters.find((x) => same(x.name, name));
+        return p === undefined ? undefined : { name: p.name, setting: parameterSetting(ast.name, p.name), type: p.type };
+      },
+      node: attributeType,
+      dictionary: this.dictionary,
+    };
+    const condition = (what: string, cond: Parameters<typeof resolveCondition>[0]): CdsCondition | undefined => {
+      try {
+        return resolveCondition(cond, scope);
+      } catch (issue) {
+        if (!(issue instanceof ExpressionIssue)) throw issue;
+        error(issue.code, `${what}: ${issue.message}`);
+        return undefined;
+      }
+    };
+    // START WHERE: implicit only in a semantic key scenario (a numeric parent), as on SAP
+    let start: CdsCondition | undefined;
+    if (h.start !== undefined) {
+      start = condition("START WHERE", h.start);
+    } else if (h.startError !== undefined) {
+      error("CDS002", `START WHERE: ${h.startError} is not supported yet`);
+    } else if (parent.every((p) => { const t = sourceField(p.child)?.type; return t !== undefined && isNumeric(t); })) {
+      start = parent
+        .map((p): CdsCondition => ({ kind: "isInitial", operand: { kind: "column", name: p.child, type: { ...(sourceField(p.child) as FieldModel).type } }, negated: false }))
+        .reduce((a, b) => ({ kind: "and", left: a, right: b }));
+    } else {
+      error("CDS022", "START WHERE is needed: it is implicit only when the parent node is numeric");
+    }
+    // SIBLINGS ORDER BY: mandatory, on elements of the source that are not strings
+    const siblings: HierarchyModel["siblings"] = [];
+    if (h.siblings.length === 0) error("CDS022", "SIBLINGS ORDER BY is mandatory in a CDS hierarchy");
+    for (const item of h.siblings) {
+      const name = item.path[item.path.length - 1] ?? "";
+      const field = item.path.length === 1 || same(item.path[0] ?? "", source.name) ? sourceField(name) : undefined;
+      if (field === undefined) {
+        error("CDS004", `SIBLINGS ORDER BY: ${source.name} has no element ${item.path.join(".")}`);
+      } else if (field.type.kind === "string" || field.type.kind === "rawstring") {
+        error("CDS022", `SIBLINGS ORDER BY: ${field.name} is a ${field.type.kind.toUpperCase()}, which cannot order siblings`);
+      } else {
+        siblings.push({ element: field.name, descending: item.descending });
+      }
+    }
+    let depth: CdsExpression | undefined;
+    if (h.depth?.value !== undefined) {
+      depth = { kind: "literal", value: h.depth.value, type: { kind: "int4" } };
+    } else if (h.depth?.parameter !== undefined) {
+      const p = scope.parameter?.(h.depth.parameter);
+      if (p === undefined) error("CDS004", `DEPTH: no parameter ${h.depth.parameter} in the hierarchy`);
+      else if (!["int1", "int2", "int4", "int8"].includes(p.type.kind)) error("CDS022", `DEPTH: the parameter ${p.name} must have an integer type`);
+      else depth = { kind: "parameter", name: p.name, setting: p.setting, type: { ...p.type } };
+    }
+    const orphans = h.orphans ?? "ignore";
+    const multipleParents = h.multipleParents ?? "notAllowed";
+    const cycles = h.cycles ?? "error";
+    if (depth !== undefined && orphans !== "ignore") error("CDS022", "DEPTH can be used only with ORPHANS IGNORE");
+    if (cycles === "breakup" && multipleParents !== "allowed") error("CDS022", "CYCLES BREAKUP needs MULTIPLE PARENTS ALLOWED");
+    let directory: CdsCondition | undefined;
+    if (h.directory !== undefined) {
+      if (!source.associations.some((a) => same(a.name, h.directory?.association ?? ""))) {
+        error("CDS004", `DIRECTORY: ${source.name} exposes no association ${h.directory.association}`);
+      } else if (h.directory.filter === undefined) {
+        error("CDS002", `DIRECTORY … FILTER BY: ${h.directory.error ?? "this condition"} is not supported yet`);
+      } else {
+        directory = condition("DIRECTORY … FILTER BY", h.directory.filter);
+      }
+    }
+    // the elements: elements of the source, hierarchy attributes, associations of the source
+    const fields: FieldModel[] = [];
+    const exposed: string[] = [];
+    for (const element of ast.elements) {
+      const path = element.path ?? [];
+      const head = (path[0] ?? "").toUpperCase();
+      if (head === "$NODE") {
+        const field = this.calculatedField(parsed, { ...element, expr: { kind: "path", path } }, scope);
+        if (field !== undefined) fields.push(field);
+        continue;
+      }
+      if (path.length === 1 && source.associations.some((a) => same(a.name, head))) {
+        exposed.push(path[0] ?? "");
+        continue;
+      }
+      const base = path.length === 1 ? sourceField(path[0] ?? "") : undefined;
+      if (base === undefined) {
+        this.diagnostics.error("CDS004", `${ast.name}.${element.name}: ${source.name} has no element ${path.join(".")}`, this.loc(file, element.loc));
+        continue;
+      }
+      const field = this.fieldFromElement(parsed, element, base.type, propagated(ast, base.annotations));
+      field.baseField = base.name;
+      fields.push(field);
+    }
+    if (start === undefined) return undefined;
+    // an exposed association of the source keeps its target; its ON elements must be elements of the hierarchy
+    const associations: AssociationModel[] = [];
+    for (const name of exposed) {
+      const a = source.associations.find((x) => same(x.name, name)) as AssociationModel;
+      const on = a.on.map((p) => ({ source: fields.find((f) => same(f.baseField ?? "", p.source))?.name, target: p.target }));
+      if (on.some((p) => p.source === undefined)) {
+        error("CDS022", `the association ${a.name} needs the elements of its ON condition in the element list`);
+        continue;
+      }
+      associations.push({ name: a.name, target: a.target, kind: "association", cardinality: { ...a.cardinality }, on: on as AssociationModel["on"] });
+    }
+    const entity: EntityModel = {
+      name: ast.name,
+      kind: "view",
+      root: false,
+      source: source.name,
+      sqlView: sqlName(ast.name),
+      fields,
+      associations,
+      annotations: this.entityAnnotations(parsed),
+      src: this.loc(file, ast.loc),
+      hierarchy: {
+        association: association.name,
+        parent,
+        start,
+        siblings,
+        ...(depth === undefined ? {} : { depth }),
+        ...(directory === undefined ? {} : { directory }),
+        multipleParents,
+        orphans,
+        cycles,
+      },
+      ...(parameters.length === 0 ? {} : { parameters }),
+    };
+    this.checkExtensionElements(parsed, entity);
+    return entity;
   }
 
   /** D107: the input parameters of an entity, typed. */

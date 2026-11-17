@@ -9,6 +9,8 @@ export interface SqlRefs {
   element(name: string, type: AbapType): string;
   /** D100: an element reached through to-one associations. */
   path?(e: Extract<CdsExpression, { kind: "path" }>): string;
+  /** D108: a hierarchy attribute (`$node.…`) of a CDS hierarchy. */
+  node?(e: Extract<CdsExpression, { kind: "node" }>): string;
 }
 
 const literal = (value: string): string => `'${value.replace(/'/g, "''")}'`;
@@ -36,6 +38,8 @@ export function renderExpression(e: CdsExpression, sqlType: (t: AbapType) => str
       return refs.element(e.name, e.type);
     case "path":
       return refs.path === undefined ? `NULL::${sqlType(e.type)}` : refs.path(e);
+    case "node":
+      return refs.node === undefined ? `NULL::${sqlType(e.type)}` : refs.node(e);
     case "parameter":
       // D107: set by the runtime on the transaction of the read
       return `nullif(current_setting('${e.setting}', true), '')::${sqlType(e.type)}`;

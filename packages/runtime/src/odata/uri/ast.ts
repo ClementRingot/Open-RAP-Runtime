@@ -47,7 +47,19 @@ export interface AggregateItem {
 export type ApplyStep =
   | { kind: "filter"; filter: Expr }
   | { kind: "groupby"; properties: string[]; aggregate: AggregateItem[] }
-  | { kind: "aggregate"; aggregate: AggregateItem[] };
+  | { kind: "aggregate"; aggregate: AggregateItem[] }
+  /** D108: the transformations of a recursive hierarchy, as OpenUI5 sends them. */
+  | { kind: "search"; search: string }
+  | { kind: "orderby"; orderby: OrderItem[] }
+  | HierarchyStep;
+
+/**
+ * D108: `ancestors|descendants($root/Set, Qualifier, NodeProperty, <filter/search>, [distance,] [keep start])`
+ * and `com.sap.vocabularies.Hierarchy.v1.TopLevels(HierarchyNodes=…, HierarchyQualifier='…', NodeProperty='…', Levels=n, ExpandLevels=[…], Show=[…])`.
+ */
+export type HierarchyStep =
+  | { kind: "ancestors" | "descendants"; set: string; qualifier: string; property: string; input: ApplyStep[]; distance?: number; keepStart: boolean }
+  | { kind: "topLevels"; set: string; qualifier: string; property: string; levels?: number; expandLevels?: Array<{ nodeId: string; levels: number | null }>; show?: string[] };
 
 /** `(value)` or `(Name=value,…)`. */
 export type KeyPredicate = { kind: "single"; value: Expr } | { kind: "named"; values: Array<{ name: string; value: Expr }> };

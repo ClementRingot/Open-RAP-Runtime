@@ -1,6 +1,6 @@
 /** OData V4 JSON (odata.metadata=minimal): entities, collections, ETags, IEEE754Compatible. */
 
-import { CREATE_BY_ASSOCIATION_CONTROL, ENTITY_CONTROL, FIELD_CONTROL, OPERATION_CONTROL, STATE_MESSAGES } from "@open-rap/model";
+import { CREATE_BY_ASSOCIATION_CONTROL, ENTITY_CONTROL, FIELD_CONTROL, HIERARCHY_PROPERTIES, OPERATION_CONTROL, STATE_MESSAGES } from "@open-rap/model";
 import { RawJsonNumber, toJson, type CanonicalValue, type JsonValue } from "../values.js";
 import type { ReadEngine, Row } from "./read.js";
 import type { ServiceRuntime, TypeInfo } from "./service.js";
@@ -65,6 +65,13 @@ export class JsonWriter {
     for (const name of this.read.selectedProperties(info, options)) {
       const { property } = this.service.property(info, name);
       result[name] = toJson(property.edm, (row[name] ?? null) as CanonicalValue, ctx.ieee754);
+    }
+    // D108: the properties of a recursive hierarchy, in the rows of a hierarchical request
+    for (const property of info.type.recursiveHierarchy === undefined ? [] : HIERARCHY_PROPERTIES) {
+      const value = row[property.name];
+      if (value !== undefined && isSelected(options, property.name)) {
+        result[property.name] = toJson(property.edm, (typeof value === "number" && property.edm.type === "Edm.Int64" ? String(value) : value) as CanonicalValue, ctx.ieee754);
+      }
     }
     for (const control of [CREATE_BY_ASSOCIATION_CONTROL, ENTITY_CONTROL, OPERATION_CONTROL, FIELD_CONTROL, STATE_MESSAGES]) {
       const value = row[control];

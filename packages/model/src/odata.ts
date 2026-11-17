@@ -80,6 +80,67 @@ export interface ODataEntityType {
   fieldControl: string[];
   /** The state messages (D81): the property SAP__Messages, annotated Common.Messages; every entity type of a BO since D94. */
   stateMessages?: true;
+  /** D108: the recursive hierarchy of `@OData.hierarchy.recursiveHierarchy`. */
+  recursiveHierarchy?: ODataRecursiveHierarchy;
+}
+
+/**
+ * D108: an OData recursive hierarchy (Aggregation.RecursiveHierarchy and Hierarchy.RecursiveHierarchy
+ * of the same qualifier, the CDS hierarchy): the node property, the navigation to the parent, and
+ * the SQL view of the CDS hierarchy, whose rows give the preorder ("$path") of the nodes ("$node").
+ */
+export interface ODataRecursiveHierarchy {
+  qualifier: string;
+  hierarchy: string;
+  view: string;
+  nodeProperty: string;
+  parentNavigation: string;
+}
+
+/** D108: the properties of Hierarchy.RecursiveHierarchy that OpenUI5 needs, computed per request. */
+export const HIERARCHY_PROPERTIES = [
+  { name: "LimitedDescendantCount", edm: { type: "Edm.Int64" } as EdmType },
+  { name: "DistanceFromRoot", edm: { type: "Edm.Int64" } as EdmType },
+  { name: "DrillState", edm: { type: "Edm.String" } as EdmType },
+  { name: "LimitedRank", edm: { type: "Edm.Int64" } as EdmType },
+] as const;
+
+/** D108: the CDS hierarchy named by `@OData.hierarchy.recursiveHierarchy: [{ entity.name: … }]`. */
+export function recursiveHierarchyName(entity: EntityModel): string | undefined {
+  const value = getAnnotation(entity.annotations, "OData.hierarchy.recursiveHierarchy");
+  const first = Array.isArray(value) ? value[0] : undefined;
+  const target = typeof first === "object" && first !== null && !Array.isArray(first) ? (first as Record<string, unknown>)["entity"] : undefined;
+  const name = typeof target === "object" && target !== null && !Array.isArray(target) ? (target as Record<string, unknown>)["name"] : undefined;
+  return typeof name === "string" ? name : undefined;
+}
+
+/**
+ * D108: the recursive hierarchy of an exposed entity, or why it cannot be one: the CDS hierarchy
+ * (without parameters, one pair in its ON condition), the element of the entity holding the node
+ * (the node element of the hierarchy association) and its to-one self association to the parent.
+ */
+export function recursiveHierarchyOf(model: Model, entity: EntityModel): { hierarchy: Omit<ODataRecursiveHierarchy, "parentNavigation"> & { parentAssociation: string } } | { error: string; code: "CDS002" | "CDS004" | "CDS022" } | undefined {
+  const name = recursiveHierarchyName(entity);
+  if (name === undefined) return undefined;
+  const target = findEntity(model, name);
+  if (target === undefined) return { code: "CDS004", error: `@OData.hierarchy.recursiveHierarchy: unknown CDS hierarchy ${name}` };
+  if (target.hierarchy === undefined) return { code: "CDS022", error: `@OData.hierarchy.recursiveHierarchy: ${target.name} is not a CDS hierarchy` };
+  if ((target.parameters?.length ?? 0) > 0) return { code: "CDS002", error: `@OData.hierarchy.recursiveHierarchy: a hierarchy with parameters (${target.name}) is not supported yet` };
+  const pair = target.hierarchy.parent.length === 1 ? target.hierarchy.parent[0] : undefined;
+  if (pair === undefined) return { code: "CDS002", error: `@OData.hierarchy.recursiveHierarchy: a hierarchy association comparing several elements (${target.hierarchy.association}) is not supported yet` };
+  const fieldOf = (element: string): FieldModel | undefined => entity.fields.find((f) => same(f.name, element)) ?? entity.fields.find((f) => same(f.baseField ?? "", element));
+  const node = fieldOf(pair.node);
+  const child = fieldOf(pair.child);
+  if (node === undefined || child === undefined) {
+    return { code: "CDS022", error: `@OData.hierarchy.recursiveHierarchy: ${entity.name} needs the elements ${pair.node} and ${pair.child} of the hierarchy ${target.name}` };
+  }
+  const parent =
+    entity.associations.find((a) => same(a.target, entity.name) && a.cardinality.max === 1 && a.on.length === 1 && same(a.on[0]?.source ?? "", child.name) && same(a.on[0]?.target ?? "", node.name)) ??
+    entity.associations.find((a) => same(a.name, target.hierarchy?.association ?? "") && same(a.target, entity.name));
+  if (parent === undefined) {
+    return { code: "CDS022", error: `@OData.hierarchy.recursiveHierarchy: ${entity.name} needs a to-one association to itself on ${child.name} = ${node.name} (the parent of a node)` };
+  }
+  return { hierarchy: { qualifier: target.name.replace(/[^A-Za-z0-9_]/g, "_"), hierarchy: target.name, view: target.sqlView ?? "", nodeProperty: node.name, parentAssociation: parent.name } };
 }
 
 export interface ODataEntitySet {
@@ -429,6 +490,12 @@ export function buildODataService(model: Model): ODataService {
       if (navigation.insertableDynamic && model.service.webApi !== true) {
         entityType.createByAssociationControl.push(navigation.name);
       }
+    }
+    // D108: the recursive hierarchy, through the navigation to the parent
+    const recursive = model.service.webApi === true ? undefined : recursiveHierarchyOf(model, entity);
+    if (recursive !== undefined && "hierarchy" in recursive && entityType.navigations.some((n) => n.name === recursive.hierarchy.parentAssociation)) {
+      const { parentAssociation, ...rest } = recursive.hierarchy;
+      entityType.recursiveHierarchy = { ...rest, parentNavigation: parentAssociation };
     }
     for (const action of exposedActions(behavior)) {
       const operation: ODataOperation = {

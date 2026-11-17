@@ -3,7 +3,7 @@
  * resolved against the data source, and typed.
  */
 
-import { isCharacterLike, isNumeric, type AbapType, type CdsCondition, type CdsExpression, type CdsFunctionName } from "@open-rap/model";
+import { isCharacterLike, isNumeric, type AbapType, type HierarchyAttribute, type CdsCondition, type CdsExpression, type CdsFunctionName } from "@open-rap/model";
 import { isCondition, type CdsCondAst, type CdsExprAst } from "../cds/expression-ast.js";
 import { parseBuiltInType } from "../ddic/catalog.js";
 import type { Dictionary } from "./dictionary.js";
@@ -36,6 +36,8 @@ export interface ExpressionScope {
   associationPath?(path: string[]): { from: "self" | "source"; element: string; type: AbapType };
   /** D107: `$parameters.name`: an input parameter of the entity. */
   parameter?(name: string): { name: string; setting: string; type: AbapType } | undefined;
+  /** D108: `$node.attribute` in the element list of a CDS hierarchy, typed. */
+  node?(attribute: string): { attribute: HierarchyAttribute; type: AbapType } | undefined;
   /** D104: a column of a joined data source, by its alias; undefined when the alias is not one. */
   joined?(alias: string, name: string): { name: string; type: AbapType } | undefined;
   dictionary: Dictionary;
@@ -205,6 +207,21 @@ class Resolver {
         throw new ExpressionIssue("CDS004", `${text}: no parameter ${rest[1] ?? ""} in the entity`);
       }
       return { kind: "parameter", name: parameter.name, setting: parameter.setting, type: { ...parameter.type } };
+    }
+    // D108: `:name`, the old syntax of an input parameter (hierarchies, conditions)
+    if (head.startsWith(":") && rest.length === 1) {
+      const parameter = this.scope.parameter?.(head.slice(1));
+      if (parameter === undefined) {
+        throw new ExpressionIssue("CDS004", `${text}: no parameter ${head.slice(1)} in the entity`);
+      }
+      return { kind: "parameter", name: parameter.name, setting: parameter.setting, type: { ...parameter.type } };
+    }
+    if (head === "$NODE" && rest.length === 2 && this.scope.node !== undefined) {
+      const node = this.scope.node(rest[1] ?? "");
+      if (node === undefined) {
+        throw new ExpressionIssue("CDS004", `${text}: no hierarchy attribute ${rest[1] ?? ""} (hierarchy_rank, hierarchy_tree_size, hierarchy_parent_rank, hierarchy_level, hierarchy_is_cycle, hierarchy_is_orphan, node_id, parent_id)`);
+      }
+      return { kind: "node", attribute: node.attribute, type: { ...node.type } };
     }
     if (head === "$SESSION") {
       const variable = (rest[1] ?? "").toLowerCase();
