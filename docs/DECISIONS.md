@@ -2570,3 +2570,29 @@ _The issues moved to the repository itself once public: see D74._
     cast to the types of the first SELECT; the sources of every branch are created first.
 - **Tests**: `ir.test.ts` (the rules, with their messages); `cds-unions.test.ts` (UNION ALL of
   travels and bookings, a filter on it, UNION removing duplicates).
+
+## D107 — Parameters of view entities
+
+- **Context**: views `with parameters` were CDS002. A PostgreSQL view has no parameters, and
+  the views of Open RAP Runtime are shared by every request.
+- **Decision**:
+  - The CDS parser reads `with parameters name : type` (with `@Environment.systemField`) and the
+    actual parameters of a data source, `select from View( p: value )` (abaplint reads it as a
+    function call when the value is a literal, as a name with parameters otherwise).
+  - The IR types the parameters (built-in types, data elements; CDS014 otherwise); `$parameters.p`
+    is an expression of the select list and the conditions, read by the view from the setting of
+    the transaction `rapt.p_<view>__<parameter>`. An actual parameter is a literal, a parameter
+    or a session variable; an unknown one is CDS004, a missing one without system field CDS022.
+  - OData: the entity set of a parameterized view is of the type `<Set>Parameters` (keys: the
+    parameters, non-nullable) whose contained navigation `Set` gives the results; the results
+    type has the navigation `Parameters`. `GET View(p=…)/Set` (with `$filter`, `$select`…) sets the
+    parameters on the transaction of the read, a system field defaulting to the date, the user,
+    the language or the client of the request; a view reading a parameterized view with the
+    values it gives sets them the same way. `View` or `View/Set` without the parameters: 400.
+  - Not yet (CDS002): a projection of a parameterized view, a join or an association to one.
+    Not supported: the ABAP SQL of the behavior pools on a parameterized view. The form of the
+    `$metadata` follows the parameterized entity sets of SAP Fiori elements for OData V4 and is
+    to confirm on SAP BTP (round 2, D99).
+- **Tests**: `ir.test.ts` (the parameters, `$parameters`, missing and unknown actual parameters,
+  an unknown type); `cds-parameters.test.ts` (`View(p=…)/Set`, a system field from the session or
+  given, 400 without parameters, a view passing a literal, the `$metadata`).

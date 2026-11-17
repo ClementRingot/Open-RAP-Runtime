@@ -273,6 +273,8 @@ export type CdsExpression =
    * entity itself (`self`, a view entity) or of its source (`source`, a projection), then the element.
    */
   | { kind: "path"; from: "self" | "source"; associations: string[]; element: string; type: AbapType }
+  /** D107: an input parameter of the entity, read from the setting of the transaction. */
+  | { kind: "parameter"; name: string; setting: string; type: AbapType }
   /** D105: an aggregate expression; COUNT(*) has no operand. */
   | { kind: "aggregate"; fn: "max" | "min" | "sum" | "avg" | "count"; distinct: boolean; operand?: CdsExpression; type: AbapType };
 
@@ -344,6 +346,13 @@ export interface EntityModel {
   sqlView?: string;
   /** D101: the WHERE condition of a view entity, on the columns of its source and its elements. */
   where?: CdsCondition;
+  /**
+   * D107: the input parameters (`with parameters`), each read by the views from the setting of
+   * the transaction `rapt.p_<view>__<name>`; `systemField`: filled from the session when absent.
+   */
+  parameters?: Array<{ name: string; type: AbapType; systemField?: "system_date" | "system_language" | "user" | "client"; annotations: Annotations }>;
+  /** D107: the actual parameters the entity passes to its parameterized data source. */
+  sourceParameters?: Array<{ name: string; value: CdsExpression }>;
   /** D106: the other SELECT branches of a UNION [ALL]; the entity itself is the first one. */
   union?: Array<{ all: boolean; branch: EntityModel }>;
   /** D105: the GROUP BY of a view entity with aggregates, and its HAVING condition. */

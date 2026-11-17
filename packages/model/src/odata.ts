@@ -98,6 +98,11 @@ export interface ODataEntitySet {
   draft?: { root: boolean; collaborative?: true };
   /** DraftAdministrativeData (D54). */
   draftAdministrativeData?: true;
+  /**
+   * D107: a parameterized view: the entity set is of the type of its parameters (`type`, keys:
+   * the parameters), the results are reached by `Set(p=…)/Set`.
+   */
+  parameters?: { type: string; properties: ODataProperty[] };
 }
 
 export interface ODataParameter {
@@ -529,6 +534,14 @@ export function buildODataService(model: Model): ODataService {
       ...(draft === undefined ? {} : { draft: { root: draft.root, ...(draft.collaborative === true ? { collaborative: true as const } : {}) } }),
       ...(set.draftAdministrativeData === true ? { draftAdministrativeData: true as const } : {}),
       ...(set.valueHelp === true ? { valueHelp: true as const } : {}),
+      ...(entity.parameters === undefined || entity.parameters.length === 0
+        ? {}
+        : {
+            parameters: {
+              type: `${typeName.replace(/Type$/, "")}Parameters`,
+              properties: entity.parameters.map((p): ODataProperty => ({ name: p.name, field: p.name, edm: edmTypeOfField(model, p.type), nullable: false, key: true, computed: false, immutable: false, mandatory: p.systemField === undefined, dynamic: false })),
+            },
+          }),
     });
   }
   for (const entity of complexTypes.values()) {

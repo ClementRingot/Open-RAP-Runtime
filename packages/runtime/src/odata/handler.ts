@@ -4,7 +4,9 @@
  * (the managed RAP runtime).
  */
 
+import { abapLanguage } from "../abap/bridge.js";
 import type { User } from "../auth/user.js";
+import { withParameters } from "./access.js";
 import { isJsonBatch, parseBatch, parseJsonBatch, serializeBatch, serializeJsonBatch, type BatchItem, type BatchRequestPart, type BatchResponseItem, type BatchResponsePart } from "./batch.js";
 import { badRequest, methodNotAllowed, notFound, notImplemented, ODataError, type ODataMessage } from "./errors.js";
 import { etagOf, JsonWriter, stringify } from "./json.js";
@@ -276,6 +278,26 @@ export class ODataHandler {
   }
 
   private async get(target: Target, ctx: HandlerContext): Promise<ODataResponse> {
+    // D107: a parameterized view is read as View(p=…)/Set, its parameters set on the transaction
+    const first = target.segments[0];
+    if (first?.kind === "entitySet" && this.service.isEntitySet(first.name) && this.service.set(first.name).set.parameters !== undefined) {
+      const next = target.segments[1];
+      if (next?.kind !== "navigation" || next.name !== "Set") {
+        throw badRequest(`${first.name} has parameters: read ${first.name}(…)/Set`);
+      }
+      const settings = this.service.parameterSettings(this.service.set(first.name), first.key, { user: ctx.user.abapName, language: abapLanguage(ctx.language), date: new Date().toISOString().slice(0, 10) });
+      const segments: Segment[] = [next.key === undefined ? { kind: "entitySet", name: first.name } : { kind: "entitySet", name: first.name, key: next.key }, ...target.segments.slice(2)];
+      return withParameters(settings, () => this.getResults({ ...target, segments }, ctx));
+    }
+    // D107: a view reading a parameterized view with the values it gives
+    if (first?.kind === "entitySet" && this.service.isEntitySet(first.name) && this.service.needsParameters(this.service.set(first.name))) {
+      const settings = this.service.parameterSettings(this.service.set(first.name), undefined, { user: ctx.user.abapName, language: abapLanguage(ctx.language), date: new Date().toISOString().slice(0, 10) });
+      return withParameters(settings, () => this.getResults(target, ctx));
+    }
+    return this.getResults(target, ctx);
+  }
+
+  private async getResults(target: Target, ctx: HandlerContext): Promise<ODataResponse> {
     const property = await this.property(target, ctx);
     if (property !== undefined) {
       return property;

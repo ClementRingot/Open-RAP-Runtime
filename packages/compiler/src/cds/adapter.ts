@@ -4,7 +4,7 @@
  */
 
 import * as abaplint from "@abaplint/core";
-import { setAnnotation, type AnnotationObject, type AnnotationValue, type Annotations } from "@open-rap/model";
+import { getString, setAnnotation, type AnnotationObject, type AnnotationValue, type Annotations } from "@open-rap/model";
 import { CdsExpressionError, parseCdsCondition, parseCdsExpression, type CdsCondAst, type CdsExprAst } from "./expression-ast.js";
 
 type Node = abaplint.INode;
@@ -63,6 +63,10 @@ export interface CdsEntityAst {
   hasWhere: boolean;
   /** D104: the joins of the data source, in order. */
   joins?: CdsJoinAst[];
+  /** D107: the input parameters of the entity (`with parameters`). */
+  parameters?: Array<{ name: string; type: string; systemField?: string; annotations: Annotations; loc: CdsLoc }>;
+  /** D107: the actual parameters passed to the data source (`select from X( p: … )`). */
+  sourceParameters?: Array<{ name: string; value?: CdsExprAst; error?: string }>;
   /** D106: the other branches of a UNION [ALL], in order. */
   unions?: Array<{ all: boolean; branch: CdsEntityAst }>;
   /** D105: the GROUP BY paths and the HAVING condition (or the construct it could not parse). */
@@ -198,6 +202,9 @@ class AdapterContext {
     }
 
     if (kind === "view") {
+      // D107: the input parameters
+      const withParameters = tree.findDirectExpression(E.CDSWithParameters);
+      if (withParameters !== undefined) entity.parameters = this.parameterList(withParameters);
       const select = tree.findDirectExpression(E.CDSSelect);
       if (select !== undefined) {
         this.select(entity, select);
@@ -259,12 +266,86 @@ class AdapterContext {
     };
   }
 
+  /** D107: the actual parameters `( name: value, … )` of a data source. */
+  private actualParameters(node: abaplint.Nodes.ExpressionNode): NonNullable<CdsEntityAst["sourceParameters"]> {
+    const result: NonNullable<CdsEntityAst["sourceParameters"]> = [];
+    const children = node.getChildren();
+    for (let i = 0; i < children.length; i++) {
+      const child = children[i];
+      if (!(child instanceof abaplint.Nodes.ExpressionNode) || !(child.get() instanceof E.CDSName) || children[i + 1]?.getFirstToken().getStr() !== ":") continue;
+      // the value: the nodes up to the next comma or the closing parenthesis
+      const value: abaplint.Nodes.ExpressionNode[] = [];
+      let j = i + 2;
+      const names: string[] = [];
+      for (; j < children.length; j++) {
+        const next = children[j];
+        const token = next?.getFirstToken().getStr();
+        if (next instanceof abaplint.Nodes.TokenNode && (token === "," || token === ")")) break;
+        if (next instanceof abaplint.Nodes.ExpressionNode) {
+          value.push(next.get() instanceof E.CDSFunctionInput ? ((next.getChildren().find((c) => c instanceof abaplint.Nodes.ExpressionNode) as abaplint.Nodes.ExpressionNode | undefined) ?? next) : next);
+          if (next.get() instanceof E.CDSName) names.push(next.concatTokens());
+        }
+      }
+      const name = child.concatTokens();
+      if (names.length === value.length && names.length > 0) {
+        result.push({ name, value: { kind: "path", path: names } });
+      } else if (value.length === 1 && value[0] !== undefined) {
+        try {
+          result.push({ name, value: parseCdsExpression(value[0]) });
+        } catch (error) {
+          if (!(error instanceof CdsExpressionError)) throw error;
+          result.push({ name, error: error.message });
+        }
+      } else {
+        result.push({ name, error: "this actual parameter" });
+      }
+      i = j;
+    }
+    return result;
+  }
+
+  /** D107: the input parameters of `with parameters`, with their annotations. */
+  private parameterList(node: abaplint.Nodes.ExpressionNode): NonNullable<CdsEntityAst["parameters"]> {
+    const result: NonNullable<CdsEntityAst["parameters"]> = [];
+    let annotations: abaplint.Nodes.ExpressionNode[] = [];
+    const children = node.getChildren();
+    for (let i = 0; i < children.length; i++) {
+      const child = children[i];
+      if (!(child instanceof abaplint.Nodes.ExpressionNode)) continue;
+      if (child.get() instanceof E.CDSAnnotation) {
+        annotations.push(child);
+        continue;
+      }
+      if (child.get() instanceof E.CDSName && children[i + 1]?.getFirstToken().getStr() === ":") {
+        const type = children.slice(i + 2).find((c): c is abaplint.Nodes.ExpressionNode => c instanceof abaplint.Nodes.ExpressionNode && c.get() instanceof E.CDSType);
+        const parameter: NonNullable<CdsEntityAst["parameters"]>[number] = { name: child.concatTokens(), type: type?.concatTokens().replace(/\s+/g, "") ?? "", annotations: this.annotations(annotations), loc: this.loc(child) };
+        const field = getString(parameter.annotations, "Environment.systemField");
+        if (field !== undefined) parameter.systemField = field.replace(/^#/, "").toLowerCase();
+        result.push(parameter);
+        annotations = [];
+      }
+    }
+    return result;
+  }
+
   /** The data source, joins, conditions, grouping, associations and elements of a SELECT. */
   private select(entity: CdsEntityAst, select: abaplint.Nodes.ExpressionNode): void {
     const source = select.findDirectExpression(E.CDSSource);
     if (source !== undefined) {
       const prefixed = source.findDirectExpression(E.CDSPrefixedName);
-      entity.source = (prefixed ?? source).concatTokens().replace(/\s+/g, "");
+      // D107: the name of the data source, without its actual parameters (abaplint reads
+      // `View( p: 'X' )` as a function call, `View( p: $parameters.q )` as a name with parameters)
+      const parameters = prefixed?.findDirectExpression(E.CDSParametersSelect);
+      const call = prefixed === undefined ? source.findDirectExpression(E.CDSFunction) : undefined;
+      entity.source = (
+        call !== undefined
+          ? call.getFirstToken().getStr()
+          : parameters === undefined
+            ? (prefixed ?? source).concatTokens()
+            : (prefixed?.findDirectExpression(E.CDSName)?.concatTokens() ?? "")
+      ).replace(/\s+/g, "");
+      if (parameters !== undefined) entity.sourceParameters = this.actualParameters(parameters);
+      if (call !== undefined) entity.sourceParameters = this.actualParameters(call);
       const as = source.findDirectExpression(E.CDSAs);
       if (as !== undefined) {
         entity.sourceAlias = as.findDirectExpression(E.CDSName)?.concatTokens() ?? "";

@@ -12,6 +12,7 @@ Open RAP Runtime, which then follows SAP (AGENTS.md, rule 1).
 | Do the entity types of a service without draft have `SAP__Messages`? | yes, empty (D94) | `$metadata` of the service without draft |
 | Do `missing-handler`, `database-write-in-handler` and `commit-in-handler` activate? | refused, refused, accepted (D91) | `fixtures/negative` |
 | Does the BO of `rapt new` activate as is? | yes | case `control` of `fixtures/negative` |
+| The `$metadata` of a view with parameters (the parameters type, the navigation `Set`) | `<Set>Parameters`, `Set` contained (D107) | variant `cds`, `$metadata` of the draft service |
 
 ## Steps
 

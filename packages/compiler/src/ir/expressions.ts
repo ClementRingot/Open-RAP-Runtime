@@ -34,6 +34,8 @@ export interface ExpressionScope {
    * throws an ExpressionIssue on an unknown name or a to-many association.
    */
   associationPath?(path: string[]): { from: "self" | "source"; element: string; type: AbapType };
+  /** D107: `$parameters.name`: an input parameter of the entity. */
+  parameter?(name: string): { name: string; setting: string; type: AbapType } | undefined;
   /** D104: a column of a joined data source, by its alias; undefined when the alias is not one. */
   joined?(alias: string, name: string): { name: string; type: AbapType } | undefined;
   dictionary: Dictionary;
@@ -196,6 +198,13 @@ class Resolver {
         throw new ExpressionIssue("CDS004", `${text}: no element ${rest[1] ?? ""} in the entity`);
       }
       return { kind: "element", name: element.name, type: { ...element.type } };
+    }
+    if (head === "$PARAMETERS" && rest.length === 2) {
+      const parameter = this.scope.parameter?.(rest[1] ?? "");
+      if (parameter === undefined) {
+        throw new ExpressionIssue("CDS004", `${text}: no parameter ${rest[1] ?? ""} in the entity`);
+      }
+      return { kind: "parameter", name: parameter.name, setting: parameter.setting, type: { ...parameter.type } };
     }
     if (head === "$SESSION") {
       const variable = (rest[1] ?? "").toLowerCase();

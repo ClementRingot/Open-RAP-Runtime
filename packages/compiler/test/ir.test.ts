@@ -307,6 +307,26 @@ describe("calculated elements (D67)", () => {
     expect(errors(union("  key booking_uuid as Id,\n  flight_price as Number"))).toEqual(["CDS022 ZRT_I_Union: UNION: branch 2: Number (curr) cannot be merged with numc"]);
   });
 
+  it("checks the parameters of view entities and their actual parameters (D107)", () => {
+    const views = (byStatus: string, open: string) =>
+      build({
+        "zrt_i_bystatus.ddls.asddls": `define view entity ZRT_I_ByStatus\n  with parameters ${byStatus}\n  as select from zrt_travel { key travel_uuid as Id, overall_status as Status }\n  where overall_status = $parameters.p_status\n`,
+        "zrt_i_open.ddls.asddls": `define view entity ZRT_I_Open as select from ${open} { key Id }\n`,
+        "zrt_ui_travel.srvd.srvdsrv": (c: string) => lf(c).replace("  expose ZRT_C_Booking as Booking;", "  expose ZRT_C_Booking as Booking;\n  expose ZRT_I_ByStatus as ByStatus;\n  expose ZRT_I_Open as Open;"),
+      })
+        .diagnostics.filter((d) => d.severity === "error")
+        .map((d) => `${d.code} ${d.message}`);
+    const ok = build({
+      "zrt_i_bystatus.ddls.asddls": "define view entity ZRT_I_ByStatus\n  with parameters p_status : abap.char(1)\n  as select from zrt_travel { key travel_uuid as Id }\n  where overall_status = $parameters.p_status\n",
+      "zrt_ui_travel.srvd.srvdsrv": (c: string) => lf(c).replace("  expose ZRT_C_Booking as Booking;", "  expose ZRT_C_Booking as Booking;\n  expose ZRT_I_ByStatus as ByStatus;"),
+    });
+    expect(findEntity(ok.model, "ZRT_I_ByStatus")).toMatchObject({ parameters: [{ name: "p_status", type: { kind: "char", length: 1 } }], where: { right: { kind: "parameter", name: "p_status", setting: "rapt.p_zrt_i_bystatus__p_status" } } });
+    expect(views("p_status : abap.char(1)", "ZRT_I_ByStatus( p_status: 'O' )")).toEqual([]);
+    expect(views("p_status : abap.char(1)", "ZRT_I_ByStatus")).toEqual(["CDS022 ZRT_I_Open: the parameter p_status of ZRT_I_ByStatus is not given"]);
+    expect(views("p_status : abap.char(1)", "ZRT_I_ByStatus( p_other: 'O' )")).toEqual(["CDS004 ZRT_I_Open: ZRT_I_ByStatus has no parameter p_other", "CDS022 ZRT_I_Open: the parameter p_status of ZRT_I_ByStatus is not given"]);
+    expect(views("p_status : zunknown", "ZRT_I_ByStatus( p_status: 'O' )")[0]).toMatch(/^CDS014 ZRT_I_ByStatus: parameter p_status: unknown type zunknown/);
+  });
+
   it("reports invalid expressions with CDS022", () => {
     const message = (line: string): string[] =>
       build(withElement(line))

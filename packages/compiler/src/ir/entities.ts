@@ -324,6 +324,8 @@ export class EntityResolver {
       this.diagnostics.error("CDS003", `${ast.name}: no data source`, this.loc(file, ast.loc));
       return undefined;
     }
+    // D107: the input parameters of the entity
+    const parameters = this.parameters(parsed);
     // D104: the joined data sources, by alias
     const joined = new Map<string, { kind: "inner" | "left" | "right" | "cross"; alias: string; table?: TableModel; entity?: EntityModel; ast: NonNullable<CdsEntityAst["joins"]>[number] }>();
     for (const join of ast.joins ?? []) {
@@ -342,6 +344,10 @@ export class EntityResolver {
       const joinEntity = joinTable === undefined ? this.resolve(join.source) : undefined;
       if (joinTable === undefined && joinEntity === undefined) {
         this.diagnostics.error("CDS003", `${ast.name}: unknown joined data source ${join.source} (no TABL or DDLS in the sources)`, this.loc(file, join.loc));
+        continue;
+      }
+      if ((joinEntity?.parameters?.length ?? 0) > 0) {
+        this.diagnostics.error("CDS002", `${ast.name}: a join with a view with parameters (${join.source}) is not supported yet`, this.loc(file, join.loc));
         continue;
       }
       const alias = join.alias ?? join.source;
@@ -383,6 +389,11 @@ export class EntityResolver {
       }
       if (path.length === 1 && associationNames.has((path[0] ?? "").toUpperCase())) {
         continue; // association exposure
+      }
+      // D107: $parameters.x, $session.x: an expression of the select list
+      if (path.length > 1 && (path[0] ?? "").startsWith("$")) {
+        slots.push(asPathElement(element, path));
+        continue;
       }
       if (path.length > 1 && associationNames.has((path[0] ?? "").toUpperCase())) {
         // D100: an element reached through to-one associations, read-only like a calculated element
@@ -436,6 +447,10 @@ export class EntityResolver {
       associations: associationNames,
       associationPath: (path) => this.associationPath(ast.associations.map((a) => ({ name: a.alias, target: a.target, cardinality: a.cardinality })), "self", path),
       joined: joinedColumn,
+      parameter: (name) => {
+        const p = parameters.find((x) => same(x.name, name));
+        return p === undefined ? undefined : { name: p.name, setting: parameterSetting(ast.name, p.name), type: p.type };
+      },
       column: (name) => {
         if (table !== undefined) {
           const column = table.columns.find((c) => c.name === name.toLowerCase() && !c.client);
@@ -499,6 +514,8 @@ export class EntityResolver {
       ...(where === undefined ? {} : { where }),
       ...(joins === undefined ? {} : { joins }),
       ...this.grouping(parsed, fields, scope),
+      ...(parameters.length === 0 ? {} : { parameters }),
+      ...this.sourceParameters(parsed, sourceEntity, scope),
     };
     entity.associations = this.associationsOf(parsed, entity);
     if (fields.filter((f) => f.key).length === 0) {
@@ -603,6 +620,65 @@ export class EntityResolver {
     entity.union = union;
   }
 
+  /** D107: the input parameters of an entity, typed. */
+  private parameters(parsed: ParsedEntity): NonNullable<EntityModel["parameters"]> {
+    const { ast, file } = parsed;
+    const result: NonNullable<EntityModel["parameters"]> = [];
+    for (const p of ast.parameters ?? []) {
+      const type = /^abap\./i.test(p.type) ? parseBuiltInType(p.type) : this.dictionary.dataElement(p.type)?.type;
+      if (type === undefined) {
+        this.diagnostics.error("CDS014", `${ast.name}: parameter ${p.name}: unknown type ${p.type}`, this.loc(file, p.loc));
+        continue;
+      }
+      const systemField = p.systemField === undefined ? undefined : ({ system_date: "system_date", system_language: "system_language", user: "user", client: "client" } as const)[p.systemField as "user"];
+      if (p.systemField !== undefined && systemField === undefined) {
+        this.diagnostics.error("CDS002", `${ast.name}: parameter ${p.name}: @Environment.systemField #${p.systemField.toUpperCase()} is not supported (SYSTEM_DATE, SYSTEM_LANGUAGE, USER, CLIENT are)`, this.loc(file, p.loc));
+      }
+      result.push({ name: p.name, type, annotations: p.annotations, ...(systemField === undefined ? {} : { systemField }) });
+    }
+    return result;
+  }
+
+  /**
+   * D107: the actual parameters a view passes to its parameterized data source: literals, its own
+   * parameters, session variables; every parameter without a system field is given.
+   */
+  private sourceParameters(parsed: ParsedEntity, source: EntityModel | undefined, scope: Omit<ExpressionScope, "element" | "dictionary">): Pick<EntityModel, "sourceParameters"> {
+    const { ast, file } = parsed;
+    const where = this.loc(file, ast.loc);
+    const given = ast.sourceParameters ?? [];
+    const expected = source?.parameters ?? [];
+    if (given.length === 0 && expected.length === 0) return {};
+    const result: NonNullable<EntityModel["sourceParameters"]> = [];
+    for (const p of given) {
+      const target = expected.find((e) => same(e.name, p.name));
+      if (target === undefined) {
+        this.diagnostics.error("CDS004", `${ast.name}: ${ast.source ?? ""} has no parameter ${p.name}`, where);
+        continue;
+      }
+      if (p.value === undefined) {
+        this.diagnostics.error("CDS002", `${ast.name}: parameter ${p.name}: ${p.error ?? "this value"} is not supported yet`, where);
+        continue;
+      }
+      try {
+        const value = resolveExpression(p.value, { ...scope, dictionary: this.dictionary, element: () => undefined });
+        if (value.kind !== "literal" && value.kind !== "parameter" && value.kind !== "session") {
+          throw new ExpressionIssue("CDS022", `parameter ${p.name}: a literal, a parameter or a session variable`);
+        }
+        result.push({ name: target.name, value });
+      } catch (error) {
+        if (!(error instanceof ExpressionIssue)) throw error;
+        this.diagnostics.error(error.code, `${ast.name}: ${error.message}`, where);
+      }
+    }
+    for (const e of expected) {
+      if (e.systemField === undefined && !given.some((g) => same(g.name, e.name))) {
+        this.diagnostics.error("CDS022", `${ast.name}: the parameter ${e.name} of ${ast.source ?? ""} is not given`, where);
+      }
+    }
+    return result.length === 0 ? {} : { sourceParameters: result };
+  }
+
   /** The labels of the elements reached by the paths (D100), by path in upper case. */
   private readonly pathLabels = new Map<string, string>();
 
@@ -626,6 +702,9 @@ export class EntityResolver {
         throw new ExpressionIssue("CDS002", `${path.join(".")}: ${name} is a to-many association: a path in the select list needs one value per instance`);
       }
       target = this.resolve(association.target);
+      if ((target?.parameters?.length ?? 0) > 0) {
+        throw new ExpressionIssue("CDS002", `${path.join(".")}: an association to a view with parameters is not supported yet`);
+      }
       if (target === undefined) {
         throw new ExpressionIssue("CDS004", `${path.join(".")}: unknown target entity ${association.target}`);
       }
@@ -724,6 +803,9 @@ export class EntityResolver {
       this.diagnostics.error("CDS002", `${ast.name}: ${ast.whereError ?? "this WHERE condition"} is not supported yet`, this.loc(file, ast.whereLoc ?? ast.loc));
     }
     const base = ast.source === undefined ? undefined : this.resolve(ast.source);
+    if (base !== undefined && (base.parameters?.length ?? 0) > 0) {
+      this.diagnostics.error("CDS002", `${ast.name}: a projection of a view with parameters (${base.name}) is not supported yet`, this.loc(file, ast.loc));
+    }
     if (base === undefined) {
       this.diagnostics.error("CDS003", `${ast.name}: unknown projected entity ${ast.source ?? ""}`, this.loc(file, ast.loc));
       return undefined;
@@ -1053,5 +1135,10 @@ function unionCompatible(first: AbapType, other: AbapType): boolean {
   if (numeric.includes(first.kind)) return numeric.includes(other.kind);
   if (characters.includes(first.kind)) return characters.includes(other.kind);
   return first.kind === other.kind;
+}
+
+/** D107: the setting of the transaction a parameter of an entity is read from. */
+export function parameterSetting(entity: string, parameter: string): string {
+  return `rapt.p_${entity.toLowerCase().replace(/[^a-z0-9_]/g, "_")}__${parameter.toLowerCase()}`;
 }
 

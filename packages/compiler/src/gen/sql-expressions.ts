@@ -36,6 +36,9 @@ export function renderExpression(e: CdsExpression, sqlType: (t: AbapType) => str
       return refs.element(e.name, e.type);
     case "path":
       return refs.path === undefined ? `NULL::${sqlType(e.type)}` : refs.path(e);
+    case "parameter":
+      // D107: set by the runtime on the transaction of the read
+      return `nullif(current_setting('${e.setting}', true), '')::${sqlType(e.type)}`;
     case "aggregate":
       // D105: computed by the GROUP BY of the view; COUNT is an INT4 (bigint in PostgreSQL)
       if (e.operand === undefined) {

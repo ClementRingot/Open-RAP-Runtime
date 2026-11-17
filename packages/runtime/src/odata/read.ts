@@ -10,7 +10,7 @@ import { fromSql, literalToCanonical, toSql, type CanonicalValue, type UrlLitera
 import { badRequest, notImplemented, ODataError } from "./errors.js";
 import type { Cond, CustomQueries } from "./custom.js";
 import { abapLanguage } from "../abap/bridge.js";
-import { currentLanguage, currentReader, type AccessControls } from "./access.js";
+import { currentLanguage, currentParameters, currentReader, type AccessControls } from "./access.js";
 import { DEPENDENT_ETAG } from "./json.js";
 
 /** The deepest nesting of $expand (D82). */
@@ -58,10 +58,13 @@ export class ReadEngine {
    */
   private async run<R>(query: (db: Database) => Promise<R>): Promise<R> {
     const db = this.db();
-    if (!this.session) {
+    const parameters = currentParameters();
+    if (!this.session && parameters.length === 0) {
       return query(db);
     }
-    const settings = sql`SELECT set_config('rapt.user', ${currentReader()?.abapName ?? ""}, true), set_config('rapt.language', ${abapLanguage(currentLanguage() ?? "en")}, true)`;
+    // D107: the parameters of a parameterized view, with the user and the language (D103)
+    const configs = [sql`set_config('rapt.user', ${currentReader()?.abapName ?? ""}, true)`, sql`set_config('rapt.language', ${abapLanguage(currentLanguage() ?? "en")}, true)`, ...parameters.map(([name, value]) => sql`set_config(${name}, ${value}, true)`)];
+    const settings = sql`SELECT ${sql.join(configs)}`;
     if (db.isTransaction) {
       await settings.execute(db);
       return query(db);

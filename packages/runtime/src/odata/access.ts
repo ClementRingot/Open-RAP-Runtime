@@ -25,6 +25,18 @@ export function currentLanguage(): string | undefined {
   return reader.getStore()?.language;
 }
 
+const parameterSettings = new AsyncLocalStorage<Array<[string, string]>>();
+
+/** D107: the settings of the parameters of the running read of a parameterized view. */
+export function currentParameters(): Array<[string, string]> {
+  return parameterSettings.getStore() ?? [];
+}
+
+/** D107: runs `fn` with the parameters of a parameterized view. */
+export function withParameters<T>(settings: Array<[string, string]>, fn: () => Promise<T>): Promise<T> {
+  return parameterSettings.run(settings, fn);
+}
+
 /** Runs `fn` with the user whose access controls apply to the reads, and its language. */
 export function withReader<T>(user: User, fn: () => Promise<T>, language = "en"): Promise<T> {
   return reader.run({ user, language }, fn);

@@ -146,6 +146,61 @@ export class ServiceRuntime {
     return key;
   }
 
+  /** D107: whether a view reads, through its data sources, a parameterized view. */
+  public needsParameters(info: TypeInfo): boolean {
+    let entity: EntityModel | undefined = info.entity;
+    for (let depth = 0; entity !== undefined && depth < 20; depth++) {
+      if ((entity.parameters?.length ?? 0) > 0) return true;
+      entity = entity.source === undefined ? undefined : findEntity(this.model, entity.source);
+    }
+    return false;
+  }
+
+  /**
+   * D107: the settings of the transaction a read of a parameterized view needs: the values of its
+   * parameters (from the key predicate of `View(p=…)/Set`, or the session for a system field), then
+   * those the view passes to its parameterized data sources.
+   */
+  public parameterSettings(info: TypeInfo, predicate: KeyPredicate | undefined, session: { user: string; language: string; date: string }): Array<[string, string]> {
+    const given = new Map<string, CanonicalValue>();
+    const properties = info.set.parameters?.properties ?? [];
+    const pairs = predicate === undefined ? [] : predicate.kind === "single" ? [{ name: properties[0]?.name ?? "", value: predicate.value }] : predicate.values;
+    for (const { name, value } of pairs) {
+      const property = properties.find((p) => p.name === name);
+      const parameter = info.entity.parameters?.find((p) => p.name === name);
+      if (property === undefined || parameter === undefined) {
+        throw badRequest(`${name} is not a parameter of ${info.set.name}`);
+      }
+      if (value.kind !== "literal") {
+        throw badRequest(`The parameter ${name} must be a literal`);
+      }
+      given.set(name, literalToCanonical(parameter.type, property.edm, value.literal, name));
+    }
+    const settings: Array<[string, string]> = [];
+    const system = (field: string | undefined): CanonicalValue | undefined =>
+      field === "system_date" ? session.date : field === "user" ? session.user : field === "system_language" ? session.language : field === "client" ? "100" : undefined;
+    const visit = (entity: EntityModel, values: Map<string, CanonicalValue>, depth: number): void => {
+      for (const parameter of entity.parameters ?? []) {
+        const value = values.get(parameter.name) ?? system(parameter.systemField);
+        if (value === undefined || value === null) {
+          throw badRequest(`The parameter ${parameter.name} of ${entity.name} is needed: ${info.set.name}(${parameter.name}=…)/Set`);
+        }
+        settings.push([`rapt.p_${entity.name.toLowerCase().replace(/[^a-z0-9_]/g, "_")}__${parameter.name.toLowerCase()}`, String(value)]);
+      }
+      const source = entity.source === undefined ? undefined : findEntity(this.model, entity.source);
+      if (source !== undefined && depth < 20) {
+        const next = new Map<string, CanonicalValue>();
+        for (const { name, value } of entity.sourceParameters ?? []) {
+          const v = value.kind === "literal" ? value.value : value.kind === "parameter" ? values.get(value.name) ?? system(entity.parameters?.find((p) => p.name === value.name)?.systemField) : value.kind === "session" ? system(value.variable) : undefined;
+          if (v !== undefined && v !== null) next.set(name, typeof v === "number" ? v : String(v));
+        }
+        visit(source, next, depth + 1);
+      }
+    };
+    visit(info.entity, given, 0);
+    return settings;
+  }
+
   private literal(info: TypeInfo, name: string, value: Expr): CanonicalValue {
     if (value.kind !== "literal") {
       throw badRequest(`The key ${name} must be a literal`);

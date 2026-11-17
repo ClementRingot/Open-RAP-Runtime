@@ -139,6 +139,19 @@ class CsdlBuilder {
     for (const type of this.service.entityTypes) {
       schemaChildren.push(this.entityType(type));
     }
+    // D107: the type of the parameters of a parameterized view, its results by the navigation Set
+    for (const set of this.service.entitySets) {
+      if (set.parameters === undefined) continue;
+      schemaChildren.push(
+        el(
+          "EntityType",
+          { Name: set.parameters.type },
+          el("Key", undefined, ...set.parameters.properties.map((p) => el("PropertyRef", { Name: p.name }))),
+          ...set.parameters.properties.map((p) => el("Property", { Name: p.name, ...edmAttributes(p.edm), Nullable: "false" })),
+          el("NavigationProperty", { Name: "Set", Type: `Collection(${this.qualified(set.entityType)})`, Partner: "Parameters", ContainsTarget: "true" }),
+        ),
+      );
+    }
     schemaChildren.push(...this.complexTypes());
     for (const operation of this.service.operations) {
       schemaChildren.push(this.operation(operation));
@@ -196,6 +209,11 @@ class CsdlBuilder {
     }
     if (type.stateMessages === true) {
       children.push(el("Property", { Name: STATE_MESSAGES, Type: `Collection(${this.qualified(STATE_MESSAGE_TYPE)})`, Nullable: "false" }));
+    }
+    // D107: the results of a parameterized view lead back to their parameters
+    const parameterized = this.service.entitySets.find((s) => s.entityType === type.name && s.parameters !== undefined);
+    if (parameterized?.parameters !== undefined) {
+      children.push(el("NavigationProperty", { Name: "Parameters", Type: this.qualified(parameterized.parameters.type), Nullable: "false", Partner: "Set" }));
     }
     for (const navigation of type.navigations) {
       const targetType = this.qualified(navigation.targetType);
@@ -306,8 +324,9 @@ class CsdlBuilder {
         const type = this.service.entityTypes.find((t) => t.name === set.entityType);
         return el(
           "EntitySet",
-          { Name: set.name, EntityType: this.qualified(set.entityType) },
-          ...(type?.navigations ?? []).map((n) => el("NavigationPropertyBinding", { Path: n.name, Target: n.targetSet })),
+          // D107: a parameterized view is an entity set of its parameters
+          { Name: set.name, EntityType: this.qualified(set.parameters?.type ?? set.entityType) },
+          ...(set.parameters !== undefined ? [] : (type?.navigations ?? [])).map((n) => el("NavigationPropertyBinding", { Path: n.name, Target: n.targetSet })),
         );
       }),
     );
