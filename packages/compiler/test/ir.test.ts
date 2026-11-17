@@ -242,6 +242,14 @@ describe("calculated elements (D67)", () => {
     expect(booking("_Travel.Nothing as X").diagnostics.filter((d) => d.severity === "error").map((d) => d.code)).toEqual(["CDS004"]);
   });
 
+  it("resolves the WHERE condition of a view entity (D101)", () => {
+    const where = (condition: string) => build({ [view]: (c: string) => lf(c).replace(/\n}\s*$/, `\n}\nwhere ${condition}\n`) });
+    const ok = where("overall_status <> 'X' and $projection.BookingFee >= 0");
+    expect(ok.diagnostics.filter((d) => d.severity !== "info")).toEqual([]);
+    expect(findEntity(ok.model, "ZRT_R_Travel")?.where).toMatchObject({ kind: "and", left: { kind: "compare", operator: "<>", left: { kind: "column", name: "overall_status" } }, right: { left: { kind: "element", name: "BookingFee" } } });
+    expect(where("nothing = 'X'").diagnostics.filter((d) => d.severity === "error").map((d) => `${d.code} ${d.message}`)).toEqual(["CDS004 ZRT_R_Travel: WHERE: zrt_travel has no element nothing"]);
+  });
+
   it("reports invalid expressions with CDS022", () => {
     const message = (line: string): string[] =>
       build(withElement(line))

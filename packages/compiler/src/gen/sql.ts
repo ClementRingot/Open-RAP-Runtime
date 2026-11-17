@@ -22,7 +22,7 @@ import {
   type TableModel,
 } from "@open-rap/model";
 import { standardRows, standardSql } from "../standard/index.js";
-import { calculatedColumn, type SqlRefs } from "./sql-expressions.js";
+import { calculatedColumn, renderCondition, type SqlRefs } from "./sql-expressions.js";
 
 export function quoteIdentifier(name: string): string {
   return `"${name.replace(/"/g, '""')}"`;
@@ -234,6 +234,7 @@ function pathTargets(model: Model, entity: EntityModel, source: EntityModel | un
     else if (typeof value === "object" && value !== null) for (const v of Object.values(value)) walkAny(v);
   };
   for (const field of entity.fields) walk(field.expression);
+  walkAny(entity.where);
   return targets;
 }
 
@@ -266,7 +267,9 @@ function createView(model: Model, entity: EntityModel): string {
   const fieldSql = (field: FieldModel): string =>
     field.expression === undefined ? plainColumn(field) : calculatedColumn(field.expression, field.type, sqlType, refs);
   const columns = entity.fields.filter((field) => field.draft !== true).map((field) => `  ${fieldSql(field)} AS ${quoteIdentifier(field.name)}`);
-  return `CREATE VIEW ${quoteIdentifier(entity.sqlView ?? "")} AS SELECT\n${columns.join(",\n")}\nFROM ${quoteIdentifier(from)};\n`;
+  // D101: the WHERE condition of the view entity, on the columns of its source
+  const where = entity.where === undefined ? "" : `\nWHERE ${renderCondition(entity.where, sqlType, refs)}`;
+  return `CREATE VIEW ${quoteIdentifier(entity.sqlView ?? "")} AS SELECT\n${columns.join(",\n")}\nFROM ${quoteIdentifier(from)}${where};\n`;
 }
 
 /**
@@ -553,7 +556,7 @@ FROM ${quoteIdentifier(entity.sqlView ?? "")} a
 UNION ALL
 SELECT ${fields.map((f) => `${draftFieldSql(model, entity, f)} AS ${quoteIdentifier(f.name)}`).join(", ")}, FALSE, d."HasActiveEntity", FALSE, d."DraftUUID",
   d."DraftEntityCreationDateTime", d."DraftEntityLastChangeDateTime"
-FROM ${quoteIdentifier(draft.table)} d;
+FROM ${quoteIdentifier(draft.table)} d${draftWhere(model, entity).length === 0 ? "" : `\nWHERE ${draftWhere(model, entity).join(" AND ")}`};
 `);
   }
   if (statements.length > 0) {
@@ -612,6 +615,40 @@ function pathSql(model: Model, start: EntityModel | undefined, e: Extract<CdsExp
     return `(SELECT ${value} FROM ${quoteIdentifier(hop.view)} ${alias(i)} WHERE ${condition} LIMIT 1)`;
   };
   return build(0, source);
+}
+
+/**
+ * D101: the WHERE conditions of an entity and of the views below it, on the values of a draft row
+ * (`d`): a draft instance is read through the same views as an active one.
+ */
+function draftWhere(model: Model, entity: EntityModel): string[] {
+  const conditions: string[] = [];
+  let current: EntityModel | undefined = entity;
+  for (let depth = 0; current !== undefined && depth < 20; depth++) {
+    if (current.where !== undefined) conditions.push(renderCondition(current.where, sqlType, draftRefs(model, current, 0)));
+    current = current.kind === "projection" || current.kind === "view" ? sourceEntityOf(model, current) : undefined;
+  }
+  return conditions;
+}
+
+function draftRefs(model: Model, entity: EntityModel, depth: number): SqlRefs {
+  const source = entity.kind === "projection" ? sourceEntityOf(model, entity) : undefined;
+  const refs: SqlRefs = {
+    column: (name, type) => {
+      if (source !== undefined) {
+        const sourceField = findField(source, name);
+        return sourceField === undefined ? `NULL::${sqlType(type)}` : draftFieldSql(model, source, sourceField, depth + 1);
+      }
+      const exposed = entity.fields.find((f) => f.expression === undefined && f.draft !== true && same(f.column ?? f.baseField ?? "", name));
+      return exposed === undefined ? `NULL::${sqlType(type)}` : `d.${quoteIdentifier(exposed.name)}`;
+    },
+    element: (name, type) => {
+      const target = findField(entity, name);
+      return target === undefined ? `NULL::${sqlType(type)}` : draftFieldSql(model, entity, target, depth + 1);
+    },
+    path: (e) => pathSql(model, e.from === "self" ? entity : source, e, (name) => (e.from === "self" ? refs.element(name, e.type) : refs.column(name, e.type)), depth + 1),
+  };
+  return refs;
 }
 
 function draftFieldSql(model: Model, entity: EntityModel, field: FieldModel, depth = 0): string {

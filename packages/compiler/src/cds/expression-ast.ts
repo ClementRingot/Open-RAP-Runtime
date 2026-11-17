@@ -44,6 +44,15 @@ const compact = (n: abaplint.Nodes.ExpressionNode): string =>
 type Item = { token: string } | { node: abaplint.Nodes.ExpressionNode };
 
 /** Parses the value of an element of the select list. Throws a CdsExpressionError. */
+/** D101: the condition of a WHERE clause (CDSWhere or CDSCondition). Throws a CdsExpressionError. */
+export function parseCdsCondition(node: abaplint.Nodes.ExpressionNode): CdsCondAst {
+  const condition = node.get() instanceof E.CDSCondition ? node : node.findDirectExpression(E.CDSCondition);
+  if (condition === undefined) {
+    throw new CdsExpressionError(`WHERE without condition (${compact(node)})`);
+  }
+  return new ItemParser(flatten(condition), compact(condition)).conditionOnly();
+}
+
 export function parseCdsExpression(node: abaplint.Nodes.ExpressionNode): CdsExprAst {
   return operand(node);
 }

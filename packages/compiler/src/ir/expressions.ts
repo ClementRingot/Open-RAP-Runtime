@@ -73,6 +73,11 @@ const plain = (t: AbapType): AbapType => {
   return rest;
 };
 
+/** D101: resolves the condition of a WHERE clause. Throws an ExpressionIssue. */
+export function resolveCondition(ast: CdsCondAst, scope: ExpressionScope): CdsCondition {
+  return new Resolver(scope).whereCondition(ast);
+}
+
 /** Resolves and types the expression of a calculated element. Throws an ExpressionIssue. */
 export function resolveExpression(ast: CdsExprAst, scope: ExpressionScope): CdsExpression {
   const expression = new Resolver(scope).expression(ast);
@@ -213,6 +218,10 @@ class Resolver {
       result.else = otherwise;
     }
     return result;
+  }
+
+  public whereCondition(ast: CdsCondAst): CdsCondition {
+    return this.condition(ast);
   }
 
   private condition(ast: CdsCondAst): CdsCondition {

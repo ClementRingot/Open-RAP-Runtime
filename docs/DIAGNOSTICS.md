@@ -16,7 +16,7 @@ exit code is 1 as soon as there is an error (or a warning with `--warnings-as-er
 | SRVD007 | info | Several service definitions: the one with a binding is built (the others, of a service consumption model for example, are not) |
 | SRVD008 | error | `--binding-type` other than `ui` or `webapi` (D60) |
 | CDS001 | error | Unreadable CDS source |
-| CDS002 | error or warning | Unsupported CDS construct; in a calculated element, the message names the construct (association path, session variable other than `$session.system_date`, `BETWEEN`, aggregate, unsupported SQL function) (D67) |
+| CDS002 | error or warning | Unsupported CDS construct; in a calculated element or a WHERE condition (D101), the message names the construct (to-many association path, session variable other than `$session.system_date`, `BETWEEN`, aggregate, unsupported SQL function) (D67, D100) |
 | CDS003 | error | Unknown data source or projected entity |
 | CDS004 | error | Unknown element in the source |
 | CDS005 | error | Unknown association or redirection target |

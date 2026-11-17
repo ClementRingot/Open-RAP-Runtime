@@ -11,6 +11,7 @@ import {
   type AdminSemantics,
   type Annotations,
   type AssociationModel,
+  type CdsCondition,
   type ColumnModel,
   type EntityModel,
   type FieldModel,
@@ -21,7 +22,7 @@ import { parseBuiltInType } from "../ddic/catalog.js";
 import type { Diagnostics } from "../diagnostics.js";
 import { filesOfType, type Project, type SourceFile } from "../input/project.js";
 import type { Dictionary } from "./dictionary.js";
-import { ExpressionIssue, resolveExpression, type ExpressionScope } from "./expressions.js";
+import { ExpressionIssue, resolveCondition, resolveExpression, type ExpressionScope } from "./expressions.js";
 
 const LAYERS = ["#CORE", "#LOCALIZATION", "#INDUSTRY", "#PARTNER", "#CUSTOMER"];
 
@@ -321,8 +322,8 @@ export class EntityResolver {
     if (ast.hasJoin) {
       this.diagnostics.error("CDS002", `${ast.name}: joins are not supported yet`, this.loc(file, ast.loc));
     }
-    if (ast.hasWhere) {
-      this.diagnostics.warning("CDS002", `${ast.name}: the WHERE condition is not supported yet and is ignored`, this.loc(file, ast.loc));
+    if (ast.hasWhere && ast.where === undefined) {
+      this.diagnostics.error("CDS002", `${ast.name}: ${ast.whereError ?? "this WHERE condition"} is not supported yet`, this.loc(file, ast.whereLoc ?? ast.loc));
     }
     if (this.parsed.get(ast.source.toUpperCase())?.ast.kind === "table") {
       this.resolve(ast.source); // a table entity is read as its table (D55)
@@ -383,7 +384,7 @@ export class EntityResolver {
         slots.push(field);
       }
     }
-    const fields = this.withCalculatedFields(parsed, slots, {
+    const scope: Omit<ExpressionScope, "element" | "dictionary"> = {
       sourceName: table?.name ?? sourceEntity?.name ?? ast.source,
       sourcePrefixes: [ast.source, ...(ast.sourceAlias === undefined ? [] : [ast.sourceAlias])],
       associations: associationNames,
@@ -396,9 +397,27 @@ export class EntityResolver {
         const base = sourceEntity?.fields.find((f) => f.name.toUpperCase() === name.toUpperCase() && f.draft !== true);
         return base === undefined ? undefined : { name: base.name, type: base.type };
       },
-    });
+    };
+    const fields = this.withCalculatedFields(parsed, slots, scope);
     if (table !== undefined) {
       this.addDataElementLabels(fields, table.name);
+    }
+    // D101: the WHERE condition, on the columns of the source, its associations and $projection
+    let where: CdsCondition | undefined;
+    if (ast.where !== undefined) {
+      try {
+        where = resolveCondition(ast.where, {
+          ...scope,
+          dictionary: this.dictionary,
+          element: (name) => {
+            const field = fields.find((f) => same(f.name, name));
+            return field === undefined ? undefined : { name: field.name, type: field.type };
+          },
+        });
+      } catch (error) {
+        if (!(error instanceof ExpressionIssue)) throw error;
+        this.diagnostics.error(error.code, `${ast.name}: WHERE: ${error.message}`, this.loc(file, ast.whereLoc ?? ast.loc));
+      }
     }
     const entity: EntityModel = {
       name: ast.name,
@@ -410,6 +429,7 @@ export class EntityResolver {
       associations: [],
       annotations: this.entityAnnotations(parsed),
       src: this.loc(file, ast.loc),
+      ...(where === undefined ? {} : { where }),
     };
     entity.associations = this.associationsOf(parsed, entity);
     if (fields.filter((f) => f.key).length === 0) {
@@ -536,6 +556,10 @@ export class EntityResolver {
 
   private projection(parsed: ParsedEntity): EntityModel | undefined {
     const { ast, file } = parsed;
+    if (ast.hasWhere) {
+      // D101: the rows of the projection would differ from SAP
+      this.diagnostics.error("CDS002", `${ast.name}: a WHERE condition in a projection is not supported yet`, this.loc(file, ast.whereLoc ?? ast.loc));
+    }
     const base = ast.source === undefined ? undefined : this.resolve(ast.source);
     if (base === undefined) {
       this.diagnostics.error("CDS003", `${ast.name}: unknown projected entity ${ast.source ?? ""}`, this.loc(file, ast.loc));

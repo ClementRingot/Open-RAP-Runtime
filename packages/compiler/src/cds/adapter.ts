@@ -5,7 +5,7 @@
 
 import * as abaplint from "@abaplint/core";
 import { setAnnotation, type AnnotationObject, type AnnotationValue, type Annotations } from "@open-rap/model";
-import { CdsExpressionError, parseCdsExpression, type CdsExprAst } from "./expression-ast.js";
+import { CdsExpressionError, parseCdsCondition, parseCdsExpression, type CdsCondAst, type CdsExprAst } from "./expression-ast.js";
 
 type Node = abaplint.INode;
 const E = abaplint.ExpressionsCDS;
@@ -61,6 +61,10 @@ export interface CdsEntityAst {
   providerContract?: string;
   hasJoin: boolean;
   hasWhere: boolean;
+  /** D101: the condition of the WHERE clause, or the construct it could not parse. */
+  where?: CdsCondAst;
+  whereError?: string;
+  whereLoc?: CdsLoc;
   annotations: Annotations;
   elements: CdsElementAst[];
   associations: CdsAssociationAst[];
@@ -185,7 +189,17 @@ class AdapterContext {
           }
         }
         entity.hasJoin = select.findDirectExpressions(E.CDSJoin).length > 0;
-        entity.hasWhere = select.findDirectExpression(E.CDSWhere) !== undefined;
+        const where = select.findDirectExpression(E.CDSWhere);
+        entity.hasWhere = where !== undefined;
+        if (where !== undefined) {
+          entity.whereLoc = this.loc(where);
+          try {
+            entity.where = parseCdsCondition(where);
+          } catch (error) {
+            if (!(error instanceof CdsExpressionError)) throw error;
+            entity.whereError = error.message;
+          }
+        }
         entity.associations = this.associations(select);
         entity.elements = select.findDirectExpressions(E.CDSElement).map((e) => this.element(e));
       }

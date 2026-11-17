@@ -336,6 +336,8 @@ export interface EntityModel {
   providerContract?: string;
   /** Name of the generated SQL view (lower case); abstract and custom entities have none. */
   sqlView?: string;
+  /** D101: the WHERE condition of a view entity, on the columns of its source and its elements. */
+  where?: CdsCondition;
   /** Custom entities: the class of `@ObjectModel.query.implementedBy`, upper case. */
   queryClass?: string;
   /**

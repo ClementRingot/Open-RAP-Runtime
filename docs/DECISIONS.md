@@ -2445,3 +2445,21 @@ _The issues moved to the repository itself once public: see D74._
 - **Tests**: `ir.test.ts` (type and expression of a path, CDS004, to-many refused);
   `cds-paths.test.ts` (a view entity, an expression and a projection; `$filter`; a draft; a body
   ignoring it; the label and `Core.Computed`).
+
+## D101 — The WHERE condition of view entities
+
+- **Context**: a view entity with a WHERE clause was compiled without it (warning CDS002): its
+  view returned rows SAP does not return.
+- **Decision**:
+  - The CDS parser keeps the condition of the WHERE clause (the condition grammar of CASE WHEN,
+    D67); the IR resolves it with the names of the select list: the columns of the source,
+    `$projection` elements, to-one association paths (D100). `EntityModel.where` holds it.
+  - The PostgreSQL view of the entity has the condition (`WHERE …` on its source); the views of
+    the ABAP SQL of the behavior pools (D26) and of the projections read it.
+  - The draft part of the `_all` view applies the conditions of the entity and of the views below
+    it to the values of the draft: a draft instance is read through the same views as an active
+    one.
+  - What the condition grammar does not parse (`BETWEEN`, `IN`) and a WHERE in a projection:
+    CDS002, an error (no longer a warning: the rows would differ from SAP).
+- **Tests**: `ir.test.ts` (the condition resolved; CDS004 on an unknown name); `cds-where.test.ts`
+  (a travel excluded, read by key: 404; bookings filtered on an element and through `_Travel`).
