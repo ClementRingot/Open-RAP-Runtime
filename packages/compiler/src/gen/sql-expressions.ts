@@ -3,8 +3,8 @@
 import { isCharacterLike, isNumeric, type AbapType, type CdsCondition, type CdsExpression } from "@open-rap/model";
 
 export interface SqlRefs {
-  /** A column of the data source (`column` of the expression). */
-  column(name: string, type: AbapType): string;
+  /** A column of the data source (`column` of the expression), or of a joined one (`source`, D104). */
+  column(name: string, type: AbapType, source?: string): string;
   /** Another element of the entity (`$projection.X`). */
   element(name: string, type: AbapType): string;
   /** D100: an element reached through to-one associations. */
@@ -31,7 +31,7 @@ export function renderExpression(e: CdsExpression, sqlType: (t: AbapType) => str
       }
       return e.type.kind === "char" ? literal(e.value) : `${literal(e.value)}::${sqlType(e.type)}`;
     case "column":
-      return refs.column(e.name, e.type);
+      return refs.column(e.name, e.type, e.source);
     case "element":
       return refs.element(e.name, e.type);
     case "path":

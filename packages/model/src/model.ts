@@ -258,7 +258,8 @@ export interface FieldModel {
  */
 export type CdsExpression =
   | { kind: "literal"; value: string | number | null; type: AbapType }
-  | { kind: "column"; name: string; type: AbapType }
+  /** `source`: the alias of a joined data source (D104); none: the primary data source. */
+  | { kind: "column"; name: string; type: AbapType; source?: string }
   | { kind: "element"; name: string; type: AbapType }
   /** `$session.…` (D103): the date, and the user, the language and the client of the request. */
   | { kind: "session"; variable: "system_date" | "user" | "system_language" | "client" | "user_timezone" | "user_date"; type: AbapType }
@@ -341,6 +342,11 @@ export interface EntityModel {
   sqlView?: string;
   /** D101: the WHERE condition of a view entity, on the columns of its source and its elements. */
   where?: CdsCondition;
+  /**
+   * D104: the joins of a view entity: the alias of the primary data source, and each joined
+   * source (a table, lower case, or an entity) with its alias and ON condition.
+   */
+  joins?: { alias: string; sources: Array<{ kind: "inner" | "left" | "right" | "cross"; alias: string; table?: string; entity?: string; on?: CdsCondition }> };
   /** Custom entities: the class of `@ObjectModel.query.implementedBy`, upper case. */
   queryClass?: string;
   /**

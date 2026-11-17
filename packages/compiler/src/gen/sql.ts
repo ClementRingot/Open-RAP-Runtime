@@ -235,6 +235,11 @@ function pathTargets(model: Model, entity: EntityModel, source: EntityModel | un
   };
   for (const field of entity.fields) walk(field.expression);
   walkAny(entity.where);
+  // D104: the joined entities
+  for (const join of entity.joins?.sources ?? []) {
+    const joinedEntity = join.entity === undefined ? undefined : model.entities.find((x) => same(x.name, join.entity ?? ""));
+    if (joinedEntity !== undefined) targets.push(joinedEntity);
+  }
   return targets;
 }
 
@@ -250,14 +255,22 @@ function sourceEntityOf(model: Model, entity: EntityModel): EntityModel | undefi
   return model.entities.find((e) => same(e.name, source));
 }
 
+/** D104: the SQL relation of a joined data source: its table, or the view of its entity. */
+function joinedRelation(model: Model, source: { table?: string; entity?: string }): string {
+  return source.table ?? model.entities.find((e) => same(e.name, source.entity ?? ""))?.sqlView ?? "";
+}
+
 function createView(model: Model, entity: EntityModel): string {
   const source = entity.source ?? "";
   const sourceEntity = sourceEntityOf(model, entity);
   const from = sourceEntity?.sqlView ?? source.toLowerCase();
+  // D104: with joins, every column is qualified by the alias of its data source
+  const primary = entity.joins === undefined ? "" : `${quoteIdentifier(entity.joins.alias.toLowerCase())}.`;
+  const qualify = (alias: string | undefined, name: string): string => (alias === undefined ? `${primary}${quoteIdentifier(name)}` : `${quoteIdentifier(alias.toLowerCase())}.${quoteIdentifier(name)}`);
   const plainColumn = (field: FieldModel): string =>
-    quoteIdentifier(sourceEntity === undefined ? field.column ?? field.name.toLowerCase() : field.baseField ?? field.name);
+    qualify(undefined, sourceEntity === undefined ? field.column ?? field.name.toLowerCase() : field.baseField ?? field.name);
   const refs: SqlRefs = {
-    column: (name) => quoteIdentifier(name),
+    column: (name, _type, alias) => qualify(alias, name),
     element: (name) => {
       const target = findField(entity, name);
       return target === undefined ? "NULL" : fieldSql(target);
@@ -269,7 +282,14 @@ function createView(model: Model, entity: EntityModel): string {
   const columns = entity.fields.filter((field) => field.draft !== true).map((field) => `  ${fieldSql(field)} AS ${quoteIdentifier(field.name)}`);
   // D101: the WHERE condition of the view entity, on the columns of its source
   const where = entity.where === undefined ? "" : `\nWHERE ${renderCondition(entity.where, sqlType, refs)}`;
-  return `CREATE VIEW ${quoteIdentifier(entity.sqlView ?? "")} AS SELECT\n${columns.join(",\n")}\nFROM ${quoteIdentifier(from)}${where};\n`;
+  // D104: the joined data sources
+  const joins =
+    entity.joins === undefined
+      ? ""
+      : ` AS ${quoteIdentifier(entity.joins.alias.toLowerCase())}${entity.joins.sources
+          .map((j) => `\n${j.kind === "left" ? "LEFT OUTER JOIN" : "INNER JOIN"} ${quoteIdentifier(joinedRelation(model, j))} AS ${quoteIdentifier(j.alias.toLowerCase())} ON ${j.on === undefined ? "TRUE" : renderCondition(j.on, sqlType, refs)}`)
+          .join("")}`;
+  return `CREATE VIEW ${quoteIdentifier(entity.sqlView ?? "")} AS SELECT\n${columns.join(",\n")}\nFROM ${quoteIdentifier(from)}${joins}${where};\n`;
 }
 
 /**
@@ -634,7 +654,15 @@ function draftWhere(model: Model, entity: EntityModel): string[] {
 function draftRefs(model: Model, entity: EntityModel, depth: number): SqlRefs {
   const source = entity.kind === "projection" ? sourceEntityOf(model, entity) : undefined;
   const refs: SqlRefs = {
-    column: (name, type) => {
+    column: (name, type, alias) => {
+      if (alias !== undefined) {
+        // D104: a column of a joined source, read from the values of the draft (first match)
+        const join = entity.joins?.sources.find((j) => same(j.alias, alias));
+        if (join === undefined) return `NULL::${sqlType(type)}`;
+        const j = `j${depth}`;
+        const onRefs: SqlRefs = { ...refs, column: (n, t, a) => (a !== undefined && same(a, alias) ? `${j}.${quoteIdentifier(n)}` : refs.column(n, t, a)) };
+        return `(SELECT ${j}.${quoteIdentifier(name)} FROM ${quoteIdentifier(joinedRelation(model, join))} ${j} WHERE ${join.on === undefined ? "TRUE" : renderCondition(join.on, sqlType, onRefs)} LIMIT 1)`;
+      }
       if (source !== undefined) {
         const sourceField = findField(source, name);
         return sourceField === undefined ? `NULL::${sqlType(type)}` : draftFieldSql(model, source, sourceField, depth + 1);
@@ -654,23 +682,7 @@ function draftRefs(model: Model, entity: EntityModel, depth: number): SqlRefs {
 function draftFieldSql(model: Model, entity: EntityModel, field: FieldModel, depth = 0): string {
   const source = entity.kind === "projection" ? sourceEntityOf(model, entity) : undefined;
   if (field.expression !== undefined && depth < 20) {
-    const refs: SqlRefs = {
-      column: (name, type) => {
-        if (source !== undefined) {
-          const sourceField = findField(source, name);
-          return sourceField === undefined ? `NULL::${sqlType(type)}` : draftFieldSql(model, source, sourceField, depth + 1);
-        }
-        const exposed = entity.fields.find((f) => f.expression === undefined && f.draft !== true && same(f.column ?? f.baseField ?? "", name));
-        return exposed === undefined ? `NULL::${sqlType(type)}` : `d.${quoteIdentifier(exposed.name)}`;
-      },
-      element: (name, type) => {
-        const target = findField(entity, name);
-        return target === undefined ? `NULL::${sqlType(type)}` : draftFieldSql(model, entity, target, depth + 1);
-      },
-      // D100: the path starts from the values of the draft
-      path: (e) => pathSql(model, e.from === "self" ? entity : source, e, (name) => (e.from === "self" ? refs.element(name, e.type) : refs.column(name, e.type)), depth + 1),
-    };
-    return calculatedColumn(field.expression, field.type, sqlType, refs);
+    return calculatedColumn(field.expression, field.type, sqlType, draftRefs(model, entity, depth));
   }
   if (source !== undefined) {
     const sourceField = findField(source, field.baseField ?? field.name);

@@ -34,6 +34,8 @@ export interface ExpressionScope {
    * throws an ExpressionIssue on an unknown name or a to-many association.
    */
   associationPath?(path: string[]): { from: "self" | "source"; element: string; type: AbapType };
+  /** D104: a column of a joined data source, by its alias; undefined when the alias is not one. */
+  joined?(alias: string, name: string): { name: string; type: AbapType } | undefined;
   dictionary: Dictionary;
 }
 
@@ -178,6 +180,13 @@ class Resolver {
     }
     if (head.startsWith("$")) {
       throw new ExpressionIssue("CDS002", `${text} is not supported in expressions`);
+    }
+    // D104: alias.column of a joined data source
+    if (rest.length === 2 && this.scope.joined !== undefined) {
+      const joined = this.scope.joined(rest[0] ?? "", rest[1] ?? "");
+      if (joined !== undefined) {
+        return { kind: "column", name: joined.name, type: { ...joined.type }, source: (rest[0] ?? "").toLowerCase() };
+      }
     }
     if (this.scope.associations.has(head) && rest.length > 1 && this.scope.associationPath !== undefined) {
       const reached = this.scope.associationPath(rest);

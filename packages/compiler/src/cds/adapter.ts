@@ -61,6 +61,8 @@ export interface CdsEntityAst {
   providerContract?: string;
   hasJoin: boolean;
   hasWhere: boolean;
+  /** D104: the joins of the data source, in order. */
+  joins?: CdsJoinAst[];
   /** D101: the condition of the WHERE clause, or the construct it could not parse. */
   where?: CdsCondAst;
   whereError?: string;
@@ -68,6 +70,17 @@ export interface CdsEntityAst {
   annotations: Annotations;
   elements: CdsElementAst[];
   associations: CdsAssociationAst[];
+  loc: CdsLoc;
+}
+
+/** D104: `inner join | left outer join | right outer join | cross join source [as alias] on cond`. */
+export interface CdsJoinAst {
+  kind: "inner" | "left" | "right" | "cross";
+  source: string;
+  alias?: string;
+  on?: CdsCondAst;
+  /** The construct of the ON condition that could not be parsed. */
+  error?: string;
   loc: CdsLoc;
 }
 
@@ -191,6 +204,7 @@ class AdapterContext {
           }
         }
         entity.hasJoin = select.findDirectExpressions(E.CDSJoin).length > 0;
+        entity.joins = select.findDirectExpressions(E.CDSJoin).map((j) => this.join(j));
         this.where(entity, select.findDirectExpression(E.CDSWhere));
         entity.associations = this.associations(select);
         entity.elements = select.findDirectExpressions(E.CDSElement).map((e) => this.element(e));
@@ -235,6 +249,30 @@ class AdapterContext {
       on: this.onCondition(child.findDirectExpression(E.CDSCondition)),
       loc: this.loc(child),
     };
+  }
+
+  /** D104: a join of the data source. */
+  private join(node: abaplint.Nodes.ExpressionNode): CdsJoinAst {
+    const words = node
+      .getChildren()
+      .filter((c) => c instanceof abaplint.Nodes.TokenNode)
+      .map((c) => c.getFirstToken().getStr().toLowerCase());
+    const kind: CdsJoinAst["kind"] = words.includes("left") ? "left" : words.includes("right") ? "right" : words.includes("cross") ? "cross" : "inner";
+    const source = node.findDirectExpression(E.CDSSource);
+    const prefixed = source?.findDirectExpression(E.CDSPrefixedName);
+    const join: CdsJoinAst = { kind, source: (prefixed ?? source)?.concatTokens().replace(/\s+/g, "") ?? "", loc: this.loc(node) };
+    const alias = source?.findDirectExpression(E.CDSAs)?.findDirectExpression(E.CDSName)?.concatTokens();
+    if (alias !== undefined) join.alias = alias;
+    const condition = node.findDirectExpression(E.CDSCondition);
+    if (condition !== undefined) {
+      try {
+        join.on = parseCdsCondition(condition);
+      } catch (error) {
+        if (!(error instanceof CdsExpressionError)) throw error;
+        join.error = error.message;
+      }
+    }
+    return join;
   }
 
   /** D101: the WHERE condition of a view entity or a projection, or the construct it cannot parse. */

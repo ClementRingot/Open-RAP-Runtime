@@ -81,7 +81,7 @@ What the project deliberately leaves out; the planned work is in
 | `$session.client`, `user_timezone` | Always `100` (one client, D9; also `sy-mandt`) and `UTC` (D40); `user_date` is the system date. `$session.user` and `system_language` are those of the OData request or of the LUW; a read outside a request (background, e-mail) has an empty user. |
 | Calculated elements read with EML in the behavior pool (D67) | Value of the active view (last save), not recomputed on the changes of the transaction; initial value for a draft instance. |
 | Association paths in the select list (`_Agency.Name`) | To-one associations, also in an expression and in a projection (D100): read-only, from the active instances of the targets (also for a draft instance); a to-many association or a filter in the path (`_X[…]`): CDS002. |
-| Joins | Diagnostic CDS002 |
+| Joins (D104) | Inner and left outer joins of tables and CDS entities, in view entities: the columns of a joined source are read-only (also a key); a left outer join without match gives the initial value, as ABAP reads it. Right outer and cross joins: CDS002. In the draft part of a view with joins, a joined column is read from the first match (an inner join does not remove a draft instance). |
 | WHERE clause (D101, D102) | View entities and projections: comparisons, `[NOT] BETWEEN`, `LIKE`, `IS [NOT] NULL`, `IS [NOT] INITIAL`, `AND`/`OR`/`NOT` on the columns, the elements and to-one association paths; also applied to the draft instances. As on SAP, no `IN` list (CDS001). |
 | Views with parameters, unions, hierarchies | Diagnostic CDS002 |
 | Custom entities (D43): parameters, aggregation (`get_aggregation`), nested `$expand`; DCL not applied (the query class filters itself) | Not handled |

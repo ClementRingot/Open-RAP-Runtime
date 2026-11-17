@@ -2509,3 +2509,24 @@ _The issues moved to the repository itself once public: see D74._
 - **Tests**: `ir.test.ts` (`$session.user` accepted, another session variable refused);
   `cds-session.test.ts` (the user, the language of `Accept-Language`, the client, a flag computed
   with the user and filtered).
+
+## D104 — Joins of view entities
+
+- **Context**: a view entity with a join was refused (CDS002). Joins are less frequent than
+  associations in RAP, but common in the read-only views of an application.
+- **Decision**:
+  - The CDS parser keeps the joins of the data source (kind, source, alias, ON condition);
+    `inner join` and `left outer join` of tables and CDS entities are supported, `right outer`
+    and `cross` joins stay CDS002 (an unknown joined source: CDS003).
+  - An element `alias.column` of a joined source, or a column found in a single joined source,
+    is an expression `{ kind: "column", source: alias }`: read-only like a calculated element,
+    possibly a key element. The ON conditions are resolved like the WHERE (D101).
+  - The PostgreSQL view joins the sources (`FROM primary AS t INNER JOIN … AS b ON …`), every
+    column qualified by its alias; the views of the joined entities are created first. In the
+    draft part of an `_all` view, a joined column is a correlated subquery on the joined source
+    from the values of the draft (first match).
+  - A left outer join without match gives `NULL`, read as the initial value, as ABAP SQL does.
+- **Tests**: `ir.test.ts` (the joins of the model, a column without alias, a key of a joined
+  source, right outer join and unknown source refused); `cds-joins.test.ts` (inner join of two
+  tables, left outer join of an entity with a condition on it, a filter on a joined column,
+  `Core.Computed`).

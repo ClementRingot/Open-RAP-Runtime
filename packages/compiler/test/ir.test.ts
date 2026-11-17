@@ -256,6 +256,23 @@ describe("calculated elements (D67)", () => {
     expect(where("nothing = 'X'").diagnostics.filter((d) => d.severity === "error").map((d) => `${d.code} ${d.message}`)).toEqual(["CDS004 ZRT_R_Travel: WHERE: zrt_travel has no element nothing"]);
   });
 
+  it("models the joins of a view entity (D104)", () => {
+    const joinView = (join: string) =>
+      build({
+        "zrt_i_join.ddls.asddls": `define view entity ZRT_I_Join as select from zrt_travel as t ${join} {\n  key b.booking_uuid as BookingUUID,\n  t.travel_id as TravelID,\n  booking_id as BookingID\n}\n`,
+        "zrt_ui_travel.srvd.srvdsrv": (c: string) => lf(c).replace("  expose ZRT_C_Booking as Booking;", "  expose ZRT_C_Booking as Booking;\n  expose ZRT_I_Join as Joined;"),
+      });
+    const ok = joinView("inner join zrt_booking as b on b.parent_uuid = t.travel_uuid");
+    expect(ok.diagnostics.filter((d) => d.severity === "error")).toEqual([]);
+    const entity = findEntity(ok.model, "ZRT_I_Join");
+    expect(entity?.joins).toMatchObject({ alias: "t", sources: [{ kind: "inner", alias: "b", table: "zrt_booking", on: { kind: "compare", left: { kind: "column", name: "parent_uuid", source: "b" }, right: { kind: "column", name: "travel_uuid" } } }] });
+    // a column of the joined source, without its alias when no other source has it
+    expect(entity?.fields.find((f) => f.name === "BookingID")?.expression).toMatchObject({ kind: "column", name: "booking_id", source: "b" });
+    expect(entity?.fields.find((f) => f.name === "BookingUUID")).toMatchObject({ key: true });
+    expect(joinView("right outer join zrt_booking as b on b.parent_uuid = t.travel_uuid").diagnostics.filter((d) => d.severity === "error").map((d) => d.code)).toContain("CDS002");
+    expect(joinView("inner join zrt_nothing as b on b.x = t.travel_uuid").diagnostics.filter((d) => d.severity === "error").map((d) => d.code)).toContain("CDS003");
+  });
+
   it("reports invalid expressions with CDS022", () => {
     const message = (line: string): string[] =>
       build(withElement(line))

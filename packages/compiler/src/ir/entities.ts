@@ -289,10 +289,11 @@ export class EntityResolver {
       if (element.name === "") {
         throw new ExpressionIssue("CDS022", "a calculated element needs a name (AS alias)");
       }
-      if (element.key) {
+      const expression = resolveExpression(element.expr, scope);
+      // D104: a column of a joined data source may be a key element
+      if (element.key && !(expression.kind === "column" && expression.source !== undefined)) {
         throw new ExpressionIssue("CDS022", "a calculated element cannot be a key element");
       }
-      const expression = resolveExpression(element.expr, scope);
       const field = this.fieldFromElement(parsed, element, expression.type, undefined);
       field.expression = expression;
       // D100: an element of an association keeps the label of the element it reaches
@@ -319,9 +320,38 @@ export class EntityResolver {
       this.diagnostics.error("CDS003", `${ast.name}: no data source`, this.loc(file, ast.loc));
       return undefined;
     }
-    if (ast.hasJoin) {
-      this.diagnostics.error("CDS002", `${ast.name}: joins are not supported yet`, this.loc(file, ast.loc));
+    // D104: the joined data sources, by alias
+    const joined = new Map<string, { kind: "inner" | "left" | "right" | "cross"; alias: string; table?: TableModel; entity?: EntityModel; ast: NonNullable<CdsEntityAst["joins"]>[number] }>();
+    for (const join of ast.joins ?? []) {
+      if (join.kind === "right" || join.kind === "cross") {
+        this.diagnostics.error("CDS002", `${ast.name}: ${join.kind === "right" ? "right outer" : "cross"} joins are not supported yet (inner and left outer joins are)`, this.loc(file, join.loc));
+        continue;
+      }
+      if (join.error !== undefined) {
+        this.diagnostics.error("CDS002", `${ast.name}: ON condition of the join of ${join.source}: ${join.error} is not supported yet`, this.loc(file, join.loc));
+        continue;
+      }
+      if (this.parsed.get(join.source.toUpperCase())?.ast.kind === "table") {
+        this.resolve(join.source);
+      }
+      const joinTable = this.dictionary.table(join.source);
+      const joinEntity = joinTable === undefined ? this.resolve(join.source) : undefined;
+      if (joinTable === undefined && joinEntity === undefined) {
+        this.diagnostics.error("CDS003", `${ast.name}: unknown joined data source ${join.source} (no TABL or DDLS in the sources)`, this.loc(file, join.loc));
+        continue;
+      }
+      const alias = join.alias ?? join.source;
+      joined.set(alias.toUpperCase(), { kind: join.kind, alias, ...(joinTable === undefined ? {} : { table: joinTable }), ...(joinEntity === undefined ? {} : { entity: joinEntity }), ast: join });
     }
+    const joinedColumn = (alias: string, name: string): { name: string; type: AbapType } | undefined => {
+      const source = joined.get(alias.toUpperCase());
+      if (source?.table !== undefined) {
+        const column = source.table.columns.find((c) => c.name === name.toLowerCase() && !c.client);
+        return column === undefined ? undefined : { name: column.name, type: column.type };
+      }
+      const field = source?.entity?.fields.find((f) => same(f.name, name) && f.draft !== true);
+      return field === undefined ? undefined : { name: field.name, type: field.type };
+    };
     if (ast.hasWhere && ast.where === undefined) {
       this.diagnostics.error("CDS002", `${ast.name}: ${ast.whereError ?? "this WHERE condition"} is not supported yet`, this.loc(file, ast.whereLoc ?? ast.loc));
     }
@@ -354,6 +384,18 @@ export class EntityResolver {
         // D100: an element reached through to-one associations, read-only like a calculated element
         slots.push(asPathElement(element, path));
         continue;
+      }
+      // D104: a column of a joined data source, read-only like a calculated element
+      if (path.length === 2 && joined.has((path[0] ?? "").toUpperCase())) {
+        slots.push(asPathElement(element, path));
+        continue;
+      }
+      if (path.length === 1 && joined.size > 0 && (table !== undefined ? !table.columns.some((c) => c.name === (path[0] ?? "").toLowerCase()) : !sourceEntity?.fields.some((f) => same(f.name, path[0] ?? "")))) {
+        const owners = [...joined.values()].filter((j) => joinedColumn(j.alias, path[0] ?? "") !== undefined);
+        if (owners.length === 1) {
+          slots.push(asPathElement(element, [(owners[0] as { alias: string }).alias, path[0] ?? ""]));
+          continue;
+        }
       }
       if (path.length > 1) {
         this.diagnostics.error("CDS002", `${ast.name}.${element.name}: path expressions (${path.join(".")}) are not supported yet`, this.loc(file, element.loc));
@@ -389,6 +431,7 @@ export class EntityResolver {
       sourcePrefixes: [ast.source, ...(ast.sourceAlias === undefined ? [] : [ast.sourceAlias])],
       associations: associationNames,
       associationPath: (path) => this.associationPath(ast.associations.map((a) => ({ name: a.alias, target: a.target, cardinality: a.cardinality })), "self", path),
+      joined: joinedColumn,
       column: (name) => {
         if (table !== undefined) {
           const column = table.columns.find((c) => c.name === name.toLowerCase() && !c.client);
@@ -401,6 +444,26 @@ export class EntityResolver {
     const fields = this.withCalculatedFields(parsed, slots, scope);
     if (table !== undefined) {
       this.addDataElementLabels(fields, table.name);
+    }
+    // D104: the ON conditions of the joins, on the columns of the joined sources
+    let joins: EntityModel["joins"];
+    if (joined.size > 0) {
+      joins = { alias: ast.sourceAlias ?? ast.source, sources: [] };
+      for (const source of joined.values()) {
+        try {
+          const on = source.ast.on === undefined ? undefined : resolveCondition(source.ast.on, { ...scope, dictionary: this.dictionary, element: () => undefined });
+          joins.sources.push({
+            kind: source.kind as "inner" | "left",
+            alias: source.alias,
+            ...(source.table === undefined ? {} : { table: source.table.name }),
+            ...(source.entity === undefined ? {} : { entity: source.entity.name }),
+            ...(on === undefined ? {} : { on }),
+          });
+        } catch (error) {
+          if (!(error instanceof ExpressionIssue)) throw error;
+          this.diagnostics.error(error.code, `${ast.name}: ON condition of the join of ${source.ast.source}: ${error.message}`, this.loc(file, source.ast.loc));
+        }
+      }
     }
     // D101: the WHERE condition, on the columns of the source, its associations and $projection
     let where: CdsCondition | undefined;
@@ -430,6 +493,7 @@ export class EntityResolver {
       annotations: this.entityAnnotations(parsed),
       src: this.loc(file, ast.loc),
       ...(where === undefined ? {} : { where }),
+      ...(joins === undefined ? {} : { joins }),
     };
     entity.associations = this.associationsOf(parsed, entity);
     if (fields.filter((f) => f.key).length === 0) {
