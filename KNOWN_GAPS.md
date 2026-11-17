@@ -79,7 +79,7 @@ What the project deliberately leaves out; the planned work is in
 |---|---|
 | Expressions in the select list (D67): `$session.user`, `$session.client`, `$session.system_language`, `BETWEEN`, aggregates, SQL functions outside the list of D67 | Diagnostic CDS002 |
 | Calculated elements read with EML in the behavior pool (D67) | Value of the active view (last save), not recomputed on the changes of the transaction; initial value for a draft instance. |
-| Association paths in the select list (`_Agency.Name`), including in an expression | Diagnostic CDS002 |
+| Association paths in the select list (`_Agency.Name`) | To-one associations, also in an expression and in a projection (D100): read-only, from the active instances of the targets (also for a draft instance); a to-many association or a filter in the path (`_X[…]`): CDS002. |
 | Joins, WHERE clause | Diagnostic CDS002 (WHERE ignored with a warning) |
 | Views with parameters, unions, hierarchies | Diagnostic CDS002 |
 | Custom entities (D43): parameters, aggregation (`get_aggregation`), nested `$expand`; DCL not applied (the query class filters itself) | Not handled |

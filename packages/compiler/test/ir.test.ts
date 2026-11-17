@@ -223,9 +223,23 @@ describe("calculated elements (D67)", () => {
     expect(message("$session.user as CurrentUser")).toEqual([
       "CDS002 ZRT_R_Travel.CurrentUser: session variable $session.user is not supported (the SQL views have no session of the request; only $session.system_date)",
     ]);
-    expect(message("concat( _Booking.BookingID, 'x' ) as FirstBooking")).toEqual(["CDS002 ZRT_R_Travel.FirstBooking: path expressions (_Booking.BookingID) are not supported yet"]);
+    // D100: a path through a to-many association has no single value
+    expect(message("concat( _Booking.BookingID, 'x' ) as FirstBooking")).toEqual(["CDS002 ZRT_R_Travel.FirstBooking: _Booking.BookingID: _Booking is a to-many association: a path in the select list needs one value per instance"]);
+    expect(message("_Booking.BookingID as FirstBooking")).toEqual(["CDS002 ZRT_R_Travel.FirstBooking: _Booking.BookingID: _Booking is a to-many association: a path in the select list needs one value per instance"]);
     expect(message("count( * ) as Bookings")).toEqual(["CDS002 ZRT_R_Travel.Bookings: aggregate functions (count ( * )) is not supported yet"]);
     expect(message("instr( description, 'a' ) as Position")).toEqual(["CDS002 ZRT_R_Travel.Position: the SQL function INSTR is not supported yet"]);
+  });
+
+  it("types an element reached through to-one associations (D100)", () => {
+    const booking = (line: string) =>
+      build({ "zrt_r_booking.ddls.asddls": (c: string) => lf(c).replace("      _Travel\n", `      ${line},\n      _Travel\n`) });
+    const ok = booking("_Travel.TravelID as TravelNumber");
+    expect(ok.diagnostics.filter((d) => d.severity === "error")).toEqual([]);
+    expect(findEntity(ok.model, "ZRT_R_Booking")?.fields.find((f) => f.name === "TravelNumber")).toMatchObject({
+      type: { kind: "numc", length: 8 },
+      expression: { kind: "path", from: "self", associations: ["_Travel"], element: "TravelID" },
+    });
+    expect(booking("_Travel.Nothing as X").diagnostics.filter((d) => d.severity === "error").map((d) => d.code)).toEqual(["CDS004"]);
   });
 
   it("reports invalid expressions with CDS022", () => {

@@ -2423,3 +2423,25 @@ _The issues moved to the repository itself once public: see D74._
 - **Tests**: `fe-har.test.mjs` (observed values without user nor key, `error`, `sap-messages`);
   `fe-record.test.mjs` (the variants of the scenarios exist); `roundtrip.test.mjs` (the `strict`
   variant applies).
+
+## D100 — Elements of to-one associations in the select list
+
+- **Context**: `_Travel.TravelID as TravelNumber` in a view entity, or `_Agency.Name` in a
+  projection, is among the most frequent constructs of RAP projections; Open RAP Runtime refused
+  every path (CDS002). Phase 4 of the roadmap (provisional D86) starts with it.
+- **Decision**:
+  - A path of to-one associations ending with an element is an element of the entity, in a view
+    entity (its own associations) or a projection (the associations of the projected entity),
+    alone or inside an expression (D67). It is typed by the element it reaches and keeps its
+    label; like a calculated element it is read-only (`Core.Computed`) and ignored in the bodies.
+  - The model holds it as an expression `{ kind: "path", from: "self" | "source", associations,
+    element }`; the PostgreSQL view computes it with nested correlated subqueries on the views of
+    the targets (`(SELECT p0_0."TravelID" FROM "zrt_r_travel" p0_0 WHERE p0_0."TravelUUID" =
+    "TravelUUID" LIMIT 1)`), so it is filtered and sorted like any element and `NULL` without a
+    target; the views read by a path are created first. In the `_all` view of a draft, the path
+    starts from the values of the draft and reads the active instances of its targets.
+  - A to-many association in a path (no single value), an unknown association or element: CDS002,
+    CDS004. Filters in a path (`_X[ … ]`) are not parsed yet.
+- **Tests**: `ir.test.ts` (type and expression of a path, CDS004, to-many refused);
+  `cds-paths.test.ts` (a view entity, an expression and a projection; `$filter`; a draft; a body
+  ignoring it; the label and `Core.Computed`).

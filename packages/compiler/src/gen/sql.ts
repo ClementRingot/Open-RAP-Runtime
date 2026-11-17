@@ -14,6 +14,7 @@ import {
   isUuid,
   same,
   type AbapType,
+  type CdsExpression,
   type ColumnModel,
   type EntityModel,
   type FieldModel,
@@ -197,12 +198,43 @@ function orderedViews(model: Model): EntityModel[] {
     if (source !== undefined) {
       visit(source, stack);
     }
+    // D100: the views a path element reads come first
+    for (const target of pathTargets(model, entity, source)) {
+      visit(target, stack);
+    }
     result.push(entity);
   };
   for (const entity of model.entities) {
     visit(entity, new Set());
   }
   return result;
+}
+
+/** The entities the path elements of an entity read (D100), through their associations. */
+function pathTargets(model: Model, entity: EntityModel, source: EntityModel | undefined): EntityModel[] {
+  const targets: EntityModel[] = [];
+  const walk = (e: CdsExpression | undefined): void => {
+    if (e === undefined) return;
+    if (e.kind === "path") {
+      let current = e.from === "self" ? entity : source;
+      for (const name of e.associations) {
+        const association = current?.associations.find((a) => same(a.name, name));
+        current = association === undefined ? undefined : model.entities.find((x) => same(x.name, association.target));
+        if (current !== undefined) targets.push(current);
+      }
+      return;
+    }
+    for (const value of Object.values(e)) {
+      if (Array.isArray(value)) value.forEach((v) => walkAny(v));
+      else walkAny(value);
+    }
+  };
+  const walkAny = (value: unknown): void => {
+    if (typeof value === "object" && value !== null && "kind" in value) walk(value as CdsExpression);
+    else if (typeof value === "object" && value !== null) for (const v of Object.values(value)) walkAny(v);
+  };
+  for (const field of entity.fields) walk(field.expression);
+  return targets;
 }
 
 /**
@@ -229,6 +261,7 @@ function createView(model: Model, entity: EntityModel): string {
       const target = findField(entity, name);
       return target === undefined ? "NULL" : fieldSql(target);
     },
+    path: (e) => pathSql(model, e.from === "self" ? entity : sourceEntity, e, (name) => (e.from === "self" ? refs.element(name, e.type) : quoteIdentifier(name))),
   };
   const fieldSql = (field: FieldModel): string =>
     field.expression === undefined ? plainColumn(field) : calculatedColumn(field.expression, field.type, sqlType, refs);
@@ -553,6 +586,34 @@ WHERE d."UserID" <> '';
  * or its calculated element (D67) computed from the draft values (NULL for a column of the data
  * source the base entity does not expose).
  */
+/**
+ * D100: an element reached through to-one associations, as a correlated subquery on the active
+ * views of the targets (one row at most, NULL when the association has no target); `source` gives
+ * the SQL of an element of the entity the first association starts from.
+ */
+function pathSql(model: Model, start: EntityModel | undefined, e: Extract<CdsExpression, { kind: "path" }>, source: (element: string) => string, depth = 0): string {
+  let entity = start;
+  const hops: Array<{ view: string; on: Array<{ source: string; target: string }> }> = [];
+  for (const name of e.associations) {
+    const association = entity?.associations.find((a) => same(a.name, name));
+    const target = association === undefined ? undefined : model.entities.find((x) => same(x.name, association.target));
+    if (association === undefined || target === undefined || target.sqlView === undefined) {
+      return `NULL::${sqlType(e.type)}`;
+    }
+    // the pair of the draft (IsActiveEntity) is not a column of the active views
+    hops.push({ view: target.sqlView, on: association.on.filter((p) => p.source !== "IsActiveEntity") });
+    entity = target;
+  }
+  const alias = (i: number): string => `p${depth}_${i}`;
+  const build = (i: number, ref: (element: string) => string): string => {
+    const hop = hops[i] as (typeof hops)[number];
+    const condition = hop.on.map((p) => `${alias(i)}.${quoteIdentifier(p.target)} = ${ref(p.source)}`).join(" AND ") || "FALSE";
+    const value = i === hops.length - 1 ? `${alias(i)}.${quoteIdentifier(e.element)}` : build(i + 1, (element) => `${alias(i)}.${quoteIdentifier(element)}`);
+    return `(SELECT ${value} FROM ${quoteIdentifier(hop.view)} ${alias(i)} WHERE ${condition} LIMIT 1)`;
+  };
+  return build(0, source);
+}
+
 function draftFieldSql(model: Model, entity: EntityModel, field: FieldModel, depth = 0): string {
   const source = entity.kind === "projection" ? sourceEntityOf(model, entity) : undefined;
   if (field.expression !== undefined && depth < 20) {
@@ -569,6 +630,8 @@ function draftFieldSql(model: Model, entity: EntityModel, field: FieldModel, dep
         const target = findField(entity, name);
         return target === undefined ? `NULL::${sqlType(type)}` : draftFieldSql(model, entity, target, depth + 1);
       },
+      // D100: the path starts from the values of the draft
+      path: (e) => pathSql(model, e.from === "self" ? entity : source, e, (name) => (e.from === "self" ? refs.element(name, e.type) : refs.column(name, e.type)), depth + 1),
     };
     return calculatedColumn(field.expression, field.type, sqlType, refs);
   }

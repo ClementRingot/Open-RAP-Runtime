@@ -7,6 +7,8 @@ export interface SqlRefs {
   column(name: string, type: AbapType): string;
   /** Another element of the entity (`$projection.X`). */
   element(name: string, type: AbapType): string;
+  /** D100: an element reached through to-one associations. */
+  path?(e: Extract<CdsExpression, { kind: "path" }>): string;
 }
 
 const literal = (value: string): string => `'${value.replace(/'/g, "''")}'`;
@@ -32,6 +34,8 @@ export function renderExpression(e: CdsExpression, sqlType: (t: AbapType) => str
       return refs.column(e.name, e.type);
     case "element":
       return refs.element(e.name, e.type);
+    case "path":
+      return refs.path === undefined ? `NULL::${sqlType(e.type)}` : refs.path(e);
     case "session":
       return "current_date";
     case "negate":

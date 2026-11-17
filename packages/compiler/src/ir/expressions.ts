@@ -29,6 +29,11 @@ export interface ExpressionScope {
   sourceName: string;
   /** `$projection.X`: an element of the entity itself, typed; undefined when unknown. */
   element(name: string): { name: string; type: AbapType } | undefined;
+  /**
+   * D100: a path through to-one associations (`_Agency.Name`), typed by the element it reaches;
+   * throws an ExpressionIssue on an unknown name or a to-many association.
+   */
+  associationPath?(path: string[]): { from: "self" | "source"; element: string; type: AbapType };
   dictionary: Dictionary;
 }
 
@@ -152,8 +157,12 @@ class Resolver {
     if (head.startsWith("$")) {
       throw new ExpressionIssue("CDS002", `${text} is not supported in expressions`);
     }
+    if (this.scope.associations.has(head) && rest.length > 1 && this.scope.associationPath !== undefined) {
+      const reached = this.scope.associationPath(rest);
+      return { kind: "path", from: reached.from, associations: rest.slice(0, -1), element: reached.element, type: { ...reached.type } };
+    }
     if (this.scope.associations.has(head) || rest.length > 1) {
-      throw new ExpressionIssue("CDS002", `path expressions (${text}) are not supported yet`);
+      throw new ExpressionIssue("CDS002", `path expressions (${text}) are not supported here`);
     }
     const column = this.scope.column(rest[0] ?? "");
     if (column === undefined) {

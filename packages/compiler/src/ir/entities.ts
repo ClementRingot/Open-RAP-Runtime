@@ -4,6 +4,7 @@ import {
   getAnnotation,
   getString,
   mergeAnnotations,
+  same,
   setAnnotation,
   sqlName,
   type AbapType,
@@ -293,6 +294,11 @@ export class EntityResolver {
       const expression = resolveExpression(element.expr, scope);
       const field = this.fieldFromElement(parsed, element, expression.type, undefined);
       field.expression = expression;
+      // D100: an element of an association keeps the label of the element it reaches
+      if (expression.kind === "path" && getAnnotation(field.annotations, "EndUserText.label") === undefined) {
+        const label = this.pathLabels.get(expression.associations.concat(expression.element).join(".").toUpperCase());
+        if (label !== undefined) setAnnotation(field.annotations, "EndUserText.label", label);
+      }
       return field;
     } catch (error) {
       if (!(error instanceof ExpressionIssue)) {
@@ -343,6 +349,11 @@ export class EntityResolver {
       if (path.length === 1 && associationNames.has((path[0] ?? "").toUpperCase())) {
         continue; // association exposure
       }
+      if (path.length > 1 && associationNames.has((path[0] ?? "").toUpperCase())) {
+        // D100: an element reached through to-one associations, read-only like a calculated element
+        slots.push(asPathElement(element, path));
+        continue;
+      }
       if (path.length > 1) {
         this.diagnostics.error("CDS002", `${ast.name}.${element.name}: path expressions (${path.join(".")}) are not supported yet`, this.loc(file, element.loc));
         continue;
@@ -376,6 +387,7 @@ export class EntityResolver {
       sourceName: table?.name ?? sourceEntity?.name ?? ast.source,
       sourcePrefixes: [ast.source, ...(ast.sourceAlias === undefined ? [] : [ast.sourceAlias])],
       associations: associationNames,
+      associationPath: (path) => this.associationPath(ast.associations.map((a) => ({ name: a.alias, target: a.target, cardinality: a.cardinality })), "self", path),
       column: (name) => {
         if (table !== undefined) {
           const column = table.columns.find((c) => c.name === name.toLowerCase() && !c.client);
@@ -405,6 +417,44 @@ export class EntityResolver {
     }
     this.checkExtensionElements(parsed, entity);
     return entity;
+  }
+
+  /** The labels of the elements reached by the paths (D100), by path in upper case. */
+  private readonly pathLabels = new Map<string, string>();
+
+  /**
+   * D100: the element a path reaches through to-one associations, from the associations of the
+   * entity (a view) or of its source (a projection).
+   */
+  private associationPath(
+    start: Array<{ name: string; target: string; cardinality: { min: number; max: number | "*" } }>,
+    from: "self" | "source",
+    path: string[],
+  ): { from: "self" | "source"; element: string; type: AbapType } {
+    let associations = start;
+    let target: EntityModel | undefined;
+    for (const name of path.slice(0, -1)) {
+      const association = associations.find((a) => same(a.name, name));
+      if (association === undefined) {
+        throw new ExpressionIssue("CDS004", `${path.join(".")}: no association ${name}`);
+      }
+      if (association.cardinality.max === "*" || association.cardinality.max > 1) {
+        throw new ExpressionIssue("CDS002", `${path.join(".")}: ${name} is a to-many association: a path in the select list needs one value per instance`);
+      }
+      target = this.resolve(association.target);
+      if (target === undefined) {
+        throw new ExpressionIssue("CDS004", `${path.join(".")}: unknown target entity ${association.target}`);
+      }
+      associations = target.associations;
+    }
+    const last = path[path.length - 1] ?? "";
+    const field = target?.fields.find((f) => same(f.name, last) && f.draft !== true);
+    if (target === undefined || field === undefined) {
+      throw new ExpressionIssue("CDS004", `${path.join(".")}: ${target?.name ?? "the target"} has no element ${last}`);
+    }
+    const label = getAnnotation(field.annotations, "EndUserText.label");
+    if (typeof label === "string") this.pathLabels.set(path.join(".").toUpperCase(), label);
+    return { from, element: field.name, type: field.type };
   }
 
   /** The associations of a view or custom entity, ON conditions resolved. */
@@ -500,10 +550,15 @@ export class EntityResolver {
         slots.push(element); // a calculated element (D67)
         continue;
       }
+      if (element.path.length > 1 && base.associations.some((a) => same(a.name, element.path?.[0] ?? ""))) {
+        // D100: an element reached through to-one associations of the projected entity
+        slots.push(asPathElement(element, element.path));
+        continue;
+      }
       if (element.path.length !== 1) {
         this.diagnostics.error(
           "CDS002",
-          `${ast.name}.${element.name || "?"}: path expressions (${source}) are not supported yet: only elements of the projected entity can be projected`,
+          `${ast.name}.${element.name || "?"}: path expressions (${source}) are not supported here: only elements of the projected entity and paths through its associations can be projected`,
           this.loc(file, element.loc),
         );
         continue;
@@ -556,6 +611,7 @@ export class EntityResolver {
         sourceName: base.name,
         sourcePrefixes: [base.name, ...(ast.sourceAlias === undefined ? [] : [ast.sourceAlias])],
         associations: new Set(base.associations.map((a) => a.name.toUpperCase())),
+        associationPath: (path) => this.associationPath(base.associations, "source", path),
         column: (name) => {
           const baseField = base.fields.find((f) => f.name.toUpperCase() === name.toUpperCase() && f.draft !== true);
           return baseField === undefined ? undefined : { name: baseField.name, type: baseField.type };
@@ -761,4 +817,10 @@ function propagated(ast: CdsEntityAst, annotations: Annotations): Annotations | 
 function projectedName(ast: CdsEntityAst, baseName: string): string {
   const element = ast.elements.find((e) => e.path?.length === 1 && (e.path[0] ?? "").toUpperCase() === baseName.toUpperCase());
   return element?.name ?? baseName;
+}
+
+/** D100: a path element (`_Agency.Name`) as a calculated element, resolved by the expressions. */
+function asPathElement(element: CdsElementAst, path: string[]): CdsElementAst {
+  const { path: _path, ...rest } = element;
+  return { ...rest, expr: { kind: "path", path } };
 }

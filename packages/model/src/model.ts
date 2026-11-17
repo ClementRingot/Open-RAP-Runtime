@@ -265,7 +265,12 @@ export type CdsExpression =
   | { kind: "negate"; operand: CdsExpression; type: AbapType }
   | { kind: "case"; operand?: CdsExpression; branches: Array<{ when: CdsExpression | CdsCondition; then: CdsExpression }>; else?: CdsExpression; type: AbapType }
   | { kind: "cast"; operand: CdsExpression; type: AbapType }
-  | { kind: "function"; name: CdsFunctionName; args: CdsExpression[]; type: AbapType };
+  | { kind: "function"; name: CdsFunctionName; args: CdsExpression[]; type: AbapType }
+  /**
+   * D100: an element reached through to-one associations (`_Agency.Name`): the associations of the
+   * entity itself (`self`, a view entity) or of its source (`source`, a projection), then the element.
+   */
+  | { kind: "path"; from: "self" | "source"; associations: string[]; element: string; type: AbapType };
 
 export type CdsFunctionName =
   | "concat"
