@@ -55,7 +55,7 @@ The sections below use the provisional numbers, unless they say "final".
 | D84 | — | ALP and OVP driven by CDS annotations | 2 |
 | D85 | — | OData V2 at the Gateway URL | 7 |
 | D86 | — | CDS: joins, WHERE, paths, parameters, unions, hierarchies, `$session`, aggregates | 4 |
-| D87 | — | Late numbering | 4 |
+| D87 | D109 (part) | Late numbering (without draft) | 4 |
 | D88 | — | Complete EML | 4 |
 | D89 | — | Business events, change documents, extensions, attachments | 4 |
 | D90 | — | Exact decimal numbers and `TIMESTAMPL` | 4 |
@@ -173,7 +173,7 @@ The sections below use the provisional numbers, unless they say "final".
   `ISOLA`, `CUNIT`), applied in the OData layer and `/ui2/cl_json`; shift of the currency
   decimals in OData (as with TCURX); `CURRENCY_CONVERSION` in CDS on the exchange rates.
 - **Late numbering (D87).** `adjust_numbers` in the save sequence, provisional keys rewritten in
-  the buffer, final keys returned after the commit, `CONVERT KEY`.
+  the buffer, final keys returned after the commit (D109, without draft); draft, `CONVERT KEY`.
 - **Complete EML (D88).** `MODIFY ENTITIES OPERATIONS`, `GET PERMISSIONS`, `SET LOCKS`, EML on a
   projection BDEF, `AUGMENTING` and `RELATING TO`.
 - **Events, change documents, extensions, attachments (D89).** `RAISE ENTITY EVENT` published

@@ -2645,3 +2645,32 @@ _The issues moved to the repository itself once public: see D74._
   multiple parents; `$metadata`, TopLevels with Levels, ExpandLevels, orderby, paging, descendants,
   ancestors with filter and search, another qualifier).
 
+## D109 — Late numbering
+
+- **Context**: `late numbering` was BDEF002 and `adjust_numbers` ABP007: a BO whose keys are drawn
+  gaplessly at the end of the transaction (numbers of documents, items) could not run.
+- **Decision**:
+  - The BDEF accepts `late numbering [in place]` on the entities of a managed BO (not in a projection
+    BDEF, which reuses it: BDEF012). As on SAP, the direct children of an entity with late
+    numbering have it too, and it excludes early numbering (BDEF032). The saver class must redefine
+    `adjust_numbers` (ABP002), declared `CHANGING mapped TYPE RESPONSE FOR MAPPED LATE reported
+    TYPE RESPONSE FOR REPORTED LATE` (and `failed` with `cl_abap_behavior_saver_failed`); its
+    `cleanup` is called after the save. MAPPED LATE of such an entity has `%pre` (`%pid`, and the
+    preliminary key `%tmp`) and `%key`.
+  - Interaction phase: a created instance gets a `%pid`, returned in `mapped` and accepted in the
+    keys of the next EML statements, and a preliminary key in its initial key fields, which no
+    instance has (negative integers, the highest NUMC values, `#`-prefixed texts, new UUIDs): the
+    buffer, the locks and the content IDs of a changeset use it.
+  - Late save phase: after the determinations and validations on save, `adjust_numbers` gets one
+    row per created instance (`%pid`, `%tmp`) and fills `%key`; the instances take their final keys,
+    the foreign keys of their children follow; then the managed write and `save_modified`. A
+    created instance left without final key is a runtime error, as on SAP.
+  - OData: the response of a create, its `Location` and the parts of a changeset are rendered with
+    the final keys.
+  - Not yet: late numbering in a draft BO (BDEF002; SAP needs the key `DRAFTUUID` in the draft
+    table), `CONVERT KEY`. Different from SAP: during the interaction phase the key fields hold the
+    preliminary values instead of initial ones.
+- **Tests**: `ir.test.ts` (the model, BDEF032 on a child without late numbering, ABP002 without
+  `adjust_numbers`); `rap-late-numbering.test.ts` (a deep create numbered by `adjust_numbers`, the
+  `Location`, a new item of an existing order, a changeset with content IDs).
+

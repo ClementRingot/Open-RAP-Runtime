@@ -462,6 +462,8 @@ export interface SaverModel {
   className: string;
   saveModified?: HandlerRef;
   cleanup?: HandlerRef;
+  /** D109: adjust_numbers of late numbering. */
+  adjustNumbers?: HandlerRef;
   /** Inherits from cl_abap_behavior_saver_failed: save_modified has a failed parameter. */
   withFailed: boolean;
 }
@@ -593,6 +595,11 @@ export interface EntityBehaviorModel {
   /** `early numbering`: keys are drawn by a FOR NUMBERING handler. */
   earlyNumbering: boolean;
   earlyNumberingHandler?: HandlerRef;
+  /**
+   * D109: `late numbering [in place]`: the keys of the created instances are preliminary until the
+   * saver method adjust_numbers gives the final ones, in the late save phase.
+   */
+  lateNumbering?: { inPlace: boolean };
   operations: OperationModel[];
   associations: BehaviorAssociationModel[];
   fieldCharacteristics: Record<string, FieldCharacteristic[]>;

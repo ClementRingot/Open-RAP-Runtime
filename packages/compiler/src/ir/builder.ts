@@ -601,6 +601,21 @@ function checkBusinessObjects(entities: EntityModel[], behaviors: BehaviorModel[
       if (!entity.root && !entity.associations.some((a) => a.kind === "toParent")) {
         diagnostics.error("BDEF025", `${entity.name}: a child entity needs an association to parent`, entityBehavior.src);
       }
+      // D109: as on SAP, the direct children of an entity with late numbering have late numbering too
+      if (entityBehavior.lateNumbering !== undefined) {
+        for (const composition of entity.associations.filter((a) => a.kind === "composition")) {
+          const child = behavior.entities.find((e) => same(e.entity, composition.target));
+          if (child !== undefined && child.lateNumbering === undefined) {
+            diagnostics.error("BDEF032", `${child.entity}: the child of ${entity.name}, which has late numbering, needs late numbering too`, child.src);
+          }
+        }
+        if (behavior.draft === true) {
+          diagnostics.error("BDEF002", `${entity.name}: late numbering in a draft BO is not supported yet`, entityBehavior.src);
+        }
+        if (entityBehavior.earlyNumbering) {
+          diagnostics.error("BDEF032", `${entity.name}: early numbering and late numbering exclude each other`, entityBehavior.src);
+        }
+      }
     }
   }
   for (const behavior of behaviors.filter((b) => b.implementationType === "projection")) {

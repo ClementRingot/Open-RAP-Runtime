@@ -629,7 +629,15 @@ function rewriteSaverMethod(tokens: Tok[], edits: SourceEdits, context: RewriteC
   }
   const method = name.upper;
   if (method === "ADJUST_NUMBERS") {
-    throw new RewriteError("ABP007", "adjust_numbers (late numbering) is not supported", name);
+    // D109: late numbering, CHANGING mapped (MAPPED LATE: %pre with %pid and %tmp, %key) and reported
+    const pool = context.pool;
+    if (pool === undefined) {
+      throw new RewriteError("ABP007", "adjust_numbers outside of the behavior pool of a BDEF", name);
+    }
+    const t = (type: string): string => `${pool.iface}=>${type}`;
+    const failed = context.saverClasses?.get(context.current?.name ?? "") === true ? ` failed TYPE ${t(derivedType.failedLate)}` : "";
+    edits.replace(redefinition, redefinition, `CHANGING mapped TYPE ${t(derivedType.mappedLate)} reported TYPE ${t(derivedType.reportedLate)}${failed}`);
+    return true;
   }
   if (method !== "SAVE_MODIFIED") {
     edits.replace(redefinition, redefinition, "");

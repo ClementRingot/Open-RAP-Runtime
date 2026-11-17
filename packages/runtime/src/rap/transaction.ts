@@ -9,7 +9,7 @@ import { randomUUID } from "node:crypto";
 import { sql, type Kysely } from "kysely";
 import { abapName, derivedType, getAnnotation, same, type ActionModel, type DeterminationModel, type EntityModel, type FieldModel, type HandlerRef, type TableModel, type TriggerModel, type ValidationModel } from "@open-rap/model";
 import type { AbapBridge } from "../abap/bridge.js";
-import { appendRow, component, isFlagOn, rowsOf, setFlag, type AbapData } from "../abap/convert.js";
+import { appendRow, component, getAbapValue, isFlagOn, rowsOf, setAbapValue, setFlag, type AbapData } from "../abap/convert.js";
 import type { User } from "../auth/user.js";
 import { withSavepoint } from "../db/database.js";
 import { fromSql, initialValue, isInitial, toSql, type CanonicalValue } from "../values.js";
@@ -67,6 +67,8 @@ interface Instance {
   /** Fields changed in this LUW (all given fields for a creation). */
   changed: Set<string>;
   cid?: string;
+  /** D109: late numbering, the preliminary identifier of a created instance (%pid, 32 hexadecimal digits). */
+  pid?: string;
 }
 
 interface ChangeEvent {
@@ -108,6 +110,9 @@ export class Transaction {
   private saved = false;
   /** ETag masters whose ETag field changes with their `etag dependent` instances (D32). */
   private readonly etagTouched = new Set<Instance>();
+  /** D109: the final keys given by adjust_numbers, by the buffer id of the preliminary key. */
+  private readonly renumbered = new Map<string, Row>();
+  private pidCounter = 0;
   /** The saver runs (save_modified, cleanup): the only place where ABAP SQL may write. */
   public inSaver = false;
 
@@ -198,8 +203,16 @@ export class Transaction {
     return instance;
   }
 
-  /** Key of a request row: its key, or the instance created with its `%cid_ref`. */
+  /** Key of a request row: its key, the instance of its `%pid` (D109), or the instance created with its `%cid_ref`. */
   private resolveKey(bo: BoEntity, key: Row | undefined, cidRef: string | undefined): Row | undefined {
+    const pid = key?.["%pid"];
+    if (typeof pid === "string" && !/^0*$/.test(pid)) {
+      for (const instance of this.instances.values()) {
+        if (instance.bo === bo && instance.pid?.toUpperCase() === pid.toUpperCase()) {
+          return keyOf(bo, instance.row);
+        }
+      }
+    }
     if (cidRef !== undefined && cidRef !== "") {
       const created = this.cids.get(cidRef);
       if (created !== undefined && created.bo === bo) {
@@ -674,6 +687,8 @@ export class Transaction {
           changed.add(field.name);
         }
       }
+      // D109: late numbering, a preliminary key until adjust_numbers (the initial key fields)
+      const pid = bo.behavior.lateNumbering === undefined ? undefined : await this.preliminaryKey(bo, row, changed);
       if (!mode.local) {
         const missing = bo.fields.find((f) => this.bo.characteristics(bo, f.name).includes("mandatoryCreate") && isInitial(f.type, row[f.name]));
         if (missing !== undefined) {
@@ -696,7 +711,7 @@ export class Transaction {
       this.setAdminFields(bo, row, true, changed);
       const id = this.id(bo, key);
       const previous = this.instances.get(id);
-      const instance: Instance = { bo, row, deleted: false, changed };
+      const instance: Instance = { bo, row, deleted: false, changed, ...(pid === undefined ? {} : { pid }) };
       if (previous?.persisted !== undefined) {
         // re-created after a deletion in the same LUW: an update of the stored row
         instance.persisted = previous.persisted;
@@ -704,12 +719,132 @@ export class Transaction {
       if (request.cid !== undefined && request.cid !== "") {
         instance.cid = request.cid;
         this.cids.set(request.cid, { bo, key });
-        responses.mapped.push({ entity: bo.entity.name, cid: request.cid, key });
+        responses.mapped.push({ entity: bo.entity.name, cid: request.cid, key: pid === undefined ? key : { ...key, "%pid": pid } });
       }
       this.instances.set(id, instance);
       this.record(bo, key, "create", new Set(changed));
     }
     return responses;
+  }
+
+  /**
+   * D109: the preliminary key of an instance created with late numbering: its initial key fields
+   * get values no instance has (negative numbers, the highest NUMC values, `#`-prefixed texts, new
+   * UUIDs), replaced by the final key of adjust_numbers in the late save phase. Returns its %pid.
+   */
+  private async preliminaryKey(bo: BoEntity, row: Row, changed: Set<string>): Promise<string> {
+    const pid = (++this.pidCounter).toString(16).toUpperCase().padStart(32, "0");
+    const initial = bo.keys.filter((k) => isInitial(k.type, row[k.name]));
+    if (initial.length === 0) {
+      return pid;
+    }
+    for (let attempt = 1; attempt < 100_000; attempt++) {
+      const n = this.pidCounter + attempt - 1;
+      for (const key of initial) {
+        row[key.name] = preliminaryValue(key, n);
+        changed.add(key.name);
+      }
+      if ((await this.instance(bo, keyOf(bo, row))) === undefined) {
+        return pid;
+      }
+    }
+    throw new RapRuntimeError(`late numbering of ${bo.behavior.alias}: no preliminary key is free`);
+  }
+
+  /**
+   * D109: the late save phase of late numbering: adjust_numbers of the saver class maps the
+   * preliminary identifiers (%pid, %tmp) of the created instances to their final keys; the buffer,
+   * the foreign keys of the children and the content IDs take the final keys. A created instance
+   * left without final key is a runtime error, as on SAP.
+   */
+  private async adjustNumbers(): Promise<Responses> {
+    const responses = new Responses();
+    for (const bdef of new Set(this.bo.entities.map((e) => e.bdef))) {
+      const saver = bdef.saver;
+      const entities = this.bo.entities.filter((e) => e.bdef === bdef && e.behavior.lateNumbering !== undefined);
+      const first = this.bo.entities.find((e) => e.bdef === bdef);
+      const created = [...this.instances.values()].filter((i) => i.pid !== undefined && !i.deleted && i.persisted === undefined && entities.includes(i.bo));
+      if (saver?.adjustNumbers === undefined || first === undefined || created.length === 0) {
+        continue;
+      }
+      const mapped = this.bridge.response(first, "mapped", true);
+      for (const instance of created) {
+        appendRow(component(mapped, abapName(instance.bo.behavior.alias)) as AbapData, (row) => {
+          component(row, "%pid")?.set(instance.pid ?? "");
+          for (const key of instance.bo.keys) {
+            const data = component(row, `${key.name}_tmp`);
+            if (data !== undefined) setAbapValue(data, key.type, instance.row[key.name] ?? null);
+          }
+        });
+      }
+      const reported = this.bridge.response(first, "reported", true);
+      const failed = saver.withFailed ? this.bridge.response(first, "failed", true) : undefined;
+      this.inSaver = true;
+      try {
+        await this.bridge.call(saver.adjustNumbers, { mapped, reported, ...(failed === undefined ? {} : { failed }) });
+      } finally {
+        this.inSaver = false;
+      }
+      responses.add(await this.bridge.readResponses(first, failed, reported));
+      // the final keys, by %pid (or by the preliminary key %tmp)
+      const finals = new Map<Instance, Row>();
+      for (const bo of entities) {
+        for (const row of rowsOf(component(mapped, abapName(bo.behavior.alias)) as AbapData)) {
+          const pid = String(component(row, "%pid")?.get() ?? "");
+          const tmp: Row = {};
+          for (const key of bo.keys) {
+            const data = component(row, `${key.name}_tmp`);
+            tmp[key.name] = data === undefined ? null : getAbapValue(data, key.type);
+          }
+          const instance = created.find((i) => i.bo === bo && ((pid !== "" && !/^0+$/.test(pid) && i.pid?.toUpperCase() === pid.toUpperCase()) || keyString(bo, i.row) === keyString(bo, tmp)));
+          if (instance !== undefined) {
+            finals.set(instance, this.bridge.readKey(row, bo));
+          }
+        }
+      }
+      for (const instance of created) {
+        const final = finals.get(instance);
+        if (final === undefined || instance.bo.keys.every((k) => isInitial(k.type, final[k.name]))) {
+          throw new RapRuntimeError(`adjust_numbers gave no final key to an instance of ${instance.bo.behavior.alias} created with late numbering`);
+        }
+      }
+      this.applyFinalKeys(finals);
+    }
+    return responses;
+  }
+
+  /** D109: the buffer under the final keys; the foreign keys of the children follow their parents. */
+  private applyFinalKeys(finals: Map<Instance, Row>): void {
+    const moves: Array<{ instance: Instance; before: Row; after: Row }> = [];
+    for (const [instance, final] of finals) {
+      moves.push({ instance, before: keyOf(instance.bo, instance.row), after: keyOf(instance.bo, final) });
+    }
+    // the foreign keys of the instances whose to-parent association points to a preliminary key;
+    // the final key of a child (given by adjust_numbers) is applied afterwards
+    for (const { instance, before, after } of moves) {
+      for (const other of this.instances.values()) {
+        const parent = other.bo.parent;
+        if (parent === undefined || parent.target !== instance.bo || other === instance) continue;
+        if (parent.on.every((p) => JSON.stringify(other.row[p.source] ?? null) === JSON.stringify(before[p.target] ?? null))) {
+          for (const p of parent.on) other.row[p.source] = after[p.target] ?? null;
+        }
+      }
+    }
+    for (const { instance, before, after } of moves) {
+      const oldId = this.id(instance.bo, before);
+      Object.assign(instance.row, after);
+      this.instances.delete(oldId);
+      this.instances.set(this.id(instance.bo, after), instance);
+      this.renumbered.set(oldId, after);
+      if (instance.cid !== undefined) {
+        this.cids.set(instance.cid, { bo: instance.bo, key: after });
+      }
+    }
+  }
+
+  /** D109: the final key of an instance created with late numbering, after the save (else the key itself). */
+  public finalKey(bo: BoEntity, key: Row): Row {
+    return this.renumbered.get(this.id(bo, key)) ?? key;
   }
 
   private createTable(bo: BoEntity, requests: CreateRequest[]): AbapData {
@@ -1250,11 +1385,20 @@ export class Transaction {
     if (responses.hasFailed) {
       return responses;
     }
+    // D109: the late save phase, the final keys of late numbering
+    responses.add(await this.adjustNumbers());
     await this.refreshEtagMasters();
     await this.write();
     // additional and unmanaged save: save_modified, whose failed (cl_abap_behavior_saver_failed)
     // makes the caller roll the LUW back
     responses.add(await this.saveModified());
+    // D109: the cleanup of a saver class with late numbering only
+    for (const bdef of new Set(this.bo.entities.map((e) => e.bdef))) {
+      const saver = bdef.saver;
+      if (saver?.adjustNumbers !== undefined && saver.saveModified === undefined && saver.cleanup !== undefined) {
+        await this.bridge.call(saver.cleanup, {});
+      }
+    }
     this.saved = !responses.hasFailed;
     return responses;
   }
@@ -1623,3 +1767,35 @@ function authorizedAs(op: FailedOperation): FailedOperation {
 export function operationId(op: FailedOperation): string {
   return op.kind === "action" || op.kind === "association" ? `${op.kind}:${op.name.toLowerCase()}` : op.kind;
 }
+
+/** D109: the n-th preliminary value of a key field of late numbering, unlike the final ones. */
+function preliminaryValue(field: FieldModel, n: number): CanonicalValue {
+  const t = field.type;
+  switch (t.kind) {
+    case "int1":
+      return 255 - (n % 255);
+    case "int2":
+    case "int4":
+    case "int8":
+      return -n;
+    case "numc": {
+      const length = t.length ?? 10;
+      const max = 10n ** BigInt(length) - 1n;
+      return (max - BigInt(n - 1)).toString().padStart(length, "0");
+    }
+    case "raw":
+      return randomUUID().replace(/-/g, "").toUpperCase().slice(0, (t.length ?? 16) * 2).padEnd((t.length ?? 16) * 2, "0");
+    case "char":
+    case "sstring":
+    case "string": {
+      if (isUuidLike(field)) return randomUUID();
+      const text = `#${n.toString(36).toUpperCase()}`;
+      return t.length === undefined ? text : text.slice(0, t.length);
+    }
+    default:
+      return randomUUID();
+  }
+}
+
+const isUuidLike = (field: FieldModel): boolean => field.type.kind === "char" && field.type.length === 36;
+

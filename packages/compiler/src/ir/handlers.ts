@@ -245,21 +245,29 @@ function findSaver(registry: abaplint.Registry, poolName: string, project: Proje
   return undefined;
 }
 
-/** The saver class for additional and unmanaged save (save_modified, cleanup). */
+/**
+ * The saver class: save_modified and cleanup for additional and unmanaged save, adjust_numbers for
+ * late numbering (D109).
+ */
 function attachSaver(behavior: BehaviorModel, pools: Set<string>, registry: abaplint.Registry, project: Project, diagnostics: Diagnostics): void {
-  const needed = behavior.saving !== undefined || behavior.entities.some((e) => e.saving !== undefined);
+  const saving = behavior.saving !== undefined || behavior.entities.some((e) => e.saving !== undefined);
+  const late = behavior.entities.some((e) => e.lateNumbering !== undefined);
+  const needed = saving || late;
   let found: FoundSaver | undefined;
   for (const pool of pools) {
     found ??= findSaver(registry, pool, project);
   }
   if (found === undefined) {
-    if (needed) {
+    if (saving) {
       diagnostics.error("ABP002", `${behavior.name}: with additional or unmanaged save, the behavior pool needs a saver class (INHERITING FROM cl_abap_behavior_saver) with save_modified`, behavior.src);
+    }
+    if (late) {
+      diagnostics.error("ABP002", `${behavior.name}: with late numbering, the behavior pool needs a saver class (INHERITING FROM cl_abap_behavior_saver) with adjust_numbers`, behavior.src);
     }
     return;
   }
   if (!needed) {
-    diagnostics.warning("ABP003", `saver class ${found.saver.className} is not called: the BDEF has no with additional save or with unmanaged save`, { file: found.file, line: found.line });
+    diagnostics.warning("ABP003", `saver class ${found.saver.className} is not called: the BDEF has no with additional save, with unmanaged save or late numbering`, { file: found.file, line: found.line });
     return;
   }
   const ref = (method: string): HandlerRef => ({
@@ -268,17 +276,23 @@ function attachSaver(behavior: BehaviorModel, pools: Set<string>, registry: abap
     method,
     params: { reported: "reported", ...(found.saver.withFailed ? { failed: "failed" } : {}) },
   });
-  if (found.methods.has("save_modified")) {
+  if (found.methods.has("save_modified") && saving) {
     found.saver.saveModified = ref("save_modified");
-  } else {
+  } else if (saving) {
     diagnostics.error("ABP002", `saver class ${found.saver.className} must redefine save_modified`, { file: found.file, line: found.line });
+  }
+  if (found.methods.has("adjust_numbers") && late) {
+    found.saver.adjustNumbers = { ...ref("adjust_numbers"), params: { ...ref("adjust_numbers").params, mapped: "mapped" } };
+  } else if (late) {
+    diagnostics.error("ABP002", `saver class ${found.saver.className} must redefine adjust_numbers (late numbering)`, { file: found.file, line: found.line });
   }
   if (found.methods.has("cleanup")) {
     found.saver.cleanup = { ...ref("cleanup"), params: {} };
   }
   for (const [method, line] of found.methods) {
-    if (method !== "save_modified" && method !== "cleanup") {
-      diagnostics.warning("ABP003", `saver method ${method} is not available in a managed BO with additional or unmanaged save and is not called`, { file: found.file, line });
+    const available = method === "cleanup" || (method === "save_modified" && saving) || (method === "adjust_numbers" && late);
+    if (!available) {
+      diagnostics.warning("ABP003", `saver method ${method} is not available in this managed BO (save_modified: additional or unmanaged save; adjust_numbers: late numbering) and is not called`, { file: found.file, line });
     }
   }
   behavior.saver = found.saver;

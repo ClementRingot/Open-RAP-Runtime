@@ -101,6 +101,11 @@ export class AbapBridge {
 
   public fillKey(target: AbapData, bo: BoEntity, key: Row): void {
     this.fillRow(target, bo, key, bo.keys.map((k) => k.name));
+    // D109: the preliminary identifier of an instance created with late numbering
+    const pid = key["%pid"];
+    if (typeof pid === "string") {
+      component(target, "%pid")?.set(pid);
+    }
   }
 
   public readRow(source: AbapData, bo: BoEntity, fields?: Iterable<string>): Row {
@@ -116,7 +121,13 @@ export class AbapBridge {
   }
 
   public readKey(source: AbapData, bo: BoEntity): Row {
-    return this.readRow(source, bo, bo.keys.map((k) => k.name));
+    const key = this.readRow(source, bo, bo.keys.map((k) => k.name));
+    // D109: %pid, which identifies an instance created with late numbering before its final key
+    if (bo.behavior.lateNumbering !== undefined) {
+      const pid = String(component(source, "%pid")?.get() ?? "");
+      if (pid !== "" && !/^0+$/.test(pid)) key["%pid"] = pid;
+    }
+    return key;
   }
 
   /** Fields flagged in the `%control` component of a row; undefined when the row has none. */

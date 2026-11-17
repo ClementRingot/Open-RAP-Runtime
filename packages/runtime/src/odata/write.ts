@@ -179,6 +179,17 @@ export class RapWriteHandler implements WriteHandler {
     return result;
   }
 
+  /** D109: the outcome with the final key of an instance created with late numbering. */
+  private finalOutcome(tx: Transaction, outcome: Outcome): Outcome {
+    if (outcome.entity === undefined) return outcome;
+    const { set } = outcome.entity;
+    const base = this.baseKey(set, outcome.entity.key);
+    const final = tx.finalKey(set.bo, base);
+    if (final === base) return outcome;
+    const key = this.projectedKey(set, final);
+    return { ...outcome, entity: { set, key }, ...(outcome.location === undefined ? {} : { location: this.path(set, key) }) };
+  }
+
   public path(set: SetInfo, key: Key): string {
     return `${set.info.set.name}${this.service.keyPredicate(set.info, key)}`;
   }
@@ -190,7 +201,8 @@ export class RapWriteHandler implements WriteHandler {
     const changeset = ctx.changeset as ChangesetState | undefined;
     if (changeset !== undefined) {
       const outcome = await this.execute(changeset.tx, request, target, ctx);
-      return { status: outcome.status, headers: {}, deferred: () => this.render(outcome, ctx) };
+      // D109: rendered after the save of the changeset, with the final keys of late numbering
+      return { status: outcome.status, headers: {}, deferred: () => this.render(this.finalOutcome(changeset.tx, outcome), ctx) };
     }
     const outcome = await this.luw(ctx, async (tx) => {
       const result = await this.execute(tx, request, target, ctx);
@@ -198,7 +210,7 @@ export class RapWriteHandler implements WriteHandler {
         const resource = result.entity === undefined ? undefined : { set: result.entity.set, key: this.baseKey(result.entity.set, result.entity.key) };
         result.messages.push(...(await this.save(tx, resource)));
       }
-      return result;
+      return this.finalOutcome(tx, result);
     });
     return this.render(outcome, ctx);
   }

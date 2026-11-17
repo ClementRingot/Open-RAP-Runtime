@@ -243,7 +243,12 @@ function buildEntityBehavior(
         model.earlyNumbering = true;
         break;
       case "lateNumbering":
-        diagnostics.error("BDEF002", "late numbering is not supported", at(option.loc));
+        // D109: the final keys come from adjust_numbers of the saver class
+        if (isProjection) {
+          diagnostics.error("BDEF012", "late numbering is reused from the base BDEF: it cannot be specified in a projection BDEF", at(option.loc));
+        } else {
+          model.lateNumbering = { inPlace: option.inPlace };
+        }
         break;
       case "implementationInClass":
         model.implementationClass = option.className.text.toUpperCase();

@@ -51,11 +51,11 @@ What the project deliberately leaves out; the planned work is in
 | ABAP SQL functions (`concat`, `division`, `dats_days_between`, `tstmp_*`…) | Passed as is: only those that exist under the same name in PostgreSQL work. |
 | SQL error at runtime | Runtime error (500), no catchable `CX_SY_OPEN_SQL_DB` exception; the transaction of the LUW stays usable (savepoint). |
 | `SELECT … FOR UPDATE`, `OFFSET`, `CLIENT SPECIFIED`, `USING CLIENT`, secondary connections | Not supported by the transpiler or irrelevant (single tenant, D9). |
-| Saver class (`lsc_…`) | `save_modified` and `cleanup` for additional and unmanaged save (D30). `adjust_numbers` (late numbering): ABP007; the other methods are not called (ABP003). The rows of `update` always carry all the values. |
+| Saver class (`lsc_…`) | `save_modified` and `cleanup` for additional and unmanaged save (D30), `adjust_numbers` for late numbering (D109); the other methods are not called (ABP003). The rows of `update` always carry all the values. |
 | Unmanaged save: database constraints | No child → parent foreign key (the BDEF has no persistent table): `save_modified` deletes the children (`delete` contains them). |
 | EML on a projection BDEF (`MODIFY ENTITIES OF zc_travel`) | Diagnostic ABP007: use the base BDEF. |
 | `MODIFY ENTITIES OPERATIONS` (dynamic EML), `RELATING TO`, `AUGMENTING`, `COMMIT ENTITIES RESPONSES`, `GET PERMISSIONS`, `SET LOCKS`, `RAISE ENTITY EVENT` | Diagnostics ABP005/ABP007. |
-| Late numbering (`adjust_numbers`) | Not supported (ABP007). Early numbering, direct or by association, is. |
+| Late numbering (D109) | Managed BOs without draft: `adjust_numbers` gives the final keys in the late save phase. Not yet: in a draft BO (BDEF002), `CONVERT KEY`. Until then the key fields of a created instance hold preliminary values (initial on SAP, with the `%pid`). |
 | `COMMIT ENTITIES` and `ROLLBACK ENTITIES` in a handler | Runtime error, as in RAP. |
 | Responses of an EML statement | Replace the content of the given `FAILED`/`REPORTED`/`MAPPED` targets; `sy-subrc` is 4 when `failed` is not empty (convention, not documented by SAP). |
 | Seventh decimal of the generated `TIMESTAMPL`s | The runtime generates them to the microsecond (D8). |

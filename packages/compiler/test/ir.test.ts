@@ -339,6 +339,63 @@ describe("calculated elements (D67)", () => {
     expect(errors(hierarchy("  start where ParentId is initial\n  siblings order by Number\n  generate spantree"))).toEqual(["CDS002 ZRT_I_BkHier: GENERATE SPANTREE is not supported yet"]);
   });
 
+  it("checks late numbering as SAP (D109)", () => {
+    const late = (bdef: (b: string) => string, saver = "    METHODS adjust_numbers REDEFINITION.") =>
+      build({
+        "zrt_lord.ddls.asddls": "@ClientHandling.type: #CLIENT_DEPENDENT\n@AbapCatalog.deliveryClass: #APPLICATION_DATA\ndefine table entity ZRT_LORD {\n  key OrderNo : abap.numc(8);\n  Description : abap.char(40);\n}\n",
+        "zrt_litem.ddls.asddls": "@ClientHandling.type: #CLIENT_DEPENDENT\n@AbapCatalog.deliveryClass: #APPLICATION_DATA\ndefine table entity ZRT_LITEM {\n  key OrderNo : abap.numc(8);\n  key ItemNo : abap.numc(4);\n}\n",
+        "zrt_r_lorder.ddls.asddls": "define root view entity ZRT_R_LOrder as select from ZRT_LORD composition [0..*] of ZRT_R_LItem as _Item {\n  key OrderNo,\n  Description,\n  _Item\n}\n",
+        "zrt_r_litem.ddls.asddls": "define view entity ZRT_R_LItem as select from ZRT_LITEM association to parent ZRT_R_LOrder as _Order on $projection.OrderNo = _Order.OrderNo {\n  key OrderNo,\n  key ItemNo,\n  _Order\n}\n",
+        "zrt_r_lorder.bdef.asbdef": bdef(`managed implementation in class zbp_rt_lorder unique;
+strict ( 2 );
+define behavior for ZRT_R_LOrder alias LOrder
+persistent table zrt_lord
+late numbering
+lock master
+authorization master ( global )
+{
+  create;
+  field ( readonly ) OrderNo;
+  association _Item { create; }
+}
+define behavior for ZRT_R_LItem alias LItem
+persistent table zrt_litem
+late numbering
+lock dependent by _Order
+authorization dependent by _Order
+{
+  field ( readonly ) OrderNo, ItemNo;
+  association _Order;
+}
+`),
+        "zbp_rt_lorder.clas.abap": "CLASS zbp_rt_lorder DEFINITION PUBLIC ABSTRACT FINAL FOR BEHAVIOR OF zrt_r_lorder.\nENDCLASS.\nCLASS zbp_rt_lorder IMPLEMENTATION.\nENDCLASS.\n",
+        "zbp_rt_lorder.clas.locals_imp.abap": `CLASS lhc_lorder DEFINITION INHERITING FROM cl_abap_behavior_handler.
+  PRIVATE SECTION.
+    METHODS get_global_authorizations FOR GLOBAL AUTHORIZATION
+      IMPORTING REQUEST requested_authorizations FOR LOrder RESULT result.
+ENDCLASS.
+CLASS lhc_lorder IMPLEMENTATION.
+  METHOD get_global_authorizations.
+  ENDMETHOD.
+ENDCLASS.
+CLASS lsc_zrt_r_lorder DEFINITION INHERITING FROM cl_abap_behavior_saver.
+  PROTECTED SECTION.
+${saver}
+ENDCLASS.
+CLASS lsc_zrt_r_lorder IMPLEMENTATION.
+${saver === "" ? "" : "  METHOD adjust_numbers.\n  ENDMETHOD."}
+ENDCLASS.
+`,
+        "zrt_ui_travel.srvd.srvdsrv": (c: string) => lf(c).replace("  expose ZRT_C_Booking as Booking;", "  expose ZRT_C_Booking as Booking;\n  expose ZRT_R_LOrder as LOrder;\n  expose ZRT_R_LItem as LItem;"),
+      });
+    const errors = (r: ReturnType<typeof late>) => r.diagnostics.filter((d) => d.severity === "error").map((d) => `${d.code} ${d.message}`);
+    const ok = late((b) => b);
+    expect(errors(ok)).toEqual([]);
+    expect(ok.model.behaviors.find((b) => b.name === "ZRT_R_LORDER")).toMatchObject({ entities: [{ lateNumbering: { inPlace: false } }, { lateNumbering: { inPlace: false } }], saver: { adjustNumbers: { method: "adjust_numbers" } } });
+    expect(errors(late((b) => b.replace("persistent table zrt_litem\nlate numbering\n", "persistent table zrt_litem\n")))).toEqual(["BDEF032 ZRT_R_LItem: the child of ZRT_R_LOrder, which has late numbering, needs late numbering too"]);
+    expect(errors(late((b) => b, ""))).toEqual(["ABP002 saver class LSC_ZRT_R_LORDER must redefine adjust_numbers (late numbering)"]);
+  });
+
   it("checks the parameters of view entities and their actual parameters (D107)", () => {
     const views = (byStatus: string, open: string) =>
       build({

@@ -49,7 +49,7 @@ exit code is 1 as soon as there is an error (or a warning with `--warnings-as-er
 | TABL001 | error | Error in the source of a table (`.tabl.astabl`): syntax, unknown type, name different from the one of the file, table without a key |
 | TABL002 | warning | Construct of the source of a table not carried over to the abapGit XML (foreign key) |
 | BDEF001 | error | BDEF syntax error |
-| BDEF002 | error | Out-of-scope feature (unmanaged, late numbering…) |
+| BDEF002 | error | Out-of-scope feature (unmanaged, late numbering in a draft BO…) |
 | BDEF003 | warning | Construct ignored |
 | BDEF004 | error | Unknown CDS entity |
 | BDEF005 | error | Unknown element |
@@ -79,13 +79,14 @@ exit code is 1 as soon as there is an error (or a warning with `--warnings-as-er
 | BDEF029 | error | `with collaborative draft` without `draft action Share` (D59) |
 | BDEF030 | error | `draft determine action Prepare` names a validation or a determination the entity does not define (D81) |
 | BDEF031 | error | `total etag` anywhere but right after `lock master` (`lock master total etag Field`), refused by SAP (D85) |
+| BDEF032 | error | Late numbering refused by SAP: on a child of an entity with late numbering but not on the child, or with early numbering (D109) |
 | ABP001 | error | Behavior pool not found |
-| ABP002 | error | Missing handler method, or missing saver class (with `save_modified`) for additional or unmanaged save |
+| ABP002 | error | Missing handler method, or missing saver class (with `save_modified`) for additional or unmanaged save, or without `adjust_numbers` for late numbering (D109) |
 | ABP003 | warning | Handler or saver method without a matching BDEF element (including an undeclared precheck, a saver without additional or unmanaged save): it is not called |
 | ABP004 | error | ABAP error (abaplint): syntax of the original sources, complete check of the rewritten sources, at the original line |
 | ABP005 | error | Malformed EML statement or unsupported form (`OPERATIONS`, `RELATING TO`…) |
 | ABP006 | error | Unknown name in the EML or a derived type: BDEF, entity, field, association, action |
-| ABP007 | error | Unsupported construct: ABAP SQL write outside the saver class, `WITH`, `SELECT … ENDSELECT` with a field list into an inline target, a list of targets or by `PACKAGE SIZE`, `adjust_numbers`, EML on a projection, `GET PERMISSIONS`, out-of-scope derived type or handler |
+| ABP007 | error | Unsupported construct: ABAP SQL write outside the saver class, `WITH`, `SELECT … ENDSELECT` with a field list into an inline target, a list of targets or by `PACKAGE SIZE`, EML on a projection, `GET PERMISSIONS`, out-of-scope derived type or handler |
 | ABP008 | error | Internal error (generated ABAP) or error of the transpiler |
 | ABP009 | error | Result of a `SELECT` abaplint does not type (literal, aggregate other than `COUNT(*)`, `MAX` and `MIN`, expression) in an inline declaration: declare the target |
 | ABP010 | error | `AUTHORITY-CHECK` on a field the authorization object does not have |

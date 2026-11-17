@@ -344,7 +344,18 @@ export function generateDerivedTypes(model: Model, behavior: BehaviorModel): Der
   w.structure(derivedType.reportedEarly, [...perEntity(derivedType.reportedRows), { component: "%other", type: "tt_other" }]);
   w.alias(derivedType.reportedLate, derivedType.reportedEarly);
   w.structure(derivedType.mappedEarly, perEntity(derivedType.mappedRows));
-  w.alias(derivedType.mappedLate, derivedType.mappedEarly);
+  // D109: MAPPED LATE of an entity with late numbering maps the preliminary identifiers (%pre:
+  // %pid and the preliminary key %tmp) to the final key (%key)
+  if (entities.some(({ entity }) => entity.lateNumbering !== undefined)) {
+    for (const { entity, index: e } of entities) {
+      if (entity.lateNumbering === undefined) continue;
+      w.structure(`ts_e${e}_pre`, [{ component: "%pid", type: "pid" }, { include: `${derivedType.key(e)} AS %tmp RENAMING WITH SUFFIX _tmp` }]);
+      w.structure(`ts_e${e}_mapl`, [{ include: `ts_e${e}_pre`, as: "%pre" }, { include: derivedType.key(e), as: "%key" }], `tt_e${e}_mapl`);
+    }
+    w.structure(derivedType.mappedLate, entities.map(({ entity, index }) => ({ component: abapName(entity.alias), type: entity.lateNumbering === undefined ? derivedType.mappedRows(index) : `tt_e${index}_mapl` })));
+  } else {
+    w.alias(derivedType.mappedLate, derivedType.mappedEarly);
+  }
   // the parameters of save_modified: TYPE REQUEST FOR CHANGE / FOR DELETE
   w.structure(derivedType.requestChange, perEntity(derivedType.change));
   w.structure(derivedType.requestDelete, perEntity(derivedType.delete));
